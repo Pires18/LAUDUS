@@ -46,16 +46,16 @@ export function Sidebar() {
           'flex items-center',
           collapsed ? 'justify-center' : 'gap-3'
         )}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-indigo-700 flex items-center justify-center shadow-md shrink-0 ring-2 ring-white">
-            <Activity size={20} className="text-white" />
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md shrink-0 ring-2 ring-brand-100 overflow-hidden">
+            <img src="/logo-icon.png" alt="LAUD.US" className="w-full h-full object-cover" />
           </div>
           {!collapsed && (
             <div className="animate-fade-in flex-1 min-w-0">
-              <h1 className="text-lg font-black text-ink-900 leading-tight tracking-tight">
+              <h1 className="text-xl font-black text-ink-900 leading-tight tracking-tighter">
                 LAUD<span className="text-brand-600">.US</span>
               </h1>
-              <p className="text-[10px] text-brand-600 font-bold uppercase tracking-widest">
-                DIGITAL PLATFORM
+              <p className="text-[10px] text-brand-600 font-bold uppercase tracking-[0.2em] -mt-0.5">
+                ULTRASOUND
               </p>
             </div>
           )}
