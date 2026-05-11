@@ -27,8 +27,17 @@ import { AppSettings } from '../types';
 
 function getUserPath(collectionName: string): string {
   const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error('Usuário não autenticado');
+  if (!uid) throw new Error('Usuário não autenticado. Realize o login novamente.');
   return `users/${uid}/${collectionName}`;
+}
+
+/**
+ * Sanitiza objetos para o Firestore (remove undefined e limpa estruturas)
+ */
+function sanitize(data: any): any {
+  return JSON.parse(JSON.stringify(data, (_, value) => 
+    value === undefined ? null : value
+  ));
 }
 
 export function getCollectionRef(collectionName: string) {
@@ -40,11 +49,10 @@ export function getDocRef(collectionName: string, docId: string) {
 }
 
 /**
- * Gera um ID único usando Firestore.
+ * Gera um ID único do Firestore sem realizar escrita.
  */
-export function genId(): string {
-  const ref = doc(collection(firestore, '_ids'));
-  return ref.id;
+export function genId(collectionName: string = '_temp'): string {
+  return doc(collection(firestore, collectionName)).id;
 }
 
 /**
@@ -78,7 +86,7 @@ export async function getSettings(): Promise<AppSettings> {
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
   const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
-  await setDoc(docRef, settings, { merge: true });
+  await setDoc(docRef, sanitize(settings), { merge: true });
 }
 
 // ─── Generic CRUD ───
@@ -88,11 +96,12 @@ export async function addItem<T extends Record<string, unknown>>(
   data: T
 ): Promise<string> {
   const colRef = getCollectionRef(collectionName);
-  const ref = await addDoc(colRef, {
+  const now = Date.now();
+  const ref = await addDoc(colRef, sanitize({
     ...data,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
+    createdAt: now,
+    updatedAt: now,
+  }));
   return ref.id;
 }
 
@@ -102,11 +111,12 @@ export async function addItemWithId<T extends Record<string, unknown>>(
   data: T
 ): Promise<void> {
   const docRef = getDocRef(collectionName, id);
-  await setDoc(docRef, {
+  const now = Date.now();
+  await setDoc(docRef, sanitize({
     ...data,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
+    createdAt: now,
+    updatedAt: now,
+  }), { merge: true });
 }
 
 export async function updateItem(
@@ -115,7 +125,10 @@ export async function updateItem(
   data: Record<string, unknown>
 ): Promise<void> {
   const docRef = getDocRef(collectionName, id);
-  await updateDoc(docRef, { ...data, updatedAt: Date.now() });
+  await updateDoc(docRef, {
+    ...sanitize(data),
+    updatedAt: Date.now()
+  });
 }
 
 export async function deleteItem(
@@ -158,7 +171,7 @@ export async function countWhere(
 }
 
 /**
- * Batch write — útil para migração.
+ * Batch write — otimizado para grandes volumes de dados.
  */
 export async function batchAdd<T extends Record<string, unknown>>(
   collectionName: string,
@@ -170,13 +183,9 @@ export async function batchAdd<T extends Record<string, unknown>>(
     const batch = writeBatch(firestore);
     for (const item of chunk) {
       const { id, ...data } = item;
-      // Tratar caso onde registro local não tem ID definido
-      const docId = id ? String(id) : genId();
+      const docId = id ? String(id) : genId(collectionName);
       const docRef = getDocRef(collectionName, docId);
-      
-      // Remover propriedades 'undefined' que causam erro no Firestore
-      const sanitizedData = JSON.parse(JSON.stringify(data));
-      batch.set(docRef, sanitizedData);
+      batch.set(docRef, sanitize(data));
     }
     await batch.commit();
   }

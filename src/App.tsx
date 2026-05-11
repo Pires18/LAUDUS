@@ -6,9 +6,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginScreen } from './components/LoginScreen';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
-import { PageTransition } from './components/PageTransition';
+import { PageTransition, Skeleton } from './components/PageTransition';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
+import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
 // ── Eager loads (critical path) ──
@@ -61,9 +62,13 @@ function ViewRenderer() {
 
   return (
     <main className={isFullBleed ? 'flex-1 min-w-0' : 'flex-1 min-w-0 p-4 md:p-6 lg:p-8 pb-24 md:pb-8'}>
-      <div key={view.name} className={isFullBleed ? 'h-screen' : 'mx-auto'}>
-        {views[view.name] ?? null}
-      </div>
+      <AnimatePresence mode="wait">
+        <PageTransition key={view.name} id={view.name}>
+          <div className={isFullBleed ? 'h-screen' : 'mx-auto'}>
+            {views[view.name] ?? null}
+          </div>
+        </PageTransition>
+      </AnimatePresence>
     </main>
   );
 }
