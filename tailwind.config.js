@@ -1,0 +1,44 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          50: '#f0f7ff',
+          100: '#e0eefe',
+          200: '#bbddfd',
+          300: '#7fc1fb',
+          400: '#3aa1f6',
+          500: '#1186e7',
+          600: '#0568c5',
+          700: '#0653a0',
+          800: '#0a4884',
+          900: '#0d3d6e',
+        },
+        ink: {
+          50: '#f6f7f9',
+          100: '#eceef2',
+          200: '#d5dae2',
+          300: '#b0b9c8',
+          400: '#8592a8',
+          500: '#67748d',
+          600: '#525d74',
+          700: '#434c5f',
+          800: '#3a4151',
+          900: '#343945',
+        }
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Lora', 'Georgia', 'serif'],
+        mono: ['JetBrains Mono', 'monospace']
+      },
+      boxShadow: {
+        'soft': '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06)',
+        'medium': '0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04)',
+      }
+    },
+  },
+  plugins: [],
+}

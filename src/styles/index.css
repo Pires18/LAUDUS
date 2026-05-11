@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ═══════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════ */
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-white text-ink-800 font-sans antialiased;
+    /* Evita bounces indesejados em iOS */
+    overscroll-behavior-y: none;
+  }
+
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
+
+  /* Better focus styles for accessibility */
+  :focus-visible {
+    @apply outline-2 outline-brand-500 outline-offset-2;
+    outline-style: solid;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATION UTILITY CLASSES
+   ═══════════════════════════════════════════ */
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out both;
+  }
+  .animate-fade-out {
+    animation: fadeOut 0.15s ease-in both;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.25s ease-out both;
+  }
+  .animate-slide-down {
+    animation: slideDown 0.2s ease-out both;
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out both;
+  }
+  .animate-spin-slow {
+    animation: spin 1s linear infinite;
+  }
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+  .animate-progress {
+    animation: shimmer 2s infinite linear;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    background-size: 200% 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PRINT STYLES (PDF EXPORT)
+   ═══════════════════════════════════════════ */
+
+@media print {
+  @page {
+    margin: 20mm;
+    size: A4;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  #print-area, #print-area * {
+    visibility: visible;
+  }
+  
+  #print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   COMPONENT STYLES
+   ═══════════════════════════════════════════ */
+
+@layer components {
+  /* ── Buttons ── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-soft active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply btn bg-ink-100 text-ink-800 hover:bg-ink-200 active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100;
+  }
+  .btn-danger {
+    @apply btn bg-red-50 text-red-700 hover:bg-red-100 active:scale-[0.98];
+  }
+  .btn-success {
+    @apply btn bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:scale-[0.98];
+  }
+
+  /* ── Form elements ── */
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-ink-200 bg-white text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors text-sm;
+  }
+  .label {
+    @apply block text-xs font-medium text-ink-700 mb-1.5 uppercase tracking-wide;
+  }
+
+  /* ── Layout ── */
+  .card {
+    @apply bg-white border border-ink-100 rounded-xl shadow-soft;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium;
+  }
+
+  /* ── Status badges ── */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* ── Skeleton loading ── */
+  .skeleton {
+    @apply bg-ink-100 rounded animate-pulse;
+  }
+
+  /* ── Tablet Grid Helpers ── */
+  .tablet-grid-2 {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   TIPTAP RICH EDITOR
+   ═══════════════════════════════════════════ */
+
+.ProseMirror {
+  @apply min-h-[400px] outline-none px-8 py-6 text-ink-900 font-serif text-[15px] leading-relaxed;
+}
+.ProseMirror h1 { @apply text-2xl font-semibold mt-6 mb-3 text-ink-900 font-sans; }
+.ProseMirror h2 { @apply text-xl font-semibold mt-5 mb-2 text-ink-900 font-sans uppercase tracking-wide; }
+.ProseMirror h3 { @apply text-lg font-semibold mt-4 mb-2 text-ink-800 font-sans; }
+.ProseMirror p { @apply mb-3; }
+.ProseMirror ul { @apply list-disc pl-6 mb-3; }
+.ProseMirror ol { @apply list-decimal pl-6 mb-3; }
+.ProseMirror strong { @apply font-semibold; }
+.ProseMirror em { @apply italic; }
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* ═══════════════════════════════════════════
+   CUSTOM SCROLLBAR
+   ═══════════════════════════════════════════ */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
+
+/* ═══════════════════════════════════════════
+   VIEW TRANSITIONS
+   ═══════════════════════════════════════════ */
+
+.view-enter {
+  animation: fadeIn 0.15s ease-out, slideUp 0.2s ease-out;
+}
+
+/* Overlay backdrop for modals/dialogs */
+.overlay-backdrop {
+  @apply fixed inset-0 z-40 bg-ink-900/40 backdrop-blur-sm;
+  animation: fadeIn 0.15s ease-out both;
+}
+
+.overlay-content {
+  animation: scaleIn 0.2s ease-out both;
+}
