@@ -142,6 +142,8 @@ export interface AppSettings {
   aiExamPrompts?: Record<string, string>; // Instruções específicas por tipo de exame
   aiTemperature?: number;       // Temperatura do modelo (0-1)
   aiGlobalInstructions?: string; // Instruções globais adicionais
+  aiStructurePrompt?: string;    // Estrutura obrigatória do laudo
+  aiRigidRules?: string;        // Regras rígidas de geração
   snippets?: { id: string; title: string; content: string; area?: string }[]; // Frases prontas
 }
 

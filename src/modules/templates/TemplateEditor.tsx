@@ -5,9 +5,10 @@ import { PageHeader } from '../../components/PageHeader';
 import { updateItem } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, FormField, Clinic } from '../../types';
 import { EXAM_CATALOG } from '../../data/exams';
-import { ArrowLeft, Save, Copy, Loader2, Building2, FileText, Wand2 } from 'lucide-react';
+import { ArrowLeft, Save, Copy, Loader2, Building2, FileText, Wand2, Sparkles } from 'lucide-react';
 import { FieldBuilder } from './FieldBuilder';
 import { generateFormFieldsFromTemplate } from '../ai/generateFormFields';
+import { generateTemplateStructure } from '../ai/generateTemplate';
 
 interface Props {
   templateId?: string;
@@ -18,6 +19,7 @@ export function TemplateEditor({ templateId }: Props) {
   const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'fields' | 'ai'>('info');
   const [draft, setDraft] = useState<ReportTemplate | null>(null);
   const [isGeneratingFields, setIsGeneratingFields] = useState(false);
+  const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
 
   const { data: template, loading } = useDocument<ReportTemplate>('templates', templateId);
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -174,15 +176,79 @@ export function TemplateEditor({ templateId }: Props) {
 
         {activeTab === 'structure' && (
           <div className="space-y-6 max-w-4xl">
-            <div className="bg-brand-50 border border-brand-200 p-4 rounded-xl text-sm text-brand-800">
-              <h4 className="font-semibold mb-1 flex items-center gap-2">
-                <Copy size={16} /> Como funciona a Estrutura?
-              </h4>
-              <p>
-                A IA usará esta estrutura como base para organizar o laudo final. Escreva os blocos de texto
-                padrão em texto simples. A formatação (negrito, itálico, etc.) será aplicada automaticamente
-                no editor de laudos após a geração pela IA.
-              </p>
+            <div className="bg-brand-50 border border-brand-200 p-5 rounded-xl text-sm text-brand-800 flex flex-col md:flex-row items-center gap-6">
+              <div className="flex-1">
+                <h4 className="font-semibold mb-1 flex items-center gap-2">
+                  <Wand2 size={16} /> Assistente de Máscara IA
+                </h4>
+                <p className="text-brand-700">
+                  A IA pode gerar uma estrutura padrão completa e os campos de formulário baseados no nome do exame.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={isGeneratingStructure || isGeneratingFields}
+                  onClick={async () => {
+                    if (!draft) return;
+                    if ((draft.title || draft.analysisTemplate) && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
+                    setIsGeneratingStructure(true);
+                    try {
+                      const result = await generateTemplateStructure(draft.area, draft.name, settings);
+                      u('title', result.title);
+                      u('technique', result.technique);
+                      u('analysisTemplate', result.analysisTemplate);
+                      u('conclusionTemplate', result.conclusionTemplate);
+                      u('recommendationsTemplate', result.recommendationsTemplate);
+                      showToast('Estrutura gerada!', 'success');
+                    } catch (err: any) {
+                      showToast(err?.message || 'Erro ao gerar estrutura', 'error');
+                    } finally {
+                      setIsGeneratingStructure(false);
+                    }
+                  }}
+                  className="btn bg-white text-brand-600 border-brand-200 hover:bg-brand-50"
+                >
+                  {isGeneratingStructure ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  Gerar Apenas Texto
+                </button>
+                
+                <button
+                  type="button"
+                  disabled={isGeneratingStructure || isGeneratingFields}
+                  onClick={async () => {
+                    if (!draft) return;
+                    if ((draft.title || draft.formFields.length > 0) && !confirm('Isso substituirá o texto e os campos atuais. Deseja continuar?')) return;
+                    setIsGeneratingStructure(true);
+                    setIsGeneratingFields(true);
+                    try {
+                      // 1. Gerar Texto
+                      const struct = await generateTemplateStructure(draft.area, draft.name, settings);
+                      // 2. Gerar Campos (usando a estrutura gerada como base)
+                      const tempDraft = { ...draft, ...struct };
+                      const fields = await generateFormFieldsFromTemplate(tempDraft, settings);
+                      
+                      u('title', struct.title);
+                      u('technique', struct.technique);
+                      u('analysisTemplate', struct.analysisTemplate);
+                      u('conclusionTemplate', struct.conclusionTemplate);
+                      u('recommendationsTemplate', struct.recommendationsTemplate);
+                      u('formFields', fields);
+                      
+                      showToast('Máscara completa gerada com sucesso!', 'success');
+                    } catch (err: any) {
+                      showToast(err?.message || 'Erro na geração completa', 'error');
+                    } finally {
+                      setIsGeneratingStructure(false);
+                      setIsGeneratingFields(false);
+                    }
+                  }}
+                  className="btn bg-gradient-to-r from-brand-600 to-indigo-600 text-white border-none hover:from-brand-700 hover:to-indigo-700 shadow-md"
+                >
+                  {(isGeneratingStructure || isGeneratingFields) ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                  Gerar Máscara Completa
+                </button>
+              </div>
             </div>
 
             <div className="card p-5">

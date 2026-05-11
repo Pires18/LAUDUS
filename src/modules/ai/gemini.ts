@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, FormField, Patient, AppSettings } from '../../types';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_RIGID_RULES, DEFAULT_STRUCTURE_PROMPT } from './prompts';
 
 interface GenerateReportParams {
   template: ReportTemplate;
@@ -54,21 +55,17 @@ export function buildPrompt({
     ? `Paciente: ${patient.name}${patient.birthDate ? ` (DN: ${patient.birthDate})` : ''}${patient.gender ? ` - ${patient.gender}` : ''}`
     : '';
 
-  const masterPrompt = settings.aiMasterPrompt || `Você é um assistente médico especializado em redação de laudos ultrassonográficos em português brasileiro, seguindo padrões da SBUS/CBR.\n\nSua tarefa: gerar um laudo COMPLETO e PROFISSIONAL com base nos achados fornecidos abaixo, seguindo RIGOROSAMENTE a estrutura padrão e a máscara fornecida.`;
+  const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
   const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
   const examInstructions = settings.aiExamPrompts?.[template.name] || '';
+  const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+  const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
 
   return `${masterPrompt}
 
 ═══════════════════════════════════════════
-ESTRUTURA OBRIGATÓRIA DO LAUDO (use HTML simples com <h2> para os títulos das seções e <p> para parágrafos):
+${structurePrompt}
 ═══════════════════════════════════════════
-
-1. TÍTULO (use <h2>)
-2. TÉCNICA (use <h2>TÉCNICA</h2>)
-3. ANÁLISE (use <h2>ANÁLISE</h2>) - descreva detalhadamente todos os achados
-4. CONCLUSÃO (use <h2>CONCLUSÃO</h2>) - sintetize os achados principais
-${template.classificationTemplate ? '5. CLASSIFICAÇÃO (use <h2>CLASSIFICAÇÃO</h2>) - quando aplicável\n' : ''}${template.classificationTemplate ? '6' : '5'}. RECOMENDAÇÕES (use <h2>RECOMENDAÇÕES</h2>)
 
 ═══════════════════════════════════════════
 DADOS DO EXAME
@@ -110,19 +107,7 @@ ${examInstructions ? `═══════════════════�
 ${template.aiInstructions ? `═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DA MÁSCARA\n═══════════════════════════════════════════\n\n${template.aiInstructions}\n` : ''}
 ${settings.aiGlobalInstructions ? `═══════════════════════════════════════════\nINSTRUÇÕES GLOBAIS AVANÇADAS\n═══════════════════════════════════════════\n\n${settings.aiGlobalInstructions}\n` : ''}
 
-═══════════════════════════════════════════
-REGRAS RÍGIDAS DE GERAÇÃO
-═══════════════════════════════════════════
-
-1. Use APENAS HTML simples: <h2>, <h3>, <p>, <strong>, <em>, <ul>, <li>. NÃO use <html>, <body>, <head>, classes ou estilos.
-2. Mantenha terminologia médica precisa em português brasileiro.
-3. Use medidas com unidades adequadas (mm, cm, ml, etc.).
-4. Não invente achados que não estejam no formulário; descreva apenas o fornecido. Quando houver lacunas previstas pela máscara, use redações padrão "dentro dos limites da normalidade" ou similar APENAS se isso for consistente com os achados informados.
-5. Mantenha a CONCLUSÃO objetiva e correlacionada com os achados.
-6. RECOMENDAÇÕES devem ser pertinentes ao caso, baseadas na máscara.
-7. NÃO inclua assinatura, dados de médico, cabeçalho de clínica ou data — esses são adicionados depois.
-8. NÃO inclua comentários, explicações ou texto fora do laudo. Devolva APENAS o HTML do laudo.
-9. NÃO use markdown (sem ##, **, etc.). Apenas HTML simples.
+${rigidRules}
 
 Gere agora o laudo completo:`;
 }

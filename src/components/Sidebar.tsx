@@ -41,25 +41,21 @@ export function Sidebar() {
       )}
     >
       {/* Logo / Brand */}
-      <div className="p-4 border-b border-ink-100">
+      <div className="p-4 border-b border-ink-100 bg-brand-50/30">
         <div className={classNames(
           'flex items-center',
-          collapsed ? 'justify-center' : 'gap-2.5'
+          collapsed ? 'justify-center' : 'gap-3'
         )}>
-          {user?.photoURL ? (
-            <img src={user.photoURL} alt="" className="w-9 h-9 rounded-lg shadow-soft shrink-0 object-cover" />
-          ) : (
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-soft shrink-0">
-              <Activity size={18} className="text-white" />
-            </div>
-          )}
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-600 to-indigo-700 flex items-center justify-center shadow-md shrink-0 ring-2 ring-white">
+            <Activity size={20} className="text-white" />
+          </div>
           {!collapsed && (
             <div className="animate-fade-in flex-1 min-w-0">
-              <h1 className="text-sm font-semibold text-ink-900 leading-tight truncate">
-                {user?.displayName?.split(' ')[0] || 'LAUD.US'}
+              <h1 className="text-lg font-black text-ink-900 leading-tight tracking-tight">
+                LAUD<span className="text-brand-600">.US</span>
               </h1>
-              <p className="text-[11px] text-ink-500 leading-tight truncate">
-                {user?.email || 'Cloud Edition'}
+              <p className="text-[10px] text-brand-600 font-bold uppercase tracking-widest">
+                DIGITAL PLATFORM
               </p>
             </div>
           )}
@@ -158,24 +154,48 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse Toggle + Footer */}
-      <div className="border-t border-ink-100">
+      {/* User Profile + Collapse Toggle */}
+      <div className="border-t border-ink-100 bg-ink-50/20">
+        {!collapsed && (
+          <div className="p-4 border-b border-ink-50 animate-fade-in">
+            <div className="flex items-center gap-3">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full border-2 border-white shadow-soft object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-bold shadow-soft">
+                  {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-ink-900 truncate">
+                  {user?.displayName || 'Usuário'}
+                </p>
+                <p className="text-[11px] text-ink-500 truncate">
+                  {user?.email}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-3 text-ink-400 hover:text-ink-700 hover:bg-ink-50 transition-colors text-xs"
+          className="w-full flex items-center justify-center gap-2 px-3 py-3 text-ink-400 hover:text-ink-700 hover:bg-ink-100/50 transition-colors text-xs"
           title={collapsed ? 'Expandir menu' : 'Recolher menu'}
         >
           {collapsed ? <PanelLeftOpen size={16} /> : (
             <>
               <PanelLeftClose size={14} />
-              <span className="animate-fade-in">Recolher</span>
+              <span className="font-medium">Recolher Barra Lateral</span>
             </>
           )}
         </button>
+
         {!collapsed && (
           <div className="px-4 pb-4 animate-fade-in text-center">
-            <span className="inline-flex items-center gap-1 text-[10px] bg-brand-50 text-brand-600 px-2 py-1 rounded-md font-medium border border-brand-100">
-              <Activity size={10} /> Sincronizado na Nuvem
+            <span className="inline-flex items-center gap-1.5 text-[9px] bg-white text-ink-500 px-2.5 py-1 rounded-full font-bold border border-ink-100 shadow-sm uppercase tracking-wider">
+              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+              Sistema Online
             </span>
           </div>
         )}

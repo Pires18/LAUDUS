@@ -5,6 +5,7 @@ import { Save, BrainCircuit, Sparkles, Settings2, Zap, Shield, FileText, TestTub
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { EXAM_CATALOG } from '../../data/exams';
 import { classNames } from '../../utils/format';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../ai/prompts';
 
 export function LaudIA() {
   const { settings, updateSettings, showToast } = useApp();
@@ -13,7 +14,7 @@ export function LaudIA() {
   const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
   const [selectedExamArea, setSelectedExamArea] = useState<ExamArea>(EXAM_AREAS[0].id);
   const [selectedExam, setSelectedExam] = useState<string>(EXAM_CATALOG[EXAM_AREAS[0].id][0] || '');
-  const [activeSection, setActiveSection] = useState<'engine' | 'area' | 'exam' | 'advanced'>('engine');
+  const [activeSection, setActiveSection] = useState<'engine' | 'area' | 'exam' | 'skeleton' | 'advanced'>('engine');
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
   useEffect(() => {
@@ -83,6 +84,7 @@ export function LaudIA() {
     { id: 'engine', label: 'Prompt Mestre & Motor', icon: <BrainCircuit size={16} /> },
     { id: 'area', label: 'Prompts por Área', icon: <Settings2 size={16} /> },
     { id: 'exam', label: 'Prompts por Exame', icon: <FileText size={16} /> },
+    { id: 'skeleton', label: 'Skeleton & Regras', icon: <Shield size={16} /> },
     { id: 'advanced', label: 'Configurações Avançadas', icon: <Zap size={16} /> },
   ] as const;
 
@@ -187,24 +189,53 @@ export function LaudIA() {
             </div>
 
             {/* Master Prompt */}
-            <div className="card p-6 border-brand-200 shadow-soft mt-6">
-              <div className="flex items-center gap-3 mb-6 border-b border-ink-100 pb-4">
-                <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                  <Shield size={20} />
+            <div className="card border-brand-200 shadow-soft mt-6 overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-ink-50/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <Shield size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg text-ink-900">Prompt Mestre</h3>
+                      <p className="text-sm text-ink-500">A instrução global que guia todo o comportamento do assistente.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => u('aiMasterPrompt', DEFAULT_MASTER_PROMPT)}
+                    className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors"
+                  >
+                    <Zap size={12} /> Restaurar Padrão
+                  </button>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-ink-900">Prompt Mestre</h3>
-                  <p className="text-sm text-ink-500">A instrução global que guia todo o comportamento do assistente.</p>
+              <div className="p-6">
+                <textarea
+                  className="input min-h-[300px] font-mono text-sm leading-relaxed"
+                  placeholder="Você é um assistente médico especializado em redação de laudos ultrassonográficos..."
+                  value={draft.aiMasterPrompt || ''}
+                  onChange={(e) => u('aiMasterPrompt', e.target.value)}
+                />
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-brand-50 border border-brand-100 rounded-lg p-4 text-xs text-brand-700">
+                    <div className="font-bold flex items-center gap-1.5 mb-1 text-[11px] uppercase tracking-wider">
+                      <Sparkles size={12} /> Dica de Especialista
+                    </div>
+                    Se deixado em branco, o sistema usará o prompt mestre padrão otimizado. Use para ditar o tom de voz global ou o formato estrutural primário.
+                  </div>
+                  <div className="bg-ink-50 border border-ink-200 rounded-lg p-4 text-xs text-ink-600">
+                    <div className="font-bold flex items-center gap-1.5 mb-1 text-[11px] uppercase tracking-wider">
+                      <Copy size={12} /> Variáveis Disponíveis
+                    </div>
+                    <ul className="grid grid-cols-2 gap-x-2 gap-y-1">
+                      <li>• <code>{"{paciente}"}</code></li>
+                      <li>• <code>{"{exame}"}</code></li>
+                      <li>• <code>{"{area}"}</code></li>
+                      <li>• <code>{"{indicacao}"}</code></li>
+                      <li>• <code>{"{achados}"}</code></li>
+                      <li>• <code>{"{mascara}"}</code></li>
+                    </ul>
+                  </div>
                 </div>
-              </div>
-              <textarea
-                className="input min-h-[250px] font-mono text-sm leading-relaxed"
-                placeholder="Você é um assistente médico especializado em redação de laudos ultrassonográficos..."
-                value={draft.aiMasterPrompt || ''}
-                onChange={(e) => u('aiMasterPrompt', e.target.value)}
-              />
-              <div className="mt-3 bg-brand-50 border border-brand-100 rounded-lg p-3 text-xs text-brand-700">
-                <strong>Dica:</strong> Se deixado em branco, o sistema usará um prompt mestre padrão otimizado. Use para ditar tom de voz global ou formato estrutural primário.
               </div>
             </div>
 
@@ -373,7 +404,70 @@ export function LaudIA() {
           </div>
         )}
 
-        {/* Section 3: Advanced */}
+        {/* Section: Skeleton */}
+        {activeSection === 'skeleton' && (
+          <div className="space-y-6">
+            {/* Structure Prompt */}
+            <div className="card border-brand-200 shadow-soft overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-ink-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg text-ink-900">Estrutura Obrigatória</h3>
+                    <p className="text-sm text-ink-500">Define a ordem e o formato das seções do laudo.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => u('aiStructurePrompt', DEFAULT_STRUCTURE_PROMPT)}
+                  className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors"
+                >
+                  <Zap size={12} /> Restaurar Padrão
+                </button>
+              </div>
+              <div className="p-6">
+                <textarea
+                  className="input min-h-[250px] font-mono text-sm leading-relaxed"
+                  value={draft.aiStructurePrompt || ''}
+                  onChange={(e) => u('aiStructurePrompt', e.target.value)}
+                  placeholder="Insira a estrutura obrigatória..."
+                />
+              </div>
+            </div>
+
+            {/* Rigid Rules */}
+            <div className="card border-brand-200 shadow-soft overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-ink-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                    <Shield size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg text-ink-900">Regras Rígidas</h3>
+                    <p className="text-sm text-ink-500">Restrições de segurança, privacidade e formatação técnica.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => u('aiRigidRules', DEFAULT_RIGID_RULES)}
+                  className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors"
+                >
+                  <Zap size={12} /> Restaurar Padrão
+                </button>
+              </div>
+              <div className="p-6">
+                <textarea
+                  className="input min-h-[300px] font-mono text-sm leading-relaxed"
+                  value={draft.aiRigidRules || ''}
+                  onChange={(e) => u('aiRigidRules', e.target.value)}
+                  placeholder="Insira as regras rígidas..."
+                />
+              </div>
+            </div>
+          </div>
+        )}
         {activeSection === 'advanced' && (
           <div className="space-y-6">
             <div className="card p-6 shadow-soft">
@@ -408,7 +502,16 @@ export function LaudIA() {
                 </div>
 
                 <div>
-                  <label className="label text-ink-800">Instrução Global Adicional</label>
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="label text-ink-800">Instrução Global Adicional</label>
+                    <button
+                      type="button"
+                      onClick={() => u('aiGlobalInstructions' as any, DEFAULT_GLOBAL_INSTRUCTIONS)}
+                      className="text-[10px] font-bold text-brand-600 uppercase tracking-wider hover:underline"
+                    >
+                      Restaurar Padrão
+                    </button>
+                  </div>
                   <textarea
                     className="input min-h-[150px] font-mono text-sm leading-relaxed"
                     value={(draft as any).aiGlobalInstructions || ''}
