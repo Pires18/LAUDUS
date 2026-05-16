@@ -225,28 +225,16 @@ export function ExamEditor({ examId }: Props) {
   }, [handleRefine, reportContent, handleCopy, handleReset, debouncedSave, showToast, handleStatusChange]);
 
   return (
-    <AnimatePresence mode="wait">
+    <>
       {!exam || !patient || !template ? (
-        <motion.div 
-          key="loading"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="flex items-center justify-center h-full"
-        >
+        <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <Loader2 size={24} className="animate-spin-slow text-brand-500 mx-auto mb-3" />
             <p className="text-sm text-ink-500">Carregando exame...</p>
           </div>
-        </motion.div>
+        </div>
       ) : (
-        <motion.div 
-          key="content"
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col h-full relative"
-        >
+        <div className="flex flex-col h-full relative">
           {/* AI Progress Bar */}
           {isGenerating && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-brand-100 z-50 overflow-hidden">
@@ -742,8 +730,8 @@ export function ExamEditor({ examId }: Props) {
         physicianName={exam.requestingPhysician}
         examDate={exam.createdAt}
       />
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }
