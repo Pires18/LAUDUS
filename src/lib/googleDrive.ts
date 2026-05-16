@@ -42,7 +42,7 @@ export async function copyFile(fileId: string, newName: string, folderId?: strin
 export async function createFolder(name: string, parentId?: string): Promise<string> {
   const token = await getGoogleAccessToken();
 
-  const body: any = {
+  const body: { name: string; mimeType: string; parents?: string[] } = {
     name,
     mimeType: 'application/vnd.google-apps.folder',
   };

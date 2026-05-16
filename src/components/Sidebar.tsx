@@ -4,25 +4,26 @@ import { useAuth } from '../hooks/useAuth';
 import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
-  LayoutList, Users, FileText, Settings as SettingsIcon, FilePlus, Activity,
-  PanelLeftClose, PanelLeftOpen, Building2, ChevronDown, BrainCircuit, LayoutDashboard
+  LayoutDashboard, ClipboardList, UserCircle, FileSignature, 
+  Calculator, Sparkles, Hospital, Sliders, PanelLeftClose, 
+  PanelLeftOpen, ChevronDown, FilePlus
 } from 'lucide-react';
 import { classNames } from '../utils/format';
+import { CreateExamModal } from './CreateExamModal';
 
 const items = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, view: { name: 'dashboard' as const } },
-  { key: 'worklist', label: 'Worklist', icon: LayoutList, view: { name: 'worklist' as const } },
-  { key: 'new-exam', label: 'Novo Laudo', icon: FilePlus, view: { name: 'new-exam' as const } },
-  { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const } },
-  { key: 'templates', label: 'Máscaras', icon: FileText, view: { name: 'templates' as const } },
-  { key: 'calculators', label: 'Calculadoras', icon: Activity, view: { name: 'calculators' as const } },
-  { key: 'laud-ia', label: 'LAUD.IA', icon: BrainCircuit, view: { name: 'laud-ia' as const } },
-  { key: 'clinics', label: 'Clínicas', icon: Building2, view: { name: 'clinics' as const } },
-  { key: 'settings', label: 'Configurações', icon: SettingsIcon, view: { name: 'settings' as const } },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, view: { name: 'dashboard' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'worklist', label: 'Worklist', icon: ClipboardList, view: { name: 'worklist' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'patients', label: 'Pacientes', icon: UserCircle, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
+  { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
+  { key: 'laud-ia', label: 'Laud.IA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
+  { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin'] },
+  { key: 'settings', label: 'Configurações', icon: Sliders, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 
 export function Sidebar() {
-  const { view, setView, selectedClinicId, setSelectedClinic, showToast } = useApp();
+  const { view, setView, selectedClinicId, setSelectedClinic, showToast, setShowCreateExamModal, settings } = useApp();
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
@@ -37,24 +38,24 @@ export function Sidebar() {
     <aside
       className={classNames(
         'hidden md:flex shrink-0 border-r border-ink-100 bg-white flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out',
-        collapsed ? 'w-[68px]' : 'w-64'
+        collapsed ? 'w-[64px]' : 'w-60'
       )}
     >
       {/* Logo / Brand */}
-      <div className="p-4 border-b border-ink-100 bg-brand-50/30">
+      <div className="p-3 border-b border-ink-100 bg-brand-50/30">
         <div className={classNames(
           'flex items-center',
           collapsed ? 'justify-center' : 'gap-3'
         )}>
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md shrink-0 ring-2 ring-brand-100 overflow-hidden">
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-md shrink-0 ring-2 ring-brand-100 overflow-hidden">
             <img src="/logo-icon.png" alt="LAUD.US" className="w-full h-full object-cover" />
           </div>
           {!collapsed && (
             <div className="animate-fade-in flex-1 min-w-0">
-              <h1 className="text-xl font-black text-ink-900 leading-tight tracking-tighter">
+              <h1 className="text-lg font-black text-ink-900 leading-tight tracking-tighter">
                 LAUD<span className="text-brand-600">.US</span>
               </h1>
-              <p className="text-[10px] text-brand-600 font-bold uppercase tracking-[0.2em] -mt-0.5">
+              <p className="text-[9px] text-brand-600 font-bold uppercase tracking-[0.2em] -mt-0.5">
                 ULTRASOUND
               </p>
             </div>
@@ -73,7 +74,7 @@ export function Sidebar() {
               {selectedClinic?.logoUrl ? (
                 <img src={selectedClinic.logoUrl} alt="" className="w-5 h-5 rounded-md object-cover" />
               ) : (
-                <Building2 size={16} className="text-brand-600 shrink-0" />
+                <Hospital size={16} className="text-brand-600 shrink-0" />
               )}
               <span className="text-xs font-semibold text-ink-900 truncate">
                 {selectedClinic ? selectedClinic.name : 'Todas as Clínicas'}
@@ -91,7 +92,7 @@ export function Sidebar() {
                   !selectedClinicId ? "bg-brand-50 text-brand-700 font-medium" : "hover:bg-ink-50 text-ink-700"
                 )}
               >
-                <LayoutList size={14} /> Todas as Clínicas
+                <ClipboardList size={14} /> Todas as Clínicas
               </button>
               <div className="max-h-48 overflow-y-auto">
                 {clinics.map(c => (
@@ -106,7 +107,7 @@ export function Sidebar() {
                     {c.logoUrl ? (
                       <img src={c.logoUrl} alt="" className="w-4 h-4 rounded object-cover" />
                     ) : (
-                      <Building2 size={14} className={selectedClinicId === c.id ? "text-brand-600" : "text-ink-400"} />
+                      <Hospital size={14} className={selectedClinicId === c.id ? "text-brand-600" : "text-ink-400"} />
                     )}
                     <span className="truncate">{c.name}</span>
                   </button>
@@ -119,7 +120,18 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {items.map(item => {
+        <button
+          onClick={() => setShowCreateExamModal(true)}
+          className={classNames(
+            'w-full flex items-center rounded-lg text-sm font-bold transition-all duration-200 mb-4 bg-brand-600 text-white shadow-md hover:bg-brand-700',
+            collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+          )}
+        >
+          <FilePlus size={collapsed ? 18 : 16} className="shrink-0" />
+          {!collapsed && <span className="animate-fade-in">Novo Laudo</span>}
+        </button>
+
+        {items.filter(item => item.roles.includes(settings.currentRole || 'medico')).map(item => {
           const isActive = view.name === item.key ||
             (item.key === 'patients' && view.name === 'patient-detail') ||
             (item.key === 'templates' && view.name === 'template-editor') ||
@@ -157,20 +169,20 @@ export function Sidebar() {
       {/* User Profile + Collapse Toggle */}
       <div className="border-t border-ink-100 bg-ink-50/20">
         {!collapsed && (
-          <div className="p-4 border-b border-ink-50 animate-fade-in">
-            <div className="flex items-center gap-3">
+          <div className="p-3 border-b border-ink-50 animate-fade-in">
+            <div className="flex items-center gap-2.5">
               {user?.photoURL ? (
-                <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full border-2 border-white shadow-soft object-cover" />
+                <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full border border-white shadow-sm object-cover" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-bold shadow-soft">
+                <div className="w-8 h-8 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-bold shadow-sm text-[10px]">
                   {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-ink-900 truncate">
+                <p className="text-[11px] font-bold text-ink-900 truncate">
                   {user?.displayName || 'Usuário'}
                 </p>
-                <p className="text-[11px] text-ink-500 truncate">
+                <p className="text-[10px] text-ink-500 truncate">
                   {user?.email}
                 </p>
               </div>
@@ -180,7 +192,7 @@ export function Sidebar() {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-3 text-ink-400 hover:text-ink-700 hover:bg-ink-100/50 transition-colors text-xs"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-ink-400 hover:text-ink-700 hover:bg-ink-100/50 transition-colors text-[10px]"
           title={collapsed ? 'Expandir menu' : 'Recolher menu'}
         >
           {collapsed ? <PanelLeftOpen size={16} /> : (

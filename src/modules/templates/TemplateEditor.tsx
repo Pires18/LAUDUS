@@ -3,11 +3,9 @@ import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { updateItem } from '../../store/db';
-import { ReportTemplate, EXAM_AREAS, FormField, Clinic } from '../../types';
-import { EXAM_CATALOG } from '../../data/exams';
-import { ArrowLeft, Save, Copy, Loader2, Building2, FileText, Wand2, Sparkles } from 'lucide-react';
-import { FieldBuilder } from './FieldBuilder';
-import { generateFormFieldsFromTemplate } from '../ai/generateFormFields';
+import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
+import { Plus, Search, FileText, Trash2, Copy, Edit2, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, LayoutDashboard, Eye, Building2, Sparkles } from 'lucide-react';
+import { RichEditor } from '../editor/RichEditor';
 import { generateTemplateStructure } from '../ai/generateTemplate';
 
 interface Props {
@@ -16,9 +14,8 @@ interface Props {
 
 export function TemplateEditor({ templateId }: Props) {
   const { setView, showToast, settings } = useApp();
-  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'fields' | 'ai'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'ai'>('info');
   const [draft, setDraft] = useState<ReportTemplate | null>(null);
-  const [isGeneratingFields, setIsGeneratingFields] = useState(false);
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
 
   const { data: template, loading } = useDocument<ReportTemplate>('templates', templateId);
@@ -47,7 +44,8 @@ export function TemplateEditor({ templateId }: Props) {
   async function handleSave() {
     if (!draft || !templateId) return;
     try {
-      await updateItem('templates', templateId, draft as any);
+      const { id, ...data } = draft;
+      await updateItem('templates', templateId, data);
       showToast('Máscara salva', 'success');
       setView({ name: 'templates' });
     } catch {
@@ -62,7 +60,6 @@ export function TemplateEditor({ templateId }: Props) {
   const tabs = [
     { id: 'info', label: 'Informações Básicas' },
     { id: 'structure', label: 'Estrutura do Laudo' },
-    { id: 'fields', label: 'Campos do Formulário', badge: draft.formFields.length },
     { id: 'ai', label: 'Configuração de IA' },
   ] as const;
 
@@ -86,23 +83,18 @@ export function TemplateEditor({ templateId }: Props) {
           }
         />
 
-        <div className="flex border-b border-ink-200 mt-4 overflow-x-auto">
+        <div className="flex bg-ink-50 p-1.5 rounded-2xl w-fit mt-4 overflow-x-auto border border-ink-100 shadow-sm">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap flex-1 text-center ${
                 activeTab === tab.id
-                  ? 'border-brand-500 text-brand-600'
-                  : 'border-transparent text-ink-500 hover:text-ink-700 hover:border-ink-300'
+                  ? 'bg-white text-brand-600 shadow-sm border border-ink-100'
+                  : 'text-ink-500 hover:text-ink-700 hover:bg-ink-100/50'
               }`}
             >
               {tab.label}
-              {'badge' in tab && tab.badge !== undefined && (
-                <span className="ml-2 bg-ink-100 text-ink-600 py-0.5 px-2 rounded-full text-[10px]">
-                  {(tab as any).badge}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -120,7 +112,6 @@ export function TemplateEditor({ templateId }: Props) {
                   onChange={(e) => {
                     const area = e.target.value as ReportTemplate['area'];
                     u('area', area);
-                    u('name', EXAM_CATALOG[area]?.[0] || '');
                   }}
                 >
                   {EXAM_AREAS.map((a) => (
@@ -130,15 +121,12 @@ export function TemplateEditor({ templateId }: Props) {
               </div>
               <div>
                 <label className="label">Exame (Nome da Máscara) *</label>
-                <select
+                <input
                   className="input"
                   value={draft.name}
                   onChange={(e) => u('name', e.target.value)}
-                >
-                  {(EXAM_CATALOG[draft.area] || []).map(exam => (
-                    <option key={exam} value={exam}>{exam}</option>
-                  ))}
-                </select>
+                  placeholder="Ex: Abdome Total, Mama, etc."
+                />
               </div>
               <div>
                 <label className="label">Descrição (Opcional)</label>
@@ -175,22 +163,20 @@ export function TemplateEditor({ templateId }: Props) {
         )}
 
         {activeTab === 'structure' && (
-          <div className="space-y-6 max-w-4xl">
-            <div className="bg-brand-50 border border-brand-200 p-5 rounded-xl text-sm text-brand-800 flex flex-col md:flex-row items-center gap-6">
-              <div className="flex-1">
-                <h4 className="font-semibold mb-1 flex items-center gap-2">
-                  <Wand2 size={16} /> Assistente de Máscara IA
-                </h4>
-                <p className="text-brand-700">
-                  A IA pode gerar uma estrutura padrão completa e os campos de formulário baseados no nome do exame.
-                </p>
-              </div>
-              <div className="flex gap-2">
+          <div className="max-w-4xl space-y-8 pb-12">
+            <div className="card p-5 border-none shadow-medium bg-gradient-to-br from-white to-ink-50/30">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                    <BrainCircuit size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-ink-900 leading-tight">Geração Assistida por IA</h3>
+                    <p className="text-xs text-ink-500">Crie a estrutura da máscara automaticamente</p>
+                  </div>
+                </div>
                 <button
-                  type="button"
-                  disabled={isGeneratingStructure || isGeneratingFields}
                   onClick={async () => {
-                    if (!draft) return;
                     if ((draft.title || draft.analysisTemplate) && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
                     setIsGeneratingStructure(true);
                     try {
@@ -200,61 +186,31 @@ export function TemplateEditor({ templateId }: Props) {
                       u('analysisTemplate', result.analysisTemplate);
                       u('conclusionTemplate', result.conclusionTemplate);
                       u('recommendationsTemplate', result.recommendationsTemplate);
+                      if (result.classificationTemplate) {
+                        u('classificationTemplate', result.classificationTemplate);
+                      }
                       showToast('Estrutura gerada!', 'success');
-                    } catch (err: any) {
-                      showToast(err?.message || 'Erro ao gerar estrutura', 'error');
+                    } catch (err: unknown) {
+                      const message = err instanceof Error ? err.message : 'Erro ao gerar estrutura';
+                      showToast(message, 'error');
                     } finally {
                       setIsGeneratingStructure(false);
                     }
                   }}
-                  className="btn bg-white text-brand-600 border-brand-200 hover:bg-brand-50"
+                  className="btn bg-brand-600 text-white border-none hover:bg-brand-700 shadow-md h-10"
                 >
-                  {isGeneratingStructure ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  Gerar Apenas Texto
-                </button>
-                
-                <button
-                  type="button"
-                  disabled={isGeneratingStructure || isGeneratingFields}
-                  onClick={async () => {
-                    if (!draft) return;
-                    if ((draft.title || draft.formFields.length > 0) && !confirm('Isso substituirá o texto e os campos atuais. Deseja continuar?')) return;
-                    setIsGeneratingStructure(true);
-                    setIsGeneratingFields(true);
-                    try {
-                      // 1. Gerar Texto
-                      const struct = await generateTemplateStructure(draft.area, draft.name, settings);
-                      // 2. Gerar Campos (usando a estrutura gerada como base)
-                      const tempDraft = { ...draft, ...struct };
-                      const fields = await generateFormFieldsFromTemplate(tempDraft, settings);
-                      
-                      u('title', struct.title);
-                      u('technique', struct.technique);
-                      u('analysisTemplate', struct.analysisTemplate);
-                      u('conclusionTemplate', struct.conclusionTemplate);
-                      u('recommendationsTemplate', struct.recommendationsTemplate);
-                      u('formFields', fields);
-                      
-                      showToast('Máscara completa gerada com sucesso!', 'success');
-                    } catch (err: any) {
-                      showToast(err?.message || 'Erro na geração completa', 'error');
-                    } finally {
-                      setIsGeneratingStructure(false);
-                      setIsGeneratingFields(false);
-                    }
-                  }}
-                  className="btn bg-gradient-to-r from-brand-600 to-indigo-600 text-white border-none hover:from-brand-700 hover:to-indigo-700 shadow-md"
-                >
-                  {(isGeneratingStructure || isGeneratingFields) ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                  Gerar Máscara Completa
+                  {isGeneratingStructure ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                  Gerar Estrutura
                 </button>
               </div>
             </div>
 
-            <div className="card p-5">
-              <label className="label">Título do Laudo</label>
+            <div className="card p-6 space-y-4 shadow-sm border border-ink-100">
+              <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
+                <FileText size={12} className="text-brand-500" /> Título do Laudo
+              </label>
               <input
-                className="input font-semibold"
+                className="input font-black text-lg text-ink-900 border-ink-200 focus:border-brand-500"
                 value={draft.title}
                 onChange={(e) => u('title', e.target.value)}
                 placeholder="Ex: ULTRASSONOGRAFIA OBSTÉTRICA"
@@ -265,7 +221,6 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Técnica"
               value={draft.technique}
               onChange={(val) => u('technique', val)}
-              rows={6}
               placeholder="Ex: Exame realizado com transdutor convexo de 3,5 MHz..."
             />
 
@@ -273,7 +228,6 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Análise"
               value={draft.analysisTemplate}
               onChange={(val) => u('analysisTemplate', val)}
-              rows={12}
               placeholder="Descreva a análise padrão para quando os achados forem normais..."
             />
 
@@ -281,60 +235,25 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Conclusão"
               value={draft.conclusionTemplate}
               onChange={(val) => u('conclusionTemplate', val)}
-              rows={6}
               placeholder="Ex: Exame ultrassonográfico sem alterações significativas."
+            />
+
+            <TemplateTextBlock
+              label="Texto Padrão: Classificação (Opcional)"
+              value={draft.classificationTemplate || ''}
+              onChange={(val) => u('classificationTemplate', val)}
+              placeholder="Ex: BI-RADS: (...) — Categoria (...)"
             />
 
             <TemplateTextBlock
               label="Texto Padrão: Recomendações / Notas (Opcional)"
               value={draft.recommendationsTemplate}
               onChange={(val) => u('recommendationsTemplate', val)}
-              rows={6}
               placeholder="Ex: Sugere-se correlação clínica..."
             />
           </div>
         )}
 
-        {activeTab === 'fields' && (
-          <div className="max-w-5xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-ink-900">Campos do Formulário</h3>
-                <p className="text-xs text-ink-500 mt-0.5">Defina os campos que o médico preencherá durante o exame.</p>
-              </div>
-              <button
-                type="button"
-                disabled={isGeneratingFields}
-                onClick={async () => {
-                  if (!draft) return;
-                  if (draft.formFields.length > 0 && !confirm('Isso substituirá os campos atuais. Deseja continuar?')) return;
-                  setIsGeneratingFields(true);
-                  try {
-                    const fields = await generateFormFieldsFromTemplate(draft, settings);
-                    u('formFields', fields);
-                    showToast(`${fields.length} campos gerados automaticamente pela IA!`, 'success');
-                  } catch (err: any) {
-                    console.error(err);
-                    showToast(err?.message || 'Erro ao gerar campos', 'error');
-                  } finally {
-                    setIsGeneratingFields(false);
-                  }
-                }}
-                className="btn bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-md"
-              >
-                {isGeneratingFields ? (
-                  <><Loader2 size={15} className="animate-spin" /> Gerando com IA...</>
-                ) : (
-                  <><Wand2 size={15} /> Gerar Formulário com IA</>
-                )}
-              </button>
-            </div>
-            <FieldBuilder
-              fields={draft.formFields}
-              onChange={(fields: FormField[]) => u('formFields', fields)}
-            />
-          </div>
-        )}
 
         {activeTab === 'ai' && (
           <div className="max-w-4xl space-y-4">
@@ -358,42 +277,24 @@ export function TemplateEditor({ templateId }: Props) {
   );
 }
 
-function TemplateTextBlock({ label, value, onChange, rows = 6, placeholder }: {
+function TemplateTextBlock({ label, value, onChange, placeholder }: {
   label: string;
   value: string;
   onChange: (val: string) => void;
   rows?: number;
   placeholder?: string;
 }) {
-  // Strip HTML tags for display if content was previously saved as rich text
-  function stripHtml(html: string): string {
-    if (!html) return '';
-    return html
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-
-  const textValue = value?.startsWith('<') ? stripHtml(value) : (value || '');
-
   return (
-    <div className="card p-5">
-      <label className="label text-brand-600 mb-2 flex items-center gap-2">
-        <FileText size={14} /> {label}
+    <div className="space-y-2">
+      <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
+        <FileText size={12} className="text-brand-500" /> {label}
       </label>
-      <textarea
-        className="input font-mono text-sm leading-relaxed w-full"
-        rows={rows}
-        value={textValue}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
+      <div className="min-h-[200px]">
+        <RichEditor
+          content={value}
+          onChange={onChange}
+        />
+      </div>
     </div>
   );
 }

@@ -7,8 +7,9 @@ import { Patient } from '../../types';
 import { addItemWithId, deleteItem, generateStandardId, countWhere } from '../../store/db';
 import { useState } from 'react';
 import { UserPlus, Search, User as UserIcon, Trash2, Users as UsersIcon } from 'lucide-react';
-import { calculateAge, formatDate } from '../../utils/format';
+import { calculateAge, formatDate, formatCPF, formatPhone } from '../../utils/format';
 import { PatientForm } from './PatientForm';
+import { ListSkeleton } from '../../components/SkeletonLoader';
 
 export function Patients() {
   const { setView, showToast } = useApp();
@@ -62,6 +63,7 @@ export function Patients() {
       <PageHeader
         title="Pacientes"
         subtitle={`${patients.length} paciente(s) cadastrado(s)`}
+        icon={UsersIcon}
         actions={
           <button className="btn-primary" onClick={() => setCreating(true)}>
             <UserPlus size={16} /> Novo Paciente
@@ -69,34 +71,32 @@ export function Patients() {
         }
       />
 
-      <div className="card mb-4 p-3">
+      <div className="search-box">
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome ou CPF..."
-            className="input pl-9"
+            className="input pl-10 h-12"
           />
         </div>
       </div>
 
       <div className="card overflow-hidden">
         {loading ? (
-          <div className="p-8 space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 bg-ink-50 rounded-lg animate-pulse" />
-            ))}
+          <div className="p-4">
+            <ListSkeleton count={4} />
           </div>
         ) : sorted.length === 0 ? (
-          <div className="text-center py-20 px-6">
-            <div className="w-16 h-16 rounded-2xl bg-ink-50 flex items-center justify-center mx-auto mb-4">
-              <UsersIcon size={28} className="text-ink-300" />
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <UsersIcon size={32} className="text-ink-300" />
             </div>
-            <p className="text-sm text-ink-600 font-medium mb-1">
+            <p className="empty-state-title">
               {patients.length === 0 ? 'Nenhum paciente cadastrado' : 'Nenhum resultado'}
             </p>
-            <p className="text-xs text-ink-400 mb-4">
+            <p className="empty-state-text">
               {patients.length === 0
                 ? 'Cadastre seu primeiro paciente para começar.'
                 : 'Tente ajustar o termo de busca.'}
@@ -113,11 +113,12 @@ export function Patients() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-500">
-                    <th className="text-left px-4 py-3 font-medium w-[40%]">Nome</th>
+                    <th className="text-left px-4 py-3 font-medium w-[30%]">Nome</th>
+                    <th className="text-left px-4 py-3 font-medium">Contato</th>
                     <th className="text-left px-4 py-3 font-medium">Idade</th>
                     <th className="text-left px-4 py-3 font-medium">CPF</th>
                     <th className="text-left px-4 py-3 font-medium">Convênio</th>
-                    <th className="text-left px-4 py-3 font-medium">Cadastro</th>
+                    <th className="text-left px-4 py-3 font-medium hidden lg:table-cell">Cadastro</th>
                     <th className="w-10"></th>
                   </tr>
                 </thead>
@@ -136,10 +137,19 @@ export function Patients() {
                           <span className="font-medium text-ink-900">{p.name}</span>
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        {p.phone ? (
+                          <span className="text-ink-700">{formatPhone(p.phone)}</span>
+                        ) : p.email ? (
+                          <span className="text-ink-500 text-xs">{p.email}</span>
+                        ) : (
+                          <span className="text-ink-300 text-xs">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-ink-600">{calculateAge(p.birthDate)}</td>
-                      <td className="px-4 py-3 text-ink-600 font-mono text-xs">{p.cpf || '—'}</td>
+                      <td className="px-4 py-3 text-ink-600 font-mono text-xs">{p.cpf ? formatCPF(p.cpf) : '—'}</td>
                       <td className="px-4 py-3 text-ink-600">{p.insurance || '—'}</td>
-                      <td className="px-4 py-3 text-ink-500 text-xs">{formatDate(p.createdAt)}</td>
+                      <td className="px-4 py-3 text-ink-500 text-xs hidden lg:table-cell">{formatDate(p.createdAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={(e) => handleRequestDelete(p.id, p.name, e)}
@@ -169,7 +179,8 @@ export function Patients() {
                     <div className="font-bold text-ink-900 truncate">{p.name}</div>
                     <div className="flex items-center gap-2 text-xs text-ink-500">
                       <span>{calculateAge(p.birthDate)}</span>
-                      {p.cpf && <span className="font-mono">{p.cpf}</span>}
+                      {p.cpf && <><span>·</span><span className="font-mono">{formatCPF(p.cpf)}</span></>}
+                      {p.phone && <><span>·</span><span>{formatPhone(p.phone)}</span></>}
                     </div>
                   </div>
                   <button

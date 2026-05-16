@@ -18,9 +18,9 @@ export async function replaceTextInDoc(docId: string, replacements: Record<strin
     replaceAllText: {
       containsText: {
         text: `{{${key}}}`,
-        matchCase: true,
+        matchCase: false,
       },
-      replaceText: value,
+      replaceText: value || '',
     },
   }));
 
@@ -41,18 +41,35 @@ export async function replaceTextInDoc(docId: string, replacements: Record<strin
   }
 }
 
+interface TextRun {
+  textRun?: { content?: string };
+}
+
+interface ParagraphElement {
+  paragraph?: { elements: TextRun[] };
+  table?: {
+    tableRows: {
+      tableCells: {
+        content: StructuralElement[];
+      }[];
+    }[];
+  };
+}
+
+type StructuralElement = ParagraphElement;
+
 /**
  * Extrai o texto puro de um nó estrutural do Google Docs.
  */
-function extractTextFromStructuralElement(element: any): string {
+function extractTextFromStructuralElement(element: StructuralElement): string {
   if (element.paragraph) {
     return element.paragraph.elements
-      .map((el: any) => el.textRun?.content || '')
+      .map((el) => el.textRun?.content || '')
       .join('');
   }
   if (element.table) {
-    return element.table.tableRows.map((row: any) =>
-      row.tableCells.map((cell: any) =>
+    return element.table.tableRows.map((row) =>
+      row.tableCells.map((cell) =>
         cell.content.map(extractTextFromStructuralElement).join('')
       ).join(' | ')
     ).join('\n');

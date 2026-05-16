@@ -21,7 +21,7 @@ interface CommandItem {
 }
 
 export function CommandPalette() {
-  const { setView } = useApp();
+  const { setView, setShowCreateExamModal } = useApp();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -59,7 +59,7 @@ export function CommandPalette() {
   const navItems: CommandItem[] = useMemo(() => [
     { id: 'nav-dashboard', type: 'nav', label: 'Dashboard', icon: <LayoutDashboard size={16} />, action: () => setView({ name: 'dashboard' }) },
     { id: 'nav-worklist', type: 'nav', label: 'Worklist', icon: <LayoutList size={16} />, action: () => setView({ name: 'worklist' }) },
-    { id: 'nav-new-exam', type: 'nav', label: 'Novo Laudo', icon: <FilePlus size={16} />, action: () => setView({ name: 'new-exam' }) },
+    { id: 'nav-new-exam', type: 'nav', label: 'Novo Laudo', icon: <FilePlus size={16} />, action: () => setShowCreateExamModal(true) },
     { id: 'nav-patients', type: 'nav', label: 'Pacientes', icon: <Users size={16} />, action: () => setView({ name: 'patients' }) },
     { id: 'nav-templates', type: 'nav', label: 'Máscaras', icon: <FileText size={16} />, action: () => setView({ name: 'templates' }) },
     { id: 'nav-laudia', type: 'nav', label: 'LAUD.IA', icon: <BrainCircuit size={16} />, action: () => setView({ name: 'laud-ia' }) },

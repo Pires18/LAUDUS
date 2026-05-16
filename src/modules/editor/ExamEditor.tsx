@@ -1,28 +1,32 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useDocument } from '../../hooks/useFirestore';
+import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem, getItem } from '../../store/db';
 import { useApp } from '../../store/app';
-import { ExamStatus, EXAM_AREAS, Patient, ReportTemplate, Clinic } from '../../types';
-import { DynamicForm } from '../forms/DynamicForm';
+import { ExamStatus, EXAM_AREAS, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
+import { LaudCopilot } from './LaudCopilot';
 import { RichEditor, RichEditorRef } from './RichEditor';
-import { SnippetLibrary } from './SnippetLibrary';
-import { generateReport, generateMockReport, buildPrompt, generateReportStream } from '../ai/gemini';
+import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import {
-  ArrowLeft, Sparkles, Download, Copy, CheckCircle2, Loader2,
-  AlertCircle, Cloud, PanelLeftClose, PanelLeftOpen, Building2, ExternalLink, Eye, X, MessageSquareText, Printer
-} from 'lucide-react';
-import { calculateAge, formatDate, classNames } from '../../utils/format';
-import { copyFile, deleteFile } from '../../lib/googleDrive';
-import { replaceTextInDoc } from '../../lib/googleDocs';
+import { Loader2, AlertCircle, Eye, X, Copy, PanelLeftClose, UserCog, Building2, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
+import { CalculatorModal } from '../calculators/CalculatorModal';
+
+// Refactored Hooks
+import { useExamActions } from './hooks/useExamActions';
+import { useGoogleDocs } from './hooks/useGoogleDocs';
+
+// Refactored Components
+import { EditorHeader } from './components/EditorHeader';
+import { EditorToolbar } from './components/EditorToolbar';
+import { getInitialReportContent } from '../templates/utils';
+import { ExamHistoryModal } from './components/ExamHistoryModal';
 
 interface Props {
   examId: string;
 }
-
-type SaveState = 'idle' | 'saving' | 'saved';
 
 export function ExamEditor({ examId }: Props) {
   const { setView, settings, showToast } = useApp();
@@ -32,8 +36,9 @@ export function ExamEditor({ examId }: Props) {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
+  const { data: clinics } = useCollection<Clinic>('clinics');
 
-  // Load related data when exam changes
+  // Load related data
   useEffect(() => {
     if (!exam) return;
     getItem<Patient>('patients', exam.patientId).then((p) => setPatient(p));
@@ -45,203 +50,97 @@ export function ExamEditor({ examId }: Props) {
     }
   }, [exam?.patientId, exam?.templateId, exam?.clinicId]);
 
-  const [formData, setFormData] = useState<Record<string, unknown>>({});
-  const [reportContent, setReportContent] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [showFormPanel, setShowFormPanel] = useState(true);
-  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [reportContent, setReportContent] = useState(exam?.reportContent || '');
   const [initialized, setInitialized] = useState(false);
+
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [unlockReason, setUnlockReason] = useState('');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
-  const [showSnippets, setShowSnippets] = useState(false);
-  const [activeTab, setActiveTab] = useState<'form' | 'report'>('form');
+  const [showEditMetadata, setShowEditMetadata] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(true); 
+  const [isCopilotDocked, setIsCopilotDocked] = useState(true); // Default docked on desktop
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showCalculators, setShowCalculators] = useState(false);
+  const [copilotPrompt, setCopilotPrompt] = useState('');
+  
+  // Metadata Edit State
+  const [editData, setEditData] = useState({
+    patientName: '',
+    birthDate: '',
+    requestingPhysician: '',
+    clinicalIndication: '',
+    clinicId: ''
+  });
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
 
   const editorRef = useRef<RichEditorRef>(null);
-  const formDataRef = useRef(formData);
   const reportContentRef = useRef(reportContent);
-  formDataRef.current = formData;
   reportContentRef.current = reportContent;
 
+  // Sync initial content when data loads
   useEffect(() => {
-    if (exam && !initialized) {
-      setFormData((exam.formData as Record<string, unknown>) || {});
-      setReportContent(exam.reportContent || '');
+    if (exam && template && !initialized) {
+      if (exam.reportContent && exam.reportContent.trim() !== '') {
+        setReportContent(exam.reportContent || '');
+      } else {
+        const initial = getInitialReportContent(template);
+        setReportContent(initial);
+        updateItem('exams', examId, { reportContent: initial });
+      }
       setInitialized(true);
     }
-  }, [exam?.id, initialized]);
+  }, [exam, template, initialized, examId]);
 
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Actions Hook
+  const {
+    isGenerating,
+    saveState,
+    debouncedSave,
+    handleRefine,
+    updateStatus
+  } = useExamActions({
+    examId,
+    settings,
+    showToast,
+    onReportChange: (html) => setReportContent(html),
+    patient,
+    template,
+    clinicalIndication: exam?.clinicalIndication
+  });
 
-  const debouncedSave = useCallback(
-    (newFormData: Record<string, unknown>, newReportContent: string) => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      setSaveState('saving');
-      saveTimerRef.current = setTimeout(async () => {
+  const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
+
+  // Google Docs Hook
+  const { createGoogleDoc, deleteGoogleDoc } = useGoogleDocs({
+    examId,
+    patient,
+    exam,
+    clinic,
+    settings,
+    showToast
+  });
+
+  // Status Change logic
+  const handleStatusChange = async (newStatus: ExamStatus) => {
+    if (newStatus === 'finalizado' && clinic?.googleDocsTemplateId && exam && patient) {
+      const needsNewDoc = !exam.googleDocId || exam.status !== 'finalizado';
+      if (needsNewDoc) {
+        showToast('Criando Google Doc e finalizando...', 'info');
         try {
-          await updateItem('exams', examId, {
-            formData: newFormData,
-            reportContent: newReportContent,
-          });
-          setSaveState('saved');
-          setTimeout(() => setSaveState('idle'), 2000);
-        } catch {
-          showToast('Erro ao salvar automaticamente', 'error');
-          setSaveState('idle');
+          await createGoogleDoc(reportContentRef.current);
+          showToast('Exame finalizado e Google Doc criado!', 'success');
+          return;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : 'Erro ao gerar Google Doc. Exame não finalizado.';
+          showToast(msg, 'error');
+          return;
         }
-      }, 800);
-    },
-    [examId, showToast]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, []);
-
-  // ── Keyboard shortcuts ──
-  useEffect(() => {
-    function handleKeyboard(e: KeyboardEvent) {
-      const isMod = e.metaKey || e.ctrlKey;
-      // Ctrl+G → Generate with AI
-      if (isMod && e.key === 'g') {
-        e.preventDefault();
-        handleGenerate();
-      }
-      // Ctrl+Shift+C → Copy report
-      if (isMod && e.shiftKey && e.key === 'C') {
-        e.preventDefault();
-        handleCopy();
       }
     }
-    document.addEventListener('keydown', handleKeyboard);
-    return () => document.removeEventListener('keydown', handleKeyboard);
-  }, []);
+    await updateStatus(newStatus);
+  };
 
-  function handleFormChange(fieldId: string, value: unknown) {
-    const next = { ...formDataRef.current, [fieldId]: value };
-    setFormData(next);
-    debouncedSave(next, reportContentRef.current);
-  }
-
-  function handleReportChange(html: string) {
-    setReportContent(html);
-    debouncedSave(formDataRef.current, html);
-  }
-
-  async function handleStatusChange(status: ExamStatus) {
-    if (status === 'finalizado' && clinic?.googleDocsTemplateId && exam && patient && !exam.googleDocId) {
-      showToast('Criando Google Doc e finalizando...', 'info');
-      try {
-        const docName = `${patient.name} - ${exam.examType}`;
-        const docId = await copyFile(clinic.googleDocsTemplateId, docName, clinic.googleDriveFolderId);
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(reportContentRef.current, 'text/html');
-        
-        const sections: Record<string, string> = {
-          titulo_laudo: '', tecnica_laudo: '', analise_laudo: '', conclusao_laudo: '', recomendacao_laudo: ''
-        };
-        let currentSection = '';
-        for (const node of Array.from(doc.body.children)) {
-          if (node.tagName === 'H2') {
-            const headerText = node.textContent?.trim().toUpperCase() || '';
-            if (headerText.includes('TÉCNICA')) currentSection = 'tecnica_laudo';
-            else if (headerText.includes('ANÁLISE')) currentSection = 'analise_laudo';
-            else if (headerText.includes('CONCLUSÃO')) currentSection = 'conclusao_laudo';
-            else if (headerText.includes('RECOMENDAÇÕES')) currentSection = 'recomendacao_laudo';
-            else if (!currentSection && !sections.titulo_laudo) {
-              sections.titulo_laudo = headerText;
-              currentSection = 'titulo_laudo';
-            }
-          } else if (currentSection && node.textContent) {
-            sections[currentSection] += node.textContent + '\n';
-          }
-        }
-        Object.keys(sections).forEach(k => { sections[k] = sections[k].trim(); });
-
-        const replacements: Record<string, string> = {
-          'PACIENTE_NOME': patient.name,
-          'PACIENTE_IDADE': calculateAge(patient.birthDate),
-          'PACIENTE_CONVENIO': patient.insurance || 'Particular',
-          'EXAME_DATA': formatDate(Date.now()),
-          'EXAME_TIPO': exam.examType,
-          'MEDICO_SOLICITANTE': exam.requestingPhysician || '',
-          'data_exame': formatDate(Date.now()),
-          'nome_completo': patient.name,
-          'data_nascimento': patient.birthDate ? formatDate(patient.birthDate) : '',
-          'numero_laudo': exam.id.slice(0, 8).toUpperCase(),
-          'dados_medico': (clinic.footerHtml?.replace(/<[^>]*>?/gm, '') || '') || settings.defaultSignature || (settings.physicianName ? `${settings.physicianName}\nCRM: ${settings.physicianCRM || ''}` : ''),
-          'titulo_laudo': sections.titulo_laudo,
-          'tecnica_laudo': sections.tecnica_laudo,
-          'analise_laudo': sections.analise_laudo,
-          'conclusao_laudo': sections.conclusao_laudo,
-          'recomendacao_laudo': sections.recomendacao_laudo,
-        };
-        
-        await replaceTextInDoc(docId, replacements);
-        
-        const url = `https://docs.google.com/document/d/${docId}/edit`;
-        await updateItem('exams', examId, { 
-          status, 
-          finalizedAt: Date.now(),
-          googleDocId: docId, 
-          googleDocUrl: url 
-        });
-        showToast('Exame finalizado e Google Doc criado!', 'success');
-        return;
-      } catch (e: any) {
-        showToast(e.message || 'Erro ao gerar Google Doc. Exame não finalizado.', 'error');
-        return;
-      }
-    }
-
-    await updateItem('exams', examId, {
-      status,
-      finalizedAt: status === 'finalizado' ? Date.now() : undefined,
-    });
-    showToast(`Status: ${status}`, 'success');
-  }
-
-  async function handleGenerate() {
-    if (!template || !patient || !exam) return;
-    setIsGenerating(true);
-    try {
-      let html: string;
-      if (settings.geminiApiKey) {
-        html = await generateReportStream({
-          template,
-          formData: formDataRef.current as Record<string, any>,
-          patient,
-          settings,
-          clinicalIndication: exam.clinicalIndication,
-        }, (chunk) => {
-          setReportContent(chunk);
-        });
-      } else {
-        html = generateMockReport({
-          template,
-          formData: formDataRef.current as Record<string, any>,
-          patient,
-          settings,
-          clinicalIndication: exam.clinicalIndication,
-        });
-        showToast('API Key não configurada — laudo gerado em modo demo', 'info');
-      }
-      setReportContent(html);
-      await updateItem('exams', examId, { reportContent: html });
-      showToast('Laudo gerado!', 'success');
-    } catch (e: unknown) {
-      console.error(e);
-      const message = e instanceof Error ? e.message : 'Erro ao gerar laudo';
-      showToast(message, 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function handleCopy() {
+  const handleCopy = async () => {
     if (!exam || !patient || !reportContent) return;
     try {
       await copyReportToClipboard(reportContent, patient, exam, settings);
@@ -250,7 +149,80 @@ export function ExamEditor({ examId }: Props) {
       const message = e instanceof Error ? e.message : 'Erro desconhecido';
       showToast('Erro ao copiar: ' + message, 'error');
     }
-  }
+  };
+
+  const handleReset = useCallback(async () => {
+    if (!template) return;
+    if (window.confirm('Deseja reiniciar o laudo para o padrão da máscara? Isso apagará as alterações atuais.')) {
+      const initial = getInitialReportContent(template);
+      setReportContent(initial);
+      await updateItem('exams', examId, { reportContent: initial });
+      showToast('Laudo reiniciado para o padrão da máscara', 'success');
+    }
+  }, [template, examId, showToast]);
+
+  const handleSaveMetadata = async () => {
+    if (!exam || !patient) return;
+    try {
+      setLoadingMetadata(true);
+      await updateItem('patients', exam.patientId, {
+        name: editData.patientName,
+        birthDate: editData.birthDate
+      });
+      await updateItem('exams', examId, {
+        requestingPhysician: editData.requestingPhysician,
+        clinicalIndication: editData.clinicalIndication,
+        clinicId: editData.clinicId
+      });
+      setShowEditMetadata(false);
+      showToast('Dados atualizados com sucesso!');
+    } catch (err) {
+      showToast('Erro ao atualizar dados', 'error');
+    } finally {
+      setLoadingMetadata(false);
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyboard(e: KeyboardEvent) {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        handleRefine(reportContent);
+      }
+      if (isMod && e.shiftKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        handleReset();
+      }
+      if (isMod && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        handleCopy();
+      }
+      if (isMod && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        debouncedSave(reportContent);
+        showToast('Laudo salvo!', 'success');
+      }
+      if (isMod && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+      if (isMod && e.key === 'Enter') {
+        e.preventDefault();
+        handleStatusChange('finalizado');
+      }
+    }
+    function handleAIRefine(e: Event) {
+      handleRefine((e as CustomEvent).detail);
+    }
+    window.addEventListener('keydown', handleKeyboard);
+    window.addEventListener('ai-refine-trigger', handleAIRefine);
+    return () => {
+      window.removeEventListener('keydown', handleKeyboard);
+      window.removeEventListener('ai-refine-trigger', handleAIRefine);
+    };
+  }, [handleRefine, reportContent, handleCopy, handleReset, debouncedSave, showToast, handleStatusChange]);
 
   if (!exam || !patient || !template) {
     return (
@@ -263,8 +235,6 @@ export function ExamEditor({ examId }: Props) {
     );
   }
 
-  const area = EXAM_AREAS.find((a) => a.id === exam.area);
-
   return (
     <div className="flex flex-col h-full relative">
       {/* AI Progress Bar */}
@@ -274,96 +244,26 @@ export function ExamEditor({ examId }: Props) {
         </div>
       )}
 
-      {/* ═══ TOPBAR ═══ */}
-      <header className="border-b border-ink-100 bg-white px-4 py-2.5 flex items-center gap-3 shrink-0">
-        <button
-          onClick={() => setView({ name: 'worklist' })}
-          className="text-ink-500 hover:text-ink-800 transition-colors p-1.5 rounded-lg hover:bg-ink-100 shrink-0"
-          title="Voltar à Worklist"
-        >
-          <ArrowLeft size={16} />
-        </button>
+      <EditorHeader 
+        exam={exam}
+        patient={patient}
+        clinic={clinic}
+        onBack={() => setView({ name: 'worklist' })}
+        onStatusChange={handleStatusChange}
+        onUnlock={() => setShowUnlockModal(true)}
+        onEditMetadata={() => {
+          setEditData({
+            patientName: patient.name,
+            birthDate: patient.birthDate || '',
+            requestingPhysician: exam.requestingPhysician || '',
+            clinicalIndication: exam.clinicalIndication || '',
+            clinicId: exam.clinicId || ''
+          });
+          setShowEditMetadata(true);
+        }}
+      />
 
-        {/* Info do paciente */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <h1 className="text-xs sm:text-sm font-semibold text-ink-900 truncate max-w-[120px] sm:max-w-[200px]">{patient.name}</h1>
-            <span className="hidden sm:inline text-ink-300 text-xs">·</span>
-            <span className="hidden sm:inline text-xs text-ink-500 truncate max-w-[180px]">{exam.examType}</span>
-          </div>
-          <p className="text-[10px] sm:text-[11px] text-ink-400 truncate">
-            {calculateAge(patient.birthDate)}
-            <span className="hidden sm:inline">{patient.birthDate && ` · DN ${formatDate(patient.birthDate)}`}</span>
-            <span className="hidden sm:inline">{exam.requestingPhysician && ` · Solic. ${exam.requestingPhysician}`}</span>
-          </p>
-        </div>
-
-        {/* Clinic badge */}
-        {clinic && (
-          <span className="chip bg-ink-50 text-ink-600 text-[10px] shrink-0">
-            <Building2 size={10} />
-            {clinic.name}
-          </span>
-        )}
-
-        {/* Status */}
-        <div className="hidden sm:flex items-center gap-2 shrink-0 ml-4">
-          {exam.status === 'finalizado' ? (
-            <>
-              <span className="chip bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm text-xs py-1 px-2.5">
-                <CheckCircle2 size={13} /> Finalizado
-              </span>
-              <button
-                onClick={() => setShowUnlockModal(true)}
-                className="btn-secondary text-[11px] py-1 px-2 hover:bg-brand-50 hover:text-brand-700"
-              >
-                Desbloquear
-              </button>
-            </>
-          ) : (
-            <>
-              <select
-                value={exam.status}
-                onChange={(e) => handleStatusChange(e.target.value as ExamStatus)}
-                className="input w-auto text-xs py-1 px-2"
-              >
-                <option value="pendente">Pendente</option>
-                <option value="em-andamento">Em Andamento</option>
-              </select>
-              <button
-                onClick={() => handleStatusChange('finalizado')}
-                className="btn-primary bg-emerald-600 hover:bg-emerald-700 border-none text-white text-[11px] py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
-              >
-                <CheckCircle2 size={13} />
-                Concluir
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Ações */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button onClick={() => window.print()} className="btn-ghost text-xs px-2.5 py-1.5" title="Imprimir / Exportar PDF">
-            <Printer size={14} />
-          </button>
-          <button onClick={handleCopy} className="btn-ghost text-xs px-2.5 py-1.5" title="Copiar para clipboard">
-            <Copy size={14} />
-          </button>
-          {exam.googleDocUrl && (
-            <a
-              href={exam.googleDocUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-ghost text-xs px-2.5 py-1.5"
-              title="Abrir no Google Docs"
-            >
-              <ExternalLink size={14} />
-            </a>
-          )}
-        </div>
-      </header>
-
-      {/* ═══ AVISO API KEY ═══ */}
+      {/* AVISO API KEY */}
       {!settings.geminiApiKey && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
           <AlertCircle size={12} />
@@ -372,150 +272,244 @@ export function ExamEditor({ examId }: Props) {
         </div>
       )}
 
-      {/* ═══ CONTEÚDO SPLIT ═══ */}
-      <div className="flex-1 flex min-h-0 relative">
-        {/* Mobile Tab Switcher */}
-        <div className="lg:hidden absolute bottom-4 left-1/2 -translate-x-1/2 flex bg-white/90 backdrop-blur border border-ink-200 rounded-full shadow-lg p-1 z-50">
-          <button
-            onClick={() => setActiveTab('form')}
-            className={classNames(
-              "px-4 py-2 rounded-full text-xs font-bold transition-all",
-              activeTab === 'form' ? "bg-brand-600 text-white" : "text-ink-600"
-            )}
-          >
-            Formulário
-          </button>
-          <button
-            onClick={() => setActiveTab('report')}
-            className={classNames(
-              "px-4 py-2 rounded-full text-xs font-bold transition-all",
-              activeTab === 'report' ? "bg-brand-600 text-white" : "text-ink-600"
-            )}
-          >
-            Laudo
-          </button>
-        </div>
-
-        {/* Painel esquerdo: formulário (Apenas visível se NÃO finalizado) */}
-        {exam.status !== 'finalizado' && (
-          <aside className={classNames(
-            "lg:w-[400px] xl:w-[480px] shrink-0 border-r border-ink-100 bg-white flex-col min-h-0 transition-all duration-300",
-            activeTab === 'form' ? "flex w-full absolute inset-0 lg:relative z-10" : "hidden lg:flex",
-            !showFormPanel && "lg:w-0 overflow-hidden"
-          )}>
-            <div className="px-4 py-2.5 border-b border-ink-100 flex items-center justify-between shrink-0">
-              <h3 className="text-xs font-semibold text-ink-900 uppercase tracking-wide">Achados</h3>
-              <button
-                onClick={() => setShowFormPanel(false)}
-                className="hidden lg:block text-ink-400 hover:text-ink-700 p-1 rounded hover:bg-ink-100 transition-colors"
-                title="Recolher"
-              >
-                <PanelLeftClose size={14} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 pb-24">
-              <DynamicForm fields={template.formFields} values={formData} onChange={handleFormChange} />
-            </div>
-          </aside>
-        )}
-
-        {/* Painel direito: editor de laudo */}
+      <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
+        {/* Main Workspace */}
         <div className={classNames(
-          "flex-1 flex flex-col min-w-0 min-h-0 bg-ink-50/30",
-          activeTab === 'report' ? "flex" : "hidden lg:flex"
+          "flex-1 flex flex-col min-w-0 dock-sidebar-transition",
+          showCopilot && isCopilotDocked ? "mr-[400px]" : "mr-0"
         )}>
-          {/* Barra IA + save state */}
-          <div className="px-4 py-2.5 border-b border-ink-100 bg-white flex items-center gap-3 shrink-0 flex-wrap">
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || exam.status === 'finalizado'}
-              className="btn-primary text-[11px] sm:text-xs py-1.5 px-3 group/gen"
-              title="Atalho: Ctrl+G / ⌘G"
-            >
-              {isGenerating ? <Loader2 size={14} className="animate-spin-slow" /> : <Sparkles size={14} />}
-              {isGenerating ? 'Gerando...' : reportContent ? 'Regerar' : 'Gerar Laudo'}
-              <kbd className="hidden lg:inline-flex ml-1.5 px-1 py-0.5 rounded text-[8px] bg-white/20 font-mono">⌘G</kbd>
-            </button>
-
-            {/* Prompt Preview Button */}
-            {template && patient && (
-              <button
-                onClick={() => setShowPromptPreview(true)}
-                className="btn-secondary text-xs py-1.5 px-2.5"
-                title="Ver prompt enviado à IA"
-              >
-                <Eye size={14} /> Prompt
-              </button>
-            )}
-
-            {/* Toggle Snippets Button */}
-            {exam.status !== 'finalizado' && (
-              <button
-                onClick={() => setShowSnippets(!showSnippets)}
-                className={classNames(
-                  "btn-secondary text-xs py-1.5 px-2.5",
-                  showSnippets ? "bg-brand-50 text-brand-700 border-brand-200" : ""
-                )}
-                title="Frases prontas"
-              >
-                <MessageSquareText size={14} /> Frases Prontas
-              </button>
-            )}
-
-            {/* Google Docs Integration - Botão removido, agora é automático ao finalizar */}
-
-            <div className="text-[11px] text-ink-500 flex items-center gap-1.5 ml-auto">
-              {saveState === 'saving' && (
-                <>
-                  <Loader2 size={11} className="animate-spin-slow text-brand-500" />
-                  <span className="text-brand-600">Salvando...</span>
-                </>
-              )}
-              {saveState === 'saved' && (
-                <>
-                  <CheckCircle2 size={11} className="text-emerald-500" />
-                  <span className="text-emerald-600">Salvo</span>
-                </>
-              )}
-              {saveState === 'idle' && (
-                <>
-                  <Cloud size={11} className="text-ink-400" />
-                  <span>Auto-save</span>
-                </>
-              )}
-            </div>
-
-            <span className="text-[11px] text-ink-400">{settings.geminiModel}</span>
+          {/* Section Progress Bar */}
+          <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
+             <motion.div 
+               initial={{ width: 0 }}
+               animate={{ width: '65%' }} // Mock progress for UI adequacy
+               className="h-full bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+             />
           </div>
 
-          {/* Editor TipTap ou Google Docs */}
-          <div className="flex-1 overflow-hidden relative bg-ink-50 flex">
+          <EditorToolbar 
+            isGenerating={isGenerating}
+            hasReport={!!reportContent}
+            status={exam.status}
+            onRefine={() => handleRefine(reportContent)}
+            onShowPrompt={() => setShowPromptPreview(true)}
+            onReset={handleReset}
+            onShowHistory={() => setShowHistoryModal(true)}
+            saveState={saveState}
+            geminiModel={settings.geminiModel || 'gemini-1.5-flash'}
+          />
+
+          <div className="flex-1 overflow-hidden relative flex flex-col">
+            <AnimatePresence>
+              {isGenerating && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-[60] bg-white/40 backdrop-blur-sm flex items-center justify-center"
+                >
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-brand-500 rounded-2xl blur-3xl opacity-20 animate-pulse" />
+                    <div className="relative bg-white/90 backdrop-blur-xl px-10 py-8 rounded-[3rem] shadow-2xl border border-brand-100 flex flex-col items-center gap-5">
+                      <div className="w-16 h-16 rounded-[1.5rem] bg-brand-600 text-white flex items-center justify-center shadow-xl shadow-brand-200">
+                        <Sparkles size={32} className="animate-spin-slow" />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-[10px] font-black text-brand-600 uppercase tracking-[0.3em] ml-1">Processamento LAUD.IA</p>
+                        <p className="text-xl font-black text-ink-900 tracking-tight">Otimizando Inteligência Clínica</p>
+                        <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest pt-1">Aguarde a finalização dos tópicos...</p>
+                      </div>
+                      <div className="w-48 h-1.5 bg-ink-50 rounded-full overflow-hidden">
+                        <motion.div 
+                          animate={{ x: [-100, 200] }}
+                          transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                          className="w-1/3 h-full bg-gradient-to-r from-brand-400 to-brand-600 rounded-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {exam.googleDocId && exam.status === 'finalizado' ? (
-              <div className="h-full w-full mx-auto p-4 flex flex-col relative overflow-auto">
+              <div className="flex-1 w-full mx-auto p-4 flex flex-col relative overflow-auto bg-white">
                 <iframe
                   src={`https://docs.google.com/document/d/${exam.googleDocId}/edit?embedded=true`}
-                  className="w-full h-full border border-ink-200 rounded-lg shadow-sm bg-white"
+                  className="w-full h-full border border-ink-200 rounded-lg shadow-sm"
                   title="Google Docs Editor"
                 />
               </div>
             ) : (
-              <div className="relative h-full flex-1 overflow-auto">
-                {exam.status === 'finalizado' && (
-                  <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] pointer-events-none" />
-                )}
-                <RichEditor ref={editorRef} content={reportContent} onChange={handleReportChange} editable={exam.status !== 'finalizado'} />
+              <div className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth custom-scrollbar">
+                <div className="max-w-[850px] mx-auto min-h-full flex flex-col relative">
+                  {exam.status === 'finalizado' && (
+                    <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] pointer-events-none rounded-xl" />
+                  )}
+                  <div className="bg-white rounded-[2rem] shadow-premium border border-ink-100 overflow-hidden min-h-[900px] flex flex-col">
+                    <RichEditor 
+                      ref={editorRef} 
+                      content={reportContent} 
+                      onChange={(html) => {
+                        if (initialized) {
+                          setReportContent(html);
+                          debouncedSave(html);
+                        }
+                      }} 
+                      editable={exam.status !== 'finalizado'} 
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-            
-            {showSnippets && exam.status !== 'finalizado' && (
-              <SnippetLibrary onInsert={(text) => editorRef.current?.insertContent(text)} />
             )}
           </div>
         </div>
+
+        {/* Copilot Sidebar (Docked) */}
+        <AnimatePresence>
+          {showCopilot && isCopilotDocked && exam.status !== 'finalizado' && (
+            <motion.aside 
+              initial={{ x: 400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 400, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-[400px] bg-white border-l border-ink-100 shadow-2xl z-[65] flex flex-col pt-[72px]" // Adjust pt for header
+            >
+              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-brand-500/20 flex items-center justify-center">
+                    <Sparkles size={16} className="text-brand-400" />
+                  </div>
+                  <div>
+                    <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copilot</span>
+                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter">Diagnostic Intelligence</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setIsCopilotDocked(false)}
+                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
+                    title="Mudar para modo flutuante"
+                  >
+                    <Minimize2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => setShowCopilot(false)}
+                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <LaudCopilot
+                  reportContent={reportContent}
+                  onUpdate={(newContent) => {
+                    setReportContent(newContent);
+                    debouncedSave(newContent);
+                  }}
+                  isGenerating={isCopilotGenerating}
+                  setIsGenerating={setIsCopilotGenerating}
+                  exam={exam}
+                  template={template}
+                  patient={patient}
+                  chatHistory={exam.chatHistory || []}
+                  onChatUpdate={(newHistory) => {
+                    updateItem('exams', examId, { chatHistory: newHistory });
+                  }}
+                  onShowCalculators={() => setShowCalculators(true)}
+                  prompt={copilotPrompt}
+                  onChangePrompt={setCopilotPrompt}
+                  isDocked={true}
+                />
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+
+        {/* Floating Copilot (Non-Docked) */}
+        <AnimatePresence>
+          {showCopilot && !isCopilotDocked && exam.status !== 'finalizado' && (
+            <motion.aside 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed bottom-24 right-6 lg:right-10 w-[92vw] sm:w-[420px] h-[75vh] max-h-[700px] bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-ink-100 flex flex-col z-[70] overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-brand-500/20 flex items-center justify-center">
+                    <Sparkles size={16} className="text-brand-400" />
+                  </div>
+                  <div>
+                    <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copilot</span>
+                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter">Diagnostic Intelligence</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setIsCopilotDocked(true)}
+                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
+                    title="Fixar lateralmente"
+                  >
+                    <Maximize2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => setShowCopilot(false)}
+                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <LaudCopilot
+                  reportContent={reportContent}
+                  onUpdate={(newContent) => {
+                    setReportContent(newContent);
+                    debouncedSave(newContent);
+                  }}
+                  isGenerating={isCopilotGenerating}
+                  setIsGenerating={setIsCopilotGenerating}
+                  exam={exam}
+                  template={template}
+                  patient={patient}
+                  chatHistory={exam.chatHistory || []}
+                  onChatUpdate={(newHistory) => {
+                    updateItem('exams', examId, { chatHistory: newHistory });
+                  }}
+                  onShowCalculators={() => setShowCalculators(true)}
+                  prompt={copilotPrompt}
+                  onChangePrompt={setCopilotPrompt}
+                  isDocked={false}
+                />
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+
+        {/* FAB Toggle Copilot */}
+        {exam.status !== 'finalizado' && (
+          <button
+            onClick={() => setShowCopilot(!showCopilot)}
+            className={classNames(
+              "fixed bottom-8 right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2",
+              showCopilot 
+                ? "bg-white text-ink-900 border-ink-100" 
+                : "bg-brand-600 text-white border-brand-500 shadow-brand-500/30"
+            )}
+          >
+            {showCopilot ? <X size={24} /> : <Sparkles size={24} />}
+            {!showCopilot && (
+               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+            )}
+          </button>
+        )}
       </div>
+
       {/* Modal de Justificativa de Desbloqueio */}
       {showUnlockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform animate-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-ink-100 bg-ink-50/50">
               <h3 className="font-semibold text-ink-900 flex items-center gap-2">
@@ -538,10 +532,7 @@ export function ExamEditor({ examId }: Props) {
             <div className="px-6 py-4 border-t border-ink-100 flex justify-end gap-3 bg-ink-50">
               <button 
                 className="btn-ghost" 
-                onClick={() => {
-                  setShowUnlockModal(false);
-                  setUnlockReason('');
-                }}
+                onClick={() => { setShowUnlockModal(false); setUnlockReason(''); }}
               >
                 Cancelar
               </button>
@@ -552,7 +543,7 @@ export function ExamEditor({ examId }: Props) {
                   try {
                     showToast('Desbloqueando e excluindo documento...', 'info');
                     if (exam.googleDocId) {
-                      await deleteFile(exam.googleDocId);
+                      await deleteGoogleDoc(exam.googleDocId);
                     }
                     const newHistory = [...(exam.unlockHistory || []), { date: Date.now(), reason: unlockReason.trim() }];
                     await updateItem('exams', examId, { 
@@ -564,8 +555,9 @@ export function ExamEditor({ examId }: Props) {
                     setShowUnlockModal(false);
                     setUnlockReason('');
                     showToast('Exame desbloqueado. Doc excluído.', 'success');
-                  } catch (e: any) {
-                    showToast(`Erro ao excluir Doc: ${e.message}`, 'error');
+                  } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : 'Erro desconhecido';
+                    showToast(`Erro ao excluir Doc: ${msg}`, 'error');
                   }
                 }}
               >
@@ -578,7 +570,7 @@ export function ExamEditor({ examId }: Props) {
 
       {/* Prompt Preview Modal */}
       {showPromptPreview && template && patient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowPromptPreview(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowPromptPreview(false)}>
           <div className="absolute inset-0 bg-ink-900/60 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-3.5 border-b border-ink-100 flex items-center justify-between shrink-0">
@@ -592,7 +584,6 @@ export function ExamEditor({ examId }: Props) {
               <pre className="text-xs font-mono text-ink-700 whitespace-pre-wrap leading-relaxed bg-ink-50 p-4 rounded-xl border border-ink-200">
                 {buildPrompt({
                   template,
-                  formData: formDataRef.current as Record<string, any>,
                   patient,
                   settings,
                   clinicalIndication: exam?.clinicalIndication,
@@ -601,13 +592,12 @@ export function ExamEditor({ examId }: Props) {
             </div>
             <div className="px-5 py-3 border-t border-ink-100 flex items-center justify-between bg-ink-50/50 shrink-0">
               <span className="text-[10px] text-ink-400">
-                Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {settings.geminiModel || 'gemini-2.0-flash-exp'}
+                Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {settings.geminiModel}
               </span>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(buildPrompt({
                     template,
-                    formData: formDataRef.current as Record<string, any>,
                     patient,
                     settings,
                     clinicalIndication: exam?.clinicalIndication,
@@ -623,6 +613,95 @@ export function ExamEditor({ examId }: Props) {
         </div>
       )}
 
+      {/* Modal de Edição de Metadados */}
+      {showEditMetadata && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between">
+              <h3 className="font-semibold text-ink-900 flex items-center gap-2">
+                <UserCog size={18} className="text-brand-500" />
+                Editar Dados do Exame
+              </h3>
+              <button onClick={() => setShowEditMetadata(false)} className="p-1 hover:bg-ink-100 rounded-lg text-ink-400"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <div>
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Nome do Paciente</label>
+                <input 
+                  className="input" 
+                  value={editData.patientName} 
+                  onChange={e => setEditData({...editData, patientName: e.target.value})} 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Data de Nascimento</label>
+                  <input 
+                    type="date"
+                    className="input" 
+                    value={editData.birthDate} 
+                    onChange={e => setEditData({...editData, birthDate: e.target.value})} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Médico Solicitante</label>
+                  <input 
+                    className="input" 
+                    value={editData.requestingPhysician} 
+                    onChange={e => setEditData({...editData, requestingPhysician: e.target.value})} 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Indicação Clínica</label>
+                <textarea 
+                  className="input min-h-[80px] py-3 resize-none" 
+                  value={editData.clinicalIndication} 
+                  onChange={e => setEditData({...editData, clinicalIndication: e.target.value})} 
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Clínica</label>
+                <select 
+                  className="input" 
+                  value={editData.clinicId} 
+                  onChange={e => setEditData({...editData, clinicId: e.target.value})}
+                >
+                  <option value="">Selecione uma clínica</option>
+                  {clinics.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-ink-400 mt-1 ml-1 italic">
+                  * Alterar a clínica afeta o template e a pasta de exportação do Google Docs.
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-ink-100 flex justify-end gap-3 bg-ink-50">
+              <button className="btn-ghost" onClick={() => setShowEditMetadata(false)}>Cancelar</button>
+              <button 
+                className="btn-primary px-8"
+                disabled={loadingMetadata}
+                onClick={handleSaveMetadata}
+              >
+                {loadingMetadata ? <Loader2 size={18} className="animate-spin" /> : 'Salvar Alterações'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHistoryModal && exam && template && patient && (
+        <ExamHistoryModal 
+          patientId={patient.id}
+          templateId={template.id}
+          currentExamId={exam.id}
+          currentContent={reportContent}
+          onClose={() => setShowHistoryModal(false)}
+        />
+      )}
+
       {/* Keyboard Shortcuts Bar */}
       <div className="hidden lg:flex items-center gap-5 px-4 py-1.5 bg-ink-900 text-ink-400 text-[10px] font-mono shrink-0">
         <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘G</kbd> Gerar IA</span>
@@ -630,7 +709,20 @@ export function ExamEditor({ examId }: Props) {
         <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘K</kbd> Busca</span>
       </div>
 
-      {/* Print Layout (Hidden on screen, visible on print) */}
+      <AnimatePresence>
+        {showCalculators && (
+          <CalculatorModal 
+            area={exam.area} 
+            onClose={() => setShowCalculators(false)} 
+            onSendToCopilot={(res) => {
+              setCopilotPrompt(res);
+              setShowCalculators(false);
+              if (!showCopilot) setShowCopilot(true);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <PrintLayout
         patient={patient}
         clinic={clinic}

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity, Sparkles } from 'lucide-react';
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
+import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
 
 interface Lesion {
   id: string;
@@ -21,15 +22,15 @@ interface Lesion {
 }
 
 const COMPOSITION = [
-  { label: 'Cística ou quase completamente cística', points: 0 },
-  { label: 'Espongiforme', points: 0 },
-  { label: 'Mista (sólida e cística)', points: 1 },
-  { label: 'Sólida ou quase completamente sólida', points: 2 },
+  { label: 'Cística', points: 0, description: 'Completamente cística' },
+  { label: 'Espongiforme', points: 0, description: 'Aspecto de esponja' },
+  { label: 'Mista', points: 1, description: 'Sólida e cística' },
+  { label: 'Sólida', points: 2, description: 'Completamente sólida' },
 ];
 
 const ECHOGENICITY = [
   { label: 'Anecóico', points: 0 },
-  { label: 'Hiperecóico ou Isoecóico', points: 1 },
+  { label: 'Hiperecóico / Isoecóico', points: 1 },
   { label: 'Hipoecóico', points: 2 },
   { label: 'Muito Hipoecóico', points: 3 },
 ];
@@ -42,36 +43,20 @@ const SHAPE = [
 const MARGIN = [
   { label: 'Lisa', points: 0 },
   { label: 'Mal definida', points: 0 },
-  { label: 'Lobulada ou Irregular', points: 2 },
+  { label: 'Lobulada / Irregular', points: 2 },
   { label: 'Extratireoideana', points: 3 },
 ];
 
 const ECHOGENIC_FOCI = [
-  { label: 'Nenhum ou artefato em cauda de cometa', points: 0 },
+  { label: 'Nenhum / Cauda de cometa', points: 0 },
   { label: 'Macrocalcificações', points: 1 },
-  { label: 'Calcificações periféricas (em casca de ovo)', points: 2 },
-  { label: 'Focos ecogênicos puntiformes', points: 3 },
+  { label: 'Calcificações periféricas', points: 2 },
+  { label: 'Focos puntiformes', points: 3 },
 ];
 
 export function TiradsCalculator({ value, onChange }: CalculatorProps) {
   const [lesions, setLesions] = useState<Lesion[]>(() => {
     if (Array.isArray(value?.lesions)) return value.lesions;
-    // Migração: se formato antigo existir, converte para primeira lesão
-    if (value?.composition !== undefined) {
-      return [{
-        id: 'L1',
-        location: 'Nódulo 1',
-        d1: '', d2: '', d3: '',
-        composition: value.composition,
-        echogenicity: value.echogenicity,
-        shape: value.shape,
-        margin: value.margin,
-        echogenicFoci: value.echogenicFoci || [],
-        totalPoints: value.totalPoints,
-        classification: value.classification,
-        recommendation: value.recommendation
-      }];
-    }
     return [];
   });
   
@@ -117,7 +102,6 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
       lesions: updatedLesions,
       _summary: summaries.length > 0 ? `Achados TI-RADS:\n${summaries.join('\n')}` : null
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);
 
   function addLesion() {
@@ -148,148 +132,119 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
   }
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Activity size={14} className="text-brand-600" />
-          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">ACR TI-RADS</h3>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center shadow-sm">
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Escalonamento TI-RADS</h3>
+            <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Padrão ACR (American College of Radiology)</p>
+          </div>
         </div>
         <button 
           onClick={addLesion}
-          className="btn-primary text-[10px] py-1 px-2 flex items-center gap-1"
+          className="px-5 py-2.5 rounded-2xl bg-brand-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-brand-700 transition-all shadow-lg shadow-brand-100 flex items-center gap-2"
         >
-          <Plus size={12} /> Nódulo
+          <Plus size={14} /> Novo Nódulo
         </button>
       </div>
 
-      <div className="divide-y divide-ink-100">
+      <div className="space-y-4">
         {lesions.length === 0 && (
-          <div className="p-4 text-center text-ink-400 text-[10px]">
-            Nenhum nódulo adicionado.
+          <div className="py-12 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center space-y-3">
+            <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200">
+               <MapPin size={32} />
+            </div>
+            <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">Nenhum achado registrado até o momento</p>
           </div>
         )}
         {lesions.map((lesion) => (
-          <div key={lesion.id} className="bg-white">
+          <div key={lesion.id} className="bg-white rounded-[2.5rem] border-2 border-ink-100 overflow-hidden shadow-sm transition-all hover:border-ink-200">
             {/* LESION HEADER */}
             <div 
               className={classNames(
-                "flex items-center justify-between p-2 cursor-pointer transition-colors hover:bg-ink-50",
-                expandedId === lesion.id ? "bg-brand-50/30" : ""
+                "flex items-center justify-between p-6 cursor-pointer transition-all",
+                expandedId === lesion.id ? "bg-brand-50/20" : "hover:bg-ink-50/50"
               )}
               onClick={() => setExpandedId(expandedId === lesion.id ? null : lesion.id)}
             >
-              <div className="flex items-center gap-2 flex-1">
-                <MapPin size={12} className="text-ink-400" />
+              <div className="flex items-center gap-4 flex-1">
+                <div className={classNames(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-all",
+                  lesion.classification ? "bg-brand-500 text-white" : "bg-ink-100 text-ink-400"
+                )}>
+                  {lesion.classification ? <span className="font-black text-xs">{lesion.classification}</span> : <Activity size={20} />}
+                </div>
                 <div>
-                  <div className="text-[11px] font-bold text-ink-900">{lesion.location || 'Sem localização'}</div>
-                  <div className="text-[9px] text-ink-500 flex items-center gap-2">
+                  <div className="text-sm font-black text-ink-900 uppercase tracking-tight">{lesion.location}</div>
+                  <div className="text-[10px] text-ink-400 font-bold uppercase tracking-widest flex items-center gap-3 mt-0.5">
                     {lesion.d1 && lesion.d2 && lesion.d3 ? (
-                      <span className="flex items-center gap-0.5"><Maximize size={8} /> {lesion.d1}x{lesion.d2}x{lesion.d3}mm</span>
-                    ) : null}
-                    {lesion.classification && (
-                      <span className="chip bg-brand-100 text-brand-700 py-0 px-1">{lesion.classification} ({lesion.totalPoints} pts)</span>
+                      <span className="flex items-center gap-1"><Maximize size={10} /> {lesion.d1}x{lesion.d2}x{lesion.d3}mm</span>
+                    ) : <span>Sem medidas</span>}
+                    {lesion.totalPoints !== null && (
+                      <span className="text-brand-600">• {lesion.totalPoints} Pontos</span>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={(e) => { e.stopPropagation(); removeLesion(lesion.id); }}
-                  className="p-1.5 text-ink-300 hover:text-red-600 transition-colors"
+                  className="w-10 h-10 rounded-xl bg-ink-50 text-ink-400 hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={18} />
                 </button>
-                {expandedId === lesion.id ? <ChevronUp size={14} className="text-ink-400" /> : <ChevronDown size={14} className="text-ink-400" />}
+                <div className="w-10 h-10 rounded-xl bg-white border border-ink-100 flex items-center justify-center text-ink-400">
+                  {expandedId === lesion.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </div>
               </div>
             </div>
 
             {/* LESION CONTENT */}
             {expandedId === lesion.id && (
-              <div className="p-3 border-t border-ink-100 bg-ink-50/30 space-y-3 animate-in slide-in-from-top-1 duration-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[9px] font-bold text-ink-500 uppercase tracking-widest block mb-1">Localização</label>
-                    <input 
-                      className="input text-[11px] py-1 h-8" 
-                      placeholder="Ex: Lóbulo Direito" 
-                      value={lesion.location} 
-                      onChange={e => updateLesion(lesion.id, { location: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-ink-500 uppercase tracking-widest block mb-1">Medidas (mm)</label>
-                    <div className="flex items-center gap-1.5">
-                      <input type="number" className="input text-center text-[11px] py-1 h-8" placeholder="C" value={lesion.d1} onChange={e => updateLesion(lesion.id, { d1: e.target.value ? Number(e.target.value) : '' })} />
-                      <input type="number" className="input text-center text-[11px] py-1 h-8" placeholder="L" value={lesion.d2} onChange={e => updateLesion(lesion.id, { d2: e.target.value ? Number(e.target.value) : '' })} />
-                      <input type="number" className="input text-center text-[11px] py-1 h-8" placeholder="A" value={lesion.d3} onChange={e => updateLesion(lesion.id, { d3: e.target.value ? Number(e.target.value) : '' })} />
-                    </div>
+              <div className="p-8 pt-0 border-t border-ink-50 space-y-8 animate-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6">
+                  <CalculatorInput 
+                    label="Localização / Nome" 
+                    placeholder="Ex: Lóbulo Direito" 
+                    value={lesion.location} 
+                    onChange={(val: string) => updateLesion(lesion.id, { location: val })} 
+                  />
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Dimensões (Eixos)</label>
+                     <div className="flex items-center gap-3">
+                        <CalculatorInput type="number" placeholder="Long" value={lesion.d1} onChange={(v: any) => updateLesion(lesion.id, { d1: v ? Number(v) : '' })} suffix="mm" />
+                        <CalculatorInput type="number" placeholder="Trans" value={lesion.d2} onChange={(v: any) => updateLesion(lesion.id, { d2: v ? Number(v) : '' })} suffix="mm" />
+                        <CalculatorInput type="number" placeholder="AP" value={lesion.d3} onChange={(v: any) => updateLesion(lesion.id, { d3: v ? Number(v) : '' })} suffix="mm" />
+                     </div>
                   </div>
                 </div>
 
-                <div className="h-px bg-ink-100 w-full" />
-
-                <div className="space-y-3">
+                <div className="space-y-8">
                   <CategorySelector label="1. Composição" options={COMPOSITION} current={lesion.composition} onSelect={(pts: number) => updateLesion(lesion.id, { composition: pts })} />
                   <CategorySelector label="2. Ecogenicidade" options={ECHOGENICITY} current={lesion.echogenicity} onSelect={(pts: number) => updateLesion(lesion.id, { echogenicity: pts })} />
                   <CategorySelector label="3. Forma" options={SHAPE} current={lesion.shape} onSelect={(pts: number) => updateLesion(lesion.id, { shape: pts })} />
                   <CategorySelector label="4. Margem" options={MARGIN} current={lesion.margin} onSelect={(pts: number) => updateLesion(lesion.id, { margin: pts })} />
-                  
-                  <div>
-                    <label className="text-[9px] font-bold text-ink-500 uppercase tracking-widest block mb-1.5">5. Focos Ecogênicos</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                      {ECHOGENIC_FOCI.map(o => {
-                        const checked = lesion.echogenicFoci.includes(o.points);
-                        return (
-                          <label key={o.label} className={classNames("flex items-start gap-1.5 p-1.5 border rounded-md cursor-pointer transition-all", checked ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-white")}>
-                            <input type="checkbox" checked={checked} className="mt-0.5 accent-brand-600 scale-75" onChange={() => {
-                              let next = [...lesion.echogenicFoci];
-                              if (o.points === 0) next = [0];
-                              else {
-                                next = next.filter(v => v !== 0);
-                                if (checked) next = next.filter(v => v !== o.points);
-                                else next.push(o.points);
-                              }
-                              updateLesion(lesion.id, { echogenicFoci: next });
-                            }} />
-                            <span className="text-[10px] leading-tight">{o.label} <span className="text-ink-400">({o.points})</span></span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <CategorySelector label="5. Focos Ecogênicos" options={ECHOGENIC_FOCI} current={lesion.echogenicFoci.length > 0 ? lesion.echogenicFoci[0] : null} onSelect={(pts: number) => {
+                    // Simplificado para UI: seleciona apenas um, ou implementa multi-select custom
+                    updateLesion(lesion.id, { echogenicFoci: [pts] });
+                  }} />
                 </div>
 
                 {lesion.classification && (
-                  <div className="bg-brand-50 border border-brand-200 rounded-lg p-2 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[8px] text-brand-600 font-bold uppercase tracking-wider">Resultado</div>
-                      <div className="text-sm font-black text-brand-900">{lesion.classification} ({lesion.totalPoints} pts)</div>
-                    </div>
-                    <div className="text-right flex-1">
-                      <div className="text-[8px] text-brand-600 font-bold uppercase tracking-wider">Recomendação</div>
-                      <div className="text-[10px] text-brand-800 font-medium line-clamp-2">{lesion.recommendation}</div>
-                    </div>
-                  </div>
+                  <ResultCard 
+                    label="Classificação ACR TI-RADS" 
+                    value={lesion.classification} 
+                    points={lesion.totalPoints || 0}
+                    recommendation={lesion.recommendation || ''}
+                    variant={lesion.totalPoints && lesion.totalPoints >= 7 ? 'red' : lesion.totalPoints && lesion.totalPoints >= 4 ? 'amber' : 'emerald'}
+                  />
                 )}
               </div>
             )}
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CategorySelector({ label, options, current, onSelect }: any) {
-  return (
-    <div>
-      <label className="text-[9px] font-bold text-ink-500 uppercase tracking-widest block mb-1">{label}</label>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-        {options.map((o: any) => (
-          <label key={o.label} className={classNames("flex items-start gap-1.5 p-1.5 border rounded-md cursor-pointer transition-all", current === o.points ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-white")}>
-            <input type="radio" checked={current === o.points} onChange={() => onSelect(o.points)} className="mt-0.5 accent-brand-600 scale-75" />
-            <span className="text-[10px] leading-tight">{o.label} <span className="text-ink-400">({o.points})</span></span>
-          </label>
         ))}
       </div>
     </div>

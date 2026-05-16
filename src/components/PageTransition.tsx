@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface Props {
   children: ReactNode;
@@ -17,11 +17,5 @@ export function PageTransition({ children, id }: Props) {
     >
       {children}
     </motion.div>
-  );
-}
-
-export function Skeleton({ className }: { className?: string }) {
-  return (
-    <div className={`animate-pulse bg-ink-100 rounded-md ${className}`} />
   );
 }

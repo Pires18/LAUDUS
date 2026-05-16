@@ -54,12 +54,15 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Reduzindo o zoom global do sistema para uma interface mais densa e profissional */
+    font-size: 14.5px;
   }
 
   body {
     @apply bg-white text-ink-800 font-sans antialiased;
     /* Evita bounces indesejados em iOS */
     overscroll-behavior-y: none;
+    line-height: 1.5;
   }
 
   ::selection {
@@ -196,6 +199,50 @@
     @apply bg-ink-100 rounded animate-pulse;
   }
 
+  /* ── Search Box ── */
+  .search-box {
+    @apply card p-3 mb-5;
+  }
+  .search-box .input {
+    @apply pl-10 h-12 text-sm;
+  }
+
+  /* ── Empty State ── */
+  .empty-state {
+    @apply text-center py-20 px-6;
+  }
+  .empty-state-icon {
+    @apply w-20 h-20 rounded-3xl bg-ink-50 flex items-center justify-center mx-auto mb-5 border border-ink-100;
+  }
+  .empty-state-title {
+    @apply text-lg font-black text-ink-900 mb-1;
+  }
+  .empty-state-text {
+    @apply text-sm text-ink-500 mb-6 max-w-sm mx-auto;
+  }
+
+  /* ── Segmented Tab Group (unified pattern) ── */
+  .tab-group {
+    @apply flex gap-1 p-1 bg-ink-100 rounded-xl overflow-x-auto w-fit;
+  }
+  .tab-item {
+    @apply px-5 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 text-ink-500 hover:text-ink-700 cursor-pointer select-none;
+  }
+  .tab-item-active {
+    @apply bg-white text-brand-700 shadow-sm;
+  }
+
+  /* ── Section Card ── */
+  .section-card {
+    @apply bg-white border border-ink-100 rounded-2xl shadow-soft overflow-hidden;
+  }
+  .section-card-header {
+    @apply px-6 py-4 border-b border-ink-100 bg-ink-50/30 flex items-center justify-between;
+  }
+  .section-card-body {
+    @apply p-6;
+  }
+
   /* ── Tablet Grid Helpers ── */
   .tablet-grid-2 {
     @apply grid grid-cols-1 md:grid-cols-2 gap-6;
@@ -203,24 +250,34 @@
 }
 
 /* ═══════════════════════════════════════════
-   TIPTAP RICH EDITOR
+   DOCKING LAYOUT TRANSITIONS
+   ═══════════════════════════════════════════ */
+
+.dock-sidebar-transition {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ═══════════════════════════════════════════
+   TIPTAP RICH EDITOR (POLISHED)
    ═══════════════════════════════════════════ */
 
 .ProseMirror {
-  @apply min-h-[400px] outline-none px-8 py-6 text-ink-900 font-serif text-[15px] leading-relaxed;
+  @apply min-h-[400px] outline-none text-ink-900 font-serif leading-relaxed;
 }
-.ProseMirror h1 { @apply text-2xl font-semibold mt-6 mb-3 text-ink-900 font-sans; }
-.ProseMirror h2 { @apply text-xl font-semibold mt-5 mb-2 text-ink-900 font-sans uppercase tracking-wide; }
-.ProseMirror h3 { @apply text-lg font-semibold mt-4 mb-2 text-ink-800 font-sans; }
-.ProseMirror p { @apply mb-3; }
-.ProseMirror ul { @apply list-disc pl-6 mb-3; }
-.ProseMirror ol { @apply list-decimal pl-6 mb-3; }
-.ProseMirror strong { @apply font-semibold; }
-.ProseMirror em { @apply italic; }
+.ProseMirror h1 { @apply text-3xl font-black mt-2 mb-10 text-ink-900 font-sans text-center uppercase tracking-tight border-b-8 border-ink-900 pb-8; }
+.ProseMirror h2 { @apply text-base font-black mt-10 mb-4 text-ink-900 font-sans uppercase tracking-[0.2em] border-b-2 border-ink-100 pb-2; }
+.ProseMirror h3 { @apply text-sm font-black mt-6 mb-2 text-ink-800 font-sans uppercase tracking-widest; }
+.ProseMirror p { @apply mb-1.5 leading-relaxed text-[16px]; }
+.ProseMirror ul { @apply list-disc pl-6 mb-4 space-y-1; }
+.ProseMirror ol { @apply list-decimal pl-6 mb-4 space-y-1; }
+.ProseMirror strong { @apply font-black text-ink-900; }
+.ProseMirror em { @apply italic text-ink-600; }
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: theme('colors.ink.400');
+  color: theme('colors.ink.300');
+  font-weight: 700;
+  letter-spacing: -0.01em;
   pointer-events: none;
   height: 0;
 }

@@ -3,6 +3,7 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
   User,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
@@ -82,5 +83,3 @@ export function useAuth() {
   };
 }
 
-// Re-export para uso no import de getGoogleAccessToken
-import { GoogleAuthProvider } from 'firebase/auth';

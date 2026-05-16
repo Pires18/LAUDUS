@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Calendar, Info } from 'lucide-react';
+import { Calendar, Sparkles, Clock, MapPin } from 'lucide-react';
+import { CalculatorInput, ResultCard, CategorySelector } from './CalculatorUI';
+import { classNames } from '../../../utils/format';
 
 export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
   const [method, setMethod] = useState<'dum' | 'usg'>(value?.method || 'dum');
@@ -23,7 +25,7 @@ export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
     today.setHours(0, 0, 0, 0);
 
     if (method === 'dum' && dumDate) {
-      const d = new Date(dumDate + 'T12:00:00'); // Midday to avoid TZ issues
+      const d = new Date(dumDate + 'T12:00:00');
       if (!isNaN(d.getTime())) {
         const diffMs = today.getTime() - d.getTime();
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -67,98 +69,94 @@ export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
       edd: eddStr,
       _summary: summary
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays]);
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center gap-1.5">
-        <Calendar size={14} className="text-blue-600" />
-        <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Idade Gestacional</h3>
+    <div className="space-y-8">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center shadow-sm">
+          <Calendar size={24} />
+        </div>
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Cronometria Gestacional</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Cálculo de IG e Data Provável do Parto (DDP)</p>
+        </div>
       </div>
 
-      <div className="p-3 space-y-3">
-        <div className="flex gap-1">
-          <button 
-            onClick={() => setMethod('dum')}
-            className={`flex-1 py-1 text-[10px] font-bold rounded border transition-all ${method === 'dum' ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-ink-600 border-ink-200 hover:bg-ink-50'}`}
-          >
-            Pela DUM
-          </button>
-          <button 
-            onClick={() => setMethod('usg')}
-            className={`flex-1 py-1 text-[10px] font-bold rounded border transition-all ${method === 'usg' ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-ink-600 border-ink-200 hover:bg-ink-50'}`}
-          >
-            Pela USG Anterior
-          </button>
+      <div className="space-y-4">
+        <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Método de Referência</label>
+        <div className="flex gap-3">
+          {[
+            { id: 'dum', label: 'Pela DUM', desc: 'Data da Última Menstruação' },
+            { id: 'usg', label: 'Pela USG', desc: 'Ultrassom Prévio / Datador' }
+          ].map(m => (
+            <button
+              key={m.id}
+              onClick={() => setMethod(m.id as any)}
+              className={classNames(
+                "flex-1 p-4 rounded-[1.5rem] border-2 transition-all text-left",
+                method === m.id 
+                  ? "bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-100" 
+                  : "bg-white text-ink-400 border-ink-100 hover:bg-ink-50"
+              )}
+            >
+              <div className="text-xs font-black uppercase tracking-widest mb-1">{m.label}</div>
+              <div className={classNames("text-[9px] font-bold opacity-60", method === m.id ? "text-white" : "text-ink-400")}>{m.desc}</div>
+            </button>
+          ))}
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {method === 'dum' ? (
-          <div>
-            <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Data da DUM</label>
-            <input 
+          <div className="col-span-full">
+            <CalculatorInput 
               type="date" 
-              className="input text-xs h-8 py-1" 
+              label="Data da DUM" 
               value={dumDate} 
-              onChange={e => setDumDate(e.target.value)} 
+              onChange={setDumDate} 
             />
           </div>
         ) : (
-          <div className="space-y-2">
-            <div>
-              <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Data da USG Anterior</label>
-              <input 
-                type="date" 
-                className="input text-xs h-8 py-1" 
-                value={prevUsgDate} 
-                onChange={e => setPrevUsgDate(e.target.value)} 
-              />
+          <>
+            <CalculatorInput 
+              type="date" 
+              label="Data da USG Anterior" 
+              value={prevUsgDate} 
+              onChange={setPrevUsgDate} 
+            />
+            <div className="space-y-1.5">
+               <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">IG no Exame Prévio</label>
+               <div className="flex gap-3">
+                  <CalculatorInput type="number" placeholder="Semanas" value={prevUsgWeeks} onChange={setPrevUsgWeeks} suffix="sem" />
+                  <CalculatorInput type="number" placeholder="Dias" value={prevUsgDays} onChange={setPrevUsgDays} suffix="d" />
+               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Semanas</label>
-                <input 
-                  type="number" 
-                  className="input text-xs h-8 py-1 text-center" 
-                  placeholder="Ex: 12"
-                  value={prevUsgWeeks} 
-                  onChange={e => setPrevUsgWeeks(e.target.value)} 
-                />
-              </div>
-              <div>
-                <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Dias</label>
-                <input 
-                  type="number" 
-                  className="input text-xs h-8 py-1 text-center" 
-                  placeholder="0-6"
-                  value={prevUsgDays} 
-                  onChange={e => setPrevUsgDays(e.target.value)} 
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {value?.currentGa ? (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 flex items-center justify-between">
-            <div>
-              <span className="text-[8px] font-bold text-blue-600 uppercase block tracking-widest mb-0.5">IG Atual</span>
-              <span className="text-lg font-black text-blue-900 leading-none">{value.currentGa}</span>
-            </div>
-            <div className="text-right">
-              <span className="text-[8px] font-bold text-blue-600 uppercase block tracking-widest mb-0.5">DDP (Provável)</span>
-              <span className="text-[11px] font-bold text-blue-800 leading-none">
-                {value.edd}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-ink-50 rounded-md p-2 flex items-center gap-2 border border-dashed border-ink-200">
-            <Info size={12} className="text-ink-400" />
-            <span className="text-[10px] text-ink-400">Insira os dados para calcular a IG atual.</span>
-          </div>
+          </>
         )}
       </div>
+
+      {value?.currentGa ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ResultCard 
+            label="Idade Gestacional Atual" 
+            value={value.currentGa} 
+            variant="brand"
+          />
+          <ResultCard 
+            label="Data Provável do Parto" 
+            value={value.edd} 
+            variant="emerald"
+          />
+        </div>
+      ) : (
+        <div className="py-12 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center space-y-3">
+          <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200 animate-pulse">
+             <Clock size={32} />
+          </div>
+          <p className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Aguardando dados cronológicos</p>
+        </div>
+      )}
     </div>
   );
 }

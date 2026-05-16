@@ -1,56 +1,41 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { PageHeader } from '../../components/PageHeader';
-import { Save, BrainCircuit, Sparkles, Settings2, Zap, Shield, FileText, TestTube, CheckCircle2, AlertCircle, Loader2, Copy, ExternalLink } from 'lucide-react';
-import { EXAM_AREAS, ExamArea } from '../../types';
-import { EXAM_CATALOG } from '../../data/exams';
+import { 
+  BrainCircuit, ShieldAlert, 
+  Settings2, Save, RotateCcw, Zap,
+  GraduationCap, CheckCircle2, AlertCircle, Loader2,
+  Sliders, LayoutList, FileText, Layout, ShieldCheck
+} from 'lucide-react';
 import { classNames } from '../../utils/format';
-import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../ai/prompts';
+import { EXAM_AREAS, ExamArea } from '../../types';
+import { 
+  DEFAULT_MASTER_PROMPT, 
+  DEFAULT_GLOBAL_INSTRUCTIONS, 
+  DEFAULT_STRUCTURE_PROMPT, 
+  DEFAULT_RIGID_RULES,
+  AREA_SPECIFIC_PROMPTS,
+} from '../ai/prompts';
+
+type TabId = 'prompts' | 'areas' | 'engine' | 'training';
 
 export function LaudIA() {
   const { settings, updateSettings, showToast } = useApp();
-  const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
+  const [localSettings, setLocalSettings] = useState(settings);
+  const [activeTab, setActiveTab] = useState<TabId>('prompts');
   const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
-  const [selectedExamArea, setSelectedExamArea] = useState<ExamArea>(EXAM_AREAS[0].id);
-  const [selectedExam, setSelectedExam] = useState<string>(EXAM_CATALOG[EXAM_AREAS[0].id][0] || '');
-  const [activeSection, setActiveSection] = useState<'engine' | 'area' | 'exam' | 'skeleton' | 'advanced'>('engine');
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
   useEffect(() => {
-    setDraft(settings);
+    setLocalSettings(settings);
   }, [settings]);
 
-  function u<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
-    setDraft((d) => ({ ...d, [key]: value }));
-  }
-
-  function uArea(areaId: ExamArea, text: string) {
-    setDraft((d) => ({
-      ...d,
-      aiAreaPrompts: {
-        ...(d.aiAreaPrompts || {}),
-        [areaId]: text,
-      },
-    }));
-  }
-
-  function uExam(examName: string, text: string) {
-    setDraft((d) => ({
-      ...d,
-      aiExamPrompts: {
-        ...(d.aiExamPrompts || {}),
-        [examName]: text,
-      },
-    }));
-  }
-
-  async function handleSave(e: FormEvent) {
-    e.preventDefault();
+  async function handleSave() {
     setIsSaving(true);
     try {
-      await updateSettings(draft);
-      showToast('Configurações de IA salvas', 'success');
+      await updateSettings(localSettings);
+      showToast('Configurações da IA salvas com sucesso', 'success');
     } catch {
       showToast('Erro ao salvar configurações', 'error');
     } finally {
@@ -59,486 +44,363 @@ export function LaudIA() {
   }
 
   async function testConnection() {
-    if (!draft.geminiApiKey) {
+    if (!localSettings.geminiApiKey) {
       showToast('Insira a API Key primeiro', 'error');
       return;
     }
     setTestStatus('testing');
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(draft.geminiApiKey);
-      const model = genAI.getGenerativeModel({ model: draft.geminiModel || 'gemini-2.5-flash' });
+      const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
       const result = await model.generateContent('Responda apenas: OK');
       const text = result.response.text();
       if (text) {
         setTestStatus('success');
-        showToast('Conexão com Gemini validada!', 'success');
+        showToast('Conexão validada!', 'success');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setTestStatus('error');
-      showToast(`Erro: ${err?.message || 'Falha na conexão'}`, 'error');
+      showToast('Falha na conexão', 'error');
     }
   }
 
-  const sections = [
-    { id: 'engine', label: 'Prompt Mestre & Motor', icon: <BrainCircuit size={16} /> },
-    { id: 'area', label: 'Prompts por Área', icon: <Settings2 size={16} /> },
-    { id: 'exam', label: 'Prompts por Exame', icon: <FileText size={16} /> },
-    { id: 'skeleton', label: 'Skeleton & Regras', icon: <Shield size={16} /> },
-    { id: 'advanced', label: 'Configurações Avançadas', icon: <Zap size={16} /> },
+  const sidebarItems = [
+    { id: 'prompts', label: 'Doutrina & Prompts', icon: ShieldAlert },
+    { id: 'areas', label: 'Especialidades', icon: LayoutList },
+    { id: 'engine', label: 'Motor & API', icon: Sliders },
+    { id: 'training', label: 'Aprendizado IA', icon: GraduationCap },
   ] as const;
 
-  const filledAreas = EXAM_AREAS.filter(a => draft.aiAreaPrompts?.[a.id]);
-
   return (
-    <div className="max-w-5xl mx-auto py-8">
-      <PageHeader
-        title="LAUD.IA"
-        subtitle="Motor de Inteligência Artificial para Geração de Laudos"
+    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+      <PageHeader 
+        title="Configurações LAUD.IA" 
+        subtitle="Gerencie o comportamento e a inteligência do sistema de laudos."
+        icon={BrainCircuit}
         actions={
-          <button className="btn-primary" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-            {isSaving ? 'Salvando...' : 'Salvar Configurações'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setLocalSettings(settings)} className="btn-ghost text-ink-400">
+              <RotateCcw size={16} />
+              Descartar
+            </button>
+            <button onClick={handleSave} disabled={isSaving} className="btn-primary">
+              {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Salvar Alterações
+            </button>
+          </div>
         }
       />
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-ink-200 mt-6 mb-6 overflow-x-auto">
-        {sections.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setActiveSection(s.id as typeof activeSection)}
-            className={classNames(
-              'flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-              activeSection === s.id
-                ? 'border-brand-500 text-brand-600'
-                : 'border-transparent text-ink-500 hover:text-ink-700 hover:border-ink-300'
-            )}
-          >
-            {s.icon} {s.label}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={handleSave}>
-        {/* Section 1: Engine */}
-        {activeSection === 'engine' && (
-          <div className="space-y-6">
-            {/* API Key */}
-            <div className="card p-6 border-brand-200 shadow-soft">
-              <div className="flex items-center gap-3 mb-6 border-b border-ink-100 pb-4">
-                <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                  <BrainCircuit size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-ink-900">Credenciais do Motor</h3>
-                  <p className="text-sm text-ink-500">Chave de API e seleção do modelo de linguagem</p>
-                </div>
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Sidebar Navigation */}
+        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
+          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Configurações</p>
+          {sidebarItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={classNames(
+                "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3",
+                activeTab === item.id 
+                  ? "bg-brand-50 text-brand-700 shadow-sm border border-brand-100" 
+                  : "text-ink-600 hover:bg-ink-50"
+              )}
+            >
+              <div className={classNames("p-1.5 rounded-lg", activeTab === item.id ? "bg-brand-100 text-brand-600" : "bg-ink-50 text-ink-400")}>
+                <item.icon size={16} />
               </div>
+              {item.label}
+            </button>
+          ))}
+        </aside>
 
-              <div className="grid gap-6 max-w-2xl">
-                <div>
-                  <label className="label text-ink-800">API Key do Google Gemini</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      className="input font-mono text-sm flex-1"
-                      value={draft.geminiApiKey || ''}
-                      onChange={(e) => u('geminiApiKey', e.target.value)}
-                      placeholder="AIzaSy..."
-                    />
-                    <button
-                      type="button"
-                      onClick={testConnection}
-                      disabled={testStatus === 'testing'}
-                      className={classNames(
-                        'px-4 rounded-lg font-bold text-xs flex items-center gap-2 border transition-all',
-                        testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        testStatus === 'error' ? 'bg-red-50 text-red-700 border-red-200' :
-                        'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
-                      )}
-                    >
-                      {testStatus === 'testing' ? <Loader2 size={14} className="animate-spin" /> :
-                       testStatus === 'success' ? <CheckCircle2 size={14} /> :
-                       testStatus === 'error' ? <AlertCircle size={14} /> :
-                       <TestTube size={14} />}
-                      {testStatus === 'testing' ? 'Testando...' : testStatus === 'success' ? 'Conectado!' : testStatus === 'error' ? 'Falhou' : 'Testar'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-ink-500 mt-2">
-                    Obtenha a sua chave no{' '}
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-brand-600 hover:underline font-medium inline-flex items-center gap-1">
-                      Google AI Studio <ExternalLink size={10} />
-                    </a>
-                  </p>
-                </div>
+        <div className="flex-1 w-full space-y-6">
+          {/* Mobile Navigation */}
+          <div className="lg:hidden flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+            {sidebarItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={classNames(
+                  "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2",
+                  activeTab === item.id ? "bg-brand-600 text-white border-brand-600" : "bg-white text-ink-600 border-ink-100"
+                )}
+              >
+                <item.icon size={14} />
+                {item.label}
+              </button>
+            ))}
+          </div>
 
-                <div>
-                  <label className="label text-ink-800">Modelo de Linguagem (LLM)</label>
-                  <select className="input" value={draft.geminiModel} onChange={(e) => u('geminiModel', e.target.value)}>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado — Rápido e Otimizado)</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Avançado — Raciocínio Clínico Complexo)</option>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Legado)</option>
-                  </select>
-                  <p className="text-xs text-ink-500 mt-2">
-                    O Flash atende 95% dos casos de rotina. Use o Pro para laudos que exigem análise complexa.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Master Prompt */}
-            <div className="card border-brand-200 shadow-soft mt-6 overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-ink-50/50">
+          {/* TAB: PROMPTS */}
+          {activeTab === 'prompts' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Master Prompt */}
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                      <Shield size={20} />
+                      <BrainCircuit size={20} />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg text-ink-900">Prompt Mestre</h3>
-                      <p className="text-sm text-ink-500">A instrução global que guia todo o comportamento do assistente.</p>
+                      <h4 className="font-bold text-ink-900">Prompt Mestre</h4>
+                      <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest">Base de Personalidade da IA</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => u('aiMasterPrompt', DEFAULT_MASTER_PROMPT)}
-                    className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors"
+                  <button 
+                    onClick={() => setLocalSettings({...localSettings, aiMasterPrompt: DEFAULT_MASTER_PROMPT})}
+                    className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors border border-brand-100"
+                    title="Restaurar Padrão"
                   >
-                    <Zap size={12} /> Restaurar Padrão
+                    <RotateCcw size={16} />
                   </button>
                 </div>
-              <div className="p-6">
+                <div className="p-6">
+                  <textarea
+                    value={localSettings.aiMasterPrompt}
+                    onChange={(e) => setLocalSettings({ ...localSettings, aiMasterPrompt: e.target.value })}
+                    rows={12}
+                    className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed"
+                    placeholder="Defina o papel principal da IA..."
+                  />
+                </div>
+              </div>
+
+              {/* Instructions & Rules Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col">
+                  <div className="p-5 border-b border-ink-100 flex items-center justify-between">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
+                      <Zap size={14} className="text-amber-500" /> Instruções de Raciocínio
+                    </h4>
+                    <button onClick={() => setLocalSettings({...localSettings, aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS})} className="text-brand-600">
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    value={localSettings.aiGlobalInstructions}
+                    onChange={(e) => setLocalSettings({ ...localSettings, aiGlobalInstructions: e.target.value })}
+                    rows={10}
+                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl"
+                  />
+                </div>
+
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col">
+                  <div className="p-5 border-b border-ink-100 flex items-center justify-between">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
+                      <ShieldCheck size={14} className="text-red-500" /> Regras Inquebráveis
+                    </h4>
+                    <button onClick={() => setLocalSettings({...localSettings, aiRigidRules: DEFAULT_RIGID_RULES})} className="text-brand-600">
+                      <RotateCcw size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    value={localSettings.aiRigidRules}
+                    onChange={(e) => setLocalSettings({ ...localSettings, aiRigidRules: e.target.value })}
+                    rows={10}
+                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl"
+                  />
+                </div>
+              </div>
+
+              {/* Structure Prompt */}
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm">
+                <div className="p-5 border-b border-ink-100 flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
+                    <Layout size={14} className="text-indigo-500" /> Estrutura Obrigatória (Skeleton)
+                  </h4>
+                  <button onClick={() => setLocalSettings({...localSettings, aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT})} className="text-brand-600">
+                    <RotateCcw size={14} />
+                  </button>
+                </div>
                 <textarea
-                  className="input min-h-[300px] font-mono text-sm leading-relaxed"
-                  placeholder="Você é um assistente médico especializado em redação de laudos ultrassonográficos..."
-                  value={draft.aiMasterPrompt || ''}
-                  onChange={(e) => u('aiMasterPrompt', e.target.value)}
+                  value={localSettings.aiStructurePrompt}
+                  onChange={(e) => setLocalSettings({ ...localSettings, aiStructurePrompt: e.target.value })}
+                  rows={8}
+                  className="w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl"
                 />
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-brand-50 border border-brand-100 rounded-lg p-4 text-xs text-brand-700">
-                    <div className="font-bold flex items-center gap-1.5 mb-1 text-[11px] uppercase tracking-wider">
-                      <Sparkles size={12} /> Dica de Especialista
-                    </div>
-                    Se deixado em branco, o sistema usará o prompt mestre padrão otimizado. Use para ditar o tom de voz global ou o formato estrutural primário.
-                  </div>
-                  <div className="bg-ink-50 border border-ink-200 rounded-lg p-4 text-xs text-ink-600">
-                    <div className="font-bold flex items-center gap-1.5 mb-1 text-[11px] uppercase tracking-wider">
-                      <Copy size={12} /> Variáveis Disponíveis
-                    </div>
-                    <ul className="grid grid-cols-2 gap-x-2 gap-y-1">
-                      <li>• <code>{"{paciente}"}</code></li>
-                      <li>• <code>{"{exame}"}</code></li>
-                      <li>• <code>{"{area}"}</code></li>
-                      <li>• <code>{"{indicacao}"}</code></li>
-                      <li>• <code>{"{achados}"}</code></li>
-                      <li>• <code>{"{mascara}"}</code></li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             </div>
+          )}
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="card p-4 text-center">
-                <div className="text-2xl font-black text-brand-600">{filledAreas.length}</div>
-                <div className="text-[11px] text-ink-500 font-medium">Áreas Configuradas</div>
-              </div>
-              <div className="card p-4 text-center">
-                <div className="text-2xl font-black text-brand-600">{EXAM_AREAS.length}</div>
-                <div className="text-[11px] text-ink-500 font-medium">Áreas Disponíveis</div>
-              </div>
-              <div className="card p-4 text-center">
-                <div className="text-2xl font-black text-emerald-600">{draft.geminiApiKey ? '✓' : '✗'}</div>
-                <div className="text-[11px] text-ink-500 font-medium">API Key</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Section 2: Behavior by Area */}
-        {activeSection === 'area' && (
-          <div className="card shadow-soft overflow-hidden">
-            <div className="p-6 border-b border-ink-100 bg-ink-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                  <Settings2 size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-ink-900">Comportamento da IA por Área</h3>
-                  <p className="text-sm text-ink-500">
-                    Defina regras, jargões e padrões que a IA deve obedecer em cada especialidade.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row">
-              {/* Area Sidebar */}
-              <div className="w-full md:w-64 border-r border-ink-100 bg-ink-50/30 p-3 flex flex-col gap-1 max-h-[500px] overflow-y-auto">
+          {/* TAB: AREAS */}
+          {activeTab === 'areas' && (
+            <div className="flex flex-col lg:flex-row bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden min-h-[600px] animate-fade-in">
+              <div className="w-full lg:w-72 bg-ink-50/50 border-r border-ink-100 p-4 space-y-1">
+                <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Áreas Médicas</p>
                 {EXAM_AREAS.map((area) => (
                   <button
                     key={area.id}
-                    type="button"
                     onClick={() => setSelectedArea(area.id)}
                     className={classNames(
-                      'text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between',
-                      selectedArea === area.id
-                        ? 'bg-white shadow-sm border border-ink-200 font-semibold text-brand-700'
-                        : 'text-ink-600 hover:bg-ink-100 font-medium border border-transparent'
+                      "w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all",
+                      selectedArea === area.id 
+                        ? "bg-brand-600 text-white shadow-md" 
+                        : "text-ink-600 hover:bg-ink-100"
                     )}
                   >
-                    <span>{area.label}</span>
-                    {draft.aiAreaPrompts?.[area.id] && (
-                      <span className="w-2 h-2 rounded-full bg-brand-500 shrink-0" title="Possui regras ativas" />
-                    )}
+                    {area.label}
                   </button>
                 ))}
               </div>
-
-              {/* Area Content */}
-              <div className="flex-1 p-6">
-                <div className="mb-4">
-                  <h4 className="font-semibold text-ink-900 flex items-center gap-2">
-                    <FileText size={16} className="text-brand-500" />
-                    Regras para {EXAM_AREAS.find((a) => a.id === selectedArea)?.label}
-                  </h4>
-                  <p className="text-xs text-ink-500 mt-1">
-                    Exemplos: "Conclua listando achados em tópicos." ou "Classifique miomas conforme FIGO." ou "Use nomenclatura CBR/SBUS."
-                  </p>
-                </div>
-
-                <textarea
-                  className="input min-h-[250px] font-mono text-sm leading-relaxed"
-                  placeholder="Insira as instruções específicas para esta área..."
-                  value={draft.aiAreaPrompts?.[selectedArea] || ''}
-                  onChange={(e) => uArea(selectedArea, e.target.value)}
-                />
-
-                <div className="mt-3 bg-brand-50 border border-brand-100 rounded-lg p-3 text-xs text-brand-700">
-                  <strong>Dica:</strong> Essas regras são injetadas automaticamente no prompt quando um exame dessa área é gerado. Elas complementam as instruções da máscara.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Section 3: Prompts by Exam */}
-        {activeSection === 'exam' && (
-          <div className="card shadow-soft overflow-hidden">
-            <div className="p-6 border-b border-ink-100 bg-ink-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-ink-900">Comportamento da IA por Exame</h3>
-                  <p className="text-sm text-ink-500">
-                    Defina regras e restrições milimétricas para exames específicos.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col md:flex-row">
-              {/* Sidebar */}
-              <div className="w-full md:w-64 border-r border-ink-100 bg-ink-50/30 p-3 flex flex-col gap-1 max-h-[500px] overflow-y-auto">
-                <div className="mb-2">
-                  <label className="text-xs font-semibold text-ink-500 px-2 uppercase tracking-wide">Área Médica</label>
-                  <select
-                    className="input text-sm mt-1 mb-3"
-                    value={selectedExamArea}
-                    onChange={(e) => {
-                      const newArea = e.target.value as ExamArea;
-                      setSelectedExamArea(newArea);
-                      setSelectedExam(EXAM_CATALOG[newArea]?.[0] || '');
+              <div className="flex-1 p-8 space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="text-xl font-black text-ink-900">Protocolos: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}</h4>
+                    <p className="text-sm text-ink-500">Diretrizes específicas para análise e conclusão desta área.</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: AREA_SPECIFIC_PROMPTS[selectedArea] };
+                      setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
                     }}
+                    className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100"
                   >
-                    {EXAM_AREAS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
-                  </select>
-                </div>
-
-                <div className="text-xs font-semibold text-ink-500 px-2 uppercase tracking-wide mb-1">Exames</div>
-                {(EXAM_CATALOG[selectedExamArea] || []).map((exam) => (
-                  <button
-                    key={exam}
-                    type="button"
-                    onClick={() => setSelectedExam(exam)}
-                    className={classNames(
-                      'text-left px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between',
-                      selectedExam === exam
-                        ? 'bg-white shadow-sm border border-ink-200 font-semibold text-brand-700'
-                        : 'text-ink-600 hover:bg-ink-100 font-medium border border-transparent'
-                    )}
-                  >
-                    <span className="truncate">{exam}</span>
-                    {draft.aiExamPrompts?.[exam] && (
-                      <span className="w-2 h-2 rounded-full bg-brand-500 shrink-0" title="Possui regras ativas" />
-                    )}
+                    <RotateCcw size={16} />
                   </button>
-                ))}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 p-6">
-                <div className="mb-4">
-                  <h4 className="font-semibold text-ink-900 flex items-center gap-2">
-                    <FileText size={16} className="text-brand-500" />
-                    Regras para: {selectedExam || 'Selecione um exame'}
-                  </h4>
-                  <p className="text-xs text-ink-500 mt-1">
-                    Exemplos: "Para este exame de Próstata, sempre inclua a tabela de peso e a classificação PI-RADS se fornecido."
-                  </p>
                 </div>
-
                 <textarea
-                  className="input min-h-[250px] font-mono text-sm leading-relaxed"
-                  placeholder="Insira as instruções cirúrgicas para este exame específico..."
-                  value={draft.aiExamPrompts?.[selectedExam] || ''}
-                  onChange={(e) => uExam(selectedExam, e.target.value)}
-                  disabled={!selectedExam}
+                  value={localSettings.aiAreaPrompts?.[selectedArea] || ''}
+                  onChange={(e) => {
+                    const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: e.target.value };
+                    setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+                  }}
+                  rows={18}
+                  className="w-full rounded-2xl border-ink-100 font-mono text-sm p-6 bg-ink-50/30 focus:ring-brand-500 focus:border-brand-500 leading-relaxed"
+                  placeholder={`Instruções clínicas para ${selectedArea}...`}
                 />
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Section: Skeleton */}
-        {activeSection === 'skeleton' && (
-          <div className="space-y-6">
-            {/* Structure Prompt */}
-            <div className="card border-brand-200 shadow-soft overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-ink-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
-                    <FileText size={20} />
-                  </div>
+          {/* TAB: ENGINE */}
+          {activeTab === 'engine' && (
+            <div className="max-w-3xl space-y-6 animate-fade-in">
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-3">
+                  <Sliders size={24} className="text-brand-600" /> Configurações do Motor
+                </h4>
+                
+                <div className="space-y-8">
                   <div>
-                    <h3 className="font-semibold text-lg text-ink-900">Estrutura Obrigatória</h3>
-                    <p className="text-sm text-ink-500">Define a ordem e o formato das seções do laudo.</p>
+                    <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Gemini API Key</label>
+                    <div className="flex gap-3">
+                      <input
+                        type="password"
+                        value={localSettings.geminiApiKey || ''}
+                        onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
+                        placeholder="AIzaSy..."
+                        className="input flex-1 font-mono text-sm h-14"
+                      />
+                      <button
+                        onClick={testConnection}
+                        disabled={testStatus === 'testing'}
+                        className={classNames(
+                          "w-14 h-14 flex items-center justify-center rounded-xl transition-all border",
+                          testStatus === 'success' ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                          testStatus === 'error' ? "bg-red-50 text-red-600 border-red-200" :
+                          "bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100"
+                        )}
+                      >
+                         {testStatus === 'testing' ? <Loader2 size={20} className="animate-spin" /> :
+                          testStatus === 'success' ? <CheckCircle2 size={20} /> :
+                          testStatus === 'error' ? <AlertCircle size={20} /> : <Zap size={20} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => u('aiStructurePrompt', DEFAULT_STRUCTURE_PROMPT)}
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors"
-                >
-                  <Zap size={12} /> Restaurar Padrão
-                </button>
-              </div>
-              <div className="p-6">
-                <textarea
-                  className="input min-h-[250px] font-mono text-sm leading-relaxed"
-                  value={draft.aiStructurePrompt || ''}
-                  onChange={(e) => u('aiStructurePrompt', e.target.value)}
-                  placeholder="Insira a estrutura obrigatória..."
-                />
-              </div>
-            </div>
 
-            {/* Rigid Rules */}
-            <div className="card border-brand-200 shadow-soft overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-ink-100 bg-ink-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
-                    <Shield size={20} />
-                  </div>
                   <div>
-                    <h3 className="font-semibold text-lg text-ink-900">Regras Rígidas</h3>
-                    <p className="text-sm text-ink-500">Restrições de segurança, privacidade e formatação técnica.</p>
+                    <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Principal</label>
+                    <select 
+                      value={localSettings.geminiModel} 
+                      onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
+                      className="input h-14"
+                    >
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash (Última Geração - Recomendado)</option>
+                      <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
+                      <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    </select>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => u('aiRigidRules', DEFAULT_RIGID_RULES)}
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-50 hover:bg-brand-100 transition-colors"
-                >
-                  <Zap size={12} /> Restaurar Padrão
-                </button>
-              </div>
-              <div className="p-6">
-                <textarea
-                  className="input min-h-[300px] font-mono text-sm leading-relaxed"
-                  value={draft.aiRigidRules || ''}
-                  onChange={(e) => u('aiRigidRules', e.target.value)}
-                  placeholder="Insira as regras rígidas..."
-                />
-              </div>
-            </div>
-          </div>
-        )}
-        {activeSection === 'advanced' && (
-          <div className="space-y-6">
-            <div className="card p-6 shadow-soft">
-              <div className="flex items-center gap-3 mb-6 border-b border-ink-100 pb-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-                  <Zap size={20} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-ink-900">Parâmetros de Geração</h3>
-                  <p className="text-sm text-ink-500">Controle fino do comportamento do modelo de IA</p>
-                </div>
-              </div>
 
-              <div className="grid gap-6 max-w-2xl">
-                <div>
-                  <label className="label text-ink-800">Temperatura (Criatividade)</label>
-                  <div className="flex items-center gap-4">
-                    <input
+                  <div className="pt-6 border-t border-ink-100">
+                     <label className="block text-sm font-bold text-ink-700 mb-6 flex items-center justify-between">
+                      Temperatura (Criatividade)
+                      <span className="text-brand-600 text-xl font-black">{localSettings.aiTemperature ?? 0.3}</span>
+                     </label>
+                     <input
                       type="range"
                       min="0"
                       max="1"
                       step="0.1"
-                      className="flex-1 accent-brand-600"
-                      value={draft.aiTemperature ?? 0.3}
-                      onChange={(e) => u('aiTemperature' as any, Number(e.target.value))}
+                      value={localSettings.aiTemperature ?? 0.3}
+                      onChange={(e) => setLocalSettings({ ...localSettings, aiTemperature: parseFloat(e.target.value) })}
+                      className="w-full h-3 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-brand-600"
+                     />
+                     <div className="flex justify-between text-[10px] text-ink-400 font-bold uppercase mt-3 tracking-widest">
+                      <span>Literal / Preciso</span>
+                      <span>Criativo / Fluído</span>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: TRAINING */}
+          {activeTab === 'training' && (
+            <div className="max-w-3xl space-y-6 animate-fade-in">
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <GraduationCap size={28} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black text-ink-900">Aprendizado por Estilo</h4>
+                      <p className="text-sm text-ink-500">A IA aprende com seus laudos finalizados.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
+                    className={classNames(
+                      "relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
+                    )}
+                  >
+                    <span className={classNames(
+                      "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                      localSettings.aiTrainingEnabled ? 'translate-x-5' : 'translate-x-0'
+                    )} />
+                  </button>
+                </div>
+
+                <div className={classNames("space-y-8 transition-opacity duration-300", !localSettings.aiTrainingEnabled && "opacity-40 pointer-events-none")}>
+                  <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl text-sm text-indigo-900 leading-relaxed">
+                    <strong>Como funciona:</strong> Ao habilitar esta função, o LAUD.IA enviará seus últimos exames finalizados da mesma especialidade como contexto. Isso garante que a IA utilize o seu vocabulário, estilo de pontuação e estrutura preferida.
+                  </div>
+
+                  <div className="space-y-4 pt-4">
+                    <label className="block text-sm font-bold text-ink-700 flex items-center gap-2">
+                      Quantidade de Exames Contextuais
+                      <span className="text-indigo-600 font-black text-lg">{localSettings.aiTrainingContextSize || 3}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      value={localSettings.aiTrainingContextSize || 3}
+                      onChange={(e) => setLocalSettings({ ...localSettings, aiTrainingContextSize: parseInt(e.target.value) })}
+                      className="w-full h-3 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                     />
-                    <span className="text-sm font-mono font-bold text-ink-700 w-10 text-center">{draft.aiTemperature ?? 0.3}</span>
+                    <p className="text-xs text-ink-400 italic">Recomendado: 3 a 5 exames para o melhor equilíbrio entre fidelidade e velocidade.</p>
                   </div>
-                  <p className="text-xs text-ink-500 mt-1">
-                    0.0 = Determinístico (sempre igual) | 1.0 = Criativo (mais variação). Recomendado: 0.2-0.4 para laudos.
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <label className="label text-ink-800">Instrução Global Adicional</label>
-                    <button
-                      type="button"
-                      onClick={() => u('aiGlobalInstructions' as any, DEFAULT_GLOBAL_INSTRUCTIONS)}
-                      className="text-[10px] font-bold text-brand-600 uppercase tracking-wider hover:underline"
-                    >
-                      Restaurar Padrão
-                    </button>
-                  </div>
-                  <textarea
-                    className="input min-h-[150px] font-mono text-sm leading-relaxed"
-                    value={(draft as any).aiGlobalInstructions || ''}
-                    onChange={(e) => u('aiGlobalInstructions' as any, e.target.value)}
-                    placeholder="Instruções que serão aplicadas a TODOS os laudos, independente da área ou máscara..."
-                  />
-                  <p className="text-xs text-ink-500 mt-1">
-                    Ex: "Sempre use a nomenclatura padrão CBR." ou "Não use abreviaturas sem definição prévia."
-                  </p>
                 </div>
               </div>
             </div>
-
-            <div className="card p-6 shadow-soft border-amber-200">
-              <div className="flex items-center gap-3 mb-4">
-                <Shield size={20} className="text-amber-600" />
-                <h3 className="font-semibold text-ink-900">Segurança e Privacidade</h3>
-              </div>
-              <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 text-sm text-amber-800 space-y-2">
-                <p>• Os dados enviados ao Gemini são processados via API e <strong>não são armazenados pelo Google</strong> para treinamento.</p>
-                <p>• A chave de API é armazenada localmente no Firestore da sua conta e <strong>nunca é compartilhada</strong>.</p>
-                <p>• Recomendamos <strong>não incluir dados pessoais</strong> do paciente (nome, CPF) no formulário de achados enviado à IA.</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </form>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,16 @@
  */
 export function formatDate(date: number | string | Date | undefined, options?: Intl.DateTimeFormatOptions): string {
   if (!date) return '';
-  const d = new Date(date);
+  
+  let d: Date;
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // Caso YYYY-MM-DD (comum em inputs de data)
+    const [year, month, day] = date.split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(date);
+  }
+
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('pt-BR', options);
 }
@@ -86,4 +95,16 @@ export function formatCEP(cep: string): string {
   const digits = cep.replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 5) return digits;
   return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
+/**
+ * Formata CNPJ: 00.000.000/0000-00
+ */
+export function formatCNPJ(cnpj: string): string {
+  const digits = cnpj.replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 }

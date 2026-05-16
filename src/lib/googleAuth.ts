@@ -43,7 +43,7 @@ export async function getGoogleAccessToken(forceRefresh = false): Promise<string
     tokenExpirationTime = Date.now() + 3600000; 
 
     return cachedAccessToken;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Se falhar em background, tentamos com prompt interativo
     console.warn('[Google Auth] Erro ao renovar token silenciosamente, solicitando interativamente...', error);
     provider.setCustomParameters({ prompt: 'select_account' });

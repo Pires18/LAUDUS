@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings, ExamArea } from '../../types';
+import { getRecentFinalizedReports } from '../../store/db';
 
 interface GeneratedTemplate {
   title: string;
@@ -7,6 +8,7 @@ interface GeneratedTemplate {
   analysisTemplate: string;
   conclusionTemplate: string;
   recommendationsTemplate: string;
+  classificationTemplate?: string;
 }
 
 /**
@@ -22,33 +24,66 @@ export async function generateTemplateStructure(
     throw new Error('API Key do Gemini não configurada. Vá em Configurações para adicionar.');
   }
 
-  const prompt = `Você é um especialista em Radiologia e Ultrassonografia.
-Sua tarefa é criar um "Modelo Padrão" (Máscara) para um laudo de ultrassom.
-Este modelo será usado por médicos como base para seus laudos.
+  // Busca exemplos de laudos da mesma área para mimetizar o estilo
+  // Como é um novo template, buscamos laudos da área em geral
+  const examples = await getRecentFinalizedReports(area, 2); 
 
-DADOS DO EXAME:
-- Área Médica: ${area}
+  const areaContext: Record<string, string> = {
+    'medicina-interna': 'Abdome total: fígado, vias biliares, pâncreas, baço, rins, bexiga, próstata ou útero, aorta. Use normalidade CBR com medidas referenciais.',
+    'ginecologia': 'Útero (posição, dimensões, miométrio, endométrio), ovários, anexos, Douglas. Inclua BI-RADS se mama, O-RADS se massa anexial.',
+    'medicina-fetal': 'Biometria fetal completa (DBP, CC, CA, CF, PFE + percentil), morfologia por trimestre, Doppler obstétrico (AU, ACM, uterinas), placenta e ILA.',
+    'pequenas-partes': 'Tireoide com TI-RADS por nódulo, glândulas salivares, linfonodos cervicais, testículos ou partes moles superficiais conforme o exame.',
+    'musculoesqueletico': 'Tendões (fibrilar/tendinopatia/ruptura), articulações (derrame/sinovite OMERACT), bursas, nervos periféricos.',
+    'vascular': 'Carótidas (VPS/VDF/EIM), sistema venoso (compressibilidade TVP), aorta (calibre), doppler hepático/renal conforme exame.',
+    'pediatria': 'Adapte à faixa etária: transfontanelar (recém-nato), quadril (Graf), piloro, abdome pediátrico, rim.',
+    'procedimentos': 'Descritivo técnico de PAAF, core biopsy, drenagem ou infiltração. Inclua técnica, material obtido e status pós-procedimento.',
+    'reumatologico': 'Articulações afetadas, sinovite OMERACT modo B + Power Doppler, erosões, enteses, depósitos de cristais.',
+  };
+
+  const prompt = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie uma Máscara de Laudo (Template) de MÁXIMA QUALIDADE CLÍNICA para o sistema LAUD.US.
+
+EXAME ALVO:
+- Área: ${area}
 - Nome do Exame: ${examName}
+- Contexto da área: ${areaContext[area] || 'Exame ultrassonográfico geral.'}
 
-INSTRUÇÕES:
-1. Crie um Título profissional.
-2. Descreva uma Técnica padrão adequada para este exame.
-3. Crie um Modelo de Análise (o corpo do laudo) que descreva os órgãos/estruturas em estado NORMAL. 
-   - Use placeholders entre colchetes como [medida], [descricao] para partes que variam.
-   - O texto deve ser articulado e profissional (PT-BR).
-4. Crie um Modelo de Conclusão padrão (ex: exame dentro da normalidade).
-5. Crie um Modelo de Recomendações (se aplicável).
+${examples.length > 0 ? `ESTILO DE REFERÊNCIA DO MÉDICO (replique vocabulário, fraseologia e nível de detalhe):\n${examples.join('\n\n---\n\n')}\n` : ''}
 
-FORMATO DE SAÍDA (JSON puro, sem markdown):
+REGRAS PARA CADA CAMPO:
+
+1. title: Nome oficial do exame em CAIXA ALTA. Sem HTML. Ex: "ULTRASSONOGRAFIA DO ABDOME SUPERIOR".
+
+2. technique: Parágrafo técnico completo: equipamento, frequência do transdutor, janelas acústicas, planos de corte, uso de Doppler se relevante. Use <p> e <strong>. Mimetize o estilo do médico de referência.
+
+3. analysisTemplate: Descrição de um exame COMPLETAMENTE NORMAL. Regras:
+   - Use <p><strong>NOME DO ÓRGÃO:</strong> descrição normal detalhada.</p> para cada estrutura.
+   - Use "(…)" APENAS para campos de medidas numéricas que variam por paciente (ex: "medindo (…) x (…) x (…) cm").
+   - Para estruturas qualitativas normais, escreva a descrição completa (não use placeholder).
+   - Inclua TODAS as estruturas relevantes para este tipo de exame, na ordem anatômica lógica.
+   - Nível de detalhe: denso, técnico, equivalente a um laudo real de especialista.
+
+4. conclusionTemplate: Conclusão padrão de exame normal. Use <p>• [achado].</p> com marcador para cada item. Ex: <p>• Aspecto ultrassonográfico dentro dos limites da normalidade.</p>
+
+5. recommendationsTemplate: Recomendação padrão ou <p>• Seguimento clínico de rotina conforme protocolo da especialidade solicitante.</p>
+
+6. classificationTemplate: SE o exame envolver mama (BI-RADS), tireoide (TI-RADS), ovário (O-RADS), fígado em cirrótico (LI-RADS) ou cisto renal (BOSNIAK): inclua tabela HTML simples com a classificação padrão. Caso contrário, retorne string vazia "".
+
+DIRETRIZES DE QUALIDADE:
+- Terminologia CBR/SBUS/ISUOG/ACR conforme a área.
+- Frases declarativas completas, sem coloquialismos.
+- NÃO inclua títulos de seção (TÉCNICA, ANÁLISE, etc.) dentro dos campos — o sistema os insere automaticamente.
+- NÃO use markdown (##, **, ---).
+- HTML limpo: apenas <p>, <strong>, <em>, <table>, <tr>, <td>, <ul>, <li>.
+
+FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
 {
-  "title": "String",
-  "technique": "String (use \\n para quebras de linha)",
-  "analysisTemplate": "String (use \\n para quebras de linha)",
-  "conclusionTemplate": "String (use \\n para quebras de linha)",
-  "recommendationsTemplate": "String (use \\n para quebras de linha)"
-}
-
-Retorne APENAS o JSON, sem explicações, sem markdown, sem \`\`\`.`;
+  "title": "NOME EM CAIXA ALTA",
+  "technique": "HTML da técnica",
+  "analysisTemplate": "HTML da análise normal",
+  "conclusionTemplate": "HTML da conclusão",
+  "recommendationsTemplate": "HTML das recomendações",
+  "classificationTemplate": "HTML da classificação ou string vazia"
+}`;
 
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
   const model = genAI.getGenerativeModel({

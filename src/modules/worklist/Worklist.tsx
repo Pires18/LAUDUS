@@ -6,28 +6,40 @@ import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../type
 import { deleteItem } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
 import { useState, useMemo } from 'react';
-import { where } from 'firebase/firestore';
 import {
   CircleDot, CheckCircle2, Clock, Search, FilePlus2, Trash2,
-  LayoutList, Building2, Filter, Calendar, SlidersHorizontal, ArrowRight
+  LayoutList, Building2, Filter, Calendar, SlidersHorizontal, ArrowRight, UserCog, Loader2, X,
+  MoreHorizontal, ChevronRight
 } from 'lucide-react';
-import { Skeleton } from '../../components/PageTransition';
+import { Skeleton } from '../../components/SkeletonLoader';
+import { AreaIcon } from '../../components/AreaIcon';
 import type { LucideIcon } from 'lucide-react';
 
-const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: string }> = {
-  'pendente': { label: 'Pendente', icon: Clock, class: 'bg-amber-50 text-amber-700' },
-  'em-andamento': { label: 'Em Andamento', icon: CircleDot, class: 'bg-brand-50 text-brand-700' },
-  'finalizado': { label: 'Finalizado', icon: CheckCircle2, class: 'bg-emerald-50 text-emerald-700' },
+const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: string; dot: string }> = {
+  'pendente': { label: 'Aguardando', icon: Clock, class: 'bg-amber-50 text-amber-700 border-amber-100', dot: 'bg-amber-400' },
+  'em-andamento': { label: 'Em Andamento', icon: CircleDot, class: 'bg-brand-50 text-brand-700 border-brand-100', dot: 'bg-brand-500' },
+  'finalizado': { label: 'Finalizado', icon: CheckCircle2, class: 'bg-emerald-50 text-emerald-700 border-emerald-100', dot: 'bg-emerald-500' },
 };
 
 export function Worklist() {
-  const { setView, showToast, selectedClinicId } = useApp();
+  const { setView, showToast, selectedClinicId, setShowCreateExamModal, settings } = useApp();
+  const currentRole = settings.currentRole || 'medico';
   const [statusFilter, setStatusFilter] = useState<ExamStatus | 'todos'>('todos');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
-  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>('todos');
+  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>('hoje');
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [editExamId, setEditExamId] = useState<string | null>(null);
+  const [editData, setEditData] = useState({
+    patientName: '',
+    birthDate: '',
+    requestingPhysician: '',
+    clinicalIndication: '',
+    clinicId: '',
+    status: 'pendente' as ExamStatus
+  });
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
 
   // Realtime listeners
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams');
@@ -35,62 +47,66 @@ export function Worklist() {
   const { data: clinics } = useCollection<Clinic>('clinics');
 
   // Build lookup maps
-  const patientMap = useMemo(
-    () => new Map(patients.map((p) => [p.id, p])),
-    [patients]
-  );
-  const clinicMap = useMemo(
-    () => new Map(clinics.map((c) => [c.id, c])),
-    [clinics]
-  );
+  const patientMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients]);
+  const clinicMap = useMemo(() => new Map(clinics.map((c) => [c.id, c])), [clinics]);
 
-  // Sort by createdAt descending
-  const sortedExams = useMemo(
-    () => [...exams].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
-    [exams]
-  );
+  // Apply filters and sort
+  const filtered = useMemo(() => {
+    let result = [...exams];
 
-  // Apply filters
-  const filtered = sortedExams.filter((e) => {
     // Clinic filter
-    if (selectedClinicId && e.clinicId !== selectedClinicId) return false;
+    if (selectedClinicId) {
+      result = result.filter(e => e.clinicId === selectedClinicId);
+    }
+
     // Status filter
-    if (statusFilter !== 'todos' && e.status !== statusFilter) return false;
+    if (statusFilter !== 'todos') {
+      result = result.filter(e => e.status === statusFilter);
+    }
+
     // Area filter
-    if (areaFilter !== 'todas' && e.area !== areaFilter) return false;
+    if (areaFilter !== 'todas') {
+      result = result.filter(e => e.area === areaFilter);
+    }
+
     // Date filter
     if (dateFilter !== 'todos') {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      if (dateFilter === 'hoje' && e.createdAt < todayStart) return false;
-      if (dateFilter === 'semana' && e.createdAt < todayStart - 7 * 86400000) return false;
-      if (dateFilter === 'mes' && e.createdAt < todayStart - 30 * 86400000) return false;
+      if (dateFilter === 'hoje') result = result.filter(e => e.createdAt >= todayStart);
+      if (dateFilter === 'semana') result = result.filter(e => e.createdAt >= todayStart - 7 * 86400000);
+      if (dateFilter === 'mes') result = result.filter(e => e.createdAt >= todayStart - 30 * 86400000);
     }
+
     // Search
     if (search) {
       const q = search.toLowerCase();
-      const patient = patientMap.get(e.patientId);
-      return (
-        patient?.name.toLowerCase().includes(q) ||
-        e.examType.toLowerCase().includes(q) ||
-        e.requestingPhysician?.toLowerCase().includes(q)
-      );
+      result = result.filter(e => {
+        const patient = patientMap.get(e.patientId);
+        return (
+          patient?.name.toLowerCase().includes(q) ||
+          e.examType.toLowerCase().includes(q) ||
+          e.friendlyId?.toLowerCase().includes(q)
+        );
+      });
     }
-    return true;
-  });
+
+    // Sort by createdAt descending (most recent first)
+    return result.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }, [exams, statusFilter, areaFilter, dateFilter, search, selectedClinicId, patientMap]);
 
   const counts = {
-    todos: sortedExams.filter((e) => !selectedClinicId || e.clinicId === selectedClinicId).length,
-    pendente: sortedExams.filter((e) => e.status === 'pendente' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
-    'em-andamento': sortedExams.filter((e) => e.status === 'em-andamento' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
-    finalizado: sortedExams.filter((e) => e.status === 'finalizado' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
+    todos: exams.filter((e) => !selectedClinicId || e.clinicId === selectedClinicId).length,
+    pendente: exams.filter((e) => e.status === 'pendente' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
+    'em-andamento': exams.filter((e) => e.status === 'em-andamento' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
+    finalizado: exams.filter((e) => e.status === 'finalizado' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
   };
 
   async function handleDelete() {
     if (!deleteId) return;
     try {
       await deleteItem('exams', deleteId);
-      showToast('Exame excluído', 'success');
+      showToast('Exame excluído com sucesso', 'success');
     } catch {
       showToast('Erro ao excluir exame', 'error');
     } finally {
@@ -98,307 +114,334 @@ export function Worklist() {
     }
   }
 
-  // Find the selected clinic name for display
-  const selectedClinic = selectedClinicId ? clinicMap.get(selectedClinicId) : null;
+  async function handleSaveMetadata() {
+    if (!editExamId) return;
+    try {
+      setLoadingMetadata(true);
+      const { updateItem: dbUpdate } = await import('../../store/db');
+      await dbUpdate('exams', editExamId, {
+        requestingPhysician: editData.requestingPhysician,
+        clinicalIndication: editData.clinicalIndication,
+        clinicId: editData.clinicId,
+        status: editData.status as ExamStatus,
+        finalizedAt: editData.status === 'finalizado' ? Date.now() : null
+      });
+      setEditExamId(null);
+      showToast('Dados atualizados!');
+    } catch {
+      showToast('Erro ao atualizar', 'error');
+    } finally {
+      setLoadingMetadata(false);
+    }
+  }
 
   return (
-    <div>
-      <PageHeader
-        title="Worklist"
-        subtitle={
-          selectedClinic
-            ? `Exames — ${selectedClinic.name}`
-            : 'Lista de exames e laudos'
-        }
-        actions={
-          <button className="btn-primary" onClick={() => setView({ name: 'new-exam' })}>
-            <FilePlus2 size={16} /> Novo Laudo
-          </button>
-        }
-      />
-
-      {/* Clinic filter indicator */}
-      {selectedClinic && (
-        <div className="mb-3 flex items-center gap-2 text-xs bg-brand-50 border border-brand-200 rounded-lg px-3 py-2">
-          <Building2 size={13} className="text-brand-600" />
-          <span className="text-brand-700 font-medium">Filtrando: {selectedClinic.name}</span>
-          <button
-            onClick={() => {
-              const { setSelectedClinic } = useApp.getState();
-              setSelectedClinic(null);
-            }}
-            className="ml-auto text-brand-600 hover:text-brand-800 font-medium"
-          >
-            Limpar filtro ×
-          </button>
+    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-black text-ink-900 tracking-tight">Worklist Profissional</h1>
+          <p className="text-sm text-ink-500">Gestão centralizada de exames e laudos clínicos.</p>
         </div>
-      )}
+        <button 
+          onClick={() => setShowCreateExamModal(true)}
+          className="h-12 px-6 rounded-2xl bg-brand-600 text-white font-black text-sm uppercase tracking-widest hover:bg-brand-700 hover:shadow-premium transition-all flex items-center justify-center gap-2"
+        >
+          <FilePlus2 size={18} /> Novo Laudo
+        </button>
+      </div>
 
-      <div className="card mb-4 p-3 space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+      {/* Stats Bar */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={classNames(
+              "p-4 rounded-2xl border transition-all text-left group",
+              statusFilter === s ? "bg-ink-900 border-ink-900 shadow-lg" : "bg-white border-ink-100 hover:border-brand-200"
+            )}
+          >
+            <p className={classNames("text-[10px] font-black uppercase tracking-widest mb-1", statusFilter === s ? "text-ink-400" : "text-ink-400")}>
+              {s === 'todos' ? 'Total' : STATUS_META[s].label}
+            </p>
+            <div className="flex items-center justify-between">
+              <span className={classNames("text-2xl font-black", statusFilter === s ? "text-white" : "text-ink-900")}>
+                {counts[s]}
+              </span>
+              <div className={classNames(
+                "w-8 h-8 rounded-xl flex items-center justify-center",
+                statusFilter === s ? "bg-white/10 text-white" : "bg-ink-50 text-ink-400"
+              )}>
+                {s === 'todos' ? <LayoutList size={16} /> : <Clock size={16} />}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Filters & Actions */}
+      <div className="bg-white rounded-[2rem] border border-ink-100 p-6 shadow-sm space-y-6">
+        <div className="flex flex-col lg:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por paciente, tipo de exame, médico..."
-              className="input pl-9"
+              placeholder="Buscar por paciente, exame ou ID..."
+              className="w-full h-11 pl-10 pr-4 bg-ink-50 border border-ink-100 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium text-xs"
             />
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={classNames(
-              'px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-colors',
-              showFilters || areaFilter !== 'todas' || dateFilter !== 'todos'
-                ? 'bg-brand-50 text-brand-700 border-brand-200'
-                : 'bg-white text-ink-600 border-ink-200 hover:bg-ink-50'
-            )}
-          >
-            <SlidersHorizontal size={14} /> Filtros
-            {(areaFilter !== 'todas' || dateFilter !== 'todos') && (
-              <span className="w-2 h-2 rounded-full bg-brand-500" />
-            )}
-          </button>
+          
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+             <div className="flex bg-ink-50 p-1 rounded-xl border border-ink-100">
+               {(['hoje', 'semana', 'mes', 'todos'] as const).map(d => (
+                 <button
+                   key={d}
+                   onClick={() => setDateFilter(d)}
+                   className={classNames(
+                     "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
+                     dateFilter === d ? "bg-white text-brand-600 shadow-sm" : "text-ink-500 hover:text-ink-700"
+                   )}
+                 >
+                   {d === 'todos' ? 'Tudo' : d}
+                 </button>
+               ))}
+             </div>
+             
+             <button
+               onClick={() => setShowFilters(!showFilters)}
+               className={classNames(
+                 "h-12 w-12 rounded-2xl border flex items-center justify-center transition-all",
+                 showFilters ? "bg-brand-50 border-brand-200 text-brand-600" : "bg-white border-ink-100 text-ink-400 hover:border-brand-200"
+               )}
+             >
+               <SlidersHorizontal size={20} />
+             </button>
+          </div>
         </div>
 
-        {/* Status tabs */}
-        <div className="flex gap-1">
-          {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={classNames(
-                'px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200',
-                statusFilter === s
-                  ? 'bg-ink-900 text-white shadow-soft'
-                  : 'bg-ink-50 text-ink-600 hover:bg-ink-100'
-              )}
-            >
-              {s === 'todos' ? 'Todos' : STATUS_META[s].label}
-              <span className={classNames('ml-1.5', statusFilter === s ? 'opacity-80' : 'opacity-50')}>
-                {counts[s]}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Advanced filters */}
         {showFilters && (
-          <div className="flex flex-wrap gap-3 pt-2 border-t border-ink-100 animate-in slide-in-from-top-1 duration-200">
-            <div>
-              <label className="text-[10px] font-bold uppercase text-ink-400 block mb-1">Área</label>
-              <select className="input text-xs py-1.5 w-44" value={areaFilter} onChange={e => setAreaFilter(e.target.value)}>
-                <option value="todas">Todas as áreas</option>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-ink-50 animate-in slide-in-from-top-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-ink-400 tracking-widest ml-1">Especialidade</label>
+              <select 
+                className="w-full h-11 bg-ink-50 border border-ink-100 rounded-xl px-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
+                value={areaFilter}
+                onChange={e => setAreaFilter(e.target.value)}
+              >
+                <option value="todas">Todas as Áreas</option>
                 {EXAM_AREAS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-[10px] font-bold uppercase text-ink-400 block mb-1">Período</label>
-              <select className="input text-xs py-1.5 w-36" value={dateFilter} onChange={e => setDateFilter(e.target.value as any)}>
-                <option value="todos">Todos</option>
-                <option value="hoje">Hoje</option>
-                <option value="semana">Última semana</option>
-                <option value="mes">Último mês</option>
-              </select>
-            </div>
-            {(areaFilter !== 'todas' || dateFilter !== 'todos') && (
-              <div className="flex items-end">
-                <button
-                  onClick={() => { setAreaFilter('todas'); setDateFilter('todos'); }}
-                  className="text-xs text-brand-600 hover:text-brand-800 font-medium py-1.5"
-                >
-                  Limpar filtros
-                </button>
-              </div>
-            )}
+            {/* Additional filters can go here */}
           </div>
         )}
+      </div>
 
-        {/* Result counter */}
-        <div className="text-[11px] text-ink-400 font-medium">
-          {filtered.length} exame{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+      {/* Table Section */}
+      <div className="bg-white rounded-[2rem] border border-ink-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-ink-50/50 border-b border-ink-100">
+                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Paciente</th>
+                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Exame / Área</th>
+                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Unidade</th>
+                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Data</th>
+                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-50">
+              {examsLoading ? (
+                [1, 2, 3, 4, 5].map(i => (
+                  <tr key={i}>
+                    <td colSpan={6} className="px-6 py-4"><Skeleton className="h-8 w-full" /></td>
+                  </tr>
+                ))
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <LayoutList size={40} className="text-ink-100" />
+                      <p className="text-ink-400 font-medium italic">Nenhum exame encontrado para os filtros aplicados.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(exam => {
+                  const patient = patientMap.get(exam.patientId);
+                  const clinic = clinicMap.get(exam.clinicId || '');
+                  const area = EXAM_AREAS.find(a => a.id === exam.area);
+                  const status = STATUS_META[exam.status];
+
+                  return (
+                    <tr 
+                      key={exam.id} 
+                      className="group hover:bg-ink-50/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (currentRole === 'recepcao') {
+                          showToast('Acesso negado: Apenas médicos podem laudar.', 'error');
+                          return;
+                        }
+                        setView({ name: 'exam-editor', examId: exam.id });
+                      }}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-black shadow-inner">
+                            {patient?.name.charAt(0) || '?'}
+                          </div>
+                          <div>
+                            <p className="font-bold text-ink-900 group-hover:text-brand-600 transition-colors">{patient?.name || 'Não identificado'}</p>
+                            <p className="text-[10px] font-mono text-ink-400">ID: {exam.friendlyId || '—'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-ink-700 text-sm leading-tight mb-1">{exam.examType}</p>
+                        {area && <span className={classNames("text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter", area.color)}>{area.label}</span>}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                         <div className={classNames(
+                           "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                           status.class
+                         )}>
+                           <div className={classNames("w-1.5 h-1.5 rounded-full", status.dot)} />
+                           {status.label}
+                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-ink-600 text-sm">
+                          <Building2 size={14} className="text-ink-300" />
+                          <span className="truncate max-w-[120px] font-medium">{clinic?.name || 'Geral'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-bold text-ink-700">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
+                        <p className="text-[10px] text-ink-400 font-medium">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setEditData({
+                                 patientName: patient?.name || '',
+                                 birthDate: patient?.birthDate || '',
+                                 requestingPhysician: exam.requestingPhysician || '',
+                                 clinicalIndication: exam.clinicalIndication || '',
+                                 clinicId: exam.clinicId || '',
+                                 status: exam.status
+                               });
+                               setEditExamId(exam.id);
+                             }}
+                             className="p-2 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-all"
+                           >
+                             <UserCog size={18} />
+                           </button>
+                           <button
+                             onClick={(e) => { e.stopPropagation(); setDeleteId(exam.id); }}
+                             className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                           >
+                             <Trash2 size={18} />
+                           </button>
+                           <div className="w-8 h-8 rounded-xl bg-ink-50 text-ink-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                             <ChevronRight size={18} />
+                           </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="card overflow-hidden">
-        {examsLoading ? (
-          <div className="p-4 space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex flex-col gap-2">
-                <div className="flex justify-between">
-                  <Skeleton className="h-5 w-48" />
-                  <Skeleton className="h-5 w-20" />
+      {/* Modal de Edição de Metadados */}
+      {editExamId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 animate-in fade-in duration-200 backdrop-blur-sm">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100">
+            <div className="px-8 py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between">
+              <h3 className="font-black text-ink-900 flex items-center gap-3">
+                <AreaIcon area={exams.find(e => e.id === editExamId)?.area || ''} size={20} className="text-brand-500" />
+                Ajustar Metadados
+              </h3>
+              <button onClick={() => setEditExamId(null)} className="p-2 hover:bg-ink-100 rounded-2xl text-ink-400 transition-colors"><X size={24} /></button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                 <div>
+                   <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Médico Solicitante</label>
+                   <input 
+                     className="w-full h-12 px-4 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium" 
+                     placeholder="Dr(a). ..."
+                     value={editData.requestingPhysician} 
+                     onChange={e => setEditData({...editData, requestingPhysician: e.target.value})} 
+                   />
+                 </div>
+                 <div>
+                   <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Indicação Clínica</label>
+                   <textarea 
+                     className="w-full p-4 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium min-h-[100px] resize-none" 
+                     placeholder="Descreva a indicação..."
+                     value={editData.clinicalIndication} 
+                     onChange={e => setEditData({...editData, clinicalIndication: e.target.value})} 
+                   />
+                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Unidade</label>
+                  <select 
+                    className="w-full h-12 px-3 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                    value={editData.clinicId}
+                    onChange={e => setEditData({...editData, clinicId: e.target.value})}
+                  >
+                    <option value="">Geral / Sem Unidade</option>
+                    {clinics.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
-                <Skeleton className="h-3 w-32" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-4 w-16 rounded-full" />
-                  <Skeleton className="h-4 w-24 rounded-full" />
+                <div>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Status do Exame</label>
+                  <select 
+                    className="w-full h-12 px-3 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                    value={editData.status}
+                    onChange={e => setEditData({...editData, status: e.target.value as ExamStatus})}
+                  >
+                    <option value="pendente">Aguardando</option>
+                    <option value="em-andamento">Em Andamento</option>
+                    <option value="finalizado">Finalizado</option>
+                  </select>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-20 px-6">
-            <div className="w-16 h-16 rounded-2xl bg-ink-50 flex items-center justify-center mx-auto mb-4">
-              <LayoutList size={28} className="text-ink-300" />
             </div>
-            <p className="text-sm text-ink-600 font-medium mb-1">
-              {exams.length === 0 ? 'Nenhum exame ainda' : 'Nenhum resultado'}
-            </p>
-            <p className="text-xs text-ink-400 mb-4">
-              {exams.length === 0
-                ? 'Comece criando seu primeiro laudo ultrassonográfico.'
-                : 'Tente ajustar os filtros ou termo de busca.'}
-            </p>
-            {exams.length === 0 && (
-              <button className="btn-primary" onClick={() => setView({ name: 'new-exam' })}>
-                <FilePlus2 size={15} /> Criar Primeiro Laudo
+            <div className="px-8 py-6 border-t border-ink-100 flex justify-end gap-3 bg-ink-50/50">
+              <button className="h-12 px-6 rounded-2xl text-ink-500 font-bold hover:bg-ink-100 transition-all" onClick={() => setEditExamId(null)}>Descartar</button>
+              <button 
+                className="h-12 px-8 rounded-2xl bg-brand-600 text-white font-black text-sm uppercase tracking-widest hover:bg-brand-700 transition-all flex items-center gap-2 shadow-lg" 
+                onClick={handleSaveMetadata} 
+                disabled={loadingMetadata}
+              >
+                {loadingMetadata ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                Confirmar Ajustes
               </button>
-            )}
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="hidden md:block">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-500">
-                    <th className="text-left px-4 py-3 font-medium">Paciente</th>
-                    <th className="text-left px-4 py-3 font-medium">Exame</th>
-                    <th className="text-left px-4 py-3 font-medium">Área</th>
-                    <th className="text-left px-4 py-3 font-medium">Clínica</th>
-                    <th className="text-left px-4 py-3 font-medium">Status</th>
-                    <th className="text-left px-4 py-3 font-medium">Atualizado</th>
-                    <th className="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((exam) => {
-                    const area = EXAM_AREAS.find((a) => a.id === exam.area);
-                    const patient = patientMap.get(exam.patientId);
-                    const clinic = exam.clinicId ? clinicMap.get(exam.clinicId) : null;
-                    const StatusIcon = STATUS_META[exam.status].icon;
-                    return (
-                      <tr
-                        key={exam.id}
-                        onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
-                        className="border-b border-ink-50 hover:bg-ink-50/40 cursor-pointer transition-colors group"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-ink-900">{patient?.name ?? '—'}</div>
-                          {exam.requestingPhysician && (
-                            <div className="text-xs text-ink-500">Solic.: {exam.requestingPhysician}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-ink-700">{exam.examType}</td>
-                        <td className="px-4 py-3">
-                          {area && <span className={classNames('chip', area.color)}>{area.label}</span>}
-                        </td>
-                        <td className="px-4 py-3">
-                          {clinic ? (
-                            <span className="text-xs text-ink-600 flex items-center gap-1">
-                              <Building2 size={11} className="text-ink-400" />
-                              {clinic.name}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-ink-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={classNames('chip', STATUS_META[exam.status].class)}>
-                            <StatusIcon size={12} />
-                            {STATUS_META[exam.status].label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-ink-500 text-xs">{formatDateTime(exam.updatedAt)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteId(exam.id); }}
-                            className="text-ink-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded hover:bg-red-50"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Card List */}
-            <div className="md:hidden divide-y divide-ink-50">
-              {filtered.map((exam) => {
-                const area = EXAM_AREAS.find((a) => a.id === exam.area);
-                const patient = patientMap.get(exam.patientId);
-                const clinic = exam.clinicId ? clinicMap.get(exam.clinicId) : null;
-                const StatusIcon = STATUS_META[exam.status].icon;
-                
-                return (
-                  <div
-                    key={exam.id}
-                    onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
-                    className="p-5 active:bg-ink-50 transition-colors relative group"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1 min-w-0 pr-4">
-                        <div className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-0.5">
-                          {area?.label || 'Exame'}
-                        </div>
-                        <div className="font-black text-ink-900 text-base truncate leading-tight">
-                          {patient?.name ?? '—'}
-                        </div>
-                        <div className="text-sm text-ink-500 truncate mt-0.5">{exam.examType}</div>
-                      </div>
-                      <div className={classNames(
-                        'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tight shadow-sm',
-                        STATUS_META[exam.status].class
-                      )}>
-                        <StatusIcon size={12} strokeWidth={3} />
-                        {STATUS_META[exam.status].label}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 mb-4">
-                      {clinic && (
-                        <div className="flex items-center gap-1.5 text-xs text-ink-500 font-medium">
-                          <Building2 size={14} className="text-ink-400" />
-                          <span className="truncate max-w-[150px]">{clinic.name}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1.5 text-xs text-ink-400 font-medium">
-                        <Calendar size={14} />
-                        {formatDateTime(exam.updatedAt)}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-ink-50/50">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteId(exam.id); }}
-                        className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-red-600 transition-colors py-1"
-                      >
-                        <Trash2 size={14} />
-                        <span>Excluir</span>
-                      </button>
-                      
-                      <div className="flex items-center gap-1 text-brand-600 font-black text-xs uppercase tracking-widest bg-brand-50 px-3 py-1.5 rounded-lg group-active:bg-brand-100 transition-colors">
-                        Editar Laudo <ArrowRight size={14} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={deleteId !== null}
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
-        title="Excluir exame"
-        message="Tem certeza que deseja excluir este exame? Esta ação não pode ser desfeita."
-        confirmLabel="Excluir"
+        title="Excluir Exame"
+        message="Tem certeza que deseja excluir este registro? Todas as informações vinculadas serão perdidas."
+        confirmLabel="Excluir Registro"
         variant="danger"
       />
     </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity, Sparkles } from 'lucide-react';
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
+import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
 
 interface Lesion {
   id: string;
@@ -21,38 +22,31 @@ interface Lesion {
 }
 
 const SHAPE = [
-  { label: 'Oval' },
-  { label: 'Redondo' },
-  { label: 'Irregular' },
+  { label: 'Oval', value: 'Oval' },
+  { label: 'Redondo', value: 'Redondo' },
+  { label: 'Irregular', value: 'Irregular' },
 ];
 
 const ORIENTATION = [
-  { label: 'Paralelo' },
-  { label: 'Não-paralelo' },
+  { label: 'Paralelo', value: 'Paralelo' },
+  { label: 'Não-paralelo', value: 'Não-paralelo' },
 ];
 
 const MARGIN = [
-  { label: 'Circunscrita' },
-  { label: 'Indistinta' },
-  { label: 'Angular' },
-  { label: 'Microlobulada' },
-  { label: 'Espiculada' },
+  { label: 'Circunscrita', value: 'Circunscrita' },
+  { label: 'Indistinta', value: 'Indistinta' },
+  { label: 'Angular', value: 'Angular' },
+  { label: 'Microlobulada', value: 'Microlobulada' },
+  { label: 'Espiculada', value: 'Espiculada' },
 ];
 
 const ECHO_PATTERN = [
-  { label: 'Anecóico' },
-  { label: 'Hiperecóico' },
-  { label: 'Isoecóico' },
-  { label: 'Hipoecóico' },
-  { label: 'Complexo Cístico e Sólido' },
-  { label: 'Heterogêneo' },
-];
-
-const POSTERIOR = [
-  { label: 'Sem características' },
-  { label: 'Reforço' },
-  { label: 'Sombreamento' },
-  { label: 'Padrão Combinado' },
+  { label: 'Anecóico', value: 'Anecóico' },
+  { label: 'Hiperecóico', value: 'Hiperecóico' },
+  { label: 'Isoecóico', value: 'Isoecóico' },
+  { label: 'Hipoecóico', value: 'Hipoecóico' },
+  { label: 'Complexo Cístico/Sólido', value: 'Complexo Cístico e Sólido' },
+  { label: 'Heterogêneo', value: 'Heterogêneo' },
 ];
 
 export function BiradsCalculator({ value, onChange }: CalculatorProps) {
@@ -104,7 +98,6 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
       lesions: updatedLesions,
       _summary: summaries.length > 0 ? `Achados BI-RADS (Mama):\n${summaries.join('\n')}` : null
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);
 
   function addLesion() {
@@ -122,86 +115,114 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
   }
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Activity size={14} className="text-rose-600" />
-          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">BI-RADS (Mama)</h3>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shadow-sm">
+            <Activity size={20} />
+          </div>
+          <div>
+            <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Lexicon BI-RADS</h3>
+            <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Breast Imaging-Reporting and Data System</p>
+          </div>
         </div>
-        <button onClick={addLesion} className="btn-primary text-[10px] py-1 px-2 flex items-center gap-1">
-          <Plus size={12} /> Lesão
+        <button 
+          onClick={addLesion}
+          className="px-5 py-2.5 rounded-2xl bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-100 flex items-center gap-2"
+        >
+          <Plus size={14} /> Nova Lesão
         </button>
       </div>
 
-      <div className="divide-y divide-ink-100">
-        {lesions.length === 0 && <div className="p-4 text-center text-ink-400 text-[10px]">Clique em "Lesão" para começar.</div>}
-        {lesions.map(lesion => (
-          <div key={lesion.id}>
+      <div className="space-y-4">
+        {lesions.length === 0 && (
+          <div className="py-12 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center space-y-3">
+            <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200">
+               <MapPin size={32} />
+            </div>
+            <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">Nenhuma lesão mamária registrada</p>
+          </div>
+        )}
+        {lesions.map((lesion) => (
+          <div key={lesion.id} className="bg-white rounded-[2.5rem] border-2 border-ink-100 overflow-hidden shadow-sm transition-all hover:border-rose-200">
+            {/* LESION HEADER */}
             <div 
-              className={classNames("flex items-center justify-between p-2 cursor-pointer hover:bg-ink-50", expandedId === lesion.id ? "bg-rose-50/20" : "")}
+              className={classNames(
+                "flex items-center justify-between p-6 cursor-pointer transition-all",
+                expandedId === lesion.id ? "bg-rose-50/20" : "hover:bg-ink-50/50"
+              )}
               onClick={() => setExpandedId(expandedId === lesion.id ? null : lesion.id)}
             >
-              <div className="flex items-center gap-2">
-                <MapPin size={12} className="text-rose-500" />
+              <div className="flex items-center gap-4 flex-1">
+                <div className={classNames(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-all",
+                  lesion.classification ? "bg-rose-500 text-white" : "bg-ink-100 text-ink-400"
+                )}>
+                  {lesion.classification ? <span className="font-black text-[10px]">{lesion.classification.replace('BI-RADS ', '')}</span> : <Sparkles size={20} />}
+                </div>
                 <div>
-                  <div className="text-[11px] font-bold text-ink-900">{lesion.location}</div>
-                  <div className="text-[9px] text-ink-500">{lesion.classification || 'Aguardando dados...'}</div>
+                  <div className="text-sm font-black text-ink-900 uppercase tracking-tight">{lesion.location}</div>
+                  <div className="text-[10px] text-ink-400 font-bold uppercase tracking-widest flex items-center gap-3 mt-0.5">
+                    {lesion.d1 && lesion.d2 && lesion.d3 ? (
+                      <span className="flex items-center gap-1"><Maximize size={10} /> {lesion.d1}x{lesion.d2}x{lesion.d3}mm</span>
+                    ) : <span>Sem medidas</span>}
+                    {lesion.classification && (
+                      <span className="text-rose-600">• {lesion.classification}</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              {expandedId === lesion.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setLesions(lesions.filter(l => l.id !== lesion.id)); }}
+                  className="w-10 h-10 rounded-xl bg-ink-50 text-ink-400 hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center"
+                >
+                  <Trash2 size={18} />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-white border border-ink-100 flex items-center justify-center text-ink-400">
+                  {expandedId === lesion.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </div>
+              </div>
             </div>
 
+            {/* LESION CONTENT */}
             {expandedId === lesion.id && (
-              <div className="p-3 bg-ink-50/20 space-y-4 border-t border-ink-100">
-                <div className="grid grid-cols-2 gap-2">
-                  <input className="input text-[11px] h-8" placeholder="Localização" value={lesion.location} onChange={e => updateLesion(lesion.id, { location: e.target.value })} />
-                  <div className="flex gap-1">
-                    <input type="number" className="input text-xs text-center p-1 h-8" placeholder="C" value={lesion.d1} onChange={e => updateLesion(lesion.id, { d1: e.target.value ? Number(e.target.value) : '' })} />
-                    <input type="number" className="input text-xs text-center p-1 h-8" placeholder="L" value={lesion.d2} onChange={e => updateLesion(lesion.id, { d2: e.target.value ? Number(e.target.value) : '' })} />
-                    <input type="number" className="input text-xs text-center p-1 h-8" placeholder="A" value={lesion.d3} onChange={e => updateLesion(lesion.id, { d3: e.target.value ? Number(e.target.value) : '' })} />
+              <div className="p-8 pt-0 border-t border-ink-50 space-y-8 animate-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6">
+                  <CalculatorInput 
+                    label="Localização da Lesão" 
+                    placeholder="Ex: Quadrante Superior Externo" 
+                    value={lesion.location} 
+                    onChange={(val: string) => updateLesion(lesion.id, { location: val })} 
+                  />
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Medidas (mm)</label>
+                     <div className="flex items-center gap-3">
+                        <CalculatorInput type="number" placeholder="C" value={lesion.d1} onChange={(v: any) => updateLesion(lesion.id, { d1: v ? Number(v) : '' })} />
+                        <CalculatorInput type="number" placeholder="L" value={lesion.d2} onChange={(v: any) => updateLesion(lesion.id, { d2: v ? Number(v) : '' })} />
+                        <CalculatorInput type="number" placeholder="A" value={lesion.d3} onChange={(v: any) => updateLesion(lesion.id, { d3: v ? Number(v) : '' })} />
+                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Selector label="Forma" options={SHAPE} current={lesion.shape} onSelect={(v: string) => updateLesion(lesion.id, { shape: v })} />
-                  <Selector label="Orientação" options={ORIENTATION} current={lesion.orientation} onSelect={(v: string) => updateLesion(lesion.id, { orientation: v })} />
-                  <Selector label="Margem" options={MARGIN} current={lesion.margin} onSelect={(v: string) => updateLesion(lesion.id, { margin: v })} />
-                  <Selector label="Padrão de Eco" options={ECHO_PATTERN} current={lesion.echoPattern} onSelect={(v: string) => updateLesion(lesion.id, { echoPattern: v })} />
-                  <Selector label="Características Posteriores" options={POSTERIOR} current={lesion.posteriorFeatures} onSelect={(v: string) => updateLesion(lesion.id, { posteriorFeatures: v })} />
+                <div className="space-y-8">
+                  <CategorySelector label="1. Forma" options={SHAPE} current={lesion.shape} onSelect={(v: string) => updateLesion(lesion.id, { shape: v })} />
+                  <CategorySelector label="2. Orientação" options={ORIENTATION} current={lesion.orientation} onSelect={(v: string) => updateLesion(lesion.id, { orientation: v })} />
+                  <CategorySelector label="3. Margem" options={MARGIN} current={lesion.margin} onSelect={(v: string) => updateLesion(lesion.id, { margin: v })} />
+                  <CategorySelector label="4. Padrão de Eco" options={ECHO_PATTERN} current={lesion.echoPattern} onSelect={(v: string) => updateLesion(lesion.id, { echoPattern: v })} />
                 </div>
 
                 {lesion.classification && (
-                  <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg">
-                    <div className="text-[11px] font-bold text-rose-700">{lesion.classification}</div>
-                    <div className="text-[9px] text-rose-600 leading-tight mt-0.5">{lesion.recommendation}</div>
-                  </div>
+                  <ResultCard 
+                    label="Classificação BI-RADS" 
+                    value={lesion.classification} 
+                    recommendation={lesion.recommendation || ''}
+                    variant={lesion.classification.includes('4') || lesion.classification.includes('5') ? 'red' : 'emerald'}
+                  />
                 )}
-                
-                <button onClick={() => setLesions(lesions.filter(l => l.id !== lesion.id))} className="text-[9px] text-red-500 flex items-center gap-1 hover:underline">
-                  <Trash2 size={12} /> Remover Lesão
-                </button>
               </div>
             )}
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Selector({ label, options, current, onSelect }: { label: string, options: any[], current: string | null, onSelect: (v: string) => void }) {
-  return (
-    <div>
-      <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">{label}</label>
-      <div className="flex flex-wrap gap-1">
-        {options.map((o: any) => (
-          <button
-            key={o.label}
-            onClick={() => onSelect(o.label)}
-            className={classNames("px-2 py-1 text-[9px] rounded border transition-all", current === o.label ? "bg-rose-500 text-white border-rose-600 shadow-sm" : "bg-white text-ink-600 border-ink-200 hover:border-ink-300")}
-          >
-            {o.label}
-          </button>
         ))}
       </div>
     </div>

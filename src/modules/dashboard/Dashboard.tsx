@@ -1,15 +1,20 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { ExamRequest, Patient, Clinic, EXAM_AREAS, ExamStatus } from '../../types';
 import {
   LayoutList, FilePlus, Clock, CheckCircle2, CircleDot, TrendingUp,
-  Users, FileText, Activity, ArrowRight, Calendar, Building2, Sparkles
+  Users, FileText, Activity, ArrowRight, Calendar, Building2, Sparkles,
+  Zap, ChevronRight, Briefcase
 } from 'lucide-react';
+import { AreaIcon } from '../../components/AreaIcon';
 import { classNames, formatDateTime } from '../../utils/format';
+import { CreateExamModal } from '../../components/CreateExamModal';
 
 export function Dashboard() {
-  const { setView, selectedClinicId, settings } = useApp();
+  const { setView, selectedClinicId, settings, showToast } = useApp();
+  const currentRole = settings.currentRole || 'medico';
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const { data: exams } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -34,7 +39,6 @@ export function Dashboard() {
     const inProgress = filteredExams.filter(e => e.status === 'em-andamento');
     const finalized = filteredExams.filter(e => e.status === 'finalizado');
     const finalizedToday = today.filter(e => e.status === 'finalizado');
-    const finalizedWeek = week.filter(e => e.status === 'finalizado');
 
     // Area distribution
     const areaMap = new Map<string, number>();
@@ -42,7 +46,7 @@ export function Dashboard() {
       areaMap.set(e.area, (areaMap.get(e.area) || 0) + 1);
     });
 
-    // Last 7 days activity (day-by-day)
+    // Last 7 days activity
     const dailyActivity: { label: string; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(todayStart);
@@ -65,7 +69,6 @@ export function Dashboard() {
       inProgress: inProgress.length,
       finalized: finalized.length,
       finalizedToday: finalizedToday.length,
-      finalizedWeek: finalizedWeek.length,
       areaMap,
       dailyActivity,
       maxDaily,
@@ -74,7 +77,7 @@ export function Dashboard() {
 
   // Recent exams
   const recentExams = useMemo(() =>
-    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 5),
+    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 6),
     [filteredExams]
   );
 
@@ -88,229 +91,299 @@ export function Dashboard() {
   })();
 
   return (
-    <div className="max-w-6xl mx-auto py-6 space-y-6 animate-in fade-in duration-300">
-      {/* Header Greeting */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-ink-900">
-            {greeting}, <span className="text-brand-600">{settings.physicianName?.split(' ')[0] || 'Doutor(a)'}</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-ink-500 mt-1">
-            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
+    <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 space-y-6 animate-in fade-in duration-500">
+      
+      {/* Premium Hero Welcome */}
+      <section className="relative overflow-hidden rounded-[2rem] bg-ink-900 p-6 sm:p-10 shadow-2xl">
+        {/* Animated Background Mesh */}
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-0 -left-1/4 w-1/2 h-full bg-brand-600 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute bottom-0 -right-1/4 w-1/2 h-full bg-indigo-600 rounded-full blur-[100px] animate-pulse delay-700" />
         </div>
-        <button onClick={() => setView({ name: 'new-exam' })} className="btn-primary shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto justify-center">
-          <FilePlus size={16} /> Novo Laudo
-        </button>
-      </div>
 
-      {/* Quick Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="relative flex flex-col lg:flex-row items-center justify-between gap-8">
+          <div className="text-center lg:text-left space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 backdrop-blur-md">
+              <Sparkles size={12} className="text-brand-400" />
+              <span className="text-[10px] font-black text-white uppercase tracking-widest">Clinical AI Core v6.0</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+              {greeting}, <br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-300">
+                {settings.physicianName || 'Especialista'}
+              </span>
+            </h1>
+            <p className="text-ink-300 text-base max-w-md mx-auto lg:mx-0">
+              Você possui <span className="text-brand-400 font-bold">{stats.pending} exames</span> aguardando laudo hoje. Pronto para iniciar?
+            </p>
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-3">
+              <button 
+                onClick={() => setShowCreateModal(true)}
+                className="h-12 px-6 rounded-2xl bg-brand-500 text-white font-black text-sm uppercase tracking-widest hover:bg-brand-400 hover:shadow-premium transition-all flex items-center gap-2 group"
+              >
+                <FilePlus size={18} className="group-hover:scale-110 transition-transform" />
+                Novo Laudo
+              </button>
+              <button 
+                onClick={() => setView({ name: 'worklist' })}
+                className="h-12 px-6 rounded-2xl bg-white/10 text-white font-black text-sm uppercase tracking-widest hover:bg-white/20 backdrop-blur-md border border-white/10 transition-all flex items-center gap-2"
+              >
+                <LayoutList size={18} />
+                Worklist
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Circle */}
+          <div className="hidden xl:flex items-center gap-12 bg-white/5 p-8 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+            <div className="text-center">
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Hoje</p>
+              <p className="text-4xl font-black text-white">{stats.today}</p>
+            </div>
+            <div className="w-px h-12 bg-white/10" />
+            <div className="text-center">
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Mês</p>
+              <p className="text-4xl font-black text-white">{stats.month}</p>
+            </div>
+            <div className="w-px h-12 bg-white/10" />
+            <div className="text-center">
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Produtividade</p>
+              <p className="text-4xl font-black text-emerald-400">
+                {stats.total > 0 ? Math.round((stats.finalized / stats.total) * 100) : 0}%
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <StatCard
-          label="Pendentes"
+          label="Aguardando"
           value={stats.pending}
-          icon={<Clock size={20} />}
+          icon={<Clock size={22} />}
           color="amber"
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
           label="Em Andamento"
           value={stats.inProgress}
-          icon={<CircleDot size={20} />}
+          icon={<CircleDot size={22} />}
           color="brand"
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
-          label="Finalizados Hoje"
+          label="Finalizados (Hoje)"
           value={stats.finalizedToday}
-          icon={<CheckCircle2 size={20} />}
+          icon={<CheckCircle2 size={22} />}
           color="emerald"
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
-          label="Total do Mês"
-          value={stats.month}
-          icon={<TrendingUp size={20} />}
+          label="Pacientes Atendidos"
+          value={patients.length}
+          icon={<Users size={22} />}
           color="indigo"
-          onClick={() => setView({ name: 'worklist' })}
+          onClick={() => setView({ name: 'patients' })}
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Activity Chart */}
-        <div className="lg:col-span-2 card p-6 shadow-soft hover:shadow-lg transition-shadow bg-white relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-50 rounded-full blur-3xl -mr-16 -mt-16 opacity-50" />
-          <div className="relative flex items-center justify-between mb-6">
-            <h3 className="font-bold text-ink-900 flex items-center gap-2.5">
-              <div className="p-1.5 rounded-lg bg-brand-100 text-brand-600">
-                <Activity size={18} />
-              </div>
-              Atividade da Semana
-            </h3>
-            <span className="text-[10px] text-brand-600 bg-brand-50 px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-              {stats.week} exames realizados
-            </span>
-          </div>
-          <div className="flex items-end justify-between gap-3 h-40">
-            {stats.dailyActivity.map((day, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2 group/bar">
-                <span className="text-[11px] font-black text-ink-600">
-                  {day.count}
-                </span>
-                <div className="w-full relative h-32 flex items-end">
-                  <div 
-                    className={classNames(
-                      "w-full rounded-t-xl transition-all duration-300 relative overflow-hidden",
-                      day.count > 0 ? "bg-gradient-to-t from-brand-600 via-brand-500 to-brand-400" : "bg-ink-100"
-                    )}
-                    style={{ height: `${Math.max((day.count / stats.maxDaily) * 100, 8)}%` }}
-                  >
-                    {day.count > 0 && <div className="absolute top-0 left-0 right-0 h-1 bg-white/30" />}
-                  </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Column: Activity & Areas */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* Chart Section */}
+          <div className="bg-white rounded-[2rem] border border-ink-100 p-8 shadow-sm group hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-brand-50 text-brand-600 shadow-inner">
+                  <Activity size={24} />
                 </div>
-                <span className="text-[10px] text-ink-400 font-bold uppercase tracking-tight">{day.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Area Distribution */}
-        <div className="card p-5 shadow-soft">
-          <h3 className="font-semibold text-ink-900 mb-4 flex items-center gap-2">
-            <FileText size={16} className="text-brand-500" /> Por Área
-          </h3>
-          <div className="space-y-2.5">
-            {EXAM_AREAS.map(area => {
-              const count = stats.areaMap.get(area.id) || 0;
-              if (count === 0 && stats.total > 0) return null;
-              const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
-              return (
-                <div key={area.id}>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-medium text-ink-700">{area.label}</span>
-                    <span className="text-ink-400 font-mono">{count}</span>
-                  </div>
-                  <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-700"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                <div>
+                  <h3 className="font-black text-ink-900 text-lg">Atividade de Exames</h3>
+                  <p className="text-xs text-ink-400 uppercase font-bold tracking-widest">Últimos 7 dias</p>
                 </div>
-              );
-            })}
-            {stats.total === 0 && (
-              <div className="text-center py-6 text-ink-400 text-xs">
-                Nenhum exame registrado ainda.
               </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Exams + Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Recent Exams */}
-        <div className="lg:col-span-2 card shadow-soft overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-ink-100 flex items-center justify-between bg-ink-50/50">
-            <h3 className="font-semibold text-ink-900 flex items-center gap-2">
-              <LayoutList size={16} className="text-brand-500" /> Últimos Laudos
-            </h3>
-            <button onClick={() => setView({ name: 'worklist' })} className="text-xs text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1">
-              Ver todos <ArrowRight size={12} />
-            </button>
-          </div>
-          {recentExams.length === 0 ? (
-            <div className="p-8 text-center text-ink-400 text-sm">
-              <Sparkles size={24} className="mx-auto mb-2 text-ink-300" />
-              Nenhum laudo ainda. Comece criando o primeiro!
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-brand-500 animate-pulse" />
+                <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Live Updates</span>
+              </div>
             </div>
-          ) : (
-            <div className="divide-y divide-ink-50">
-              {recentExams.map(exam => {
-                const patient = patientMap.get(exam.patientId);
-                const area = EXAM_AREAS.find(a => a.id === exam.area);
-                const StatusIcon = exam.status === 'finalizado' ? CheckCircle2 : exam.status === 'em-andamento' ? CircleDot : Clock;
-                const statusColor = exam.status === 'finalizado' ? 'text-emerald-500' : exam.status === 'em-andamento' ? 'text-brand-500' : 'text-amber-500';
-                return (
-                  <button
-                    key={exam.id}
-                    onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
-                    className="w-full text-left px-5 py-3 hover:bg-ink-50/60 transition-colors flex items-center gap-3 group"
-                  >
-                    <StatusIcon size={16} className={classNames(statusColor, 'shrink-0')} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-ink-900 truncate">{patient?.name || 'Paciente'}</span>
-                        {area && <span className={`chip text-[9px] py-0 px-1.5 ${area.color}`}>{area.label}</span>}
-                      </div>
-                      <span className="text-xs text-ink-400 truncate block">{exam.examType}</span>
+
+            <div className="flex items-end justify-between gap-4 h-48 pt-4">
+              {stats.dailyActivity.map((day, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar">
+                  <div className="relative w-full flex flex-col items-center">
+                    <div 
+                      className={classNames(
+                        "w-full max-w-[40px] rounded-t-2xl transition-all duration-500 relative group-hover/bar:brightness-110",
+                        day.count > 0 ? "bg-gradient-to-t from-brand-600 to-brand-400 shadow-lg shadow-brand-500/20" : "bg-ink-50"
+                      )}
+                      style={{ height: `${Math.max((day.count / (stats.maxDaily || 1)) * 140, 8)}px` }}
+                    >
+                      {day.count > 0 && (
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-opacity bg-ink-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">
+                          {day.count}
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[10px] text-ink-400 shrink-0">{formatDateTime(exam.updatedAt || exam.createdAt)}</span>
-                    <ArrowRight size={14} className="text-ink-300 group-hover:text-brand-500 transition-colors shrink-0" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="space-y-4">
-          <div className="card p-5 shadow-soft">
-            <h3 className="font-semibold text-ink-900 mb-3 text-sm">Ações Rápidas</h3>
-            <div className="space-y-2">
-              {[
-                { label: 'Novo Laudo', icon: FilePlus, view: { name: 'new-exam' as const }, color: 'bg-brand-50 text-brand-600 hover:bg-brand-100' },
-                { label: 'Cadastrar Paciente', icon: Users, view: { name: 'patients' as const }, color: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
-                { label: 'Gerenciar Máscaras', icon: FileText, view: { name: 'templates' as const }, color: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
-                { label: 'Configurar IA', icon: Sparkles, view: { name: 'laud-ia' as const }, color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
-              ].map(action => (
-                <button
-                  key={action.label}
-                  onClick={() => setView(action.view)}
-                  className={classNames("w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", action.color)}
-                >
-                  <action.icon size={16} />
-                  {action.label}
-                </button>
+                  </div>
+                  <span className="text-[10px] text-ink-400 font-black uppercase tracking-widest">{day.label}</span>
+                </div>
               ))}
             </div>
           </div>
 
-          {/* System Info */}
-          <div className="card p-5 shadow-soft bg-gradient-to-br from-brand-50 to-white border-brand-100">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-brand-100 flex items-center justify-center">
-                <Activity size={16} className="text-brand-600" />
+          {/* Recent Exams List */}
+          <div className="bg-white rounded-[2rem] border border-ink-100 shadow-sm overflow-hidden">
+            <div className="px-8 py-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
+              <h3 className="font-black text-ink-900 text-lg flex items-center gap-3">
+                <LayoutList size={20} className="text-brand-500" /> Atividade Recente
+              </h3>
+              <button 
+                onClick={() => setView({ name: 'worklist' })} 
+                className="text-xs font-black text-brand-600 hover:text-brand-700 uppercase tracking-widest flex items-center gap-1 group"
+              >
+                Ver tudo <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+            
+            <div className="divide-y divide-ink-50">
+              {recentExams.length === 0 ? (
+                <div className="p-12 text-center">
+                  <FileText size={40} className="mx-auto text-ink-100 mb-4" />
+                  <p className="text-ink-400 font-medium italic">Nenhum exame recente registrado.</p>
+                </div>
+              ) : (
+                recentExams.map(exam => {
+                  const patient = patientMap.get(exam.patientId);
+                  const area = EXAM_AREAS.find(a => a.id === exam.area);
+                  return (
+                    <button
+                      key={exam.id}
+                      onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
+                      className="w-full flex items-center gap-4 p-6 hover:bg-ink-50/50 transition-all text-left group"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center font-black text-lg shrink-0 group-hover:scale-110 transition-transform shadow-inner">
+                        {patient?.name.charAt(0) || '?'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-black text-ink-900 truncate group-hover:text-brand-600 transition-colors">{patient?.name || 'Paciente'}</h4>
+                          {area && <span className={classNames("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border", area.color.replace('bg-', 'bg-').replace('text-', 'text-'))}>{area.label}</span>}
+                        </div>
+                        <p className="text-xs text-ink-500 flex items-center gap-2 truncate">
+                          <AreaIcon area={exam.area} size={12} className="text-ink-400" />
+                          {exam.examType}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                         <span className={classNames(
+                           "text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border",
+                           exam.status === 'finalizado' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
+                           exam.status === 'em-andamento' ? "bg-brand-50 text-brand-700 border-brand-100" :
+                           "bg-amber-50 text-amber-700 border-amber-100"
+                         )}>
+                           {exam.status}
+                         </span>
+                         <p className="text-[10px] text-ink-400 mt-2 font-bold uppercase tracking-tighter">{formatDateTime(exam.updatedAt || exam.createdAt)}</p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Actions & System Info */}
+        <div className="space-y-8">
+          
+          {/* Action Cards Grid */}
+          <div className="grid grid-cols-1 gap-4">
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-4 p-6 rounded-[2rem] bg-brand-600 text-white shadow-premium hover:bg-brand-700 hover:shadow-xl transition-all group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:rotate-12 transition-transform">
+                <Zap size={24} />
+              </div>
+              <div className="text-left">
+                <p className="font-black text-lg leading-tight">Novo Laudo IA</p>
+                <p className="text-xs text-white/70">Fluxo ultra-rápido</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => setView({ name: 'patients' })}
+              className="flex items-center gap-4 p-6 rounded-[2rem] bg-white border border-ink-100 shadow-sm hover:border-brand-300 hover:shadow-md transition-all group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:-rotate-6 transition-transform">
+                <UserPlus size={24} />
+              </div>
+              <div className="text-left">
+                <p className="font-black text-ink-900 text-lg leading-tight">Meus Pacientes</p>
+                <p className="text-xs text-ink-400">Gerenciar cadastros</p>
+              </div>
+            </button>
+          </div>
+
+          {/* Distribution Section */}
+          <div className="bg-white rounded-[2rem] border border-ink-100 p-8 shadow-sm">
+            <h3 className="font-black text-ink-900 uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
+              <TrendingUp size={14} className="text-brand-500" /> Especialidades
+            </h3>
+            <div className="space-y-5">
+              {EXAM_AREAS.map(area => {
+                const count = stats.areaMap.get(area.id) || 0;
+                if (count === 0 && stats.total > 0) return null;
+                const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                return (
+                  <div key={area.id} className="group">
+                    <div className="flex items-center justify-between text-[11px] mb-2">
+                      <span className="font-black text-ink-800 uppercase tracking-tight group-hover:text-brand-600 transition-colors">{area.label}</span>
+                      <span className="text-ink-400 font-bold">{count}</span>
+                    </div>
+                    <div className="h-1.5 bg-ink-50 rounded-full overflow-hidden border border-ink-100/50">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-brand-400 to-indigo-500 transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(var(--brand-500-rgb),0.3)]"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Platform Info */}
+          <div className="bg-ink-900 rounded-[2rem] p-8 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform" />
+            <div className="relative flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-brand-400 border border-white/10">
+                <Briefcase size={24} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-brand-900">LAUD.US 3.0</h4>
-                <p className="text-[10px] text-brand-600">Cloud Edition</p>
+                <h4 className="font-black text-xl tracking-tight">Status Global</h4>
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest">Workspace v6.2</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-white/70 rounded-md px-2.5 py-1.5 border border-brand-100">
-                <span className="block text-[10px] text-ink-400 uppercase font-bold">Pacientes</span>
-                <span className="text-lg font-black text-ink-800">{patients.length}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1">Total Exames</p>
+                <p className="text-2xl font-black">{exams.length}</p>
               </div>
-              <div className="bg-white/70 rounded-md px-2.5 py-1.5 border border-brand-100">
-                <span className="block text-[10px] text-ink-400 uppercase font-bold">Exames</span>
-                <span className="text-lg font-black text-ink-800">{exams.length}</span>
-              </div>
-              <div className="bg-white/70 rounded-md px-2.5 py-1.5 border border-brand-100">
-                <span className="block text-[10px] text-ink-400 uppercase font-bold">Clínicas</span>
-                <span className="text-lg font-black text-ink-800">{clinics.length}</span>
-              </div>
-              <div className="bg-white/70 rounded-md px-2.5 py-1.5 border border-brand-100">
-                <span className="block text-[10px] text-ink-400 uppercase font-bold">Modelo IA</span>
-                <span className="text-[11px] font-bold text-ink-700 truncate block">{settings.geminiModel || '—'}</span>
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1">Unidades</p>
+                <p className="text-2xl font-black">{clinics.length}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showCreateModal && <CreateExamModal onClose={() => setShowCreateModal(false)} />}
     </div>
   );
 }
@@ -323,34 +396,37 @@ function StatCard({ label, value, icon, color, onClick }: {
   onClick?: () => void;
 }) {
   const colorMap = {
-    amber: 'bg-amber-50 text-amber-600 border-amber-100',
-    brand: 'bg-brand-50 text-brand-600 border-brand-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+    amber: 'bg-white border-amber-100 hover:border-amber-400',
+    brand: 'bg-white border-brand-100 hover:border-brand-400',
+    emerald: 'bg-white border-emerald-100 hover:border-emerald-400',
+    indigo: 'bg-white border-indigo-100 hover:border-indigo-400',
   };
-  const iconBg = {
-    amber: 'bg-amber-100 text-amber-600',
-    brand: 'bg-brand-100 text-brand-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    indigo: 'bg-indigo-100 text-indigo-600',
+  const iconColors = {
+    amber: 'bg-amber-50 text-amber-600',
+    brand: 'bg-brand-50 text-brand-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
   };
 
   return (
     <button
       onClick={onClick}
       className={classNames(
-        "card p-4 shadow-soft border text-left group hover:shadow-md transition-all duration-200 hover:-translate-y-0.5",
+        "p-6 rounded-[2rem] border text-left group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300",
         colorMap[color]
       )}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div className={classNames("w-9 h-9 rounded-xl flex items-center justify-center", iconBg[color])}>
-          {icon}
-        </div>
-        <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-inner group-hover:scale-110 transition-transform", iconColors[color])}>
+        {icon}
       </div>
-      <div className="text-2xl font-black leading-none mb-1">{value}</div>
-      <div className="text-[11px] font-medium opacity-80">{label}</div>
+      <div>
+        <p className="text-4xl font-black text-ink-900 leading-none mb-2">{value}</p>
+        <p className="text-[11px] font-black text-ink-400 uppercase tracking-widest">{label}</p>
+      </div>
     </button>
   );
+}
+
+function UserPlus({ size, className }: { size: number; className?: string }) {
+  return <Users size={size} className={className} />;
 }

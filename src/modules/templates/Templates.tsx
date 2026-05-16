@@ -2,16 +2,31 @@ import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
+import { ReportTemplate, EXAM_AREAS, Clinic, ExamArea } from '../../types';
 import { addItemWithId, deleteItem, genId, countWhere } from '../../store/db';
 import { useState, useMemo } from 'react';
-import { Plus, Search, FileText, Trash2, Copy, Edit2, Building2 } from 'lucide-react';
+import { 
+  Plus, Search, FileSignature, Trash2, Copy, Hospital, 
+  ChevronRight, Sparkles, Activity, Baby, 
+  Dna, Bone, Zap, ToyBrick, Syringe, Filter, Stethoscope,
+  RotateCcw, Loader2, X, ClipboardList, Flower2, ScanSearch, LayoutGrid, Waves
+} from 'lucide-react';
+import { generateTemplateStructure } from '../ai/generateTemplate';
+import { AreaIcon } from '../../components/AreaIcon';
+import { CardSkeleton } from '../../components/SkeletonLoader';
+import { classNames } from '../../utils/format';
+
+
 
 export function Templates() {
   const { setView, showToast, selectedClinicId } = useApp();
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
 
   const { data: templates, loading } = useCollection<ReportTemplate>('templates');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -21,7 +36,7 @@ export function Templates() {
   const filtered = templates.filter((t) => {
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (areaFilter !== 'todas' && t.area !== areaFilter) return false;
-    if (selectedClinicId && t.clinicId !== selectedClinicId && t.clinicId) return false; // Mostra globais (sem clinicId) ou da clínica selecionada
+    if (selectedClinicId && t.clinicId !== selectedClinicId && t.clinicId) return false;
     return true;
   });
 
@@ -31,14 +46,15 @@ export function Templates() {
     const id = genId();
     await addItemWithId('templates', id, {
       name: 'Nova Máscara',
-      area: 'medicina-interna',
+      area: areaFilter !== 'todas' ? areaFilter as ExamArea : 'medicina-interna',
       title: 'TÍTULO DO LAUDO',
       technique: 'Exame realizado com equipamento...',
-      analysisTemplate: 'Fígado: dimensões normais, contornos regulares, ecotextura homogênea.\n\nVesícula biliar: ausência de cálculos.',
+      analysisTemplate: 'Fígado: dimensões normais, contornos regulares, ecotextura homogênea.',
       conclusionTemplate: 'Exame ecográfico sem alterações significativas.',
       recommendationsTemplate: '',
-      formFields: [],
-      clinicId: selectedClinicId || undefined, // Atribui à clínica selecionada por padrão
+      clinicId: selectedClinicId || undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     });
     setView({ name: 'template-editor', templateId: id });
   }
@@ -50,6 +66,8 @@ export function Templates() {
     await addItemWithId('templates', id, {
       ...rest,
       name: `${template.name} (Cópia)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
     });
     showToast('Máscara duplicada', 'success');
   }
@@ -78,158 +96,173 @@ export function Templates() {
   }
 
   return (
-    <div>
+    <div className="space-y-6 animate-fade-in p-4 lg:p-8">
       <PageHeader
-        title="Máscaras"
-        subtitle={`${templates.length} modelo(s) cadastrado(s)`}
+        title="Máscaras de Laudo"
+        subtitle="Gerencie modelos e padrões diagnósticos"
         actions={
-          <button className="btn-primary" onClick={handleCreateNew}>
-            <Plus size={16} /> Nova Máscara
+          <button className="btn-primary group h-12 px-6 shadow-premium" onClick={handleCreateNew}>
+            <Plus size={20} className="group-hover:rotate-90 transition-transform" /> 
+            <span className="font-bold uppercase tracking-widest text-xs">Nova Máscara</span>
           </button>
         }
       />
 
-      {selectedClinicId && (
-        <div className="mb-4 bg-brand-50 border border-brand-200 rounded-lg p-3 text-sm flex items-center justify-between">
-          <div className="flex items-center gap-2 text-brand-700">
-            <Building2 size={16} />
-            Mostrando máscaras da clínica <strong>{clinicMap.get(selectedClinicId)?.name}</strong> e máscaras globais.
-          </div>
-        </div>
-      )}
-
-      <div className="card mb-4 p-3 flex gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar máscara..."
-            className="input pl-9"
-          />
-        </div>
-        <select
-          className="input w-48 text-sm"
-          value={areaFilter}
-          onChange={(e) => setAreaFilter(e.target.value)}
-        >
-          <option value="todas">Todas as Áreas</option>
-          {EXAM_AREAS.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          [1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="card p-5 animate-pulse h-[140px]">
-              <div className="h-5 bg-ink-100 rounded w-3/4 mb-3" />
-              <div className="h-4 bg-ink-100 rounded w-1/4 mb-4" />
-              <div className="h-8 bg-ink-100 rounded w-full mt-auto" />
-            </div>
-          ))
-        ) : sorted.length === 0 ? (
-          <div className="col-span-full card p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-ink-50 flex items-center justify-center mx-auto mb-4">
-              <FileText size={28} className="text-ink-300" />
-            </div>
-            <p className="text-sm text-ink-600 font-medium mb-1">
-              {templates.length === 0 ? 'Nenhuma máscara cadastrada' : 'Nenhum resultado'}
-            </p>
-            <p className="text-xs text-ink-400 mb-4">
-              Crie suas máscaras base para gerar laudos rapidamente.
-            </p>
-            {templates.length === 0 && (
-              <button className="btn-primary" onClick={handleCreateNew}>
-                <Plus size={15} /> Criar Primeira Máscara
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Sidebar Áreas (Desktop) */}
+        <aside className="hidden lg:flex flex-col gap-1 w-72 shrink-0 bg-white p-3 rounded-[2.5rem] border border-ink-100 shadow-sm sticky top-24">
+          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-5 py-4">Áreas do Sistema</p>
+          <button
+            onClick={() => setAreaFilter('todas')}
+            className={classNames(
+              "w-full px-5 py-4 rounded-2xl text-sm font-black transition-all flex items-center gap-4 uppercase tracking-widest",
+              areaFilter === 'todas' 
+                ? "bg-ink-900 text-white shadow-lg" 
+                : "text-ink-600 hover:bg-ink-50"
+            )}
+          >
+            <LayoutGrid size={18} />
+            Todas
+          </button>
+          {EXAM_AREAS.map((area) => {
+            const isActive = areaFilter === area.id;
+            return (
+              <button
+                key={area.id}
+                onClick={() => setAreaFilter(area.id)}
+                className={classNames(
+                  "w-full px-5 py-4 rounded-2xl text-sm font-black transition-all flex items-center gap-4 uppercase tracking-widest group",
+                  isActive 
+                    ? "bg-brand-50 text-brand-700 border border-brand-100 shadow-sm" 
+                    : "text-ink-600 hover:bg-ink-50"
+                )}
+              >
+                <div className={classNames(
+                  "p-2 rounded-xl transition-all shadow-inner", 
+                  isActive ? area.color : "bg-ink-50 text-ink-400 group-hover:bg-ink-100"
+                )}>
+                  <AreaIcon area={area.id} size={18} />
+                </div>
+                <span className="truncate">{area.label}</span>
               </button>
+            );
+          })}
+
+          {areaFilter !== 'todas' && (
+            <div className="mt-4 p-4 border-t border-ink-100 pt-6">
+              <button 
+                className="w-full h-12 rounded-2xl bg-brand-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg"
+                onClick={() => setShowBatchModal(true)}
+              >
+                <Sparkles size={16} />
+                <span>Criação Massa IA</span>
+              </button>
+            </div>
+          )}
+        </aside>
+
+        <div className="flex-1 w-full space-y-6">
+          {/* Search and Mobile Filters */}
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-3xl border border-ink-100 shadow-sm">
+            <div className="relative flex-1 w-full flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Pesquisar máscara por nome..."
+                  className="w-full h-14 pl-12 pr-4 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium text-sm"
+                />
+              </div>
+              {(search || areaFilter !== 'todas') && (
+                <button 
+                  onClick={() => { setSearch(''); setAreaFilter('todas'); }}
+                  className="p-3 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-2xl transition-all border border-ink-100 h-14 w-14 flex items-center justify-center shrink-0"
+                  title="Limpar Filtros"
+                >
+                  <RotateCcw size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Templates Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {loading ? (
+              [1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)
+            ) : sorted.length === 0 ? (
+              <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-ink-100">
+                <div className="w-16 h-16 rounded-3xl bg-ink-50 flex items-center justify-center mx-auto mb-4">
+                  <FileSignature size={32} className="text-ink-200" />
+                </div>
+                <p className="text-ink-400 font-medium">Nenhuma máscara encontrada.</p>
+                <button onClick={handleCreateNew} className="text-brand-600 font-black text-xs uppercase tracking-widest mt-4 hover:underline">
+                  + Criar Modelo Base
+                </button>
+              </div>
+            ) : (
+              sorted.map((template) => {
+                const area = EXAM_AREAS.find(a => a.id === template.area);
+                const clinic = template.clinicId ? clinicMap.get(template.clinicId) : null;
+
+                return (
+                  <div
+                    key={template.id}
+                    onClick={() => setView({ name: 'template-editor', templateId: template.id })}
+                    className="group bg-white p-6 rounded-3xl border border-ink-100 hover:border-brand-300 hover:shadow-premium transition-all cursor-pointer flex flex-col relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    <div className="flex justify-between items-start mb-4">
+                    <div className={classNames("p-3 rounded-2xl shadow-inner", area?.color || "bg-ink-100 text-ink-400")}>
+                      <AreaIcon area={template.area} size={24} />
+                    </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={(e) => handleDuplicate(template, e)}
+                          className="p-2 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50"
+                          title="Duplicar"
+                        >
+                          <Copy size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => handleRequestDelete(template.id, template.name, e)}
+                          className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50"
+                          title="Excluir"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <h4 className="font-black text-ink-900 mb-1 line-clamp-2 leading-snug group-hover:text-brand-700 transition-colors">
+                      {template.name}
+                    </h4>
+                    
+                    <div className="flex flex-wrap gap-2 mt-auto pt-4">
+                       {area && <span className={classNames("text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border", area.color)}>
+                         {area.label}
+                       </span>}
+                       {clinic && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-ink-50 text-ink-500 border border-ink-100">
+                         {clinic.name}
+                       </span>}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
-        ) : (
-          sorted.map((t) => {
-            const area = EXAM_AREAS.find((a) => a.id === t.area);
-            const clinic = t.clinicId ? clinicMap.get(t.clinicId) : null;
-            return (
-              <div
-                key={t.id}
-                className="card p-5 group hover:border-brand-300 hover:shadow-medium transition-all cursor-pointer flex flex-col"
-                onClick={() => setView({ name: 'template-editor', templateId: t.id })}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  {area && (
-                    <span className={`chip ${area.color} text-[10px] py-0.5 px-2`}>
-                      {area.label}
-                    </span>
-                  )}
-                  {clinic ? (
-                    <span className="text-[10px] bg-ink-100 text-ink-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Building2 size={10} /> Clínica Específica
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full">
-                      Global
-                    </span>
-                  )}
-                </div>
-                
-                <h3 className="font-semibold text-ink-900 mb-1 leading-tight group-hover:text-brand-600 transition-colors">
-                  {t.name}
-                </h3>
-                
-                {t.description && (
-                  <p className="text-xs text-ink-500 line-clamp-2 mt-1">{t.description}</p>
-                )}
-
-                <div className="mt-auto pt-4 flex items-center justify-between border-t border-ink-50">
-                  <div className="text-[11px] text-ink-400 font-medium">
-                    {t.formFields.length} campos de formulário
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(e) => handleDuplicate(t, e)}
-                      className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded transition-colors"
-                      title="Duplicar"
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      onClick={(e) => handleRequestDelete(t.id, t.name, e)}
-                      className="p-1.5 text-ink-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+        </div>
       </div>
 
       <ConfirmDialog
         open={deleteTarget !== null}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteTarget(null)}
-        title="Excluir máscara"
-        message={
-          deleteTarget?.examCount ? (
-            <span>
-              A máscara <strong>{deleteTarget.name}</strong> está vinculada a{' '}
-              <strong>{deleteTarget.examCount} exame(s)</strong>. Exclua os exames
-              primeiro para poder remover a máscara.
-            </span>
-          ) : (
-            <span>
-              Tem certeza que deseja excluir a máscara <strong>{deleteTarget?.name}</strong>?
-            </span>
-          )
-        }
-        confirmLabel={deleteTarget?.examCount ? 'Entendido' : 'Excluir'}
-        variant={deleteTarget?.examCount ? 'warning' : 'danger'}
+        title="Excluir Máscara"
+        message={`Deseja excluir "${deleteTarget?.name}"? Esta ação é irreversível.`}
+        confirmLabel="Excluir Definitivamente"
+        variant="danger"
       />
     </div>
   );

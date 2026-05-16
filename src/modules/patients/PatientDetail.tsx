@@ -3,8 +3,8 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
-import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, FileText, Edit, ShieldPlus, Loader2, Building2 } from 'lucide-react';
-import { calculateAge, formatDate, formatDateTime } from '../../utils/format';
+import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList } from 'lucide-react';
+import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
 import { useState, useMemo } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function PatientDetail({ patientId }: Props) {
-  const { setView, showToast, selectedClinicId } = useApp();
+  const { setView, showToast, selectedClinicId, setShowCreateExamModal, setCreateExamDefaultPatient } = useApp();
   const [editing, setEditing] = useState(false);
 
   const { data: patient, loading: patientLoading } = useDocument<Patient>('patients', patientId);
@@ -74,127 +74,147 @@ export function PatientDetail({ patientId }: Props) {
   ].filter(Boolean).join(', ');
 
   return (
-    <div>
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
       <button
         onClick={() => setView({ name: 'patients' })}
-        className="text-sm text-ink-500 hover:text-ink-800 flex items-center gap-1 mb-3"
+        className="text-[10px] font-black uppercase tracking-widest text-ink-400 hover:text-ink-900 flex items-center gap-2 transition-colors mb-2"
       >
-        <ArrowLeft size={14} /> Voltar
+        <ArrowLeft size={14} /> Voltar para Lista
       </button>
 
       <PageHeader
         title={patient.name}
-        subtitle={`${calculateAge(patient.birthDate)} — CPF: ${patient.cpf || 'Não informado'}`}
+        subtitle={`${calculateAge(patient.birthDate)} — CPF: ${patient.cpf ? formatCPF(patient.cpf) : 'Não informado'}`}
         actions={
-          <>
-            <button className="btn-secondary" onClick={() => setEditing(true)}>
-              <Edit size={15} /> Editar Dados
+          <div className="flex gap-3">
+            <button className="btn-secondary h-11 px-5 rounded-2xl" onClick={() => setEditing(true)}>
+              <Edit size={16} /> <span className="font-bold text-xs uppercase tracking-widest">Editar Dados</span>
             </button>
-            <button className="btn-primary" onClick={() => setView({ name: 'new-exam' })}>
-              <FileText size={15} /> Novo Exame
+            <button className="btn-primary h-11 px-6 rounded-2xl shadow-brand" onClick={() => {
+              setCreateExamDefaultPatient(patient);
+              setShowCreateExamModal(true);
+            }}>
+              <Plus size={16} /> <span className="font-bold text-xs uppercase tracking-widest">Novo Laudo</span>
             </button>
-          </>
+          </div>
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="card p-5 space-y-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500 flex items-center gap-2">
-            <User size={14} /> Informações Pessoais
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-[2rem] border border-ink-100 shadow-sm space-y-5">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-ink-400 flex items-center gap-2 mb-2">
+            <UserCircle size={16} className="text-brand-500" /> Informações Pessoais
           </h3>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-4 text-sm">
             {patient.birthDate && (
-              <div className="flex justify-between border-b border-ink-50 pb-2">
-                <span className="text-ink-500">Nascimento</span>
-                <span className="font-medium text-ink-900">{formatDate(patient.birthDate)}</span>
+              <div className="flex justify-between items-center border-b border-ink-50 pb-3">
+                <span className="text-ink-500 font-medium">Nascimento</span>
+                <span className="font-black text-ink-900">{formatDate(patient.birthDate)}</span>
               </div>
             )}
             {patient.gender && (
-              <div className="flex justify-between border-b border-ink-50 pb-2">
-                <span className="text-ink-500">Gênero</span>
-                <span className="font-medium text-ink-900">
+              <div className="flex justify-between items-center border-b border-ink-50 pb-3">
+                <span className="text-ink-500 font-medium">Gênero</span>
+                <span className="font-black text-ink-900">
                   {patient.gender === 'M' ? 'Masculino' : patient.gender === 'F' ? 'Feminino' : 'Outro'}
                 </span>
               </div>
             )}
             {patient.rg && (
-              <div className="flex justify-between border-b border-ink-50 pb-2">
-                <span className="text-ink-500">RG</span>
-                <span className="font-medium text-ink-900">{patient.rg}</span>
+              <div className="flex justify-between items-center border-b border-ink-50 pb-3">
+                <span className="text-ink-500 font-medium">RG</span>
+                <span className="font-black text-ink-900">{patient.rg}</span>
               </div>
             )}
-            <div className="flex justify-between pt-1">
-              <span className="text-ink-500">Cadastro</span>
-              <span className="text-ink-700">{formatDate(patient.createdAt)}</span>
+            <div className="flex justify-between items-center pt-1">
+              <span className="text-ink-500 font-medium text-xs">Registrado em</span>
+              <span className="text-ink-400 font-bold text-xs">{formatDate(patient.createdAt)}</span>
             </div>
           </div>
         </div>
 
-        <div className="card p-5 space-y-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500 flex items-center gap-2">
-            <Phone size={14} /> Contato & Endereço
+        <div className="bg-white p-6 rounded-[2rem] border border-ink-100 shadow-sm space-y-5">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-ink-400 flex items-center gap-2 mb-2">
+            <Phone size={16} className="text-brand-500" /> Contato & Endereço
           </h3>
-          <div className="space-y-3 text-sm">
+          <div className="space-y-4 text-sm">
             {patient.phone && (
-              <div className="flex items-center gap-2 text-ink-700">
-                <Phone size={14} className="text-ink-400 shrink-0" />
-                {patient.phone}
+              <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-2xl border border-brand-100">
+                <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-brand-600 shadow-sm">
+                  <Phone size={14} />
+                </div>
+                <span className="font-black text-ink-900 tracking-tight">{formatPhone(patient.phone)}</span>
               </div>
             )}
             {patient.email && (
-              <div className="flex items-center gap-2 text-ink-700">
-                <Mail size={14} className="text-ink-400 shrink-0" />
-                {patient.email}
+              <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-2xl border border-indigo-100">
+                <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-indigo-600 shadow-sm">
+                  <Mail size={14} />
+                </div>
+                <span className="font-bold text-ink-900 text-xs truncate">{patient.email}</span>
               </div>
             )}
             {fullAddress ? (
-              <div className="flex items-start gap-2 text-ink-700 pt-1">
-                <MapPin size={14} className="text-ink-400 mt-0.5 shrink-0" />
-                <span>{fullAddress}</span>
+              <div className="flex items-start gap-3 pt-2">
+                <MapPin size={16} className="text-brand-400 mt-0.5 shrink-0" />
+                <span className="text-xs text-ink-600 leading-relaxed font-medium">{fullAddress}</span>
               </div>
             ) : (
-              <div className="text-ink-400 italic text-xs">Endereço não informado</div>
+              <div className="text-ink-400 font-medium italic text-xs pt-2">Endereço não informado</div>
             )}
           </div>
         </div>
 
-        <div className="card p-5 space-y-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500 flex items-center gap-2">
-            <ShieldPlus size={14} /> Dados Clínicos
+        <div className="bg-white p-6 rounded-[2rem] border border-ink-100 shadow-sm space-y-5">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-ink-400 flex items-center gap-2 mb-2">
+            <ShieldPlus size={16} className="text-brand-500" /> Dados Clínicos
           </h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between border-b border-ink-50 pb-2">
-              <span className="text-ink-500">Convênio</span>
-              <span className="font-medium text-ink-900">{patient.insurance || 'Particular'}</span>
+          <div className="space-y-4 text-sm">
+            <div className="flex justify-between items-center border-b border-ink-50 pb-3">
+              <span className="text-ink-500 font-medium">Convênio</span>
+              <span className="font-black text-brand-700 bg-brand-50 px-3 py-1 rounded-full border border-brand-100 text-[10px] uppercase tracking-widest">
+                {patient.insurance || 'Particular'}
+              </span>
             </div>
             {patient.insuranceNumber && (
-              <div className="flex justify-between border-b border-ink-50 pb-2">
-                <span className="text-ink-500">Carteirinha</span>
-                <span className="font-medium text-ink-900 font-mono text-xs mt-0.5">{patient.insuranceNumber}</span>
+              <div className="flex justify-between items-center border-b border-ink-50 pb-3">
+                <span className="text-ink-500 font-medium">Carteirinha</span>
+                <span className="font-black text-ink-900 font-mono text-[11px] mt-0.5 tracking-tighter">{patient.insuranceNumber}</span>
               </div>
             )}
             {patient.history && (
               <div className="pt-1">
-                <span className="text-ink-500 block mb-1">Histórico:</span>
-                <p className="text-ink-700 text-xs leading-relaxed">{patient.history}</p>
+                <span className="text-ink-500 font-medium block mb-2">Histórico Clínico:</span>
+                <div className="p-4 bg-ink-50 rounded-2xl border border-ink-100 text-xs text-ink-700 leading-relaxed whitespace-pre-wrap font-medium">
+                  {patient.history}
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-ink-100 flex items-center gap-2 bg-ink-50/50">
-          <Calendar size={15} className="text-ink-500" />
-          <h3 className="text-sm font-semibold text-ink-900">Histórico de Exames</h3>
-          <span className="text-xs font-medium text-ink-500 bg-ink-100 px-2 py-0.5 rounded-full ml-1">
-            {filteredExams.length}
-          </span>
-          {selectedClinicId && (
-            <span className="ml-2 text-[10px] text-brand-600 bg-brand-50 border border-brand-200 px-2 py-0.5 rounded-full">
-              Filtrando clínica atual
+      <div className="bg-white rounded-[2.5rem] border border-ink-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-brand-600 text-white flex items-center justify-center shadow-lg shadow-brand-100">
+              <ClipboardList size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-ink-900 uppercase tracking-widest leading-none">Histórico de Exames</h3>
+              <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter mt-1">Registros totais do paciente</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-ink-500 bg-ink-100 px-3 py-1.5 rounded-xl uppercase tracking-widest">
+              {filteredExams.length} Total
             </span>
-          )}
+            {selectedClinicId && (
+              <span className="text-[9px] font-black text-brand-600 bg-brand-50 border border-brand-200 px-3 py-1.5 rounded-xl uppercase tracking-widest">
+                Unidade Atual
+              </span>
+            )}
+          </div>
         </div>
 
         {examsLoading ? (
@@ -226,7 +246,13 @@ export function PatientDetail({ patientId }: Props) {
                       <div className="flex items-center gap-2 mt-1 text-xs text-ink-500">
                         <span>{formatDateTime(exam.createdAt)}</span>
                         <span>·</span>
-                        <span className="capitalize">{exam.status}</span>
+                        {exam.status === 'finalizado' ? (
+                          <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-1.5 rounded text-[10px] uppercase font-bold tracking-wider">Finalizado</span>
+                        ) : exam.status === 'em-andamento' ? (
+                          <span className="bg-amber-50 text-amber-600 border border-amber-200 px-1.5 rounded text-[10px] uppercase font-bold tracking-wider">Em Andamento</span>
+                        ) : (
+                          <span className="bg-ink-100 text-ink-600 border border-ink-200 px-1.5 rounded text-[10px] uppercase font-bold tracking-wider">Pendente</span>
+                        )}
                         {clinic && (
                           <>
                             <span>·</span>

@@ -1,49 +1,238 @@
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { CALCULATORS } from './registry';
-import { Calculator } from 'lucide-react';
+import { 
+  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X
+} from 'lucide-react';
+import { EXAM_AREAS, ExamArea } from '../../types';
+import { classNames } from '../../utils/format';
+import { AreaIcon } from '../../components/AreaIcon';
 
 export function Calculators() {
+  const [areaFilter, setAreaFilter] = useState<ExamArea | 'todas'>('todas');
+  const [search, setSearch] = useState('');
+  const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
+  const [calcResult, setCalcResult] = useState<any>(null);
+
+  const filtered = useMemo(() => {
+    return CALCULATORS.filter(calc => {
+      const matchesArea = areaFilter === 'todas' || calc.areas.includes(areaFilter);
+      const matchesSearch = calc.name.toLowerCase().includes(search.toLowerCase()) || 
+                            calc.description.toLowerCase().includes(search.toLowerCase());
+      return matchesArea && matchesSearch;
+    });
+  }, [areaFilter, search]);
+
   return (
-    <div className="max-w-5xl mx-auto py-8">
+    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
       <PageHeader
-        title="Biblioteca de Calculadoras"
-        subtitle="Explore e teste os módulos de cálculos clínicos complexos disponíveis para integração nas máscaras."
+        title="Calculadoras Clínicas"
+        subtitle="Biblioteca de módulos integrados para cálculos especializados."
+        icon={Calculator}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        {CALCULATORS.map(calc => (
-          <div key={calc.id} className="card overflow-hidden flex flex-col shadow-soft border border-ink-200">
-            <div className="p-5 border-b border-ink-100 bg-white">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                  <Calculator size={20} />
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Sidebar Áreas (Desktop) */}
+        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
+          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Filtrar por Área</p>
+          <button
+            onClick={() => setAreaFilter('todas')}
+            className={classNames(
+              "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3",
+              areaFilter === 'todas' 
+                ? "bg-brand-50 text-brand-700 shadow-sm border border-brand-100" 
+                : "text-ink-600 hover:bg-ink-50"
+            )}
+          >
+            <LayoutList size={18} />
+            Todas as Áreas
+          </button>
+          {EXAM_AREAS.map((area) => {
+            const isActive = areaFilter === area.id;
+            return (
+              <button
+                key={area.id}
+                onClick={() => setAreaFilter(area.id as ExamArea)}
+                className={classNames(
+                  "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3",
+                  isActive 
+                    ? "bg-brand-50 text-brand-700 shadow-sm border border-brand-100" 
+                    : "text-ink-600 hover:bg-ink-50"
+                )}
+              >
+                <div className={classNames("p-1.5 rounded-lg", isActive ? area.color : "bg-ink-50 text-ink-400")}>
+                  <AreaIcon area={area.id} size={16} />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-ink-900 text-lg">{calc.name}</h3>
-                  <span className="text-[10px] uppercase font-bold text-ink-400 bg-ink-100 px-2 py-0.5 rounded">ID: {calc.id}</span>
-                </div>
+                {area.label}
+              </button>
+            );
+          })}
+        </aside>
+
+        <div className="flex-1 w-full space-y-6">
+          {/* Search and Mobile Filters */}
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+            <div className="relative flex-1 w-full flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar calculadora..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="input pl-12 py-3 text-base shadow-sm border-ink-200 focus:border-brand-500 h-14 w-full"
+                />
               </div>
-              <p className="text-sm text-ink-500 mt-2">{calc.description}</p>
+              {(search || areaFilter !== 'todas') && (
+                <button 
+                  onClick={() => { setSearch(''); setAreaFilter('todas'); }}
+                  className="p-3 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-ink-100 h-14 w-14 flex items-center justify-center shrink-0"
+                  title="Limpar Filtros"
+                >
+                  <RotateCcw size={20} />
+                </button>
+              )}
             </div>
             
-            <div className="bg-ink-50/50 p-5 flex-1 border-b border-ink-100">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-4 text-center">Demonstração Interativa</h4>
-              <DemoWrapper Component={calc.component} />
-            </div>
-
-            <div className="p-4 bg-white text-xs text-ink-500 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-              Pronta para ser adicionada no Editor de Máscaras (Tipo: "Calculadora Integrada")
+            <div className="lg:hidden flex gap-2 overflow-x-auto w-full pb-2 scrollbar-hide">
+              <button
+                onClick={() => setAreaFilter('todas')}
+                className={classNames(
+                  "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border",
+                  areaFilter === 'todas' ? "bg-brand-600 text-white border-brand-600" : "bg-white text-ink-600 border-ink-100"
+                )}
+              >
+                Todas
+              </button>
+              {EXAM_AREAS.map(area => (
+                <button
+                  key={area.id}
+                  onClick={() => setAreaFilter(area.id as ExamArea)}
+                  className={classNames(
+                    "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2",
+                    areaFilter === area.id ? "bg-brand-600 text-white border-brand-600" : "bg-white text-ink-600 border-ink-100"
+                  )}
+                >
+                  <AreaIcon area={area.id} size={14} />
+                  {area.label}
+                </button>
+              ))}
             </div>
           </div>
-        ))}
+
+          {/* Grid de Calculadoras */}
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
+            {filtered.map(calc => (
+              <button
+                key={calc.id}
+                onClick={() => setSelectedCalcId(calc.id)}
+                className="group flex flex-col p-6 bg-white rounded-[2.5rem] border border-ink-100 hover:border-brand-500 hover:shadow-2xl hover:shadow-brand-500/10 transition-all text-left relative overflow-hidden h-full"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-ink-50 text-ink-400 flex items-center justify-center group-hover:bg-brand-500 group-hover:text-white transition-all shadow-inner">
+                      <AreaIcon area={calc.areas[0]} size={24} />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-ink-900 group-hover:text-brand-700 transition-colors">{calc.name}</h4>
+                      <div className="flex gap-1 mt-0.5">
+                        {calc.areas.map(aId => {
+                          const a = EXAM_AREAS.find(x => x.id === aId);
+                          return a && (
+                            <span key={aId} className="text-[8px] font-black uppercase text-ink-300 tracking-tighter">
+                              • {a.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-ink-200 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" />
+                </div>
+                <p className="text-xs text-ink-500 leading-relaxed font-medium line-clamp-3">
+                  {calc.description}
+                </p>
+                
+                {/* Background Decoration */}
+                <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-brand-50 rounded-full opacity-0 group-hover:opacity-40 transition-all blur-2xl" />
+              </button>
+            ))}
+          </div>
+
+          {filtered.length === 0 && (
+            <div className="py-20 text-center">
+              <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Search size={32} className="text-ink-200" />
+              </div>
+              <h3 className="text-ink-900 font-black">Nenhuma calculadora encontrada</h3>
+              <p className="text-sm text-ink-400">Tente ajustar sua busca ou filtros.</p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Modal da Calculadora */}
+      {selectedCalcId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-4 lg:p-8 animate-in fade-in duration-200 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100 flex flex-col">
+            <div className="px-8 py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20">
+                  <Calculator size={24} />
+                </div>
+                <div>
+                  <h3 className="font-black text-ink-900 text-lg">{CALCULATORS.find(c => c.id === selectedCalcId)?.name}</h3>
+                  <p className="text-xs text-ink-400 font-bold uppercase tracking-widest">Módulo de Cálculo Clínico</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { setSelectedCalcId(null); setCalcResult(null); }} 
+                className="p-3 hover:bg-ink-100 rounded-2xl text-ink-400 hover:text-ink-900 transition-all border border-ink-100"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              {React.createElement(CALCULATORS.find(c => c.id === selectedCalcId)!.component, {
+                value: calcResult ?? {},
+                onChange: (res: Record<string, unknown>) => setCalcResult(res)
+              })}
+              
+              {calcResult && (
+                <div className="mt-8 p-8 bg-brand-50 rounded-[2.5rem] border border-brand-100 animate-in slide-in-from-bottom-4">
+                  <h4 className="text-xs font-black text-brand-600 uppercase tracking-widest mb-4">Resultado da Análise</h4>
+                  <div className="text-ink-900 font-bold whitespace-pre-wrap leading-relaxed">
+                    {typeof calcResult === 'string' ? calcResult : JSON.stringify(calcResult, null, 2)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-8 py-6 bg-ink-50/50 border-t border-ink-100 flex justify-end gap-3 shrink-0">
+              <button 
+                onClick={() => { setSelectedCalcId(null); setCalcResult(null); }}
+                className="px-6 py-3 rounded-2xl text-sm font-black text-ink-600 hover:bg-ink-100 transition-all uppercase tracking-widest"
+              >
+                Fechar
+              </button>
+              {calcResult && (
+                <button 
+                  className="px-8 py-3 rounded-2xl text-sm font-black text-white bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all uppercase tracking-widest"
+                  onClick={() => {
+                    // Aqui iria a lógica de copiar para o laudo
+                    alert('Resultado copiado para o clipboard!');
+                    setSelectedCalcId(null);
+                    setCalcResult(null);
+                  }}
+                >
+                  Usar no Laudo
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-function DemoWrapper({ Component }: { Component: React.FC<any> }) {
-  const [val, setVal] = useState<any>({});
-  return <Component value={val} onChange={setVal} />;
 }

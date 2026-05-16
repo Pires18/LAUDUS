@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User } from 'firebase/auth';
-import { AppSettings } from '../types';
+import { AppSettings, Patient } from '../types';
 import { getSettings, saveSettings } from './db';
 
 type View =
@@ -14,7 +14,6 @@ type View =
   | { name: 'settings' }
   | { name: 'laud-ia' }
   | { name: 'calculators' }
-  | { name: 'new-exam' }
   | { name: 'clinics' }
   | { name: 'clinic-detail'; clinicId: string }
   | { name: 'clinic-form'; clinicId?: string };
@@ -41,6 +40,12 @@ interface AppState {
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   clearToast: () => void;
+
+  // ── Global Modals ──
+  showCreateExamModal: boolean;
+  setShowCreateExamModal: (val: boolean) => void;
+  createExamDefaultPatient: Patient | null;
+  setCreateExamDefaultPatient: (p: Patient | null) => void;
 }
 
 export const useApp = create<AppState>((set, get) => ({
@@ -85,4 +90,10 @@ export const useApp = create<AppState>((set, get) => ({
     }, 3500);
   },
   clearToast: () => set({ toast: null }),
+
+  // ── Global Modals ──
+  showCreateExamModal: false,
+  setShowCreateExamModal: (val) => set({ showCreateExamModal: val }),
+  createExamDefaultPatient: null,
+  setCreateExamDefaultPatient: (p) => set({ createExamDefaultPatient: p }),
 }));

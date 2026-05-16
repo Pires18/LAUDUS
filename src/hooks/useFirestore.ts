@@ -1,20 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   collection,
   doc,
   onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  setDoc,
-  getDoc,
   query,
   where,
   orderBy,
   QueryConstraint,
-  DocumentData,
-  Timestamp,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 
@@ -117,65 +109,5 @@ export function useDocument<T extends { id: string }>(
   return { data, loading, error };
 }
 
-// ─── CRUD operations ───
-
-export async function addDocument<T extends Record<string, unknown>>(
-  collectionName: string,
-  data: T
-): Promise<string> {
-  const colRef = collection(firestore, userPath(collectionName));
-  const docRef = await addDoc(colRef, {
-    ...data,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  });
-  return docRef.id;
-}
-
-export async function setDocument<T extends Record<string, unknown>>(
-  collectionName: string,
-  documentId: string,
-  data: T,
-  merge = true
-): Promise<void> {
-  const docRef = doc(firestore, userPath(collectionName), documentId);
-  await setDoc(docRef, { ...data, updatedAt: Date.now() }, { merge });
-}
-
-export async function updateDocument(
-  collectionName: string,
-  documentId: string,
-  data: Record<string, unknown>
-): Promise<void> {
-  const docRef = doc(firestore, userPath(collectionName), documentId);
-  await updateDoc(docRef, { ...data, updatedAt: Date.now() });
-}
-
-export async function deleteDocument(
-  collectionName: string,
-  documentId: string
-): Promise<void> {
-  const docRef = doc(firestore, userPath(collectionName), documentId);
-  await deleteDoc(docRef);
-}
-
-export async function getDocument<T extends { id: string }>(
-  collectionName: string,
-  documentId: string
-): Promise<T | null> {
-  const docRef = doc(firestore, userPath(collectionName), documentId);
-  const snapshot = await getDoc(docRef);
-  if (!snapshot.exists()) return null;
-  return { id: snapshot.id, ...snapshot.data() } as T;
-}
-
-/**
- * Gera um ID único usando o Firestore doc().id
- */
-export function genId(collectionName = '_ids'): string {
-  const colRef = collection(firestore, collectionName);
-  return doc(colRef).id;
-}
-
 // ─── Re-export query helpers for use in components ───
-export { where, orderBy, query, collection, doc } from 'firebase/firestore';
+export { where, orderBy, query } from 'firebase/firestore';

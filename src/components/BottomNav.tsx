@@ -1,14 +1,16 @@
+import { useState } from 'react';
 import { useApp } from '../store/app';
 import { LayoutDashboard, LayoutList, FilePlus, Users, Settings } from 'lucide-react';
 import { classNames } from '../utils/format';
+import { CreateExamModal } from './CreateExamModal';
 
 export function BottomNav() {
-  const { view, setView } = useApp();
+  const { view, setView, setShowCreateExamModal } = useApp();
 
   const navItems = [
     { key: 'dashboard', label: 'Início', icon: LayoutDashboard, view: { name: 'dashboard' as const } },
     { key: 'worklist', label: 'Exames', icon: LayoutList, view: { name: 'worklist' as const } },
-    { key: 'new-exam', label: 'Novo', icon: FilePlus, view: { name: 'new-exam' as const } },
+    { key: 'new-exam', label: 'Novo', icon: FilePlus, onClick: () => setShowCreateExamModal(true) },
     { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const } },
     { key: 'settings', label: 'Ajustes', icon: Settings, view: { name: 'settings' as const } },
   ];
@@ -26,7 +28,7 @@ export function BottomNav() {
         return (
           <button
             key={item.key}
-            onClick={() => setView(item.view)}
+            onClick={() => item.onClick ? item.onClick() : setView(item.view!)}
             className={classNames(
               "flex flex-col items-center gap-1 transition-all duration-200",
               isActive ? "text-brand-600 scale-110" : "text-ink-400"

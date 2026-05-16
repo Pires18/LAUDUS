@@ -1,170 +1,239 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { Clinic } from '../../types';
-import { Plus, Search, Building2, MapPin, Phone, ToggleLeft, ToggleRight } from 'lucide-react';
-import { classNames } from '../../utils/format';
+import { 
+  Plus, Search, Building2, MapPin, Phone, 
+  ToggleLeft, ToggleRight, FileText, LayoutList, 
+  ChevronRight, CheckCircle2, Globe, Mail, 
+  Clock, RotateCcw
+} from 'lucide-react';
+import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
 export function Clinics() {
-  const { setView, showToast, selectedClinicId, setSelectedClinic } = useApp();
+  const { setView, selectedClinicId, setSelectedClinic } = useApp();
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<'todas' | 'ativas' | 'inativas'>('todas');
 
   const { data: clinics, loading } = useCollection<Clinic>('clinics');
 
-  const filtered = clinics.filter((c) =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    return clinics.filter((c) => {
+      const matchesSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) || 
+                            (c.cnpj && c.cnpj.includes(search));
+      const matchesFilter = filter === 'todas' || 
+                            (filter === 'ativas' && c.active) || 
+                            (filter === 'inativas' && !c.active);
+      return matchesSearch && matchesFilter;
+    });
+  }, [clinics, search, filter]);
+
+  const stats = useMemo(() => ({
+    total: clinics.length,
+    active: clinics.filter(c => c.active).length,
+    inactive: clinics.filter(c => !c.active).length,
+  }), [clinics]);
 
   return (
-    <div>
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
       <PageHeader
-        title="Clínicas"
-        subtitle={`${clinics.length} clínica(s) cadastrada(s)`}
+        title="Unidades & Clínicas"
+        subtitle="Gerencie as unidades de atendimento e configurações de exportação."
         actions={
-          <button className="btn-primary" onClick={() => setView({ name: 'clinic-form' })}>
-            <Plus size={16} /> Nova Clínica
+          <button className="btn-primary h-11 px-6 rounded-2xl shadow-brand" onClick={() => setView({ name: 'clinic-form' })}>
+            <Plus size={18} /> <span className="font-bold text-xs uppercase tracking-widest">Nova Unidade</span>
           </button>
         }
       />
 
-      {/* Search */}
-      <div className="card mb-4 p-3">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar clínica..."
-            className="input pl-9"
-          />
-        </div>
-      </div>
-
-      {/* Clinics grid */}
-      {loading ? (
-        <div className="grid grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card p-6 animate-pulse">
-              <div className="h-5 bg-ink-100 rounded w-2/3 mb-3" />
-              <div className="h-3 bg-ink-100 rounded w-1/2 mb-2" />
-              <div className="h-3 bg-ink-100 rounded w-1/3" />
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Sidebar Navigation */}
+        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
+          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Filtrar por Status</p>
+          <button
+            onClick={() => setFilter('todas')}
+            className={classNames(
+              "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between",
+              filter === 'todas' ? "bg-brand-50 text-brand-700 border border-brand-100" : "text-ink-600 hover:bg-ink-50"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <LayoutList size={18} />
+              Todas
             </div>
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-ink-50 flex items-center justify-center mx-auto mb-4">
-            <Building2 size={28} className="text-ink-300" />
-          </div>
-          <p className="text-sm text-ink-600 font-medium mb-1">
-            {clinics.length === 0 ? 'Nenhuma clínica cadastrada' : 'Nenhum resultado'}
-          </p>
-          <p className="text-xs text-ink-400 mb-4">
-            {clinics.length === 0
-              ? 'Cadastre sua primeira clínica para começar a organizar seus laudos.'
-              : 'Tente ajustar o termo de busca.'}
-          </p>
-          {clinics.length === 0 && (
-            <button className="btn-primary" onClick={() => setView({ name: 'clinic-form' })}>
-              <Plus size={15} /> Cadastrar Primeira Clínica
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((clinic) => {
-            const isSelected = selectedClinicId === clinic.id;
-            return (
-              <div
-                key={clinic.id}
-                onClick={() => setView({ name: 'clinic-detail', clinicId: clinic.id })}
-                className={classNames(
-                  'card p-5 cursor-pointer transition-all duration-300 hover:shadow-medium group relative',
-                  isSelected && 'ring-2 ring-brand-500 ring-offset-2'
-                )}
+            <span className="text-[10px] bg-ink-100 text-ink-600 px-2 py-0.5 rounded-full">{stats.total}</span>
+          </button>
+          
+          <button
+            onClick={() => setFilter('ativas')}
+            className={classNames(
+              "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between",
+              filter === 'ativas' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "text-ink-600 hover:bg-ink-50"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <ToggleRight size={18} />
+              Ativas
+            </div>
+            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{stats.active}</span>
+          </button>
+
+          <button
+            onClick={() => setFilter('inativas')}
+            className={classNames(
+              "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between",
+              filter === 'inativas' ? "bg-ink-100 text-ink-900 border border-ink-200" : "text-ink-600 hover:bg-ink-50"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <ToggleLeft size={18} />
+              Inativas
+            </div>
+            <span className="text-[10px] bg-ink-200 text-ink-700 px-2 py-0.5 rounded-full">{stats.inactive}</span>
+          </button>
+        </aside>
+
+        <div className="flex-1 w-full space-y-6">
+          {/* Search Box */}
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full">
+              <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
+              <input
+                type="text"
+                placeholder="Buscar por nome ou CNPJ..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="input pl-12 py-3 h-14 text-base shadow-sm border-ink-200 focus:border-brand-500 w-full"
+              />
+            </div>
+            {(search || filter !== 'todas') && (
+              <button 
+                onClick={() => { setSearch(''); setFilter('todas'); }}
+                className="p-3 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-ink-100 h-14 flex items-center gap-2 shrink-0 px-4"
               >
-                {/* Active indicator */}
-                <div className="absolute top-4 right-4">
-                  {clinic.active ? (
-                    <span className="chip bg-emerald-50 text-emerald-700">
-                      <ToggleRight size={14} /> Ativa
-                    </span>
-                  ) : (
-                    <span className="chip bg-ink-100 text-ink-500">
-                      <ToggleLeft size={14} /> Inativa
-                    </span>
-                  )}
-                </div>
+                <RotateCcw size={18} />
+                <span className="text-xs font-bold uppercase tracking-widest">Limpar</span>
+              </button>
+            )}
+          </div>
 
-                {/* Logo + Name */}
-                <div className="flex items-start gap-3 mb-3">
-                  {clinic.logoUrl ? (
-                    <img
-                      src={clinic.logoUrl}
-                      alt={clinic.name}
-                      className="w-12 h-12 rounded-lg object-cover border border-ink-100 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center shrink-0">
-                      <Building2 size={20} className="text-brand-600" />
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-ink-900 truncate">{clinic.name}</h3>
-                    {clinic.cnpj && (
-                      <p className="text-xs text-ink-500 font-mono">{clinic.cnpj}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Address */}
-                {clinic.address?.city && (
-                  <div className="flex items-center gap-1.5 text-xs text-ink-500 mb-1">
-                    <MapPin size={12} />
-                    <span>
-                      {[clinic.address.city, clinic.address.state].filter(Boolean).join('/')}
-                    </span>
-                  </div>
-                )}
-
-                {/* Phone */}
-                {clinic.phone && (
-                  <div className="flex items-center gap-1.5 text-xs text-ink-500">
-                    <Phone size={12} />
-                    <span>{clinic.phone}</span>
-                  </div>
-                )}
-
-                {/* Quick select button */}
-                <div className="mt-3 pt-3 border-t border-ink-50 flex items-center justify-between">
-                  <span className="text-[11px] text-ink-400">
-                    {clinic.googleDocsTemplateId ? '📄 Template vinculado' : 'Sem template'}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedClinic(isSelected ? null : clinic.id);
-                      showToast(
-                        isSelected ? 'Filtro de clínica removido' : `Filtrando por: ${clinic.name}`,
-                        'info'
-                      );
-                    }}
+          {/* Clinics List */}
+          <div className="flex flex-col gap-2 pb-12">
+            {loading ? (
+              [1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-white border border-ink-100 rounded-2xl animate-pulse" />
+              ))
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-24 bg-white border border-ink-100 rounded-3xl">
+                <Building2 size={40} className="mx-auto text-ink-200 mb-3" />
+                <p className="text-ink-500 font-medium">Nenhuma clínica encontrada.</p>
+                <button onClick={() => setView({ name: 'clinic-form' })} className="mt-4 text-brand-600 font-bold hover:underline text-sm">
+                  Cadastrar nova unidade
+                </button>
+              </div>
+            ) : (
+              filtered.map((clinic) => {
+                const isSelected = selectedClinicId === clinic.id;
+                return (
+                  <div
+                    key={clinic.id}
+                    onClick={() => setView({ name: 'clinic-detail', clinicId: clinic.id })}
                     className={classNames(
-                      'text-[11px] px-2.5 py-1 rounded-md font-medium transition-all',
-                      isSelected
-                        ? 'bg-brand-600 text-white'
-                        : 'bg-ink-50 text-ink-600 hover:bg-ink-100'
+                      "group flex items-center gap-4 bg-white border rounded-2xl p-4 transition-all duration-200 cursor-pointer",
+                      isSelected ? "border-brand-500 shadow-md ring-1 ring-brand-500/20" : "border-ink-100 hover:border-brand-400 hover:shadow-sm"
                     )}
                   >
-                    {isSelected ? '✓ Selecionada' : 'Selecionar'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                    {/* Logo/Icon */}
+                    <div className="relative shrink-0">
+                      {clinic.logoUrl ? (
+                        <img
+                          src={clinic.logoUrl}
+                          alt={clinic.name}
+                          className="w-16 h-16 rounded-xl object-cover border border-ink-100 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-600 flex items-center justify-center border border-brand-200">
+                          <Building2 size={24} />
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div className="absolute -top-1.5 -right-1.5 bg-brand-600 text-white p-1 rounded-full border-2 border-white shadow-sm">
+                          <CheckCircle2 size={10} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 py-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-black text-ink-900 text-lg leading-tight truncate group-hover:text-brand-600 transition-colors">
+                          {clinic.name}
+                        </h3>
+                        {!clinic.active && (
+                          <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-ink-100 text-ink-500 uppercase tracking-tighter">Inativa</span>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        {clinic.cnpj && (
+                          <div className="flex items-center gap-1 text-[11px] text-ink-500 font-medium">
+                            <FileText size={12} className="text-ink-400" />
+                            {formatCNPJ(clinic.cnpj)}
+                          </div>
+                        )}
+                        {clinic.address?.city && (
+                          <div className="flex items-center gap-1 text-[11px] text-ink-500 font-medium">
+                            <MapPin size={12} className="text-brand-500" />
+                            {clinic.address.city}/{clinic.address.state}
+                          </div>
+                        )}
+                        {clinic.phone && (
+                          <div className="flex items-center gap-1 text-[11px] text-ink-500 font-medium">
+                            <Phone size={12} className="text-indigo-500" />
+                            {formatPhone(clinic.phone)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions Area */}
+                    <div className="hidden sm:flex flex-col items-end gap-2 pr-4">
+                      {clinic.googleDocsTemplateId ? (
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                          <CheckCircle2 size={10} /> Template OK
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                          Sem Template
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedClinic(isSelected ? null : clinic.id);
+                        }}
+                        className={classNames(
+                          "text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all border",
+                          isSelected 
+                            ? "bg-brand-600 text-white border-brand-600" 
+                            : "bg-white text-ink-600 border-ink-200 hover:bg-ink-50"
+                        )}
+                      >
+                        {isSelected ? 'Selecionada' : 'Selecionar'}
+                      </button>
+                    </div>
+
+                    <div className="text-ink-300 group-hover:text-brand-500 transition-colors">
+                      <ChevronRight size={20} />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

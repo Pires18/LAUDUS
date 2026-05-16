@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Ruler } from 'lucide-react';
+import { Ruler, Sparkles, Maximize2 } from 'lucide-react';
+import { CalculatorInput, ResultCard } from './CalculatorUI';
 
 export function VolumeCalculator({ value, onChange }: CalculatorProps) {
+  const [structureName, setStructureName] = useState<string>(value?.structureName ?? '');
   const [d1, setD1] = useState<number | ''>(value?.d1 ?? '');
   const [d2, setD2] = useState<number | ''>(value?.d2 ?? '');
   const [d3, setD3] = useState<number | ''>(value?.d3 ?? '');
@@ -14,74 +16,79 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
       volume = d1 * d2 * d3 * 0.523;
     }
     
+    const name = structureName.trim() || 'Estrutura';
+    
     onChange({
-      d1, d2, d3, unit,
+      structureName, d1, d2, d3, unit,
       volume: volume ? parseFloat(volume.toFixed(1)) : null,
-      _summary: volume ? `Dimensões: ${d1} x ${d2} x ${d3} ${unit}. Volume estimado: ${volume.toFixed(1)} ${unit}³` : null
+      _summary: volume ? `${name} medindo ${d1} x ${d2} x ${d3} ${unit}, com volume estimado de ${volume.toFixed(1)} ${unit}³.` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d1, d2, d3, unit]);
+  }, [structureName, d1, d2, d3, unit]);
 
   const volume = value?.volume;
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center gap-1.5">
-        <Ruler size={14} className="text-brand-600" />
-        <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Volume (Elipsoide)</h3>
+    <div className="space-y-8">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-600 flex items-center justify-center shadow-sm">
+          <Ruler size={24} />
+        </div>
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Cálculo Volumétrico</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Fórmula de Elipsóide (D1 x D2 x D3 x 0.523)</p>
+        </div>
       </div>
-      
-      <div className="p-3 space-y-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 space-y-0.5">
-            <label className="text-[9px] font-bold text-ink-400 uppercase tracking-widest text-center block">D1</label>
-            <input 
-              type="number" step="0.1" placeholder="D1" 
-              className="input text-center font-bold text-sm border-ink-200 focus:border-brand-500 py-1 h-9"
-              value={d1} onChange={e => setD1(e.target.value ? Number(e.target.value) : '')}
-            />
-          </div>
-          <span className="text-ink-300 mt-4 text-xs">×</span>
-          <div className="flex-1 space-y-0.5">
-            <label className="text-[9px] font-bold text-ink-400 uppercase tracking-widest text-center block">D2</label>
-            <input 
-              type="number" step="0.1" placeholder="D2" 
-              className="input text-center font-bold text-sm border-ink-200 focus:border-brand-500 py-1 h-9"
-              value={d2} onChange={e => setD2(e.target.value ? Number(e.target.value) : '')}
-            />
-          </div>
-          <span className="text-ink-300 mt-4 text-xs">×</span>
-          <div className="flex-1 space-y-0.5">
-            <label className="text-[9px] font-bold text-ink-400 uppercase tracking-widest text-center block">D3</label>
-            <input 
-              type="number" step="0.1" placeholder="D3" 
-              className="input text-center font-bold text-sm border-ink-200 focus:border-brand-500 py-1 h-9"
-              value={d3} onChange={e => setD3(e.target.value ? Number(e.target.value) : '')}
-            />
-          </div>
-          <div className="w-16 space-y-0.5">
-            <label className="text-[9px] font-bold text-ink-400 uppercase tracking-widest text-center block">UNID.</label>
-            <select className="input text-center font-bold text-xs border-ink-200 focus:border-brand-500 py-1 h-9" value={unit} onChange={e => setUnit(e.target.value)}>
-              <option value="cm">cm</option>
-              <option value="mm">mm</option>
-            </select>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <CalculatorInput 
+          label="Identificação da Estrutura" 
+          placeholder="Ex: Próstata, Nódulo, Tireoide..." 
+          value={structureName} 
+          onChange={setStructureName} 
+        />
+        
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Unidade de Medida</label>
+          <div className="flex gap-2">
+            {['cm', 'mm'].map(u => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className={`flex-1 h-12 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all ${
+                  unit === u ? 'bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-100' : 'bg-white text-ink-400 border-ink-100 hover:bg-ink-50'
+                }`}
+              >
+                {u}
+              </button>
+            ))}
           </div>
         </div>
-        
-        {volume ? (
-          <div className="bg-brand-50 border border-brand-200 rounded-lg p-2 text-center">
-            <span className="text-[8px] uppercase font-bold text-brand-600 block mb-0.5 tracking-widest">Volume Estimado</span>
-            <div className="flex items-baseline justify-center gap-1">
-              <span className="text-xl font-black text-brand-900">{volume.toFixed(1)}</span>
-              <span className="text-[10px] font-bold text-brand-600">{unit}³</span>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-ink-50 rounded-lg p-2 text-center text-[10px] text-ink-400 border border-dashed border-ink-200">
-            Preencha os 3 diâmetros.
-          </div>
-        )}
       </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Maximize2 size={16} className="text-brand-500" />
+          <span className="text-[10px] font-black text-ink-900 uppercase tracking-widest">Dimensões do Elipsóide</span>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <CalculatorInput type="number" label="D1 (Long)" placeholder="0.0" value={d1} onChange={(v: any) => setD1(v ? Number(v) : '')} suffix={unit} />
+          <CalculatorInput type="number" label="D2 (Trans)" placeholder="0.0" value={d2} onChange={(v: any) => setD2(v ? Number(v) : '')} suffix={unit} />
+          <CalculatorInput type="number" label="D3 (AP)" placeholder="0.0" value={d3} onChange={(v: any) => setD3(v ? Number(v) : '')} suffix={unit} />
+        </div>
+      </div>
+
+      {volume ? (
+        <ResultCard 
+          label={`Volume Estimado (${structureName.trim() || 'Estrutura'})`} 
+          value={`${volume.toFixed(1)} ${unit}³`} 
+          variant="brand"
+        />
+      ) : (
+        <div className="py-10 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center">
+           <p className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Aguardando medidas para cálculo</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,319 +1,264 @@
 import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
+import { deleteItem } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { Clinic, ExamRequest, ReportTemplate, EXAM_AREAS } from '../../types';
-import { deleteItem } from '../../store/db';
-import { where } from 'firebase/firestore';
-import { useState } from 'react';
-import {
-  ArrowLeft, Edit, Building2, MapPin, Phone, Mail, FileText,
-  Trash2, ExternalLink, Loader2
+import { Clinic, ExamRequest } from '../../types';
+import { 
+  Building2, MapPin, Phone, Mail, 
+  Settings2, Trash2, ArrowLeft, Globe, 
+  FileText, ExternalLink, Activity, Users,
+  CheckCircle2, AlertCircle, Calendar
 } from 'lucide-react';
-import { formatDateTime, classNames } from '../../utils/format';
+import { useState, useMemo } from 'react';
+import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
 interface Props {
   clinicId: string;
 }
 
 export function ClinicDetail({ clinicId }: Props) {
-  const { setView, showToast, selectedClinicId, setSelectedClinic } = useApp();
+  const { setView, showToast } = useApp();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const { data: clinic, loading: clinicLoading } = useDocument<Clinic>('clinics', clinicId);
+  const { data: clinic, loading } = useDocument<Clinic>('clinics', clinicId);
+  const { data: exams } = useCollection<ExamRequest>('exams');
 
-  const { data: exams } = useCollection<ExamRequest>('exams', {
-    constraints: [where('clinicId', '==', clinicId)],
-  });
+  const clinicExams = useMemo(() => 
+    exams.filter(e => e.clinicId === clinicId),
+  [exams, clinicId]);
 
-  const { data: templates } = useCollection<ReportTemplate>('templates', {
-    constraints: [where('clinicId', '==', clinicId)],
-  });
-
-  if (clinicLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-brand-500" />
-      </div>
-    );
-  }
-
-  if (!clinic) {
-    return (
-      <div className="text-center py-12 text-ink-500">
-        Clínica não encontrada.
-        <div className="mt-3">
-          <button onClick={() => setView({ name: 'clinics' })} className="btn-secondary">
-            Voltar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const fullAddress = [
-    clinic.address?.street,
-    clinic.address?.number,
-    clinic.address?.neighborhood,
-    clinic.address?.city && clinic.address?.state
-      ? `${clinic.address.city}/${clinic.address.state}`
-      : '',
-  ]
-    .filter(Boolean)
-    .join(', ');
-
-  const isSelected = selectedClinicId === clinicId;
-
-  const statusCounts = {
-    pendente: exams.filter((e) => e.status === 'pendente').length,
-    'em-andamento': exams.filter((e) => e.status === 'em-andamento').length,
-    finalizado: exams.filter((e) => e.status === 'finalizado').length,
-  };
+  const stats = useMemo(() => ({
+    total: clinicExams.length,
+    finalized: clinicExams.filter(e => e.status === 'finalizado').length,
+    pending: clinicExams.filter(e => e.status === 'pendente').length,
+  }), [clinicExams]);
 
   async function handleDelete() {
-    setShowDeleteConfirm(false);
-    if (exams.length > 0) {
-      showToast(`Clínica tem ${exams.length} exame(s) vinculado(s). Desvincule antes.`, 'error');
-      return;
-    }
     try {
       await deleteItem('clinics', clinicId);
-      if (selectedClinicId === clinicId) setSelectedClinic(null);
-      showToast('Clínica excluída', 'success');
+      showToast('Clínica excluída com sucesso', 'success');
       setView({ name: 'clinics' });
     } catch {
       showToast('Erro ao excluir clínica', 'error');
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+        <p className="text-ink-400 font-bold uppercase tracking-widest text-xs">Carregando unidade...</p>
+      </div>
+    );
+  }
+
+  if (!clinic) {
+    return (
+      <div className="p-8 text-center bg-white border border-ink-100 rounded-3xl">
+        <AlertCircle size={40} className="mx-auto text-red-500 mb-4" />
+        <h3 className="text-lg font-black text-ink-900">Unidade não encontrada</h3>
+        <button onClick={() => setView({ name: 'clinics' })} className="mt-4 text-brand-600 font-bold">Voltar para a lista</button>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <button
-        onClick={() => setView({ name: 'clinics' })}
-        className="text-sm text-ink-500 hover:text-ink-800 flex items-center gap-1 mb-3"
-      >
-        <ArrowLeft size={14} /> Voltar
-      </button>
-
-      <PageHeader
-        title={clinic.name}
-        subtitle={clinic.cnpj || 'Sem CNPJ'}
-        actions={
-          <>
-            <button
-              onClick={() => {
-                setSelectedClinic(isSelected ? null : clinicId);
-                showToast(
-                  isSelected ? 'Filtro removido' : `Filtrando por: ${clinic.name}`,
-                  'info'
-                );
-              }}
-              className={classNames(
-                'btn text-sm',
-                isSelected ? 'bg-brand-600 text-white hover:bg-brand-700' : 'btn-secondary'
-              )}
-            >
-              {isSelected ? '✓ Selecionada' : 'Selecionar para filtro'}
-            </button>
-            <button
-              className="btn-secondary"
-              onClick={() => setView({ name: 'clinic-form', clinicId })}
-            >
-              <Edit size={15} /> Editar
-            </button>
-          </>
-        }
-      />
-
-      {/* Stats cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-semibold text-ink-900">{exams.length}</div>
-          <div className="text-xs text-ink-500 mt-0.5">Exames Total</div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-semibold text-amber-600">{statusCounts.pendente}</div>
-          <div className="text-xs text-ink-500 mt-0.5">Pendentes</div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-semibold text-brand-600">{statusCounts['em-andamento']}</div>
-          <div className="text-xs text-ink-500 mt-0.5">Em Andamento</div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-semibold text-emerald-600">{statusCounts.finalizado}</div>
-          <div className="text-xs text-ink-500 mt-0.5">Finalizados</div>
+    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setView({ name: 'clinics' })}
+          className="p-2.5 rounded-2xl bg-white border border-ink-100 text-ink-500 hover:text-brand-600 hover:border-brand-100 transition-all"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <h2 className="text-2xl font-black text-ink-900 leading-tight">Visão Geral da Unidade</h2>
+          <p className="text-sm text-ink-500">Métricas e configurações da unidade {clinic.name}.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {/* Info card */}
-        <div className="card p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-3">
-            Informações
-          </h3>
-          <div className="space-y-2 text-sm">
-            {fullAddress && (
-              <div className="flex items-start gap-2 text-ink-700">
-                <MapPin size={13} className="text-ink-400 mt-0.5 shrink-0" />
-                <span>{fullAddress}</span>
-              </div>
-            )}
-            {clinic.phone && (
-              <div className="flex items-center gap-2 text-ink-700">
-                <Phone size={13} className="text-ink-400" />
-                {clinic.phone}
-              </div>
-            )}
-            {clinic.email && (
-              <div className="flex items-center gap-2 text-ink-700">
-                <Mail size={13} className="text-ink-400" />
-                {clinic.email}
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Profile Card */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden p-8 text-center">
+             <div className="w-32 h-32 rounded-3xl bg-ink-50 border border-ink-100 mx-auto mb-6 flex items-center justify-center overflow-hidden">
+                {clinic.logoUrl ? (
+                  <img src={clinic.logoUrl} alt={clinic.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Building2 size={48} className="text-ink-300" />
+                )}
+             </div>
+             <h3 className="font-black text-ink-900 text-xl leading-tight mb-2">{clinic.name}</h3>
+             <span className={classNames(
+                "inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border mb-6",
+                clinic.active ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-ink-50 text-ink-500 border-ink-200"
+             )}>
+               {clinic.active ? 'Unidade Ativa' : 'Unidade Inativa'}
+             </span>
 
-        {/* Logo card */}
-        <div className="card p-4 flex items-center justify-center">
-          {clinic.logoUrl ? (
-            <img
-              src={clinic.logoUrl}
-              alt={clinic.name}
-              className="max-h-24 object-contain"
-            />
-          ) : (
-            <div className="text-center text-ink-400">
-              <Building2 size={32} className="mx-auto mb-1 opacity-30" />
-              <span className="text-xs">Sem logo</span>
-            </div>
-          )}
-        </div>
-
-        {/* Google Integration */}
-        <div className="card p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-3">
-            Google Integration
-          </h3>
-          <div className="space-y-2 text-sm">
-            {clinic.googleDocsTemplateId ? (
-              <a
-                href={`https://docs.google.com/document/d/${clinic.googleDocsTemplateId}/edit`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 text-brand-600 hover:underline text-xs"
-              >
-                <FileText size={13} /> Template Google Docs <ExternalLink size={10} />
-              </a>
-            ) : (
-              <span className="text-xs text-ink-400">Sem template vinculado</span>
-            )}
-            {clinic.googleDriveFolderId ? (
-              <a
-                href={`https://drive.google.com/drive/folders/${clinic.googleDriveFolderId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 text-brand-600 hover:underline text-xs"
-              >
-                <FileText size={13} /> Pasta no Drive <ExternalLink size={10} />
-              </a>
-            ) : (
-              <span className="text-xs text-ink-400">Sem pasta vinculada</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Templates vinculados */}
-      <div className="card overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-ink-100 flex items-center gap-2">
-          <FileText size={15} className="text-ink-500" />
-          <h3 className="text-sm font-semibold text-ink-800">Máscaras desta Clínica</h3>
-          <span className="text-xs text-ink-500">({templates.length})</span>
-        </div>
-        {templates.length === 0 ? (
-          <div className="text-center py-8 text-sm text-ink-400">
-            Nenhuma máscara vinculada a esta clínica.
-          </div>
-        ) : (
-          <div className="divide-y divide-ink-50">
-            {templates.map((t) => {
-              const area = EXAM_AREAS.find((a) => a.id === t.area);
-              return (
+             <div className="space-y-3 pt-6 border-t border-ink-50">
                 <button
-                  key={t.id}
-                  onClick={() => setView({ name: 'template-editor', templateId: t.id })}
-                  className="w-full text-left px-4 py-3 hover:bg-ink-50/40 flex items-center gap-3"
+                  onClick={() => setView({ name: 'clinic-form', clinicId })}
+                  className="w-full py-3 rounded-2xl bg-brand-50 text-brand-600 border border-brand-100 font-bold text-sm hover:bg-brand-600 hover:text-white transition-all flex items-center justify-center gap-2"
                 >
-                  <div className={`chip ${area?.color}`}>{area?.label}</div>
-                  <span className="text-sm font-medium text-ink-900">{t.name}</span>
+                  <Settings2 size={16} /> Editar Unidade
                 </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Últimos exames */}
-      <div className="card overflow-hidden mb-6">
-        <div className="px-4 py-3 border-b border-ink-100 flex items-center gap-2">
-          <FileText size={15} className="text-ink-500" />
-          <h3 className="text-sm font-semibold text-ink-800">Últimos Exames</h3>
-          <span className="text-xs text-ink-500">({exams.length})</span>
-        </div>
-        {exams.length === 0 ? (
-          <div className="text-center py-8 text-sm text-ink-400">
-            Nenhum exame nesta clínica.
-          </div>
-        ) : (
-          <div className="divide-y divide-ink-50">
-            {exams.slice(0, 10).map((e) => {
-              const area = EXAM_AREAS.find((a) => a.id === e.area);
-              return (
                 <button
-                  key={e.id}
-                  onClick={() => setView({ name: 'exam-editor', examId: e.id })}
-                  className="w-full text-left px-4 py-3 hover:bg-ink-50/40 flex items-center gap-3"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full py-3 rounded-2xl bg-white text-red-500 border border-red-100 font-bold text-sm hover:bg-red-50 transition-all flex items-center justify-center gap-2"
                 >
-                  {area && <div className={`chip ${area.color}`}>{area.label}</div>}
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-ink-900">{e.examType}</div>
-                    <div className="text-xs text-ink-500">{formatDateTime(e.updatedAt)}</div>
+                  <Trash2 size={16} /> Excluir Registro
+                </button>
+             </div>
+          </div>
+          
+          <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 space-y-6">
+             <h4 className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-2">Dados de Contato</h4>
+             <div className="space-y-4">
+                {clinic.cnpj && (
+                  <div className="flex items-center gap-3 text-sm text-ink-600">
+                    <FileText size={16} className="text-ink-400 shrink-0" />
+                    <span className="font-mono">{formatCNPJ(clinic.cnpj)}</span>
                   </div>
-                  <span className="text-xs text-ink-500">{e.status}</span>
-                </button>
-              );
-            })}
+                )}
+                {clinic.phone && (
+                  <div className="flex items-center gap-3 text-sm text-ink-600">
+                    <Phone size={16} className="text-ink-400 shrink-0" />
+                    {formatPhone(clinic.phone)}
+                  </div>
+                )}
+                {clinic.email && (
+                  <div className="flex items-center gap-3 text-sm text-ink-600">
+                    <Mail size={16} className="text-ink-400 shrink-0" />
+                    <span className="truncate">{clinic.email}</span>
+                  </div>
+                )}
+             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Danger zone */}
-      <div className="card p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-red-700">Zona de Perigo</h3>
-            <p className="text-xs text-ink-500 mt-1">
-              Remover esta clínica não afeta exames ou templates já existentes.
-            </p>
+        {/* Stats & Integrations */}
+        <div className="lg:col-span-3 space-y-8">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <Activity size={20} />
+                </div>
+                <span className="text-xs font-black text-ink-400 uppercase tracking-widest">Total de Exames</span>
+              </div>
+              <p className="text-3xl font-black text-ink-900">{stats.total}</p>
+            </div>
+            <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 size={20} />
+                </div>
+                <span className="text-xs font-black text-ink-400 uppercase tracking-widest">Finalizados</span>
+              </div>
+              <p className="text-3xl font-black text-emerald-600">{stats.finalized}</p>
+            </div>
+            <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Calendar size={20} />
+                </div>
+                <span className="text-xs font-black text-ink-400 uppercase tracking-widest">Pendentes</span>
+              </div>
+              <p className="text-3xl font-black text-amber-600">{stats.pending}</p>
+            </div>
           </div>
-          <button onClick={() => setShowDeleteConfirm(true)} className="btn-danger text-xs">
-            <Trash2 size={13} /> Excluir Clínica
-          </button>
+
+          {/* Integrations */}
+          <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+            <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-8 flex items-center gap-2">
+              <Globe size={16} className="text-emerald-500" /> Integrações Ativas
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className={classNames(
+                "p-6 rounded-3xl border flex flex-col gap-4",
+                clinic.googleDocsTemplateId ? "bg-emerald-50/30 border-emerald-100" : "bg-ink-50 border-ink-100 grayscale opacity-60"
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600">
+                    <FileText size={24} />
+                  </div>
+                  {clinic.googleDocsTemplateId && (
+                    <a 
+                      href={`https://docs.google.com/document/d/${clinic.googleDocsTemplateId}/edit`} 
+                      target="_blank" 
+                      className="p-2 rounded-xl bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold text-ink-900">Google Docs Template</h4>
+                  <p className="text-xs text-ink-500 leading-relaxed">
+                    {clinic.googleDocsTemplateId ? "Documento base para geração automática de laudos configurado." : "Template do Google Docs não vinculado."}
+                  </p>
+                </div>
+              </div>
+
+              <div className={classNames(
+                "p-6 rounded-3xl border flex flex-col gap-4",
+                clinic.googleDriveFolderId ? "bg-indigo-50/30 border-indigo-100" : "bg-ink-50 border-ink-100 grayscale opacity-60"
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-2xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600">
+                    <Globe size={24} />
+                  </div>
+                  {clinic.googleDriveFolderId && (
+                    <a 
+                      href={`https://drive.google.com/drive/folders/${clinic.googleDriveFolderId}`} 
+                      target="_blank" 
+                      className="p-2 rounded-xl bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold text-ink-900">Google Drive Storage</h4>
+                  <p className="text-xs text-ink-500 leading-relaxed">
+                    {clinic.googleDriveFolderId ? "Pasta de destino para armazenamento de PDFs configurada." : "Pasta do Google Drive não vinculada."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Address & Info */}
+          <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+            <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-6">Localização da Unidade</h3>
+            <div className="flex items-start gap-4 p-6 rounded-2xl bg-ink-50 border border-ink-100">
+              <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-brand-600 shadow-sm">
+                <MapPin size={20} />
+              </div>
+              <div>
+                <p className="font-bold text-ink-900">
+                  {clinic.address?.street}, {clinic.address?.number}
+                </p>
+                <p className="text-sm text-ink-500">
+                  {clinic.address?.neighborhood} - {clinic.address?.city}/{clinic.address?.state}
+                </p>
+                <p className="text-xs text-ink-400 mt-1">CEP: {clinic.address?.zipCode}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <ConfirmDialog
         open={showDeleteConfirm}
-        onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
-        title="Excluir clínica"
-        message={
-          exams.length > 0
-            ? `Esta clínica tem ${exams.length} exame(s) vinculado(s). Desvincule ou exclua os exames antes.`
-            : `Tem certeza que deseja excluir "${clinic.name}"? Esta ação não pode ser desfeita.`
-        }
-        confirmLabel={exams.length > 0 ? 'Entendido' : 'Excluir'}
-        variant={exams.length > 0 ? 'warning' : 'danger'}
+        onConfirm={handleDelete}
+        title="Excluir Unidade"
+        message={`Tem certeza que deseja excluir a unidade "${clinic.name}"? Esta ação não pode ser desfeita.`}
       />
     </div>
   );

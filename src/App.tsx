@@ -6,9 +6,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginScreen } from './components/LoginScreen';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
-import { PageTransition, Skeleton } from './components/PageTransition';
+import { PageTransition } from './components/PageTransition';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
+import { CreateExamModal } from './components/CreateExamModal';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
@@ -16,7 +17,6 @@ import { Loader2 } from 'lucide-react';
 import { Dashboard } from './modules/dashboard/Dashboard';
 import { Worklist } from './modules/worklist/Worklist';
 import { ExamEditor } from './modules/editor/ExamEditor';
-import { NewExam } from './modules/forms/NewExam';
 
 // ── Lazy loads (secondary modules) ──
 const Patients = lazy(() => import('./modules/patients/Patients').then(m => ({ default: m.Patients })));
@@ -46,7 +46,6 @@ function ViewRenderer() {
     worklist: <Worklist />,
     patients: <Suspense fallback={<LazyFallback />}><Patients /></Suspense>,
     'patient-detail': view.name === 'patient-detail' ? <Suspense fallback={<LazyFallback />}><PatientDetail patientId={view.patientId} /></Suspense> : null,
-    'new-exam': <NewExam />,
     'exam-editor': view.name === 'exam-editor' ? <ExamEditor examId={view.examId} /> : null,
     templates: <Suspense fallback={<LazyFallback />}><Templates /></Suspense>,
     'template-editor': view.name === 'template-editor' ? <Suspense fallback={<LazyFallback />}><TemplateEditor templateId={view.templateId} /></Suspense> : null,
@@ -72,9 +71,8 @@ function ViewRenderer() {
     </main>
   );
 }
-
 function AuthenticatedApp() {
-  const { loadSettings } = useApp();
+  const { loadSettings, showCreateExamModal, setShowCreateExamModal } = useApp();
 
   useEffect(() => {
     loadSettings();
@@ -87,6 +85,7 @@ function AuthenticatedApp() {
       <BottomNav />
       <Toast />
       <CommandPalette />
+      {showCreateExamModal && <CreateExamModal onClose={() => setShowCreateExamModal(false)} />}
     </div>
   );
 }

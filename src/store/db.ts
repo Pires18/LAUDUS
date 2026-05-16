@@ -16,6 +16,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   writeBatch,
   QueryConstraint,
@@ -34,10 +35,22 @@ function getUserPath(collectionName: string): string {
 /**
  * Sanitiza objetos para o Firestore (remove undefined e limpa estruturas)
  */
-function sanitize(data: any): any {
-  return JSON.parse(JSON.stringify(data, (_, value) => 
-    value === undefined ? null : value
-  ));
+function sanitize<T>(data: T): T {
+  if (data === null || typeof data !== 'object') return data;
+  if (data instanceof Date) return data;
+  
+  // Se for uma instância de FieldValue (deleteField, serverTimestamp, etc)
+  const obj = data as Record<string, unknown>;
+  if (obj.constructor?.name === 'FieldValueImpl' || ((obj as Record<string, unknown>)._methodName && obj.constructor?.name?.includes('FieldValue'))) {
+    return data;
+  }
+
+  const result = (Array.isArray(data) ? [] : {}) as Record<string, unknown>;
+  for (const key in obj) {
+    if (obj[key] === undefined) continue;
+    result[key] = sanitize(obj[key]);
+  }
+  return result as T;
 }
 
 export function getCollectionRef(collectionName: string) {
@@ -53,6 +66,13 @@ export function getDocRef(collectionName: string, docId: string) {
  */
 export function genId(collectionName: string = '_temp'): string {
   return doc(collection(firestore, collectionName)).id;
+}
+
+/**
+ * Gera um ID numérico curto (ex: 100234)
+ */
+export function generateNumericId(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 /**
@@ -193,3 +213,23 @@ export async function batchAdd<T extends Record<string, unknown>>(
 
 // Re-export for components
 export { where, orderBy, query } from 'firebase/firestore';
+
+/**
+ * Busca os últimos laudos finalizados do mesmo template para contexto da IA.
+ */
+export async function getRecentFinalizedReports(templateId: string, limitCount: number = 3): Promise<string[]> {
+  try {
+    const q = query(
+      collection(firestore, 'exams'),
+      where('templateId', '==', templateId),
+      where('status', '==', 'finalizado'),
+      orderBy('finalizedAt', 'desc'),
+      limit(limitCount)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => doc.data().reportContent).filter(Boolean);
+  } catch (err) {
+    console.error('Erro ao buscar laudos recentes:', err);
+    return [];
+  }
+}
