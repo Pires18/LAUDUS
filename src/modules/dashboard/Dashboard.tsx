@@ -385,6 +385,7 @@ export function Dashboard() {
       </div>
 
       {showCreateModal && <CreateExamModal onClose={() => setShowCreateModal(false)} />}
+      </div>
     </div>
   );
 }

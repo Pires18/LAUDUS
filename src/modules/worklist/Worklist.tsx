@@ -445,6 +445,7 @@ export function Worklist() {
         confirmLabel="Excluir Registro"
         variant="danger"
       />
+      </div>
     </div>
   );
 }

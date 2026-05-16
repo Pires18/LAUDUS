@@ -742,7 +742,8 @@ export function ExamEditor({ examId }: Props) {
         physicianName={exam.requestingPhysician}
         examDate={exam.createdAt}
       />
-    </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }

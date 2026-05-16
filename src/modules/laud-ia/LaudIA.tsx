@@ -402,6 +402,7 @@ export function LaudIA() {
           )}
         </div>
       </div>
+      </div>
     </div>
   );
 }
