@@ -59,8 +59,9 @@ export function Patients() {
   }
 
   return (
-    <div>
-      <PageHeader
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+        <PageHeader
         title="Pacientes"
         subtitle={`${patients.length} paciente(s) cadastrado(s)`}
         icon={UsersIcon}
@@ -222,6 +223,7 @@ export function Patients() {
         confirmLabel={deleteTarget?.examCount ? 'Entendido' : 'Excluir'}
         variant={deleteTarget?.examCount ? 'warning' : 'danger'}
       />
+      </div>
     </div>
   );
 }

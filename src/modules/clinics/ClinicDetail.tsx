@@ -64,7 +64,8 @@ export function ClinicDetail({ clinicId }: Props) {
   }
 
   return (
-    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
       <div className="flex items-center gap-4">
         <button
           onClick={() => setView({ name: 'clinics' })}
@@ -260,6 +261,7 @@ export function ClinicDetail({ clinicId }: Props) {
         title="Excluir Unidade"
         message={`Tem certeza que deseja excluir a unidade "${clinic.name}"? Esta ação não pode ser desfeita.`}
       />
+      </div>
     </div>
   );
 }

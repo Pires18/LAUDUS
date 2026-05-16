@@ -24,7 +24,8 @@ export function Calculators() {
   }, [areaFilter, search]);
 
   return (
-    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+    <div className="module-container">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
         title="Calculadoras Clínicas"
         subtitle="Biblioteca de módulos integrados para cálculos especializados."
@@ -233,6 +234,7 @@ export function Calculators() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

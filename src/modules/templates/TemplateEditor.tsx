@@ -64,8 +64,9 @@ export function TemplateEditor({ templateId }: Props) {
   ] as const;
 
   return (
-    <div className="flex flex-col h-full max-h-[100vh]">
-      <div className="shrink-0 mb-4">
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+        <div className="shrink-0">
         <button
           onClick={() => setView({ name: 'templates' })}
           className="text-sm text-ink-500 hover:text-ink-800 flex items-center gap-1 mb-3"
@@ -100,7 +101,7 @@ export function TemplateEditor({ templateId }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-8">
+      <div className="pb-8 space-y-8">
         {activeTab === 'info' && (
           <div className="grid grid-cols-2 gap-6 max-w-4xl">
             <div className="card p-5 space-y-4 col-span-2">
@@ -272,6 +273,7 @@ export function TemplateEditor({ templateId }: Props) {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

@@ -36,7 +36,8 @@ export function Clinics() {
   }), [clinics]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
         title="Unidades & Clínicas"
         subtitle="Gerencie as unidades de atendimento e configurações de exportação."
@@ -233,6 +234,7 @@ export function Clinics() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

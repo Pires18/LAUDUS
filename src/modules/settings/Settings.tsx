@@ -48,7 +48,8 @@ export function Settings() {
   ] as const;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
         title="Configurações"
         subtitle="Gerencie seu perfil, assinatura digital e parâmetros globais."
@@ -296,6 +297,7 @@ export function Settings() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

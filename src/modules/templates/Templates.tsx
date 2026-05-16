@@ -96,7 +96,8 @@ export function Templates() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in p-4 lg:p-8">
+    <div className="module-container">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
         title="Máscaras de Laudo"
         subtitle="Gerencie modelos e padrões diagnósticos"
@@ -264,6 +265,7 @@ export function Templates() {
         confirmLabel="Excluir Definitivamente"
         variant="danger"
       />
+      </div>
     </div>
   );
 }

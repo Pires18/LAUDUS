@@ -74,7 +74,8 @@ export function PatientDetail({ patientId }: Props) {
   ].filter(Boolean).join(', ');
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
       <button
         onClick={() => setView({ name: 'patients' })}
         className="text-[10px] font-black uppercase tracking-widest text-ink-400 hover:text-ink-900 flex items-center gap-2 transition-colors mb-2"
@@ -291,6 +292,7 @@ export function PatientDetail({ patientId }: Props) {
           onCancel={() => setEditing(false)}
         />
       </Modal>
+      </div>
     </div>
   );
 }
