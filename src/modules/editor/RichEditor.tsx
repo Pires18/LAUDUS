@@ -6,7 +6,7 @@ import Underline from '@tiptap/extension-underline';
 import { useEffect, ReactNode, forwardRef, useImperativeHandle } from 'react';
 import {
   Bold, Italic, Underline as UnderlineIcon, List, ListOrdered,
-  Heading2, Heading3, AlignLeft, AlignCenter, AlignJustify,
+  Heading1, Heading2, Heading3, AlignLeft, AlignCenter, AlignJustify,
   Undo2, Redo2, Sparkles, Type
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
@@ -122,7 +122,8 @@ function Toolbar({ editor }: { editor: Editor }) {
       <Sep />
 
       <div className="flex items-center gap-1">
-        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Título Principal"><Heading2 size={s} /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="Título do Laudo"><Heading1 size={s} /></ToolbarBtn>
+        <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Título de Seção"><Heading2 size={s} /></ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Subtítulo Técnico"><Heading3 size={s} /></ToolbarBtn>
         <ToolbarBtn onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive('paragraph')} title="Texto Normal"><Type size={s} /></ToolbarBtn>
       </div>

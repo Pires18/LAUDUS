@@ -35,7 +35,7 @@ PILARES COGNITIVOS MANDATÓRIOS:
 
 5. EXCELÊNCIA ESTRUTURAL (Guardian do Skeleton v7.0)
    - Produza HTML semântico limpo, sem markdown, sem comentários, sem textos fora das tags.
-   - Use <h2> para seções, <p> para parágrafos, <strong> para nomes de estruturas.`;
+   - Use <h1> para o título do exame, <h2> para seções, <p> para parágrafos, <strong> para nomes de estruturas.`;
 
 export const DEFAULT_ADVANCED_REASONING = `SISTEMA DE RACIOCÍNIO AVANÇADO v7.0 (CLINICAL COGNITION ENGINE):
 
@@ -93,6 +93,8 @@ export const DEFAULT_STRUCTURE_PROMPT = `SKELETON v7.0 — ARQUITETURA OBRIGATÓ
 
 Produza HTML semântico seguindo EXATAMENTE esta ordem de seções:
 
+<h1>[NOME DO EXAME EM MAIÚSCULO]</h1>
+
 <h2>TÉCNICA</h2>
 <p>Descreva: equipamento, transdutor utilizado (frequência e tipo), janelas acústicas, planos de corte e uso de Doppler se aplicável. Mimetize o estilo do médico de referência.</p>
 
@@ -130,14 +132,15 @@ export const DEFAULT_RIGID_RULES = `REGRAS INVIOLÁVEIS DO LAUD.IA v7.0 — COMP
    Se não há dado: use qualificador ("dimensões habituais", "calibre preservado").
 
 3. INTEGRIDADE ESTRUTURAL TOTAL
-   Todos os <h2> da máscara DEVEM aparecer no laudo final.
+   Todos os <h1> e <h2> da máscara DEVEM aparecer no laudo final.
+   O <h1> deve conter o título profissional do exame.
    Proibido remover, renomear ou reordenar seções sem instrução explícita.
 
 4. MARCADOR OBRIGATÓRIO NA CONCLUSÃO E RECOMENDAÇÕES
    Cada item em <p> das seções Conclusão e Recomendações DEVE iniciar com "•".
 
 5. HTML PURO — ZERO MARKDOWN
-   Proibido: #, ##, *, **, ---, \`\`\`. Use apenas: <h2>, <p>, <strong>, <em>, <ul>, <li>.
+   Proibido: #, ##, *, **, ---, \`\`\`. Use apenas: <h1>, <h2>, <p>, <strong>, <em>, <ul>, <li>.
 
 6. LÉXICO DE ESPECIALISTA SÊNIOR
    Use: "ecotextura homogênea", "contornos regulares e definidos", "fluxo laminar preservado",

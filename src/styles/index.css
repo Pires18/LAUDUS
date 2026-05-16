@@ -265,7 +265,20 @@
   @apply min-h-[400px] outline-none text-ink-900 font-serif leading-relaxed;
 }
 .ProseMirror h1 { @apply text-3xl font-black mt-2 mb-10 text-ink-900 font-sans text-center uppercase tracking-tight border-b-8 border-ink-900 pb-8; }
-.ProseMirror h2 { @apply text-base font-black mt-10 mb-4 text-ink-900 font-sans uppercase tracking-[0.2em] border-b-2 border-ink-100 pb-2; }
+.prose h1 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #1a1b1e;
+  text-align: center;
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #f1f3f5;
+  padding-bottom: 1rem;
+}
+
+.prose h2 { @apply text-base font-black mt-10 mb-4 text-ink-900 font-sans uppercase tracking-[0.2em] border-b-2 border-ink-100 pb-2; }
 .ProseMirror h3 { @apply text-sm font-black mt-6 mb-2 text-ink-800 font-sans uppercase tracking-widest; }
 .ProseMirror p { @apply mb-1.5 leading-relaxed text-[16px]; }
 .ProseMirror ul { @apply list-disc pl-6 mb-4 space-y-1; }
