@@ -73,7 +73,8 @@ export function LaudIA() {
   ] as const;
 
   return (
-    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+    <div className="module-container">
+      <div className="space-y-6 animate-fade-in">
       <PageHeader 
         title="Configurações LAUD.IA" 
         subtitle="Gerencie o comportamento e a inteligência do sistema de laudos."

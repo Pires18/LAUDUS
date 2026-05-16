@@ -224,80 +224,90 @@ export function ExamEditor({ examId }: Props) {
     };
   }, [handleRefine, reportContent, handleCopy, handleReset, debouncedSave, showToast, handleStatusChange]);
 
-  if (!exam || !patient || !template) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Loader2 size={24} className="animate-spin-slow text-brand-500 mx-auto mb-3" />
-          <p className="text-sm text-ink-500">Carregando exame...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col h-full relative">
-      {/* AI Progress Bar */}
-      {isGenerating && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-brand-100 z-50 overflow-hidden">
-          <div className="h-full bg-brand-500 w-1/3 animate-ping" style={{ animationDuration: '2s' }} />
-        </div>
-      )}
-
-      <EditorHeader 
-        exam={exam}
-        patient={patient}
-        clinic={clinic}
-        onBack={() => setView({ name: 'worklist' })}
-        onStatusChange={handleStatusChange}
-        onUnlock={() => setShowUnlockModal(true)}
-        onEditMetadata={() => {
-          setEditData({
-            patientName: patient.name,
-            birthDate: patient.birthDate || '',
-            requestingPhysician: exam.requestingPhysician || '',
-            clinicalIndication: exam.clinicalIndication || '',
-            clinicId: exam.clinicId || ''
-          });
-          setShowEditMetadata(true);
-        }}
-      />
-
-      {/* AVISO API KEY */}
-      {!settings.geminiApiKey && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
-          <AlertCircle size={12} />
-          <span>API Key não configurada — geração em <strong>modo demo</strong>.</span>
-          <button className="underline ml-1 font-medium" onClick={() => setView({ name: 'settings' })}>Configurar</button>
-        </div>
-      )}
-
-      <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
-        {/* Main Workspace */}
-        <div className={classNames(
-          "flex-1 flex flex-col min-w-0 dock-sidebar-transition",
-          showCopilot && isCopilotDocked ? "mr-[400px]" : "mr-0"
-        )}>
-          {/* Section Progress Bar */}
-          <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
-             <motion.div 
-               initial={{ width: 0 }}
-               animate={{ width: '65%' }} // Mock progress for UI adequacy
-               className="h-full bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-             />
+    <AnimatePresence mode="wait">
+      {!exam || !patient || !template ? (
+        <motion.div 
+          key="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="flex items-center justify-center h-full"
+        >
+          <div className="text-center">
+            <Loader2 size={24} className="animate-spin-slow text-brand-500 mx-auto mb-3" />
+            <p className="text-sm text-ink-500">Carregando exame...</p>
           </div>
+        </motion.div>
+      ) : (
+        <motion.div 
+          key="content"
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col h-full relative"
+        >
+          {/* AI Progress Bar */}
+          {isGenerating && (
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-brand-100 z-50 overflow-hidden">
+              <div className="h-full bg-brand-500 w-1/3 animate-ping" style={{ animationDuration: '2s' }} />
+            </div>
+          )}
 
-          <EditorToolbar 
-            isGenerating={isGenerating}
-            hasReport={!!reportContent}
-            status={exam.status}
-            onRefine={() => handleRefine(reportContent)}
-            onShowPrompt={() => setShowPromptPreview(true)}
-            onReset={handleReset}
-            onShowHistory={() => setShowHistoryModal(true)}
-            saveState={saveState}
-            geminiModel={settings.geminiModel || 'gemini-1.5-flash'}
+          <EditorHeader 
+            exam={exam}
+            patient={patient}
+            clinic={clinic}
+            onBack={() => setView({ name: 'worklist' })}
+            onStatusChange={handleStatusChange}
+            onUnlock={() => setShowUnlockModal(true)}
+            onEditMetadata={() => {
+              setEditData({
+                patientName: patient.name,
+                birthDate: patient.birthDate || '',
+                requestingPhysician: exam.requestingPhysician || '',
+                clinicalIndication: exam.clinicalIndication || '',
+                clinicId: exam.clinicId || ''
+              });
+              setShowEditMetadata(true);
+            }}
           />
+
+          {/* AVISO API KEY */}
+          {!settings.geminiApiKey && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
+              <AlertCircle size={12} />
+              <span>API Key não configurada — geração em <strong>modo demo</strong>.</span>
+              <button className="underline ml-1 font-medium" onClick={() => setView({ name: 'settings' })}>Configurar</button>
+            </div>
+          )}
+
+          <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
+            {/* Main Workspace */}
+            <div className={classNames(
+              "flex-1 flex flex-col min-w-0 dock-sidebar-transition",
+              showCopilot && isCopilotDocked ? "mr-[400px]" : "mr-0"
+            )}>
+              {/* Section Progress Bar */}
+              <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
+                 <motion.div 
+                   initial={{ width: 0 }}
+                   animate={{ width: '65%' }} // Mock progress for UI adequacy
+                   className="h-full bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                 />
+              </div>
+
+              <EditorToolbar 
+                isGenerating={isGenerating}
+                hasReport={!!reportContent}
+                status={exam.status}
+                onRefine={() => handleRefine(reportContent)}
+                onShowPrompt={() => setShowPromptPreview(true)}
+                onReset={handleReset}
+                onShowHistory={() => setShowHistoryModal(true)}
+                saveState={saveState}
+                geminiModel={settings.geminiModel || 'gemini-1.5-flash'}
+              />
 
           <div className="flex-1 overflow-hidden relative flex flex-col">
             <AnimatePresence>
@@ -732,6 +742,7 @@ export function ExamEditor({ examId }: Props) {
         physicianName={exam.requestingPhysician}
         examDate={exam.createdAt}
       />
-    </div>
+    </motion.div>
+    </AnimatePresence>
   );
 }

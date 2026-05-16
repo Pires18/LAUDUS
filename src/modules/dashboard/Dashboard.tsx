@@ -91,7 +91,8 @@ export function Dashboard() {
   })();
 
   return (
-    <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 space-y-6 animate-in fade-in duration-500">
+    <div className="module-container">
+      <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
       
       {/* Premium Hero Welcome */}
       <section className="relative overflow-hidden rounded-[2rem] bg-ink-900 p-6 sm:p-10 shadow-2xl">

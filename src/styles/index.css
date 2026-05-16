@@ -247,6 +247,10 @@
   .tablet-grid-2 {
     @apply grid grid-cols-1 md:grid-cols-2 gap-6;
   }
+
+  .module-container {
+    @apply flex-1 flex flex-col h-full overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 w-full;
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -254,7 +258,14 @@
    ═══════════════════════════════════════════ */
 
 .dock-sidebar-transition {
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: margin-right, width, padding-right, opacity, transform;
+  transition-duration: 0.4s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Evita o tremido de scrollbar */
+html, body {
+  scrollbar-gutter: stable;
 }
 
 /* ═══════════════════════════════════════════

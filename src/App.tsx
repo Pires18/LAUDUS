@@ -60,12 +60,10 @@ function ViewRenderer() {
   const isFullBleed = view.name === 'exam-editor';
 
   return (
-    <main className={isFullBleed ? 'flex-1 min-w-0' : 'flex-1 min-w-0 p-4 md:p-6 lg:p-8 pb-24 md:pb-8'}>
+    <main className="flex-1 min-w-0 relative h-screen overflow-hidden">
       <AnimatePresence mode="wait">
         <PageTransition key={view.name} id={view.name}>
-          <div className={isFullBleed ? 'h-screen' : 'mx-auto'}>
-            {views[view.name] ?? null}
-          </div>
+          {views[view.name] ?? null}
         </PageTransition>
       </AnimatePresence>
     </main>

@@ -136,7 +136,8 @@ export function Worklist() {
   }
 
   return (
-    <div className="space-y-6 p-4 lg:p-8 animate-fade-in">
+    <div className="module-container">
+      <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-ink-900 tracking-tight">Worklist Profissional</h1>
