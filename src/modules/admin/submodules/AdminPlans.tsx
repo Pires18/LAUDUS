@@ -4,7 +4,7 @@ import { Plan } from '../../../types';
 import { useApp } from '../../../store/app';
 import { addItemGlobalWithId, updateGlobalItem, deleteGlobalItem, genId, addAuditLog } from '../../../store/db';
 import { 
-  Plus, Check, DollarSign, Clock, Settings2, 
+  Plus, Check, DollarSign, Settings2, 
   Trash2, Activity, Hospital, Loader2, X 
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';

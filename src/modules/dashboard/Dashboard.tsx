@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { useAuth } from '../../hooks/useAuth';
-import { ExamRequest, Patient, Clinic, EXAM_AREAS, ExamStatus } from '../../types';
+import { ExamRequest, Patient, Clinic, EXAM_AREAS } from '../../types';
 import {
   LayoutList, FilePlus, Clock, CheckCircle2, CircleDot, TrendingUp,
-  Users, FileText, Activity, ArrowRight, Calendar, Building2, Sparkles,
-  Zap, ChevronRight, Briefcase, Terminal, Loader2, MessageSquare, Send
+  Users, FileText, Activity, Building2, Sparkles,
+  Zap, ChevronRight, Briefcase, Terminal, Loader2
 } from 'lucide-react';
 import { AreaIcon } from '../../components/AreaIcon';
 import { classNames, formatDateTime } from '../../utils/format';
@@ -15,7 +15,6 @@ export function Dashboard() {
   const { user } = useAuth();
   const { setView, selectedClinicId, settings, showToast } = useApp();
   const currentRole = settings.currentRole || 'medico';
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const { data: exams } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -59,7 +58,6 @@ export function Dashboard() {
     }, 850);
   }
 
-  const now = Date.now();
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
   const monthStart = new Date(todayStart); monthStart.setDate(1);

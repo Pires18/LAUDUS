@@ -7,7 +7,7 @@ import { useEffect, ReactNode, forwardRef, useImperativeHandle } from 'react';
 import {
   Bold, Italic, Underline as UnderlineIcon, List, ListOrdered,
   Heading1, Heading2, Heading3, AlignLeft, AlignCenter, AlignJustify,
-  Undo2, Redo2, Sparkles, Type
+  Undo2, Redo2, Type
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 

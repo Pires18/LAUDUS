@@ -6,7 +6,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Clinic } from '../../types';
 import { 
   ArrowLeft, Save, Upload, Building2, MapPin, 
-  Globe, Mail, Phone, FileText, Layout, 
+  Globe, FileText, Layout, 
   RotateCcw, Info, CheckCircle2
 } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';

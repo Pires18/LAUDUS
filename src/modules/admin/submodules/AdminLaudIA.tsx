@@ -4,7 +4,7 @@ import {
   BrainCircuit, ShieldAlert, 
   RotateCcw, Zap,
   GraduationCap, CheckCircle2, AlertCircle, Loader2,
-  Sliders, LayoutList, Layout, ShieldCheck,
+  Sliders, LayoutList, ShieldCheck,
   FlaskConical, Play, FileText, History
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';

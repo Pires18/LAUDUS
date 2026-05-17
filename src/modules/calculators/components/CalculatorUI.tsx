@@ -135,3 +135,27 @@ export function CalculatorInput({ label, value, onChange, placeholder, type = 't
     </div>
   );
 }
+
+export function CalculatorReference({ text, link }: { text: string; link?: string }) {
+  return (
+    <div className="mt-8 pt-6 border-t border-ink-100 flex items-start gap-3.5 text-xs text-ink-500 font-medium">
+      <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 shadow-sm">
+        <Info size={16} />
+      </div>
+      <div className="flex-1 leading-relaxed pt-0.5">
+        <span className="font-black text-ink-900 uppercase text-[9px] tracking-widest block mb-1">Referência Científica & Diretriz</span>
+        <span>{text}</span>
+        {link && (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-600 hover:text-brand-700 hover:underline font-bold transition-all block sm:inline sm:ml-2 mt-1 sm:mt-0"
+          >
+            Ver Diretriz original →
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}

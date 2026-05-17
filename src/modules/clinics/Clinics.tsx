@@ -6,8 +6,7 @@ import { Clinic } from '../../types';
 import { 
   Plus, Search, Building2, MapPin, Phone, 
   ToggleLeft, ToggleRight, FileText, LayoutList, 
-  ChevronRight, CheckCircle2, Globe, Mail, 
-  Clock, RotateCcw
+  ChevronRight, CheckCircle2, RotateCcw
 } from 'lucide-react';
 import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
@@ -168,7 +167,6 @@ export function Clinics() {
                     {/* Content */}
                     <div className="flex-1 min-w-0 py-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Endereço & Localização</h3>
                         <h3 className="font-black text-ink-900 text-lg leading-tight truncate group-hover:text-brand-600 transition-colors">
                           {clinic.name}
                         </h3>

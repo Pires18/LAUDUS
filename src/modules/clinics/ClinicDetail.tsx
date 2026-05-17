@@ -7,7 +7,7 @@ import { Clinic, ExamRequest } from '../../types';
 import { 
   Building2, MapPin, Phone, Mail, 
   Settings2, Trash2, ArrowLeft, Globe, 
-  FileText, ExternalLink, Activity, Users,
+  FileText, ExternalLink, Activity,
   CheckCircle2, AlertCircle, Calendar
 } from 'lucide-react';
 import { useState, useMemo } from 'react';

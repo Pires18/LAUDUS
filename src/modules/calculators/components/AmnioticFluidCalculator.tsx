@@ -68,51 +68,126 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
   }
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center gap-1.5">
-        <Droplets size={14} className="text-sky-600" />
-        <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Líquido Amniótico</h3>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-sm">
+          <Droplets size={20} />
+        </div>
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Líquido Amniótico</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Estudo Volumétrico Fetal (MBV / ILA)</p>
+        </div>
       </div>
-      <div className="p-3 space-y-3">
-        <div className="flex gap-1">
-          <button onClick={() => setMethod('mbv')} className={classNames("flex-1 py-1 text-[10px] font-bold rounded border transition-all", method === 'mbv' ? 'bg-sky-600 text-white border-sky-700' : 'bg-white text-ink-600 border-ink-200')}>MBV (Maior Bolsão)</button>
-          <button onClick={() => setMethod('ila')} className={classNames("flex-1 py-1 text-[10px] font-bold rounded border transition-all", method === 'ila' ? 'bg-sky-600 text-white border-sky-700' : 'bg-white text-ink-600 border-ink-200')}>ILA (4 Quadrantes)</button>
+
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setMethod('mbv')} 
+            className={classNames(
+              "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl border transition-all active:scale-[0.98]", 
+              method === 'mbv' 
+                ? 'bg-sky-600 text-white border-sky-500 shadow-lg shadow-sky-100' 
+                : 'bg-white text-ink-400 border-ink-100 hover:bg-ink-50/50'
+            )}
+          >
+            MBV (Maior Bolsão)
+          </button>
+          <button 
+            onClick={() => setMethod('ila')} 
+            className={classNames(
+              "flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl border transition-all active:scale-[0.98]", 
+              method === 'ila' 
+                ? 'bg-sky-600 text-white border-sky-500 shadow-lg shadow-sky-100' 
+                : 'bg-white text-ink-400 border-ink-100 hover:bg-ink-50/50'
+            )}
+          >
+            ILA (4 Quadrantes)
+          </button>
         </div>
 
         {method === 'mbv' ? (
-          <div className="space-y-2">
+          <div className="space-y-3 p-4 bg-ink-50/20 rounded-3xl border border-ink-100/55">
             {pockets.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-2">
-                <span className="text-[9px] font-bold text-ink-400 w-16 shrink-0">Bolsão {i + 1}</span>
-                <input type="number" step="0.1" className="input text-center text-xs h-8 flex-1" placeholder="cm" value={p.depth} onChange={e => updatePocket(p.id, e.target.value)} />
-                {pockets.length > 1 && <button onClick={() => removePocket(p.id)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button>}
+              <div key={p.id} className="flex items-center gap-3">
+                <span className="text-[10px] font-black text-ink-500 uppercase tracking-wider w-16 shrink-0">Bolsão {i + 1}</span>
+                <div className="relative flex-1">
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    className="w-full h-11 px-4 pr-10 bg-white border-2 border-ink-100 rounded-xl focus:border-sky-500 focus:ring-4 focus:ring-sky-500/5 outline-none transition-all text-xs font-bold" 
+                    placeholder="Profundidade" 
+                    value={p.depth} 
+                    onChange={e => updatePocket(p.id, e.target.value)} 
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-ink-300 uppercase">cm</span>
+                </div>
+                {pockets.length > 1 && (
+                  <button 
+                    onClick={() => removePocket(p.id)} 
+                    className="w-9 h-9 rounded-xl bg-red-50 text-red-400 hover:text-red-600 transition-all flex items-center justify-center shrink-0"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
             ))}
-            <button onClick={addPocket} className="text-[9px] text-sky-600 font-bold flex items-center gap-1 hover:underline">
-              <Plus size={12} /> Adicionar bolsão
+            <button 
+              onClick={addPocket} 
+              className="text-[10px] text-sky-600 font-black uppercase tracking-wider flex items-center gap-1.5 hover:text-sky-700 transition-colors pt-1"
+            >
+              <Plus size={14} /> Adicionar bolsão
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <div><label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">QSD (cm)</label><input type="number" step="0.1" className="input text-center text-xs h-8" value={q1} onChange={e => setQ1(e.target.value)} /></div>
-            <div><label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">QSE (cm)</label><input type="number" step="0.1" className="input text-center text-xs h-8" value={q2} onChange={e => setQ2(e.target.value)} /></div>
-            <div><label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">QID (cm)</label><input type="number" step="0.1" className="input text-center text-xs h-8" value={q3} onChange={e => setQ3(e.target.value)} /></div>
-            <div><label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">QIE (cm)</label><input type="number" step="0.1" className="input text-center text-xs h-8" value={q4} onChange={e => setQ4(e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3 p-4 bg-ink-50/20 rounded-3xl border border-ink-100/55">
+            {[
+              { label: 'QSD (S. Direito)', val: q1, set: setQ1 },
+              { label: 'QSE (S. Esquerdo)', val: q2, set: setQ2 },
+              { label: 'QID (I. Direito)', val: q3, set: setQ3 },
+              { label: 'QIE (I. Esquerdo)', val: q4, set: setQ4 }
+            ].map((q, idx) => (
+              <div key={idx} className="space-y-1">
+                <label className="text-[9px] font-black text-ink-400 uppercase tracking-widest ml-1">{q.label}</label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    className="w-full h-11 px-4 pr-10 bg-white border-2 border-ink-100 rounded-xl focus:border-sky-500 focus:ring-4 focus:ring-sky-500/5 outline-none transition-all text-xs font-bold text-center" 
+                    value={q.val} 
+                    onChange={e => q.set(e.target.value)} 
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-ink-300 uppercase">cm</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
         {value?.result !== null && value?.result !== undefined ? (
-          <div className={classNames("rounded-lg p-2 border flex items-center justify-between",
-            value.classification?.includes('Oligo') ? "bg-red-50 border-red-200" :
-            value.classification?.includes('Poli') ? "bg-amber-50 border-amber-200" :
-            "bg-emerald-50 border-emerald-200"
+          <div className={classNames(
+            "rounded-3xl p-5 border-2 flex items-center justify-between shadow-sm animate-in zoom-in-95 duration-150",
+            value.classification?.includes('Oligo') ? "bg-red-50/80 border-red-200 text-red-900" :
+            value.classification?.includes('Poli') ? "bg-amber-50/80 border-amber-200 text-amber-900" :
+            "bg-emerald-50/80 border-emerald-200 text-emerald-900"
           )}>
-            <div><span className="text-[8px] font-bold uppercase block mb-0.5 opacity-60">{method === 'mbv' ? 'MBV' : 'ILA'}</span><span className="text-lg font-black leading-none">{value.result.toFixed(1)} cm</span></div>
-            <div className="text-right max-w-[55%]"><span className="text-[10px] font-bold leading-tight">{value.classification}</span></div>
+            <div>
+              <span className="text-[9px] font-black uppercase tracking-widest block mb-0.5 opacity-60">
+                Resultado ({method === 'mbv' ? 'MBV' : 'ILA'})
+              </span>
+              <span className="text-3xl font-black leading-none">
+                {value.result.toFixed(1)} <small className="text-sm opacity-70">cm</small>
+              </span>
+            </div>
+            <div className="text-right max-w-[55%]">
+              <span className="text-xs font-black uppercase tracking-tight block">
+                {value.classification}
+              </span>
+            </div>
           </div>
         ) : (
-          <div className="bg-ink-50 rounded-md p-2 flex items-center gap-2 border border-dashed border-ink-200">
-            <Info size={12} className="text-ink-400" /><span className="text-[10px] text-ink-400">Insira as medidas do líquido amniótico.</span>
+          <div className="bg-ink-50/40 rounded-3xl p-4 flex items-center gap-3 border-2 border-dashed border-ink-100">
+            <Info size={16} className="text-ink-400 shrink-0" />
+            <span className="text-[10px] text-ink-500 font-bold uppercase tracking-tight">Insira as medidas do líquido amniótico para processar a volumetria fetal.</span>
           </div>
         )}
       </div>

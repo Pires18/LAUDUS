@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator, 
-  Lightbulb, Info, CheckCircle2, RotateCcw, AlertCircle, Volume2,
-  Waves, Zap, Command, ChevronRight, FileText, Search, ShieldCheck, Languages, Eye
+  Lightbulb, Zap, Command, ChevronRight, Search, ShieldCheck
 } from 'lucide-react';
 import { useApp } from '../../store/app';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';

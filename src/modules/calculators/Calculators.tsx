@@ -7,12 +7,17 @@ import {
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
+import { CalculatorReference } from './components/CalculatorUI';
 
 export function Calculators() {
   const [areaFilter, setAreaFilter] = useState<ExamArea | 'todas'>('todas');
   const [search, setSearch] = useState('');
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
+
+  const activeCalc = useMemo(() => {
+    return CALCULATORS.find(c => c.id === selectedCalcId);
+  }, [selectedCalcId]);
 
   const filtered = useMemo(() => {
     return CALCULATORS.filter(calc => {
@@ -182,7 +187,7 @@ export function Calculators() {
                   <Calculator size={24} />
                 </div>
                 <div>
-                  <h3 className="font-black text-ink-900 text-lg">{CALCULATORS.find(c => c.id === selectedCalcId)?.name}</h3>
+                  <h3 className="font-black text-ink-900 text-lg">{activeCalc?.name}</h3>
                   <p className="text-xs text-ink-400 font-bold uppercase tracking-widest">Módulo de Cálculo Clínico</p>
                 </div>
               </div>
@@ -195,10 +200,17 @@ export function Calculators() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              {React.createElement(CALCULATORS.find(c => c.id === selectedCalcId)!.component, {
+              {activeCalc && React.createElement(activeCalc.component, {
                 value: calcResult ?? {},
                 onChange: (res: Record<string, unknown>) => setCalcResult(res)
               })}
+              
+              {activeCalc?.reference && (
+                <CalculatorReference 
+                  text={activeCalc.reference.text} 
+                  link={activeCalc.reference.link} 
+                />
+              )}
               
               {calcResult && (
                 <div className="mt-8 p-8 bg-brand-50 rounded-[2.5rem] border border-brand-100 animate-in slide-in-from-bottom-4">

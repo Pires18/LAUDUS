@@ -1,11 +1,13 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { useAuth } from '../../hooks/useAuth';
+import { useCollection } from '../../hooks/useFirestore';
+import { Clinic } from '../../types';
 import { PageHeader } from '../../components/PageHeader';
 import { 
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
-  RotateCcw, CheckCircle2, AlertCircle, Clock
+  RotateCcw, Clock
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -15,6 +17,7 @@ type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'audit';
 export function Settings() {
   const { settings, updateSettings, showToast } = useApp();
   const { user, signOut } = useAuth();
+  const { data: clinics } = useCollection<Clinic>('clinics');
   
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
@@ -143,7 +146,9 @@ export function Settings() {
                           onChange={(e) => u('defaultClinicId', e.target.value)}
                         >
                           <option value="">Nenhuma (Global)</option>
-                          {/* Clinics are loaded from DB, assuming they are available in a provider or hook */}
+                          {clinics.filter(c => c.active).map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
                         </select>
                       </div>
                     </div>

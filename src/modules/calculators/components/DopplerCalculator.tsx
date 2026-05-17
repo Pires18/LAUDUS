@@ -42,7 +42,7 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   const [utaPi, setUtaPi] = useState(value?.utaPi || '');
   const [dvPi, setDvPi] = useState(value?.dvPi || '');
   const [auFlow, setAuFlow] = useState<'normal'|'aedf'|'redf'>(value?.auFlow || 'normal');
-  const [dvWave, setDvWave] = useState<'normal'|'rav'>(value?.dvWave || 'normal');
+  const [dvWave, setDvWave] = useState<'not_evaluated'|'normal'|'rav'>(value?.dvWave || 'not_evaluated');
   const [efwPercentile, setEfwPercentile] = useState(value?.efwPercentile || '');
 
   const ga = Math.round(Number(gaWeeks||0)+(Number(gaDays||0)/7));
@@ -97,7 +97,11 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
           </div>
           <div><label className="text-[9px] font-bold text-ink-500 uppercase block mb-1 text-center">Onda 'a' Ducto Venoso</label>
             <div className="flex gap-1">
-              {[{id:'normal',l:'Normal/Positiva',c:'bg-blue-600'},{id:'rav',l:'Reversa (RAV)',c:'bg-red-800'}].map(o=>
+              {[
+                {id:'not_evaluated',l:'Não Avaliada',c:'bg-ink-600'},
+                {id:'normal',l:'Normal/Positiva',c:'bg-blue-600'},
+                {id:'rav',l:'Reversa (RAV)',c:'bg-red-800'}
+              ].map(o=>
                 <button key={o.id} onClick={()=>setDvWave(o.id as any)} className={classNames("flex-1 py-1.5 text-[8px] font-bold rounded border transition-all uppercase",dvWave===o.id?`${o.c} text-white border-transparent shadow-sm`:"bg-white text-ink-500 border-ink-100")}>{o.l}</button>
               )}
             </div>

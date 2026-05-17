@@ -3,12 +3,12 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
-import { ArrowLeft, User, Phone, Mail, MapPin, Calendar, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList } from 'lucide-react';
 import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
 import { useState, useMemo } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
-import { where, orderBy } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 
 interface Props {
   patientId: string;

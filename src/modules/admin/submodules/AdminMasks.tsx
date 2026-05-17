@@ -3,7 +3,7 @@ import { useApp } from '../../../store/app';
 import { useCollection } from '../../../hooks/useFirestore';
 import { ReportTemplate, EXAM_AREAS, ExamArea } from '../../../types';
 import { genId, addItemWithId, deleteItem } from '../../../store/db';
-import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, RotateCcw } from 'lucide-react';
+import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid } from 'lucide-react';
 import { AreaIcon } from '../../../components/AreaIcon';
 import { classNames } from '../../../utils/format';
 

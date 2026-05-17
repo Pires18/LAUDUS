@@ -12,7 +12,7 @@ import {
 } from '../../../store/adminUsers';
 import { 
   Search, UserPlus, Shield, MoreVertical, 
-  CheckCircle2, XCircle, AlertCircle, Loader2,
+  CheckCircle2, XCircle, Loader2,
   ChevronDown, Trash2, Mail, User, Filter
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';

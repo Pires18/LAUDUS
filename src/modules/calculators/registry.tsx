@@ -32,6 +32,10 @@ export interface CalculatorDef {
   description: string;
   component: React.FC<CalculatorProps>;
   areas: ExamArea[];
+  reference?: {
+    text: string;
+    link?: string;
+  };
 }
 
 export const CALCULATORS: CalculatorDef[] = [
@@ -41,35 +45,55 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'Cálculo de Volume', 
     description: 'Cálculo universal de volume para estruturas (C × L × A × 0.523).', 
     component: VolumeCalculator,
-    areas: ['medicina-interna', 'ginecologia', 'pequenas-partes', 'medicina-fetal', 'vascular', 'musculoesqueletico', 'pediatria', 'procedimentos']
+    areas: ['medicina-interna', 'ginecologia', 'pequenas-partes', 'medicina-fetal', 'vascular', 'musculoesqueletico', 'pediatria', 'procedimentos'],
+    reference: {
+      text: 'Fórmula do Elipsoide Prolado (Comprimento × Largura × Altura × 0.523). Modelo físico universal padrão-ouro na ultrassonografia clínica volumétrica.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
   },
   { 
     id: 'organ-refs', 
     name: 'Valores de Referência', 
     description: 'Guia rápido de dimensões normais para Fígado, Baço, Rins e Vesícula.', 
     component: OrganReferenceCalculator,
-    areas: ['medicina-interna', 'pediatria']
+    areas: ['medicina-interna', 'pediatria'],
+    reference: {
+      text: 'Diretrizes e Tabelas Anatômicas de Dimensões Orgânicas Normais do Colégio Brasileiro de Radiologia e Diagnóstico por Imagem (CBR).',
+      link: 'https://cbr.org.br/'
+    }
   },
   { 
     id: 'pleural-effusion', 
     name: 'Derrame Pleural (Balik)', 
     description: 'Estimativa de volume de derrame pleural pela espessura da lâmina líquida.', 
     component: PleuralEffusionCalculator,
-    areas: ['medicina-interna', 'procedimentos']
+    areas: ['medicina-interna', 'procedimentos'],
+    reference: {
+      text: 'Fórmula de Balik: Volume Estimado (mL) = Espessura Máxima da Lâmina Líquida (mm) × 20. Validada clinicamente com pacientes em decúbito dorsal.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/12951478/'
+    }
   },
   { 
     id: 'ivc-index', 
     name: 'Índice da Veia Cava', 
     description: 'Cálculo de colapsabilidade da VCI para avaliação de status volêmico.', 
     component: IvcIndexCalculator,
-    areas: ['medicina-interna', 'vascular']
+    areas: ['medicina-interna', 'vascular'],
+    reference: {
+      text: 'Consenso da American Society of Echocardiography (ASE) para avaliação não invasiva da hemodinâmica e pressão atrial direita a partir do índice de colapsabilidade da Veia Cava Inferior.',
+      link: 'https://www.asecho.org/'
+    }
   },
   { 
     id: 'prostate-weight', 
     name: 'Peso Prostático', 
     description: 'Volume e peso estimado da próstata com classificação por grau de aumento.', 
     component: ProstateWeightCalculator,
-    areas: ['medicina-interna']
+    areas: ['medicina-interna'],
+    reference: {
+      text: 'Fórmula de Volume do Elipsoide Prostático (C × L × A × 0.523) com pareamento densimétrico de 1.05g/mL e classificação clínica de aumento de Weyman (1998).',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
   },
 
   // --- PEQUENAS PARTES ---
@@ -78,14 +102,22 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'ACR TI-RADS (Tireoide)', 
     description: 'Calculadora oficial do ACR (2017) para nódulos tireoidianos.', 
     component: TiradsCalculator,
-    areas: ['pequenas-partes']
+    areas: ['pequenas-partes'],
+    reference: {
+      text: 'Tessler FN, et al. ACR Thyroid Imaging, Reporting and Data System (TI-RADS): White Paper of the ACR TI-RADS Committee. J Am Coll Radiol 2017.',
+      link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Thyroid-Imaging-Reporting-and-Data-System'
+    }
   },
   { 
     id: 'birads-us-2013', 
     name: 'ACR BI-RADS (Mama)', 
     description: 'Léxico e classificação BI-RADS para ultrassonografia mamária.', 
     component: BiradsCalculator,
-    areas: ['pequenas-partes', 'ginecologia']
+    areas: ['pequenas-partes', 'ginecologia'],
+    reference: {
+      text: 'American College of Radiology (ACR) Breast Imaging Reporting and Data System (BI-RADS) US Atlas 2013. Léxico oficial de lesões mamárias.',
+      link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Bi-Rads'
+    }
   },
 
   // --- GINECOLOGIA ---
@@ -94,14 +126,22 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'ACR O-RADS (Anexos)', 
     description: 'Classificação de risco para lesões anexiais baseada em US.', 
     component: OradsCalculator,
-    areas: ['ginecologia']
+    areas: ['ginecologia'],
+    reference: {
+      text: 'Andreotti RF, et al. ACR Ovarian-Adnexal Reporting and Data System (O-RADS) Ultrasound Risk Stratification and Management Consensus Guidelines 2022.',
+      link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/O-Rads'
+    }
   },
   { 
     id: 'figo-myoma', 
     name: 'Classificação FIGO (Miomas)', 
     description: 'Sistema de classificação para leiomiomas uterinos (0 a 8).', 
     component: FigoCalculator,
-    areas: ['ginecologia']
+    areas: ['ginecologia'],
+    reference: {
+      text: 'Munro MG, et al. FIGO classification system (PALM-COEIN) for causes of abnormal uterine bleeding in nongravid women of reproductive age. Int J Gynaecol Obstet 2011/2018.',
+      link: 'https://www.figo.org/'
+    }
   },
 
   // --- MEDICINA FETAL ---
@@ -110,49 +150,77 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'Barcelona Fetal Growth & Doppler', 
     description: 'Calculadora completa passo-a-passo: peso, Doppler e estadiamento RCF.', 
     component: BarcelonaFetalGrowthCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Gratacós E, et al. Fetal Medicine Barcelona Clinical Consensus for Fetal Growth Restriction (FGR): Classification, doppler staging and clinical management.',
+      link: 'https://www.medicinafetalbarcelona.org/'
+    }
   },
   { 
     id: 'gestational-age', 
     name: 'Idade Gestacional (DUM/USG)', 
     description: 'Calcula a IG atual e DDP baseada na DUM ou USG anterior.', 
     component: GestationalAgeCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'ACOG Committee Opinion No. 700: Methods for Estimating the Due Date. American College of Obstetricians and Gynecologists, Obstetrics & Gynecology 2017.',
+      link: 'https://www.acog.org/'
+    }
   },
   { 
     id: 'fetal-biometry', 
     name: 'Biometria Fetal (Peso/Percentil)', 
     description: 'Peso fetal estimado (Hadlock IV) e percentil de crescimento.', 
     component: FetalBiometryCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Hadlock FP, et al. Estimation of fetal weight with the use of head, body, and femur measurements. American Journal of Obstetrics and Gynecology 1985.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/3890522/'
+    }
   },
   { 
     id: 'doppler-fetal', 
     name: 'Doppler Fetal (Percentis)', 
     description: 'Cálculo de percentis para AU, ACM, UtA e Ducto Venoso.', 
     component: DopplerCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Arduini D, Rizzo G. Normal values of pulsatility index from fetal vessels. J Perinat Med 1990; Baschat AA. Doppler fetal normograms. Am J Obstet Gynecol 2003.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
   },
   { 
     id: 'amniotic-fluid', 
     name: 'Líquido Amniótico (MBV/ILA)', 
     description: 'Avaliação do volume de LA por MBV (maior bolsão) ou ILA (4 quadrantes).', 
     component: AmnioticFluidCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Phelan JP, et al. Amniotic fluid volume assessment using the four-quadrant technique (ILA). Chamberlain PF, et al. Single deepest pocket technique (MBV) assessment.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
   },
   { 
     id: 'crl-ccn', 
     name: 'Idade Gestacional (CCN)', 
     description: 'Calcula IG e DDP pelo CCN (Hadlock 1992).', 
     component: CrlCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Hadlock FP, et al. Fetal crown-rump length: relation to gestational age. Radiology 1992. Curva normativa oficial de primeiro trimestre.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/1549421/'
+    }
   },
   { 
     id: 'msd-dmsg', 
     name: 'DMSG (Saco Gestacional)', 
     description: 'Calcula o diâmetro médio do saco gestacional e IG aproximada.', 
     component: MsdCalculator,
-    areas: ['medicina-fetal']
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Hadlock FP, et al. Estimation of gestational age from mean gestational sac diameter (MSD). Radiology 1984.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
   },
 
   // --- VASCULAR ---
@@ -161,13 +229,21 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'Índices Hemodinâmicos', 
     description: 'Cálculo universal de IR (Resistência), IP (Pulsatilidade) e Relação S/D.', 
     component: VascularRatiosCalculator,
-    areas: ['vascular', 'medicina-interna']
+    areas: ['vascular', 'medicina-interna'],
+    reference: {
+      text: 'Pourcelot L. (Índice de Resistência, 1974), Wladimiroff JW. (Índice de Pulsatilidade, 1984) e Stuart B. (Relação Sistólica/Diastólica) para análises espectrais Doppler.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
   },
   { 
     id: 'imt-elsa-br', 
     name: 'IMT Carótidas (ELSA-Brasil)', 
     description: 'Espessura médio-intimal com referência ELSA-Brasil por idade e sexo.', 
     component: ImtCalculator,
-    areas: ['vascular']
+    areas: ['vascular'],
+    reference: {
+      text: 'Santos IS, et al. Carotid Intima-Media Thickness and Reference Values: Estudo Longitudinal de Saúde do Adulto (ELSA-Brasil). Arq Bras Cardiol 2016.',
+      link: 'https://www.scielo.br/j/abc/a/v8x6QRL9P6q7XbJcQz7KxQf/?lang=pt'
+    }
   },
 ];

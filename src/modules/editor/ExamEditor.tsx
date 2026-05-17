@@ -8,7 +8,7 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, PanelLeftClose, UserCog, Building2, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';

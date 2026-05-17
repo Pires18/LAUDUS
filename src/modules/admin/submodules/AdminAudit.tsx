@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useCollection } from '../../../hooks/useFirestore';
 import { AuditLog } from '../../../types';
 import { 
-  Search, History, Filter, Download, 
-  Calendar, User, Box, ArrowRight, Eye, X
+  Search, History, Download, 
+  Calendar, User, Box, Eye, X
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 

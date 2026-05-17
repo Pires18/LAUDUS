@@ -5,10 +5,8 @@ import { useApp } from '../../../store/app';
 import { useCollection, orderBy } from '../../../hooks/useFirestore';
 import { SupportTicket, SupportMessage } from '../../../types';
 import { 
-  MessageSquare, Clock, CheckCircle2, 
-  AlertCircle, Search, MoreVertical, 
-  Send, Loader2, User, Box, ArrowLeft,
-  XCircle, Filter
+  MessageSquare, AlertCircle, Search, 
+  Send, Loader2, User, Box, ArrowLeft
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 

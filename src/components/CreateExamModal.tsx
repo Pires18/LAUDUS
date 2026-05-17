@@ -4,8 +4,8 @@ import { useCollection } from '../hooks/useFirestore';
 import { addItemWithId, genId } from '../store/db';
 import { Patient, ReportTemplate, Clinic, ExamRequest, EXAM_AREAS, ExamArea } from '../types';
 import { 
-  X, Search, UserPlus, Building2, ArrowRight, Loader2, Sparkles, 
-  Info, LayoutGrid, Zap, Brain, ChevronRight, Wand2
+  X, Search, UserPlus, ArrowRight, Loader2, Sparkles, 
+  LayoutGrid, Brain, ChevronRight, Wand2
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { generateNumericId } from '../store/db';

@@ -6,12 +6,10 @@ import { ReportTemplate, EXAM_AREAS, Clinic, ExamArea } from '../../types';
 import { addItemWithId, deleteItem, genId, countWhere } from '../../store/db';
 import { useState, useMemo } from 'react';
 import { 
-  Plus, Search, FileSignature, Trash2, Copy, Hospital, 
-  ChevronRight, Sparkles, Activity, Baby, 
-  Dna, Bone, Zap, ToyBrick, Syringe, Filter, Stethoscope,
-  RotateCcw, Loader2, X, ClipboardList, Flower2, ScanSearch, LayoutGrid, Waves
+  Plus, Search, FileSignature, Trash2, Copy,
+  RotateCcw, LayoutGrid
 } from 'lucide-react';
-import { generateTemplateStructure } from '../ai/generateTemplate';
+
 import { AreaIcon } from '../../components/AreaIcon';
 import { CardSkeleton } from '../../components/SkeletonLoader';
 import { classNames } from '../../utils/format';
@@ -23,10 +21,7 @@ export function Templates() {
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
-  const [showBatchModal, setShowBatchModal] = useState(false);
-  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
-  const [batchProgress, setBatchProgress] = useState(0);
-  const [batchTotal, setBatchTotal] = useState(0);
+
 
   const { data: templates, loading } = useCollection<ReportTemplate>('templates');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -149,17 +144,7 @@ export function Templates() {
             );
           })}
 
-          {areaFilter !== 'todas' && (
-            <div className="mt-4 p-4 border-t border-ink-100 pt-6">
-              <button 
-                className="w-full h-12 rounded-2xl bg-brand-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-brand-700 transition-all flex items-center justify-center gap-2 shadow-lg"
-                onClick={() => setShowBatchModal(true)}
-              >
-                <Sparkles size={16} />
-                <span>Criação Massa IA</span>
-              </button>
-            </div>
-          )}
+
         </aside>
 
         <div className="flex-1 w-full space-y-6">

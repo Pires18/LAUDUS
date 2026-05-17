@@ -7,8 +7,8 @@ import { formatDateTime, classNames } from '../../utils/format';
 import { useState, useMemo } from 'react';
 import {
   CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2, FileText,
-  LayoutList, Building2, Filter, Calendar, SlidersHorizontal, ArrowRight, UserCog, Loader2, X,
-  MoreHorizontal, ChevronRight
+  LayoutList, Building2, SlidersHorizontal, UserCog, Loader2, X,
+  ChevronRight
 } from 'lucide-react';
 import { Skeleton } from '../../components/SkeletonLoader';
 import { AreaIcon } from '../../components/AreaIcon';
@@ -22,7 +22,6 @@ const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: 
 
 export function Worklist() {
   const { setView, showToast, selectedClinicId, setShowCreateExamModal, settings } = useApp();
-  const currentRole = settings.currentRole || 'medico';
   const [statusFilter, setStatusFilter] = useState<ExamStatus | 'todos'>('todos');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>('todos');
@@ -31,8 +30,6 @@ export function Worklist() {
   const [showFilters, setShowFilters] = useState(false);
   const [editExamId, setEditExamId] = useState<string | null>(null);
   const [editData, setEditData] = useState({
-    patientName: '',
-    birthDate: '',
     requestingPhysician: '',
     clinicalIndication: '',
     clinicId: '',
@@ -376,8 +373,6 @@ export function Worklist() {
                            <button
                              onClick={() => {
                                setEditData({
-                                 patientName: patient?.name || '',
-                                 birthDate: patient?.birthDate || '',
                                  requestingPhysician: exam.requestingPhysician || '',
                                  clinicalIndication: exam.clinicalIndication || '',
                                  clinicId: exam.clinicId || '',

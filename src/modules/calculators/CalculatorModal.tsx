@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { X, Calculator, Send, Filter, ArrowLeft, Activity, Info, Zap, CheckCircle2, Sparkles } from 'lucide-react';
+import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles } from 'lucide-react';
 import { CALCULATORS } from './registry';
-import { Modal } from '../../components/Modal';
+
 import { ExamArea, EXAM_AREAS } from '../../types';
 import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CalculatorReference } from './components/CalculatorUI';
 
 interface Props {
   area?: ExamArea;
@@ -23,7 +24,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot }: Props) {
   );
 
   const selectedCalc = CALCULATORS.find(c => c.id === selectedCalcId);
-  const currentAreaMeta = EXAM_AREAS.find(a => a.id === area);
+
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 lg:p-10">
@@ -148,10 +149,18 @@ export function CalculatorModal({ area, onClose, onSendToCopilot }: Props) {
                 <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
                   <div className="max-w-3xl mx-auto bg-white rounded-[3rem] border-2 border-ink-100 shadow-sm p-10">
                     {selectedCalc && (
-                      <selectedCalc.component 
-                        value={{}} 
-                        onChange={(val: any) => setCalcResult(val)} 
-                      />
+                      <>
+                        <selectedCalc.component 
+                          value={{}} 
+                          onChange={(val: any) => setCalcResult(val)} 
+                        />
+                        {selectedCalc.reference && (
+                          <CalculatorReference 
+                            text={selectedCalc.reference.text} 
+                            link={selectedCalc.reference.link} 
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

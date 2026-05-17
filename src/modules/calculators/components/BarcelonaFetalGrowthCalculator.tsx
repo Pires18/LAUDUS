@@ -33,6 +33,61 @@ const DV_REF: Record<number,[number,number]> = {
   32:[0.45,0.13],34:[0.43,0.13],36:[0.41,0.12],38:[0.39,0.12],40:[0.38,0.11]
 };
 
+const BIOMETRY_LIMITS: Record<number, { bpd: [number, number], hc: [number, number], ac: [number, number], fl: [number, number] }> = {
+  14: { bpd: [28, 2.0], hc: [98, 8.0], ac: [82, 9.0], fl: [15, 1.5] },
+  15: { bpd: [31, 2.1], hc: [111, 9.0], ac: [93, 10.0], fl: [18, 1.7] },
+  16: { bpd: [34, 2.2], hc: [124, 10.0], ac: [105, 11.0], fl: [21, 1.9] },
+  17: { bpd: [37, 2.3], hc: [137, 11.0], ac: [117, 12.0], fl: [24, 2.1] },
+  18: { bpd: [40, 2.4], hc: [150, 12.0], ac: [129, 13.0], fl: [27, 2.3] },
+  19: { bpd: [43, 2.5], hc: [162, 13.0], ac: [141, 14.0], fl: [30, 2.5] },
+  20: { bpd: [46, 2.6], hc: [175, 14.0], ac: [152, 15.0], fl: [33, 2.7] },
+  21: { bpd: [49, 2.7], hc: [187, 15.0], ac: [164, 16.0], fl: [36, 2.9] },
+  22: { bpd: [52, 2.8], hc: [199, 16.0], ac: [175, 17.0], fl: [39, 3.1] },
+  23: { bpd: [55, 2.9], hc: [210, 17.0], ac: [186, 18.0], fl: [41, 3.3] },
+  24: { bpd: [58, 3.0], hc: [222, 18.0], ac: [197, 19.0], fl: [44, 3.5] },
+  25: { bpd: [61, 3.1], hc: [232, 19.0], ac: [208, 20.0], fl: [46, 3.7] },
+  26: { bpd: [64, 3.2], hc: [242, 20.0], ac: [218, 21.0], fl: [49, 3.9] },
+  27: { bpd: [67, 3.3], hc: [252, 21.0], ac: [228, 22.0], fl: [51, 4.1] },
+  28: { bpd: [70, 3.4], hc: [262, 22.0], ac: [238, 23.0], fl: [53, 4.3] },
+  29: { bpd: [73, 3.5], hc: [271, 23.0], ac: [248, 24.0], fl: [55, 4.5] },
+  30: { bpd: [75, 3.6], hc: [280, 24.0], ac: [258, 25.0], fl: [58, 4.6] },
+  31: { bpd: [78, 3.7], hc: [289, 25.0], ac: [268, 26.0], fl: [60, 4.7] },
+  32: { bpd: [80, 3.8], hc: [297, 26.0], ac: [278, 27.0], fl: [62, 4.8] },
+  33: { bpd: [83, 3.9], hc: [305, 27.0], ac: [287, 28.0], fl: [64, 4.9] },
+  34: { bpd: [85, 4.0], hc: [313, 28.0], ac: [297, 29.0], fl: [66, 5.0] },
+  35: { bpd: [87, 4.1], hc: [320, 29.0], ac: [306, 30.0], fl: [68, 5.1] },
+  36: { bpd: [89, 4.2], hc: [327, 30.0], ac: [315, 31.0], fl: [70, 5.2] },
+  37: { bpd: [91, 4.3], hc: [333, 31.0], ac: [324, 32.0], fl: [71, 5.3] },
+  38: { bpd: [93, 4.4], hc: [339, 32.0], ac: [332, 33.0], fl: [73, 5.4] },
+  39: { bpd: [94, 4.5], hc: [344, 33.0], ac: [340, 34.0], fl: [74, 5.5] },
+  40: { bpd: [96, 4.6], hc: [349, 34.0], ac: [348, 35.0], fl: [76, 5.6] },
+  41: { bpd: [97, 4.7], hc: [353, 35.0], ac: [355, 36.0], fl: [77, 5.7] },
+  42: { bpd: [98, 4.8], hc: [357, 36.0], ac: [362, 37.0], fl: [78, 5.8] }
+};
+
+function getBiometryRef(ga: number): { bpd: [number, number], hc: [number, number], ac: [number, number], fl: [number, number] } {
+  const keys = Object.keys(BIOMETRY_LIMITS).map(Number).sort((a,b)=>a-b);
+  if (ga <= keys[0]) return BIOMETRY_LIMITS[keys[0]];
+  if (ga >= keys[keys.length-1]) return BIOMETRY_LIMITS[keys[keys.length-1]];
+  const lo = keys.filter(k=>k<=ga).pop()!;
+  const hi = keys.filter(k=>k>ga).shift()!;
+  const f = (ga-lo)/(hi-lo);
+  
+  const interp = (lVal: [number, number], hVal: [number, number]): [number, number] => {
+    return [
+      lVal[0] + (hVal[0] - lVal[0]) * f,
+      lVal[1] + (hVal[1] - lVal[1]) * f
+    ];
+  };
+
+  return {
+    bpd: interp(BIOMETRY_LIMITS[lo].bpd, BIOMETRY_LIMITS[hi].bpd),
+    hc: interp(BIOMETRY_LIMITS[lo].hc, BIOMETRY_LIMITS[hi].hc),
+    ac: interp(BIOMETRY_LIMITS[lo].ac, BIOMETRY_LIMITS[hi].ac),
+    fl: interp(BIOMETRY_LIMITS[lo].fl, BIOMETRY_LIMITS[hi].fl)
+  };
+}
+
 function erf(x: number) {
   const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
   const s=x<0?-1:1; x=Math.abs(x);
@@ -66,7 +121,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
   const [utaPi, setUtaPi] = useState(value?.utaPi || '');
   const [dvPi, setDvPi] = useState(value?.dvPi || '');
   const [auFlow, setAuFlow] = useState<'normal'|'aedf'|'redf'>(value?.auFlow || 'normal');
-  const [dvWave, setDvWave] = useState<'normal'|'rav'>(value?.dvWave || 'normal');
+  const [dvWave, setDvWave] = useState<'not_evaluated'|'normal'|'rav'>(value?.dvWave || 'not_evaluated');
 
   const gaDecimal = useMemo(() => Number(gaWeeks||0)+(Number(gaDays||0)/7), [gaWeeks, gaDays]);
   const gaRound = Math.round(gaDecimal);
@@ -81,6 +136,19 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     let dvP: number|null = null;
     let rcp: number|null = null;
     let rcpP: number|null = null;
+
+    let bpdP: number|null = null;
+    let hcP: number|null = null;
+    let acP: number|null = null;
+    let flP: number|null = null;
+
+    if (gaDecimal > 0) {
+      const refs = getBiometryRef(gaDecimal);
+      if (bpd) bpdP = zToPercentile((Number(bpd) - refs.bpd[0]) / refs.bpd[1]);
+      if (hc) hcP = zToPercentile((Number(hc) - refs.hc[0]) / refs.hc[1]);
+      if (ac) acP = zToPercentile((Number(ac) - refs.ac[0]) / refs.ac[1]);
+      if (fl) flP = zToPercentile((Number(fl) - refs.fl[0]) / refs.fl[1]);
+    }
 
     // Hadlock IV EFW
     if (bpd && hc && ac && fl) {
@@ -122,7 +190,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     else if (auFlow === 'aedf') stage = 2;
     else if ((efwP !== null && efwP < 3) || (auP !== null && auP > 95) || (acmP !== null && acmP < 5) || (rcp !== null && rcp < 1.0)) stage = 1;
 
-    return { efw, efwP, auP, acmP, utaP, dvP, rcp, rcpP, stage };
+    return { efw, efwP, auP, acmP, utaP, dvP, rcp, rcpP, stage, bpdP, hcP, acP, flP };
   }, [bpd,hc,ac,fl,auPi,acmPi,utaPi,dvPi,auFlow,dvWave,gaWeeks,gaDays,gaDecimal,gaRound]);
 
   useEffect(() => {
@@ -130,6 +198,10 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     const stageLabels = ['Normal','Estágio I','Estágio II','Estágio III','Estágio IV'];
     const lines = [`IG: ${gaWeeks||'?'}s ${gaDays||0}d | Sexo: ${sexLabel}`];
     if (calc.efw) lines.push(`Peso Fetal Estimado (Hadlock IV): ${calc.efw}g (Percentil ${calc.efwP}%)`);
+    if (calc.bpdP !== null) lines.push(`DBP p${calc.bpdP}%`);
+    if (calc.hcP !== null) lines.push(`CC p${calc.hcP}%`);
+    if (calc.acP !== null) lines.push(`CA p${calc.acP}%`);
+    if (calc.flP !== null) lines.push(`CF p${calc.flP}%`);
     if (calc.rcp) lines.push(`RCP: ${calc.rcp.toFixed(2)}`);
     if (calc.auP!==null) lines.push(`AU PI: ${auPi} (p${calc.auP})`);
     if (calc.acmP!==null) lines.push(`ACM PI: ${acmPi} (p${calc.acmP})`);
@@ -205,10 +277,38 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
         {step === 'biometry' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <MI label="DBP (mm)" value={bpd} onChange={setBpd} />
-              <MI label="CC (mm)" value={hc} onChange={setHc} />
-              <MI label="CA (mm)" value={ac} onChange={setAc} />
-              <MI label="CF (mm)" value={fl} onChange={setFl} />
+              <div>
+                <MI label="DBP (mm)" value={bpd} onChange={setBpd} />
+                {calc.bpdP !== null && (
+                  <span className={classNames("text-[8px] font-black block text-center mt-1 uppercase tracking-wider py-0.5 rounded border border-current/10", calc.bpdP < 10 || calc.bpdP > 90 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50")}>
+                    p{calc.bpdP}%
+                  </span>
+                )}
+              </div>
+              <div>
+                <MI label="CC (mm)" value={hc} onChange={setHc} />
+                {calc.hcP !== null && (
+                  <span className={classNames("text-[8px] font-black block text-center mt-1 uppercase tracking-wider py-0.5 rounded border border-current/10", calc.hcP < 10 || calc.hcP > 90 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50")}>
+                    p{calc.hcP}%
+                  </span>
+                )}
+              </div>
+              <div>
+                <MI label="CA (mm)" value={ac} onChange={setAc} />
+                {calc.acP !== null && (
+                  <span className={classNames("text-[8px] font-black block text-center mt-1 uppercase tracking-wider py-0.5 rounded border border-current/10", calc.acP < 10 || calc.acP > 90 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50")}>
+                    p{calc.acP}%
+                  </span>
+                )}
+              </div>
+              <div>
+                <MI label="CF (mm)" value={fl} onChange={setFl} />
+                {calc.flP !== null && (
+                  <span className={classNames("text-[8px] font-black block text-center mt-1 uppercase tracking-wider py-0.5 rounded border border-current/10", calc.flP < 10 || calc.flP > 90 ? "text-amber-600 bg-amber-50" : "text-emerald-600 bg-emerald-50")}>
+                    p{calc.flP}%
+                  </span>
+                )}
+              </div>
             </div>
             {calc.efw && (
               <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex justify-between items-center">
@@ -245,7 +345,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
               <label className="text-[9px] font-bold text-ink-500 uppercase block text-center">Achados Qualitativos Críticos</label>
               <div className="grid grid-cols-2 gap-2">
                 <TG label="Diástole AU" opts={[{id:'normal',l:'Pres.'},{id:'aedf',l:'Zero'},{id:'redf',l:'Rev.'}]} val={auFlow} set={setAuFlow}/>
-                <TG label="DV Onda 'a'" opts={[{id:'normal',l:'Pos.'},{id:'rav',l:'Rev.'}]} val={dvWave} set={setDvWave}/>
+                <TG label="DV Onda 'a'" opts={[{id:'not_evaluated',l:'N/A'},{id:'normal',l:'Pos.'},{id:'rav',l:'Rev.'}]} val={dvWave} set={setDvWave}/>
               </div>
             </div>
             <div className="flex gap-2">

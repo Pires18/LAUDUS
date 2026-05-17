@@ -1,7 +1,5 @@
 import { 
-  ChevronLeft, Building2, CheckCircle2, UserCog, Clock, FileText, 
-  Layout, History, Share2, Download, Settings, ChevronDown, Sparkles, 
-  Wand2, Shield, Search, X, Loader2, User, Activity, AlertCircle, Info
+  ChevronLeft, CheckCircle2, Settings, User, Activity, Info
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDateTime, classNames } from '../../../utils/format';

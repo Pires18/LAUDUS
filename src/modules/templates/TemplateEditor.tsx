@@ -4,7 +4,7 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { updateItem } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
-import { Plus, Search, FileText, Trash2, Copy, Edit2, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, LayoutDashboard, Eye, Building2, Sparkles } from 'lucide-react';
+import { FileText, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, Building2 } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
 import { generateTemplateStructure } from '../ai/generateTemplate';
 
