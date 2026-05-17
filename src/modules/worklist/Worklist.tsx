@@ -6,7 +6,7 @@ import { deleteItem, addAuditLog } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
 import { useState, useMemo } from 'react';
 import {
-  CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2,
+  CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2, FileText,
   LayoutList, Building2, Filter, Calendar, SlidersHorizontal, ArrowRight, UserCog, Loader2, X,
   MoreHorizontal, ChevronRight
 } from 'lucide-react';
@@ -362,6 +362,17 @@ export function Worklist() {
                       
                       <td className="px-4 xl:px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
+                            {exam.googleDocUrl && (
+                             <a
+                               href={exam.googleDocUrl}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="p-3 rounded-2xl text-blue-500 hover:text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all shadow-sm shrink-0 flex items-center justify-center"
+                               title="Abrir no Google Docs"
+                             >
+                               <FileText size={18} />
+                             </a>
+                           )}
                            <button
                              onClick={() => {
                                setEditData({

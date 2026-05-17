@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ReportTemplate, Patient, AppSettings } from '../../types';
+import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_RIGID_RULES, DEFAULT_STRUCTURE_PROMPT, AREA_SPECIFIC_PROMPTS, DEFAULT_ADVANCED_REASONING } from './prompts';
 
 interface GenerateReportParams {
@@ -130,11 +130,12 @@ export function buildRefinePrompt({
     : '';
 
   const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+  const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
   const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
   const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
   const areaSpecificRules = AREA_SPECIFIC_PROMPTS[template.area] || '';
 
-  const previousContext = previousExams.length > 0 
+  const previousContext = previousExams.length > 0
     ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\nSiga rigorosamente o estilo de fraseologia e padronização de condutas destes exemplos:\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
     : '';
 
@@ -170,6 +171,14 @@ Tipo de exame: ${template.name}
 ${patientBlock}
 ${clinicalIndication ? `\nIndicação clínica: ${clinicalIndication}` : ''}
 
+═══════════════════════════════════════════
+INSTRUÇÕES ADICIONAIS:
+═══════════════════════════════════════════
+${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
+${template.aiInstructions ? `\nINSTRUÇÕES DA MÁSCARA: ${template.aiInstructions}` : ''}
+${settings.aiGlobalInstructions ? `\nINSTRUÇÕES GLOBAIS: ${settings.aiGlobalInstructions}` : ''}
+${DEFAULT_ADVANCED_REASONING}
+
 ${rigidRules}
 
 Gere agora o laudo final REFINADO (apenas o HTML completo):`;
@@ -192,11 +201,12 @@ export function buildCopilotPrompt({
     : '';
 
   const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+  const areaInstructions = settings.aiAreaPrompts?.[exam.area as ExamArea] || '';
   const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
   const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
-  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[exam.area] || '';
+  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[exam.area as ExamArea] || '';
 
-  const previousContext = previousExams.length > 0 
+  const previousContext = previousExams.length > 0
     ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\nUse estes exemplos para guiar a forma de inserir novos dados e manter a consistência:\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
     : '';
 
@@ -230,6 +240,7 @@ INSTRUÇÃO DO MÉDICO (O QUE MUDAR):
 >>> ${instruction} <<<
 
 ${settings.aiGlobalInstructions ? `═══════════════════════════════════════════\nINSTRUÇÕES GLOBAIS AVANÇADAS\n═══════════════════════════════════════════\n\n${settings.aiGlobalInstructions}\n` : ''}
+${areaInstructions ? `═══════════════════════════════════════════\nCOMPORTAMENTO DA ÁREA\n═══════════════════════════════════════════\n\n${areaInstructions}\n` : ''}
 
 ${DEFAULT_ADVANCED_REASONING}
 
