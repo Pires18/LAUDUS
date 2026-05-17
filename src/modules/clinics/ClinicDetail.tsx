@@ -65,7 +65,7 @@ export function ClinicDetail({ clinicId }: Props) {
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <div className="flex items-center gap-4">
         <button
           onClick={() => setView({ name: 'clinics' })}

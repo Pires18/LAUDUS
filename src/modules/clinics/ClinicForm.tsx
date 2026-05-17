@@ -131,7 +131,8 @@ export function ClinicForm({ clinicId }: Props) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 p-4 lg:p-8 animate-fade-in">
+    <div className="module-container">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <div className="flex items-center gap-4">
         <button
           onClick={() => setView({ name: 'clinics' })}
@@ -157,7 +158,7 @@ export function ClinicForm({ clinicId }: Props) {
               <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
                 <Building2 size={20} />
               </div>
-              <h3 className="font-black text-ink-900 uppercase tracking-widest text-xs">Identificação & Contato</h3>
+              <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Identificação & Contato</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -208,7 +209,7 @@ export function ClinicForm({ clinicId }: Props) {
               <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                 <MapPin size={20} />
               </div>
-              <h3 className="font-black text-ink-900 uppercase tracking-widest text-xs">Endereço & Localização</h3>
+              <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Endereço & Localização</h3>
             </div>
 
             <div className="grid grid-cols-6 gap-6">
@@ -249,7 +250,7 @@ export function ClinicForm({ clinicId }: Props) {
               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <Globe size={20} />
               </div>
-              <h3 className="font-black text-ink-900 uppercase tracking-widest text-xs">Integração Google Cloud</h3>
+              <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Integração Google Cloud</h3>
             </div>
             <p className="text-xs text-ink-500 mb-8 max-w-lg">
               Vincule um template do Google Docs e uma pasta no Drive para que os laudos desta unidade sejam gerados e salvos automaticamente.
@@ -383,6 +384,7 @@ export function ClinicForm({ clinicId }: Props) {
           </div>
         </div>
       </form>
+      </div>
     </div>
   );
 }

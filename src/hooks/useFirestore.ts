@@ -21,13 +21,14 @@ function userPath(collectionName: string): string {
 interface UseCollectionOptions {
   constraints?: QueryConstraint[];
   enabled?: boolean;
+  isGlobal?: boolean;
 }
 
 export function useCollection<T extends { id: string }>(
   collectionName: string,
   options: UseCollectionOptions = {}
 ): { data: T[]; loading: boolean; error: string | null } {
-  const { constraints = [], enabled = true } = options;
+  const { constraints = [], enabled = true, isGlobal = false } = options;
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,8 @@ export function useCollection<T extends { id: string }>(
     }
 
     setLoading(true);
-    const colRef = collection(firestore, userPath(collectionName));
+    const path = isGlobal ? collectionName : userPath(collectionName);
+    const colRef = collection(firestore, path);
     const q = constraints.length > 0 ? query(colRef, ...constraints) : query(colRef);
 
     const unsubscribe = onSnapshot(
@@ -64,7 +66,7 @@ export function useCollection<T extends { id: string }>(
     );
 
     return unsubscribe;
-  }, [collectionName, constraintKey, enabled, auth.currentUser?.uid]);
+  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid]);
 
   return { data, loading, error };
 }
@@ -72,7 +74,8 @@ export function useCollection<T extends { id: string }>(
 // ─── useDocument: realtime listener for a single document ───
 export function useDocument<T extends { id: string }>(
   collectionName: string,
-  documentId: string | undefined
+  documentId: string | undefined,
+  isGlobal: boolean = false
 ): { data: T | null; loading: boolean; error: string | null } {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +87,8 @@ export function useDocument<T extends { id: string }>(
       return;
     }
 
-    const docRef = doc(firestore, userPath(collectionName), documentId);
+    const path = isGlobal ? collectionName : userPath(collectionName);
+    const docRef = doc(firestore, path, documentId);
     const unsubscribe = onSnapshot(
       docRef,
       (snapshot) => {
@@ -104,7 +108,7 @@ export function useDocument<T extends { id: string }>(
     );
 
     return unsubscribe;
-  }, [collectionName, documentId, auth.currentUser?.uid]);
+  }, [collectionName, documentId, isGlobal, auth.currentUser?.uid]);
 
   return { data, loading, error };
 }

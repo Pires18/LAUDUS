@@ -37,7 +37,7 @@ export function Clinics() {
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
         title="Unidades & Clínicas"
         subtitle="Gerencie as unidades de atendimento e configurações de exportação."
@@ -51,7 +51,7 @@ export function Clinics() {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Sidebar Navigation */}
         <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
-          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Filtrar por Status</p>
+          <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest px-4 py-3">Identificação & Contato</h3>
           <button
             onClick={() => setFilter('todas')}
             className={classNames(
@@ -141,8 +141,8 @@ export function Clinics() {
                     key={clinic.id}
                     onClick={() => setView({ name: 'clinic-detail', clinicId: clinic.id })}
                     className={classNames(
-                      "group flex items-center gap-4 bg-white border rounded-2xl p-4 transition-all duration-200 cursor-pointer",
-                      isSelected ? "border-brand-500 shadow-md ring-1 ring-brand-500/20" : "border-ink-100 hover:border-brand-400 hover:shadow-sm"
+                      "group flex items-center gap-4 bg-white border rounded-2xl p-4 transition-all duration-300 cursor-pointer",
+                      isSelected ? "border-brand-500 shadow-premium ring-1 ring-brand-500/20" : "border-ink-100 hover:border-brand-500 hover:shadow-premium hover:bg-brand-50/30"
                     )}
                   >
                     {/* Logo/Icon */}
@@ -168,6 +168,7 @@ export function Clinics() {
                     {/* Content */}
                     <div className="flex-1 min-w-0 py-1">
                       <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Endereço & Localização</h3>
                         <h3 className="font-black text-ink-900 text-lg leading-tight truncate group-hover:text-brand-600 transition-colors">
                           {clinic.name}
                         </h3>

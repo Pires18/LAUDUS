@@ -44,8 +44,8 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <section>
-        <h3 className="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-3">Identificação</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-4">Identificação</h3>
+        <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="label">Nome completo *</label>
             <input className="input" required value={data.name} onChange={e => u('name', e.target.value)} />
@@ -74,8 +74,8 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-3">Contato</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-4">Contato</h3>
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Telefone</label>
             <input className="input" value={data.phone} onChange={e => u('phone', e.target.value)} />
@@ -88,8 +88,8 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-3">Endereço</h3>
-        <div className="grid grid-cols-6 gap-3">
+        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-4">Endereço</h3>
+        <div className="grid grid-cols-6 gap-4">
           <div className="col-span-4">
             <label className="label">Logradouro</label>
             <input className="input" value={data.address.street} onChange={e => ua('street', e.target.value)} />
@@ -122,8 +122,8 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-3">Convênio</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-4">Convênio</h3>
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Convênio</label>
             <input className="input" value={data.insurance} onChange={e => u('insurance', e.target.value)} />
@@ -136,7 +136,7 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-3">Histórico clínico</h3>
+        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-4">Histórico clínico</h3>
         <textarea
           className="input min-h-[80px] resize-none"
           rows={3}
@@ -147,7 +147,7 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold text-ink-700 uppercase tracking-wide mb-3">Observações</h3>
+        <h3 className="text-[10px] font-black text-brand-600 uppercase tracking-widest mb-4">Observações</h3>
         <textarea
           className="input min-h-[60px] resize-none"
           rows={2}

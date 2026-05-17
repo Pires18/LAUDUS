@@ -1,13 +1,12 @@
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
-import { PageHeader } from '../../components/PageHeader';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
-import { deleteItem } from '../../store/db';
+import { deleteItem, addAuditLog } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
 import { useState, useMemo } from 'react';
 import {
-  CircleDot, CheckCircle2, Clock, Search, FilePlus2, Trash2,
+  CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2,
   LayoutList, Building2, Filter, Calendar, SlidersHorizontal, ArrowRight, UserCog, Loader2, X,
   MoreHorizontal, ChevronRight
 } from 'lucide-react';
@@ -16,9 +15,9 @@ import { AreaIcon } from '../../components/AreaIcon';
 import type { LucideIcon } from 'lucide-react';
 
 const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: string; dot: string }> = {
-  'pendente': { label: 'Aguardando', icon: Clock, class: 'bg-amber-50 text-amber-700 border-amber-100', dot: 'bg-amber-400' },
-  'em-andamento': { label: 'Em Andamento', icon: CircleDot, class: 'bg-brand-50 text-brand-700 border-brand-100', dot: 'bg-brand-500' },
-  'finalizado': { label: 'Finalizado', icon: CheckCircle2, class: 'bg-emerald-50 text-emerald-700 border-emerald-100', dot: 'bg-emerald-500' },
+  'pendente': { label: 'Aguardando', icon: Clock, class: 'bg-amber-50 text-amber-700 border-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.1)]', dot: 'bg-amber-500 animate-pulse' },
+  'em-andamento': { label: 'Em Andamento', icon: CircleDot, class: 'bg-brand-50 text-brand-700 border-brand-200 shadow-[0_0_15px_rgba(99,102,241,0.1)]', dot: 'bg-brand-500 animate-pulse' },
+  'finalizado': { label: 'Finalizado', icon: CheckCircle2, class: 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.1)]', dot: 'bg-emerald-500' },
 };
 
 export function Worklist() {
@@ -26,7 +25,7 @@ export function Worklist() {
   const currentRole = settings.currentRole || 'medico';
   const [statusFilter, setStatusFilter] = useState<ExamStatus | 'todos'>('todos');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
-  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>('hoje');
+  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>('todos');
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -105,7 +104,13 @@ export function Worklist() {
   async function handleDelete() {
     if (!deleteId) return;
     try {
+      const examToDelete = exams.find(e => e.id === deleteId);
       await deleteItem('exams', deleteId);
+      await addAuditLog({
+        action: 'EXCLUIR_EXAME',
+        details: `Exame ${examToDelete?.examType} do paciente ID ${examToDelete?.patientId} foi excluído.`,
+        module: 'Worklist'
+      });
       showToast('Exame excluído com sucesso', 'success');
     } catch {
       showToast('Erro ao excluir exame', 'error');
@@ -127,9 +132,9 @@ export function Worklist() {
         finalizedAt: editData.status === 'finalizado' ? Date.now() : null
       });
       setEditExamId(null);
-      showToast('Dados atualizados!');
+      showToast('Dados de exame atualizados com sucesso!', 'success');
     } catch {
-      showToast('Erro ao atualizar', 'error');
+      showToast('Erro ao atualizar dados do exame', 'error');
     } finally {
       setLoadingMetadata(false);
     }
@@ -137,74 +142,80 @@ export function Worklist() {
 
   return (
     <div className="module-container">
-      <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* Sleek Glass Header Block */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 bg-white border border-ink-100 p-8 rounded-[2.5rem] shadow-sm shrink-0">
         <div>
-          <h1 className="text-3xl font-black text-ink-900 tracking-tight">Worklist Profissional</h1>
-          <p className="text-sm text-ink-500">Gestão centralizada de exames e laudos clínicos.</p>
+          <h1 className="text-3xl font-black text-ink-900 tracking-tight leading-none">Fila de Exames</h1>
+          <p className="text-sm text-ink-500 font-medium mt-2">Gerencie, acompanhe e redija laudos clínicos assistidos por IA em tempo real.</p>
         </div>
         <button 
           onClick={() => setShowCreateExamModal(true)}
-          className="h-12 px-6 rounded-2xl bg-brand-600 text-white font-black text-sm uppercase tracking-widest hover:bg-brand-700 hover:shadow-premium transition-all flex items-center justify-center gap-2"
+          className="h-14 px-8 rounded-2xl bg-brand-600 text-white font-black text-xs uppercase tracking-widest hover:bg-brand-500 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-[0_12px_24px_rgba(99,102,241,0.2)] shrink-0"
         >
-          <FilePlus2 size={18} /> Novo Laudo
+          <FilePlus size={18} /> Novo Laudo IA
         </button>
       </div>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map(s => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={classNames(
-              "p-4 rounded-2xl border transition-all text-left group",
-              statusFilter === s ? "bg-ink-900 border-ink-900 shadow-lg" : "bg-white border-ink-100 hover:border-brand-200"
-            )}
-          >
-            <p className={classNames("text-[10px] font-black uppercase tracking-widest mb-1", statusFilter === s ? "text-ink-400" : "text-ink-400")}>
-              {s === 'todos' ? 'Total' : STATUS_META[s].label}
-            </p>
-            <div className="flex items-center justify-between">
-              <span className={classNames("text-2xl font-black", statusFilter === s ? "text-white" : "text-ink-900")}>
-                {counts[s]}
-              </span>
-              <div className={classNames(
-                "w-8 h-8 rounded-xl flex items-center justify-center",
-                statusFilter === s ? "bg-white/10 text-white" : "bg-ink-50 text-ink-400"
-              )}>
-                {s === 'todos' ? <LayoutList size={16} /> : <Clock size={16} />}
+      {/* Stats Quick Filter Bar */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10 shrink-0">
+        {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map(s => {
+          const isActive = statusFilter === s;
+          const sColors = {
+            todos: isActive ? 'bg-ink-900 border-ink-900 shadow-lg text-white' : 'bg-white border-ink-100 hover:border-brand-200 text-ink-900',
+            pendente: isActive ? 'bg-amber-600 border-amber-600 shadow-lg shadow-amber-600/20 text-white' : 'bg-white border-ink-100 hover:border-amber-400 text-ink-900',
+            'em-andamento': isActive ? 'bg-brand-600 border-brand-600 shadow-lg shadow-brand-600/20 text-white' : 'bg-white border-ink-100 hover:border-brand-400 text-ink-900',
+            finalizado: isActive ? 'bg-emerald-600 border-emerald-600 shadow-lg shadow-emerald-600/20 text-white' : 'bg-white border-ink-100 hover:border-emerald-400 text-ink-900',
+          };
+          const countBadgeColor = isActive ? 'bg-white/10 text-white' : 'bg-ink-50 text-ink-400';
+
+          return (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={classNames(
+                "p-6 rounded-[2.2rem] border transition-all text-left group hover:-translate-y-1 hover:shadow-md",
+                sColors[s]
+              )}
+            >
+              <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-80">
+                {s === 'todos' ? 'Volume Total' : STATUS_META[s].label}
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-3xl font-black tracking-tight">{counts[s]}</span>
+                <div className={classNames("w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-105 transition-transform", countBadgeColor)}>
+                  {s === 'todos' ? <LayoutList size={18} /> : s === 'finalizado' ? <CheckCircle2 size={18} /> : s === 'em-andamento' ? <CircleDot size={18} /> : <Clock size={18} />}
+                </div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filters & Actions */}
-      <div className="bg-white rounded-[2rem] border border-ink-100 p-6 shadow-sm space-y-6">
-        <div className="flex flex-col lg:flex-row items-center gap-4">
+      {/* Advanced Clinical Filter Panel */}
+      <div className="bg-white border border-ink-100 rounded-[2.5rem] p-8 mb-10 shadow-sm shrink-0">
+        <div className="flex flex-col xl:flex-row items-center gap-6">
           <div className="relative flex-1 w-full">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
+            <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por paciente, exame ou ID..."
-              className="w-full h-11 pl-10 pr-4 bg-ink-50 border border-ink-100 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium text-xs"
+              placeholder="Buscar por paciente, tipo de exame ou ID..."
+              className="w-full h-14 pl-14 pr-6 bg-ink-50/50 border border-ink-200 focus:border-brand-500 rounded-2xl focus:ring-4 focus:ring-brand-500/5 outline-none transition-all font-bold text-sm"
             />
           </div>
           
-          <div className="flex items-center gap-2 w-full lg:w-auto">
-             <div className="flex bg-ink-50 p-1 rounded-xl border border-ink-100">
+          <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+             <div className="tab-group flex-1 xl:flex-none">
                {(['hoje', 'semana', 'mes', 'todos'] as const).map(d => (
                  <button
                    key={d}
                    onClick={() => setDateFilter(d)}
                    className={classNames(
-                     "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                     dateFilter === d ? "bg-white text-brand-600 shadow-sm" : "text-ink-500 hover:text-ink-700"
+                     "tab-item flex-1 xl:flex-none",
+                     dateFilter === d && "tab-item-active shadow-sm"
                    )}
                  >
-                   {d === 'todos' ? 'Tudo' : d}
+                   {d === 'todos' ? 'Histórico' : d}
                  </button>
                ))}
              </div>
@@ -212,8 +223,8 @@ export function Worklist() {
              <button
                onClick={() => setShowFilters(!showFilters)}
                className={classNames(
-                 "h-12 w-12 rounded-2xl border flex items-center justify-center transition-all",
-                 showFilters ? "bg-brand-50 border-brand-200 text-brand-600" : "bg-white border-ink-100 text-ink-400 hover:border-brand-200"
+                 "h-14 w-14 rounded-2xl border flex items-center justify-center transition-all shadow-sm shrink-0",
+                 showFilters ? "bg-brand-50 border-brand-300 text-brand-600 shadow-inner" : "bg-white border-ink-200 text-ink-500 hover:border-brand-300"
                )}
              >
                <SlidersHorizontal size={20} />
@@ -221,51 +232,72 @@ export function Worklist() {
           </div>
         </div>
 
+        {/* Clicáveis Specialty chips filters on drawer expand */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-ink-50 animate-in slide-in-from-top-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-ink-400 tracking-widest ml-1">Especialidade</label>
-              <select 
-                className="w-full h-11 bg-ink-50 border border-ink-100 rounded-xl px-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none"
-                value={areaFilter}
-                onChange={e => setAreaFilter(e.target.value)}
+          <div className="pt-6 mt-6 border-t border-ink-100 animate-slide-down">
+            <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-3 ml-1">Filtrar por Especialidade</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setAreaFilter('todas')}
+                className={classNames(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all border",
+                  areaFilter === 'todas' 
+                    ? "bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/10" 
+                    : "bg-ink-50 border-ink-200 text-ink-700 hover:bg-ink-100"
+                )}
               >
-                <option value="todas">Todas as Áreas</option>
-                {EXAM_AREAS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
-              </select>
+                Todas as Especialidades
+              </button>
+              {EXAM_AREAS.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => setAreaFilter(a.id)}
+                  className={classNames(
+                    "px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-2",
+                    areaFilter === a.id 
+                      ? "bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/10" 
+                      : "bg-ink-50 border-ink-200 text-ink-700 hover:bg-ink-100"
+                  )}
+                >
+                  <AreaIcon area={a.id} size={12} className={areaFilter === a.id ? "text-white" : "text-ink-500"} />
+                  {a.label}
+                </button>
+              ))}
             </div>
-            {/* Additional filters can go here */}
           </div>
         )}
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-[2rem] border border-ink-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Impeccable Glass Table Workstation */}
+      <div className="bg-white border border-ink-100 rounded-[2.5rem] overflow-hidden shadow-sm shrink-0">
+        <div className="w-full">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-ink-50/50 border-b border-ink-100">
-                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Paciente</th>
-                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Exame / Área</th>
-                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest text-center">Status</th>
-                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Unidade</th>
-                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest">Data</th>
-                <th className="px-6 py-4 text-[10px] font-black text-ink-400 uppercase tracking-widest text-right">Ações</th>
+              <tr className="bg-ink-50/20 border-b border-ink-100">
+                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Paciente</th>
+                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Exame & Especialidade</th>
+                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-center">Status</th>
+                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Unidade</th>
+                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Data / Hora</th>
+                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">
               {examsLoading ? (
-                [1, 2, 3, 4, 5].map(i => (
+                [1, 2, 3, 4].map(i => (
                   <tr key={i}>
-                    <td colSpan={6} className="px-6 py-4"><Skeleton className="h-8 w-full" /></td>
+                    <td colSpan={6} className="px-4 xl:px-6 py-6"><Skeleton className="h-12 w-full rounded-xl" /></td>
                   </tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <LayoutList size={40} className="text-ink-100" />
-                      <p className="text-ink-400 font-medium italic">Nenhum exame encontrado para os filtros aplicados.</p>
+                  <td colSpan={6} className="px-4 xl:px-6 py-24 text-center">
+                    <div className="empty-state border-none shadow-none bg-transparent py-0">
+                      <div className="empty-state-icon bg-ink-50/50">
+                        <LayoutList size={36} />
+                      </div>
+                      <h3 className="empty-state-title">Sem Exames na Fila</h3>
+                      <p className="empty-state-text">Nenhum laudo clínico preenche os critérios dos filtros ativos.</p>
                     </div>
                   </td>
                 </tr>
@@ -275,58 +307,63 @@ export function Worklist() {
                   const clinic = clinicMap.get(exam.clinicId || '');
                   const area = EXAM_AREAS.find(a => a.id === exam.area);
                   const status = STATUS_META[exam.status];
+                  
+                  // Gender-coded Avatar Halo Glow
+                  const genderHalo = patient?.gender === 'F'
+                    ? 'ring-2 ring-pink-400/40 bg-pink-50 text-pink-700'
+                    : patient?.gender === 'M'
+                    ? 'ring-2 ring-blue-400/40 bg-blue-50 text-blue-700'
+                    : 'ring-2 ring-brand-400/20 bg-brand-50 text-brand-700';
 
                   return (
                     <tr 
                       key={exam.id} 
-                      className="group hover:bg-ink-50/50 transition-colors cursor-pointer"
+                      className="group hover:bg-brand-50/30 transition-all duration-300 cursor-pointer"
                       onClick={() => {
-                        if (currentRole === 'recepcao') {
-                          showToast('Acesso negado: Apenas médicos podem laudar.', 'error');
-                          return;
-                        }
                         setView({ name: 'exam-editor', examId: exam.id });
                       }}
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-black shadow-inner">
-                            {patient?.name.charAt(0) || '?'}
+                      <td className="px-4 xl:px-6 py-5">
+                        <div className="flex items-center gap-4">
+                          {/* Safe patient initial with safe optional chaining */}
+                          <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shadow-inner transition-all duration-500 shrink-0", genderHalo)}>
+                            {patient?.name?.charAt(0) || '?'}
                           </div>
-                          <div>
-                            <p className="font-bold text-ink-900 group-hover:text-brand-600 transition-colors">{patient?.name || 'Não identificado'}</p>
-                            <p className="text-[10px] font-mono text-ink-400">ID: {exam.friendlyId || '—'}</p>
+                          <div className="min-w-0">
+                            <p className="font-black text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px]">{patient?.name || 'Não identificado'}</p>
+                            <p className="text-[10px] font-mono text-ink-400 font-bold uppercase tracking-tight mt-0.5">ID: {exam.friendlyId || '—'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-ink-700 text-sm leading-tight mb-1">{exam.examType}</p>
-                        {area && <span className={classNames("text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter", area.color)}>{area.label}</span>}
+                      
+                      <td className="px-4 xl:px-6 py-5">
+                        <p className="font-black text-ink-800 text-sm leading-snug mb-1.5 truncate max-w-[220px]">{exam.examType}</p>
+                        {area && <span className={classNames("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0", area.color)}>{area.label}</span>}
                       </td>
-                      <td className="px-6 py-4 text-center">
-                         <div className={classNames(
-                           "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
-                           status.class
-                         )}>
-                           <div className={classNames("w-1.5 h-1.5 rounded-full", status.dot)} />
+                      
+                      <td className="px-4 xl:px-6 py-5 text-center">
+                         <div className={classNames("badge shadow-sm border", status.class)}>
+                           <div className={classNames("w-1.5 h-1.5 rounded-full shrink-0", status.dot)} />
                            {status.label}
                          </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 text-ink-600 text-sm">
-                          <Building2 size={14} className="text-ink-300" />
-                          <span className="truncate max-w-[120px] font-medium">{clinic?.name || 'Geral'}</span>
+                      
+                      <td className="px-4 xl:px-6 py-5">
+                        <div className="flex items-center gap-2 text-ink-600 text-xs font-bold">
+                          <Building2 size={14} className="text-ink-400 shrink-0" />
+                          <span className="truncate max-w-[120px]">{clinic?.name || 'Geral / Sem Unidade'}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-ink-700">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
-                        <p className="text-[10px] text-ink-400 font-medium">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
+                      
+                      <td className="px-4 xl:px-6 py-5">
+                        <p className="text-xs font-black text-ink-800 leading-none">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
+                        <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-1">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      
+                      <td className="px-4 xl:px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
                            <button
-                             onClick={(e) => {
-                               e.stopPropagation();
+                             onClick={() => {
                                setEditData({
                                  patientName: patient?.name || '',
                                  birthDate: patient?.birthDate || '',
@@ -337,17 +374,19 @@ export function Worklist() {
                                });
                                setEditExamId(exam.id);
                              }}
-                             className="p-2 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-all"
+                             className="p-3 rounded-2xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 border border-transparent hover:border-brand-100 transition-all shadow-sm shrink-0"
+                             title="Ajustar Metadados"
                            >
                              <UserCog size={18} />
                            </button>
                            <button
-                             onClick={(e) => { e.stopPropagation(); setDeleteId(exam.id); }}
-                             className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                             onClick={() => setDeleteId(exam.id)}
+                             className="p-3 rounded-2xl text-ink-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all shadow-sm shrink-0"
+                             title="Excluir Registro"
                            >
                              <Trash2 size={18} />
                            </button>
-                           <div className="w-8 h-8 rounded-xl bg-ink-50 text-ink-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                           <div className="w-9 h-9 rounded-xl bg-ink-50 text-ink-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
                              <ChevronRight size={18} />
                            </div>
                         </div>
@@ -361,23 +400,24 @@ export function Worklist() {
         </div>
       </div>
 
-      {/* Modal de Edição de Metadados */}
+      {/* High-Fidelity Metadados Modal Overlay */}
       {editExamId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/60 p-4 animate-in fade-in duration-200 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200 backdrop-blur-md">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100">
             <div className="px-8 py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between">
               <h3 className="font-black text-ink-900 flex items-center gap-3">
-                <AreaIcon area={exams.find(e => e.id === editExamId)?.area || ''} size={20} className="text-brand-500" />
-                Ajustar Metadados
+                <AreaIcon area={exams.find(e => e.id === editExamId)?.area || ''} size={18} className="text-brand-500" />
+                Ajustar Informações do Exame
               </h3>
-              <button onClick={() => setEditExamId(null)} className="p-2 hover:bg-ink-100 rounded-2xl text-ink-400 transition-colors"><X size={24} /></button>
+              <button onClick={() => setEditExamId(null)} className="p-2 hover:bg-ink-100 rounded-2xl text-ink-400 transition-colors"><X size={20} /></button>
             </div>
+            
             <div className="p-8 space-y-6">
               <div className="grid grid-cols-1 gap-6">
                  <div>
                    <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Médico Solicitante</label>
                    <input 
-                     className="w-full h-12 px-4 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium" 
+                     className="w-full h-12 px-4 bg-ink-50/50 border border-ink-200 rounded-2xl focus:border-brand-500 outline-none transition-all font-bold text-sm" 
                      placeholder="Dr(a). ..."
                      value={editData.requestingPhysician} 
                      onChange={e => setEditData({...editData, requestingPhysician: e.target.value})} 
@@ -386,8 +426,8 @@ export function Worklist() {
                  <div>
                    <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Indicação Clínica</label>
                    <textarea 
-                     className="w-full p-4 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium min-h-[100px] resize-none" 
-                     placeholder="Descreva a indicação..."
+                     className="w-full p-4 bg-ink-50/50 border border-ink-200 rounded-2xl focus:border-brand-500 outline-none transition-all font-bold text-sm min-h-[100px] resize-none" 
+                     placeholder="Escreva a indicação diagnóstica do exame..."
                      value={editData.clinicalIndication} 
                      onChange={e => setEditData({...editData, clinicalIndication: e.target.value})} 
                    />
@@ -395,9 +435,9 @@ export function Worklist() {
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Unidade</label>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Unidade Clínica</label>
                   <select 
-                    className="w-full h-12 px-3 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                    className="w-full h-12 px-3 bg-ink-50/50 border border-ink-200 rounded-2xl focus:border-brand-500 outline-none font-bold text-sm"
                     value={editData.clinicId}
                     onChange={e => setEditData({...editData, clinicId: e.target.value})}
                   >
@@ -408,9 +448,9 @@ export function Worklist() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Status do Exame</label>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-2 block ml-1 tracking-widest">Estado Clínico</label>
                   <select 
-                    className="w-full h-12 px-3 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none font-medium"
+                    className="w-full h-12 px-3 bg-ink-50/50 border border-ink-200 rounded-2xl focus:border-brand-500 outline-none font-bold text-sm"
                     value={editData.status}
                     onChange={e => setEditData({...editData, status: e.target.value as ExamStatus})}
                   >
@@ -421,15 +461,16 @@ export function Worklist() {
                 </div>
               </div>
             </div>
+            
             <div className="px-8 py-6 border-t border-ink-100 flex justify-end gap-3 bg-ink-50/50">
-              <button className="h-12 px-6 rounded-2xl text-ink-500 font-bold hover:bg-ink-100 transition-all" onClick={() => setEditExamId(null)}>Descartar</button>
+              <button className="h-12 px-6 rounded-2xl text-ink-500 font-bold hover:bg-ink-100 transition-all text-xs uppercase tracking-widest" onClick={() => setEditExamId(null)}>Cancelar</button>
               <button 
-                className="h-12 px-8 rounded-2xl bg-brand-600 text-white font-black text-sm uppercase tracking-widest hover:bg-brand-700 transition-all flex items-center gap-2 shadow-lg" 
+                className="h-12 px-8 rounded-2xl bg-brand-600 text-white font-black text-xs uppercase tracking-widest hover:bg-brand-500 transition-all flex items-center gap-2 shadow-[0_8px_16px_rgba(99,102,241,0.2)]" 
                 onClick={handleSaveMetadata} 
                 disabled={loadingMetadata}
               >
-                {loadingMetadata ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                Confirmar Ajustes
+                {loadingMetadata ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Confirmar Alterações
               </button>
             </div>
           </div>
@@ -440,12 +481,11 @@ export function Worklist() {
         open={deleteId !== null}
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
-        title="Excluir Exame"
-        message="Tem certeza que deseja excluir este registro? Todas as informações vinculadas serão perdidas."
-        confirmLabel="Excluir Registro"
+        title="Excluir Registro de Exame"
+        message="Deseja realmente excluir este exame do histórico? Esta operação expurgará permanentemente o relatório clínico."
+        confirmLabel="Sim, Excluir"
         variant="danger"
       />
-      </div>
     </div>
   );
 }

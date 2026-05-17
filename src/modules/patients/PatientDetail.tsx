@@ -75,7 +75,7 @@ export function PatientDetail({ patientId }: Props) {
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <button
         onClick={() => setView({ name: 'patients' })}
         className="text-[10px] font-black uppercase tracking-widest text-ink-400 hover:text-ink-900 flex items-center gap-2 transition-colors mb-2"

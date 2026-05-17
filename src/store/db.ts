@@ -2,7 +2,7 @@
  * Camada de acesso a dados — Firebase Firestore.
  *
  * Substitui completamente o antigo db.ts (Dexie/IndexedDB).
- * Todas as operações são user-scoped: users/{uid}/collection.
+ * Todas as operações são user-scoped por padrão: users/{uid}/collection.
  */
 import {
   collection,
@@ -22,7 +22,7 @@ import {
   QueryConstraint,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
-import { AppSettings } from '../types';
+import { AppSettings, SupportTicket, SupportMessage } from '../types';
 
 // ─── Helpers ───
 
@@ -39,7 +39,6 @@ function sanitize<T>(data: T): T {
   if (data === null || typeof data !== 'object') return data;
   if (data instanceof Date) return data;
   
-  // Se for uma instância de FieldValue (deleteField, serverTimestamp, etc)
   const obj = data as Record<string, unknown>;
   if (obj.constructor?.name === 'FieldValueImpl' || ((obj as Record<string, unknown>)._methodName && obj.constructor?.name?.includes('FieldValue'))) {
     return data;
@@ -57,8 +56,16 @@ export function getCollectionRef(collectionName: string) {
   return collection(firestore, getUserPath(collectionName));
 }
 
+export function getGlobalCollectionRef(collectionName: string) {
+  return collection(firestore, collectionName);
+}
+
 export function getDocRef(collectionName: string, docId: string) {
   return doc(firestore, getUserPath(collectionName), docId);
+}
+
+export function getGlobalDocRef(collectionName: string, docId: string) {
+  return doc(firestore, collectionName, docId);
 }
 
 /**
@@ -139,6 +146,20 @@ export async function addItemWithId<T extends Record<string, unknown>>(
   }), { merge: true });
 }
 
+export async function addItemGlobalWithId<T extends Record<string, unknown>>(
+  collectionName: string,
+  id: string,
+  data: T
+): Promise<void> {
+  const docRef = getGlobalDocRef(collectionName, id);
+  const now = Date.now();
+  await setDoc(docRef, sanitize({
+    ...data,
+    createdAt: now,
+    updatedAt: now,
+  }), { merge: true });
+}
+
 export async function updateItem(
   collectionName: string,
   id: string,
@@ -151,11 +172,31 @@ export async function updateItem(
   });
 }
 
+export async function updateGlobalItem(
+  collectionName: string,
+  id: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  const docRef = getGlobalDocRef(collectionName, id);
+  await updateDoc(docRef, {
+    ...sanitize(data),
+    updatedAt: Date.now()
+  });
+}
+
 export async function deleteItem(
   collectionName: string,
   id: string
 ): Promise<void> {
   const docRef = getDocRef(collectionName, id);
+  await deleteDoc(docRef);
+}
+
+export async function deleteGlobalItem(
+  collectionName: string,
+  id: string
+): Promise<void> {
+  const docRef = getGlobalDocRef(collectionName, id);
   await deleteDoc(docRef);
 }
 
@@ -232,4 +273,94 @@ export async function getRecentFinalizedReports(templateId: string, limitCount: 
     console.error('Erro ao buscar laudos recentes:', err);
     return [];
   }
+}
+
+/**
+ * Adiciona um registro de auditoria no sistema (Coleção Global).
+ */
+export async function addAuditLog(log: {
+  action: string;
+  details: string;
+  module: string;
+  userId?: string;
+  userName?: string;
+}): Promise<void> {
+  try {
+    const currentUser = auth.currentUser;
+    const colRef = collection(firestore, 'audit_logs');
+    
+    await addDoc(colRef, sanitize({
+      ...log,
+      userId: log.userId || currentUser?.uid || 'system',
+      userName: log.userName || currentUser?.displayName || currentUser?.email || 'Sistema',
+      timestamp: Date.now()
+    }));
+  } catch (err) {
+    console.error('[DB] Erro ao gravar log de auditoria:', err);
+  }
+}
+
+/**
+ * Gerencia mensagens globais do sistema (Broadcast).
+ */
+export async function setBroadcast(message: string | null, type: 'info' | 'warning' | 'error' = 'info'): Promise<void> {
+  const docRef = doc(firestore, 'system', 'broadcast');
+  await setDoc(docRef, {
+    message,
+    type,
+    updatedAt: Date.now(),
+    active: !!message
+  });
+}
+
+export function onBroadcastChange(callback: (broadcast: { message: string; type: string; active: boolean } | null) => void) {
+  const docRef = doc(firestore, 'system', 'broadcast');
+  return onSnapshot(docRef, (snap) => {
+    if (snap.exists()) {
+      callback(snap.data() as any);
+    } else {
+      callback(null);
+    }
+  });
+}
+
+/**
+ * Gestão de Chamados de Suporte.
+ */
+export async function createSupportTicket(ticket: Omit<SupportTicket, 'id' | 'createdAt' | 'updatedAt' | 'messages'>) {
+  const colRef = collection(firestore, 'support_tickets');
+  const now = Date.now();
+  await addDoc(colRef, sanitize({
+    ...ticket,
+    messages: [],
+    createdAt: now,
+    updatedAt: now,
+    status: 'open'
+  }));
+}
+
+export async function addSupportMessage(ticketId: string, message: Omit<SupportMessage, 'id' | 'timestamp'>) {
+  const docRef = doc(firestore, 'support_tickets', ticketId);
+  const now = Date.now();
+  
+  const snap = await getDoc(docRef);
+  if (snap.exists()) {
+    const data = snap.data() as SupportTicket;
+    const newMessage = { ...message, id: genId(), timestamp: now };
+    await updateDoc(docRef, {
+      messages: [...(data.messages || []), newMessage],
+      updatedAt: now
+    });
+  }
+}
+
+export function onSupportTicketsChange(userId: string | null, callback: (tickets: SupportTicket[]) => void) {
+  const colRef = collection(firestore, 'support_tickets');
+  const q = userId 
+    ? query(colRef, where('userId', '==', userId), orderBy('updatedAt', 'desc'))
+    : query(colRef, orderBy('updatedAt', 'desc'));
+    
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportTicket)));
+  });
 }

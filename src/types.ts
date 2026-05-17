@@ -203,3 +203,47 @@ export interface Clinic {
   createdAt: number;
   updatedAt: number;
 }
+
+/** Registro de auditoria do sistema */
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userName?: string;
+  action: string;
+  details: string;
+  module: string;
+  timestamp: number;
+}
+
+/** Plano de assinatura */
+export interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  interval: 'month' | 'year';
+  features: string[];
+  examLimit?: number; // null = ilimitado
+  clinicLimit?: number;
+  active: boolean;
+}
+
+export interface SupportMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  userName: string;
+  subject: string;
+  message: string;
+  status: 'open' | 'pending' | 'resolved';
+  priority: 'low' | 'medium' | 'high';
+  messages: SupportMessage[];
+  createdAt: number;
+  updatedAt: number;
+}

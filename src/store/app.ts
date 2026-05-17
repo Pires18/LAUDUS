@@ -16,7 +16,8 @@ type View =
   | { name: 'calculators' }
   | { name: 'clinics' }
   | { name: 'clinic-detail'; clinicId: string }
-  | { name: 'clinic-form'; clinicId?: string };
+  | { name: 'clinic-form'; clinicId?: string }
+  | { name: 'admin'; activeTab?: string };
 
 interface AppState {
   // ── Auth ──
@@ -44,6 +45,8 @@ interface AppState {
   // ── Global Modals ──
   showCreateExamModal: boolean;
   setShowCreateExamModal: (val: boolean) => void;
+  showSupportModal: boolean;
+  setShowSupportModal: (val: boolean) => void;
   createExamDefaultPatient: Patient | null;
   setCreateExamDefaultPatient: (p: Patient | null) => void;
 }
@@ -94,6 +97,8 @@ export const useApp = create<AppState>((set, get) => ({
   // ── Global Modals ──
   showCreateExamModal: false,
   setShowCreateExamModal: (val) => set({ showCreateExamModal: val }),
+  showSupportModal: false,
+  setShowSupportModal: (val) => set({ showSupportModal: val }),
   createExamDefaultPatient: null,
   setCreateExamDefaultPatient: (p) => set({ createExamDefaultPatient: p }),
 }));

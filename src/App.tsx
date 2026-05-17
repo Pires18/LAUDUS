@@ -1,6 +1,7 @@
 import { useEffect, useState, ReactNode, lazy, Suspense } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './lib/firebase';
+import { auth, firestore } from './lib/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useApp } from './store/app';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginScreen } from './components/LoginScreen';
@@ -10,6 +11,8 @@ import { PageTransition } from './components/PageTransition';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 import { CreateExamModal } from './components/CreateExamModal';
+import { SupportCenterModal } from './components/SupportCenterModal';
+import { BroadcastBanner } from './components/BroadcastBanner';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
@@ -29,6 +32,7 @@ const Calculators = lazy(() => import('./modules/calculators/Calculators').then(
 const Clinics = lazy(() => import('./modules/clinics/Clinics').then(m => ({ default: m.Clinics })));
 const ClinicDetail = lazy(() => import('./modules/clinics/ClinicDetail').then(m => ({ default: m.ClinicDetail })));
 const ClinicForm = lazy(() => import('./modules/clinics/ClinicForm').then(m => ({ default: m.ClinicForm })));
+const Admin = lazy(() => import('./modules/admin/Admin').then(m => ({ default: m.Admin })));
 
 function LazyFallback() {
   return (
@@ -55,12 +59,13 @@ function ViewRenderer() {
     clinics: <Suspense fallback={<LazyFallback />}><Clinics /></Suspense>,
     'clinic-detail': view.name === 'clinic-detail' ? <Suspense fallback={<LazyFallback />}><ClinicDetail clinicId={view.clinicId} /></Suspense> : null,
     'clinic-form': view.name === 'clinic-form' ? <Suspense fallback={<LazyFallback />}><ClinicForm clinicId={view.clinicId} /></Suspense> : null,
+    admin: <Suspense fallback={<LazyFallback />}><Admin /></Suspense>,
   };
 
   const isFullBleed = view.name === 'exam-editor';
 
   return (
-    <main className="flex-1 min-w-0 relative h-screen overflow-hidden">
+    <main className="flex-1 min-w-0 relative flex flex-col min-h-0 overflow-hidden">
       <AnimatePresence mode="wait">
         <PageTransition key={view.name} id={view.name}>
           {views[view.name] ?? null}
@@ -70,20 +75,53 @@ function ViewRenderer() {
   );
 }
 function AuthenticatedApp() {
-  const { loadSettings, showCreateExamModal, setShowCreateExamModal } = useApp();
+  const { showCreateExamModal, setShowCreateExamModal, showSupportModal } = useApp();
+  const { loadSettings } = useApp();
 
   useEffect(() => {
     loadSettings();
+    
+    // Sync user to global users collection if not exists
+    const syncUser = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      
+      const userRef = doc(firestore, 'users', user.uid);
+      const snap = await getDoc(userRef);
+      
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          name: user.displayName || 'Usuário',
+          email: user.email,
+          role: user.email === 'matheuskpires@gmail.com' ? 'admin' : 'medico',
+          active: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        });
+      } else {
+        // Atualiza apenas o último login
+        await setDoc(userRef, { 
+          lastLogin: Date.now(),
+          updatedAt: Date.now() 
+        }, { merge: true });
+      }
+    };
+    
+    syncUser();
   }, [loadSettings]);
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-ink-50/30">
-      <Sidebar />
-      <ViewRenderer />
+    <div className="flex flex-col h-screen overflow-hidden bg-ink-50/30">
+      <BroadcastBanner />
+      <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+        <Sidebar />
+        <ViewRenderer />
+      </div>
       <BottomNav />
       <Toast />
       <CommandPalette />
       {showCreateExamModal && <CreateExamModal onClose={() => setShowCreateExamModal(false)} />}
+      <SupportCenterModal />
     </div>
   );
 }

@@ -30,6 +30,7 @@ interface Props {
 
 export function ExamEditor({ examId }: Props) {
   const { setView, settings, showToast } = useApp();
+  const currentRole = settings.currentRole || 'medico';
 
   // Firestore realtime listeners
   const { data: exam } = useDocument<import('../../types').ExamRequest>('exams', examId);
@@ -247,9 +248,25 @@ export function ExamEditor({ examId }: Props) {
             patient={patient}
             clinic={clinic}
             onBack={() => setView({ name: 'worklist' })}
-            onStatusChange={handleStatusChange}
-            onUnlock={() => setShowUnlockModal(true)}
+            onStatusChange={(status) => {
+              if (currentRole === 'recepcao') {
+                showToast('Acesso restrito: Secretárias não finalizam laudos.', 'error');
+                return;
+              }
+              handleStatusChange(status);
+            }}
+            onUnlock={() => {
+              if (currentRole === 'recepcao') {
+                showToast('Acesso restrito: Secretárias não desbloqueiam laudos.', 'error');
+                return;
+              }
+              setShowUnlockModal(true);
+            }}
             onEditMetadata={() => {
+              if (currentRole === 'recepcao') {
+                showToast('Acesso restrito: Secretárias não alteram dados de exame.', 'error');
+                return;
+              }
               setEditData({
                 patientName: patient.name,
                 birthDate: patient.birthDate || '',
@@ -274,7 +291,7 @@ export function ExamEditor({ examId }: Props) {
             {/* Main Workspace */}
             <div className={classNames(
               "flex-1 flex flex-col min-w-0 dock-sidebar-transition",
-              showCopilot && isCopilotDocked ? "mr-[400px]" : "mr-0"
+              showCopilot && isCopilotDocked && currentRole !== 'recepcao' ? "mr-[400px]" : "mr-0"
             )}>
               {/* Section Progress Bar */}
               <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
@@ -289,9 +306,21 @@ export function ExamEditor({ examId }: Props) {
                 isGenerating={isGenerating}
                 hasReport={!!reportContent}
                 status={exam.status}
-                onRefine={() => handleRefine(reportContent)}
+                onRefine={() => {
+                  if (currentRole === 'recepcao') {
+                    showToast('Acesso restrito: Secretárias não utilizam Laud.IA.', 'error');
+                    return;
+                  }
+                  handleRefine(reportContent);
+                }}
                 onShowPrompt={() => setShowPromptPreview(true)}
-                onReset={handleReset}
+                onReset={() => {
+                  if (currentRole === 'recepcao') {
+                    showToast('Acesso restrito: Secretárias não alteram o laudo.', 'error');
+                    return;
+                  }
+                  handleReset();
+                }}
                 onShowHistory={() => setShowHistoryModal(true)}
                 saveState={saveState}
                 geminiModel={settings.geminiModel || 'gemini-1.5-flash'}
@@ -339,12 +368,12 @@ export function ExamEditor({ examId }: Props) {
                 />
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-4 lg:p-8 scroll-smooth custom-scrollbar">
-                <div className="max-w-[850px] mx-auto min-h-full flex flex-col relative">
+              <div className="flex-1 overflow-hidden p-4 lg:p-6 flex flex-col bg-ink-50/10">
+                <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col relative min-h-0">
                   {exam.status === 'finalizado' && (
                     <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] pointer-events-none rounded-xl" />
                   )}
-                  <div className="bg-white rounded-[2rem] shadow-premium border border-ink-100 overflow-hidden min-h-[900px] flex flex-col">
+                  <div className="bg-white rounded-[2rem] shadow-premium border border-ink-100 overflow-hidden flex-1 flex flex-col min-h-0">
                     <RichEditor 
                       ref={editorRef} 
                       content={reportContent} 
@@ -354,7 +383,7 @@ export function ExamEditor({ examId }: Props) {
                           debouncedSave(html);
                         }
                       }} 
-                      editable={exam.status !== 'finalizado'} 
+                      editable={exam.status !== 'finalizado' && currentRole !== 'recepcao'} 
                     />
                   </div>
                 </div>
@@ -365,7 +394,7 @@ export function ExamEditor({ examId }: Props) {
 
         {/* Copilot Sidebar (Docked) */}
         <AnimatePresence>
-          {showCopilot && isCopilotDocked && exam.status !== 'finalizado' && (
+          {showCopilot && isCopilotDocked && exam.status !== 'finalizado' && currentRole !== 'recepcao' && (
             <motion.aside 
               initial={{ x: 400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -427,7 +456,7 @@ export function ExamEditor({ examId }: Props) {
 
         {/* Floating Copilot (Non-Docked) */}
         <AnimatePresence>
-          {showCopilot && !isCopilotDocked && exam.status !== 'finalizado' && (
+          {showCopilot && !isCopilotDocked && exam.status !== 'finalizado' && currentRole !== 'recepcao' && (
             <motion.aside 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -60,7 +60,7 @@ export function Patients() {
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
         <PageHeader
         title="Pacientes"
         subtitle={`${patients.length} paciente(s) cadastrado(s)`}

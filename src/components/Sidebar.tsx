@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
+import { useAdmin } from '../hooks/useAdmin';
 import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature, 
   Calculator, Sparkles, Hospital, Sliders, PanelLeftClose, 
-  PanelLeftOpen, ChevronDown, FilePlus
+  PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { CreateExamModal } from './CreateExamModal';
@@ -17,14 +18,17 @@ const items = [
   { key: 'patients', label: 'Pacientes', icon: UserCircle, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
-  { key: 'laud-ia', label: 'Laud.IA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin'] },
   { key: 'settings', label: 'Configurações', icon: Sliders, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 
 export function Sidebar() {
-  const { view, setView, selectedClinicId, setSelectedClinic, showToast, setShowCreateExamModal, settings } = useApp();
+  const { 
+    view, setView, selectedClinicId, setSelectedClinic, 
+    showToast, setShowCreateExamModal, setShowSupportModal, settings 
+  } = useApp();
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const [collapsed, setCollapsed] = useState(false);
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
 
@@ -37,7 +41,7 @@ export function Sidebar() {
   return (
     <aside
       className={classNames(
-        'hidden md:flex shrink-0 border-r border-ink-100 bg-white flex-col h-screen sticky top-0 transition-all duration-300 ease-in-out',
+        'hidden md:flex shrink-0 border-r border-ink-100 bg-white flex-col h-full transition-all duration-300 ease-in-out',
         collapsed ? 'w-[64px]' : 'w-60'
       )}
     >
@@ -165,24 +169,52 @@ export function Sidebar() {
           );
         })}
       </nav>
+      
+      {/* Admin Quick Access (Bottom) */}
+      {isAdmin && (
+        <div className="px-3 pb-4">
+          <button
+            onClick={() => setView({ name: 'admin' })}
+            title={collapsed ? 'Administração' : undefined}
+            className={classNames(
+              'w-full flex items-center rounded-[1.5rem] transition-all duration-500 relative overflow-hidden group shadow-premium',
+              collapsed ? 'justify-center p-3.5' : 'gap-3 px-5 py-4',
+              view.name === 'admin'
+                ? 'bg-ink-900 text-white ring-4 ring-brand-500/20'
+                : 'bg-white text-brand-700 border-2 border-brand-100 hover:border-brand-500 hover:shadow-xl'
+            )}
+          >
+            <ShieldCheck size={collapsed ? 24 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-brand-400" : "text-brand-600")} />
+            {!collapsed && (
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] animate-fade-in">Administração</span>
+                <span className="text-[8px] text-ink-400 font-bold mt-1 group-hover:text-brand-500 transition-colors uppercase tracking-widest">Master Panel</span>
+              </div>
+            )}
+            {view.name !== 'admin' && !collapsed && (
+              <div className="ml-auto w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(var(--brand-500-rgb),0.5)] animate-pulse" />
+            )}
+          </button>
+        </div>
+      )}
 
       {/* User Profile + Collapse Toggle */}
-      <div className="border-t border-ink-100 bg-ink-50/20">
+      <div className="border-t border-ink-100 bg-ink-50/10">
         {!collapsed && (
-          <div className="p-3 border-b border-ink-50 animate-fade-in">
-            <div className="flex items-center gap-2.5">
+          <div className="p-4 animate-fade-in">
+            <div className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white/50 transition-colors group cursor-pointer">
               {user?.photoURL ? (
-                <img src={user.photoURL} alt="" className="w-8 h-8 rounded-full border border-white shadow-sm object-cover" />
+                <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full border-2 border-white shadow-md object-cover group-hover:scale-105 transition-transform" />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-bold shadow-sm text-[10px]">
+                <div className="w-10 h-10 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-black shadow-inner text-xs group-hover:scale-105 transition-transform border-2 border-white">
                   {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-ink-900 truncate">
+                <p className="text-xs font-black text-ink-900 truncate">
                   {user?.displayName || 'Usuário'}
                 </p>
-                <p className="text-[10px] text-ink-500 truncate">
+                <p className="text-[10px] text-ink-500 truncate font-medium">
                   {user?.email}
                 </p>
               </div>
@@ -192,23 +224,32 @@ export function Sidebar() {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-ink-400 hover:text-ink-700 hover:bg-ink-100/50 transition-colors text-[10px]"
+          className="w-full flex items-center justify-center gap-2 px-3 py-3 text-ink-400 hover:text-ink-800 hover:bg-ink-100/30 transition-all text-[10px] font-bold uppercase tracking-widest"
           title={collapsed ? 'Expandir menu' : 'Recolher menu'}
         >
-          {collapsed ? <PanelLeftOpen size={16} /> : (
+          {collapsed ? <PanelLeftOpen size={18} /> : (
             <>
-              <PanelLeftClose size={14} />
-              <span className="font-medium">Recolher Barra Lateral</span>
+              <PanelLeftClose size={16} />
+              <span>Recolher Menu</span>
             </>
           )}
         </button>
 
         {!collapsed && (
-          <div className="px-4 pb-4 animate-fade-in text-center">
-            <span className="inline-flex items-center gap-1.5 text-[9px] bg-white text-ink-500 px-2.5 py-1 rounded-full font-bold border border-ink-100 shadow-sm uppercase tracking-wider">
-              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-              Sistema Online
-            </span>
+          <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-2 text-[9px] bg-white text-ink-600 px-3 py-1.5 rounded-full font-black border border-ink-100 shadow-sm uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]" />
+                Online
+              </span>
+              <button 
+                onClick={() => setShowSupportModal(true)}
+                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-brand-50 text-brand-700 px-3 py-1.5 rounded-full font-black border border-brand-100 shadow-sm uppercase tracking-widest hover:bg-brand-600 hover:text-white transition-all active:scale-95"
+              >
+                <LifeBuoy size={12} />
+                Suporte
+              </button>
+            </div>
           </div>
         )}
       </div>

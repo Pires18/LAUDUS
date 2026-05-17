@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { PageHeader } from '../../components/PageHeader';
 import { 
   Save, User, LogOut, Sliders, ShieldCheck, 
-  Signature, Building2, Bell, Shield, Mail,
+  Signature, Building2, Bell, Mail,
   RotateCcw, CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
@@ -49,7 +49,7 @@ export function Settings() {
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
         title="Configurações"
         subtitle="Gerencie seu perfil, assinatura digital e parâmetros globais."
@@ -150,28 +150,6 @@ export function Settings() {
                   </div>
                 </div>
 
-                <div className="bg-amber-50 rounded-3xl border border-amber-200 p-8">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                      <Shield size={24} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-amber-900">Modo de Acesso (RBAC)</h4>
-                      <p className="text-sm text-amber-700 mb-4 leading-relaxed">
-                        Defina o seu perfil de acesso para simular as permissões do sistema.
-                      </p>
-                      <select
-                        className="input border-amber-300 bg-white h-12"
-                        value={draft.currentRole || 'medico'}
-                        onChange={(e) => u('currentRole', e.target.value as any)}
-                      >
-                        <option value="admin">Administrador (Acesso Total)</option>
-                        <option value="medico">Médico (Worklist e Laudos)</option>
-                        <option value="recepcao">Recepção (Apenas Worklist)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <div className="lg:col-span-1">

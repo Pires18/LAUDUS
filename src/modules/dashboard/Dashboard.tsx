@@ -1,23 +1,63 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
+import { useAuth } from '../../hooks/useAuth';
 import { ExamRequest, Patient, Clinic, EXAM_AREAS, ExamStatus } from '../../types';
 import {
   LayoutList, FilePlus, Clock, CheckCircle2, CircleDot, TrendingUp,
   Users, FileText, Activity, ArrowRight, Calendar, Building2, Sparkles,
-  Zap, ChevronRight, Briefcase
+  Zap, ChevronRight, Briefcase, Terminal, Loader2, MessageSquare, Send
 } from 'lucide-react';
 import { AreaIcon } from '../../components/AreaIcon';
 import { classNames, formatDateTime } from '../../utils/format';
-import { CreateExamModal } from '../../components/CreateExamModal';
 
 export function Dashboard() {
+  const { user } = useAuth();
   const { setView, selectedClinicId, settings, showToast } = useApp();
   const currentRole = settings.currentRole || 'medico';
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { data: exams } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
+
+  // Interactive AI Sandbox State
+  const [sandboxPreset, setSandboxPreset] = useState<string | null>(null);
+  const [sandboxLoading, setSandboxLoading] = useState(false);
+  const [sandboxResult, setSandboxResult] = useState<string | null>(null);
+
+  const sandboxOptions = [
+    { 
+      id: 'vocab', 
+      label: 'Polir Vocabulário', 
+      desc: 'Melhora o linguajar científico para termos acadêmicos radiológicos.', 
+      response: '<b>[LAUD.IA] Análise Semântica Aplicada:</b><br/>"Achados descritos com refinamento semântico. Substituídos termos vulgares por terminologia anatômica padronizada (ex: <i>\"líquido na barriga\"</i> por <i>\"ascite livre de volume moderado\"</i>) conforme normas CBR."' 
+    },
+    { 
+      id: 'cbr', 
+      label: 'Checar Diretrizes', 
+      desc: 'Verifica conformidade estrita com consensos do CBR/ACR.', 
+      response: '<b>[LAUD.IA] Validação de Conformidade:</b><br/>"Estruturas em conformidade estrita com o consenso de laudos BI-RADS 5ª Edição. Medidas de fluxos vasculares normais e mapeadas dentro de 1.5 desvio padrão clínico."' 
+    },
+    { 
+      id: 'conclusion', 
+      label: 'Criar Conclusão', 
+      desc: 'Gera síntese estruturada e diagnóstico conclusivo resumido.', 
+      response: '<b>[LAUD.IA] Conclusão Sugerida:</b><br/>1. Sinais ultrassonográficos compatíveis com esteatose hepática moderada (Grau II).<br/>2. Ausência de ectasia de vias biliares intra ou extra-hepáticas.' 
+    }
+  ];
+
+  function runSandbox(optionId: string) {
+    const opt = sandboxOptions.find(o => o.id === optionId);
+    if (!opt) return;
+    setSandboxPreset(optionId);
+    setSandboxLoading(true);
+    setSandboxResult(null);
+    setTimeout(() => {
+      setSandboxLoading(false);
+      setSandboxResult(opt.response);
+      showToast('Simulação LAUD.IA executada!', 'success');
+    }, 850);
+  }
 
   const now = Date.now();
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -54,7 +94,7 @@ export function Dashboard() {
       const dEnd = new Date(d); dEnd.setDate(dEnd.getDate() + 1);
       const count = filteredExams.filter(e => e.createdAt >= d.getTime() && e.createdAt < dEnd.getTime()).length;
       dailyActivity.push({
-        label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''),
+        label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase(),
         count
       });
     }
@@ -77,79 +117,92 @@ export function Dashboard() {
 
   // Recent exams
   const recentExams = useMemo(() =>
-    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 6),
+    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 5),
     [filteredExams]
   );
 
   const patientMap = useMemo(() => new Map(patients.map(p => [p.id, p])), [patients]);
+  const selectedClinic = useMemo(() => clinics.find(c => c.id === selectedClinicId), [clinics, selectedClinicId]);
 
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bom dia';
-    if (h < 18) return 'Boa tarde';
-    return 'Boa noite';
-  })();
+  const displayName = settings.physicianName || user?.displayName || 'Especialista';
+  const hasDrPrefix = /^(dr|dra)\.?\s+/i.test(displayName);
+  const greetingHeader = hasDrPrefix ? "Olá," : "Olá, Dr.";
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
-      
-      {/* Premium Hero Welcome */}
-      <section className="relative overflow-hidden rounded-[2rem] bg-ink-900 p-6 sm:p-10 shadow-2xl">
-        {/* Animated Background Mesh */}
-        <div className="absolute inset-0 opacity-40">
-          <div className="absolute top-0 -left-1/4 w-1/2 h-full bg-brand-600 rounded-full blur-[100px] animate-pulse" />
-          <div className="absolute bottom-0 -right-1/4 w-1/2 h-full bg-indigo-600 rounded-full blur-[100px] animate-pulse delay-700" />
+      {/* Premium Glassmorphic Hero Welcome Banner */}
+      <section className="relative overflow-hidden shrink-0 rounded-[2.5rem] bg-[#0c0c0e] p-8 sm:p-12 shadow-[0_24px_60px_rgba(0,0,0,0.4)] border border-white/5 mb-10 group">
+        {/* Ambient Glows */}
+        <div className="absolute inset-0 opacity-30 pointer-events-none">
+          <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[120%] bg-brand-600 rounded-full blur-[140px] animate-pulse" />
+          <div className="absolute bottom-[-30%] right-[-10%] w-[60%] h-[120%] bg-indigo-600 rounded-full blur-[140px] animate-pulse delay-700" />
         </div>
 
-        <div className="relative flex flex-col lg:flex-row items-center justify-between gap-8">
-          <div className="text-center lg:text-left space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 backdrop-blur-md">
-              <Sparkles size={12} className="text-brand-400" />
-              <span className="text-[10px] font-black text-white uppercase tracking-widest">Clinical AI Core v6.0</span>
+        <div className="relative flex flex-col xl:flex-row items-center justify-between gap-10">
+          <div className="text-center xl:text-left space-y-5">
+            <div className="flex flex-wrap items-center justify-center xl:justify-start gap-2">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                <Sparkles size={14} className="text-brand-400 animate-spin animate-duration-1000" />
+                <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">LAUD.IA ACTIVE CORE 6.2</span>
+              </div>
+              {selectedClinic ? (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-500/20 border border-brand-500/30 backdrop-blur-md animate-fade-in shadow-[0_0_15px_rgba(var(--brand-500-rgb),0.3)]">
+                  <Building2 size={12} className="text-brand-300" />
+                  <span className="text-[10px] font-black text-brand-200 uppercase tracking-[0.2em]">Unidade: {selectedClinic.name}</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
+                  <Building2 size={12} className="text-ink-400" />
+                  <span className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Multiclínicas Ativo</span>
+                </div>
+              )}
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-              {greeting}, <br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-300">
-                {settings.physicianName || 'Especialista'}
+
+            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+              {greetingHeader} <br />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-400 via-indigo-300 to-emerald-400 animate-gradient-x">
+                {displayName}
               </span>
             </h1>
-            <p className="text-ink-300 text-base max-w-md mx-auto lg:mx-0">
-              Você possui <span className="text-brand-400 font-bold">{stats.pending} exames</span> aguardando laudo hoje. Pronto para iniciar?
+
+            <p className="text-ink-300 text-lg max-w-md mx-auto xl:mx-0 font-medium">
+              Você possui <span className="text-brand-400 font-black">{stats.pending} exames</span> aguardando laudo na fila hoje.
             </p>
-            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-3">
-              <button 
-                onClick={() => setShowCreateModal(true)}
-                className="h-12 px-6 rounded-2xl bg-brand-500 text-white font-black text-sm uppercase tracking-widest hover:bg-brand-400 hover:shadow-premium transition-all flex items-center gap-2 group"
-              >
-                <FilePlus size={18} className="group-hover:scale-110 transition-transform" />
-                Novo Laudo
-              </button>
+
+            <div className="flex flex-wrap items-center justify-center xl:justify-start gap-4 pt-2">
               <button 
                 onClick={() => setView({ name: 'worklist' })}
-                className="h-12 px-6 rounded-2xl bg-white/10 text-white font-black text-sm uppercase tracking-widest hover:bg-white/20 backdrop-blur-md border border-white/10 transition-all flex items-center gap-2"
+                className="h-14 px-8 rounded-2xl bg-brand-600 text-white font-black text-xs uppercase tracking-widest hover:bg-brand-500 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-3 group shadow-[0_12px_24px_rgba(99,102,241,0.3)]"
+              >
+                <FilePlus size={18} className="group-hover:translate-x-0.5 transition-transform" />
+                Acessar Worklist
+              </button>
+              <button 
+                onClick={() => setView({ name: 'templates' })}
+                className="h-14 px-8 rounded-2xl bg-white/5 text-white font-black text-xs uppercase tracking-widest hover:bg-white/10 hover:border-white/20 backdrop-blur-md border border-white/10 hover:scale-[1.02] transition-all flex items-center gap-3"
               >
                 <LayoutList size={18} />
-                Worklist
+                Minhas Máscaras
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics Circle */}
-          <div className="hidden xl:flex items-center gap-12 bg-white/5 p-8 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+          {/* Quick Metrics Circle Panel */}
+          <div className="hidden xl:flex items-center gap-12 bg-white/[0.03] p-10 rounded-[2.5rem] border border-white/5 backdrop-blur-md shadow-inner relative overflow-hidden group/panel">
+            <div className="absolute inset-0 bg-gradient-to-tr from-brand-500/5 to-transparent pointer-events-none" />
             <div className="text-center">
-              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Hoje</p>
-              <p className="text-4xl font-black text-white">{stats.today}</p>
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-2">Hoje</p>
+              <p className="text-5xl font-black text-white leading-none tracking-tighter">{stats.today}</p>
             </div>
-            <div className="w-px h-12 bg-white/10" />
+            <div className="w-px h-16 bg-white/10" />
             <div className="text-center">
-              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Mês</p>
-              <p className="text-4xl font-black text-white">{stats.month}</p>
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-2">Mês</p>
+              <p className="text-5xl font-black text-white leading-none tracking-tighter">{stats.month}</p>
             </div>
-            <div className="w-px h-12 bg-white/10" />
+            <div className="w-px h-16 bg-white/10" />
             <div className="text-center">
-              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Produtividade</p>
-              <p className="text-4xl font-black text-emerald-400">
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-2">Finalização</p>
+              <p className="text-5xl font-black text-emerald-400 leading-none tracking-tighter">
                 {stats.total > 0 ? Math.round((stats.finalized / stats.total) * 100) : 0}%
               </p>
             </div>
@@ -157,8 +210,8 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* Main Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+      {/* Main Stats Neon Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10 shrink-0">
         <StatCard
           label="Aguardando"
           value={stats.pending}
@@ -174,14 +227,14 @@ export function Dashboard() {
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
-          label="Finalizados (Hoje)"
+          label="Laudados Hoje"
           value={stats.finalizedToday}
           icon={<CheckCircle2 size={22} />}
           color="emerald"
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
-          label="Pacientes Atendidos"
+          label="Pacientes Ativos"
           value={patients.length}
           icon={<Users size={22} />}
           color="indigo"
@@ -189,106 +242,130 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Layout Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-10 items-start shrink-0">
         
-        {/* Left Column: Activity & Areas */}
-        <div className="lg:col-span-2 space-y-8">
+        {/* Left Column (2 cols) - Charts and Feeds */}
+        <div className="xl:col-span-2 space-y-10">
           
-          {/* Chart Section */}
-          <div className="bg-white rounded-[2rem] border border-ink-100 p-8 shadow-sm group hover:shadow-md transition-shadow">
+          {/* Visual Activity Chart Card */}
+          <div className="bg-white border border-ink-100 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden group">
             <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <div className="p-3 rounded-2xl bg-brand-50 text-brand-600 shadow-inner">
-                  <Activity size={24} />
+                  <Activity size={22} />
                 </div>
                 <div>
-                  <h3 className="font-black text-ink-900 text-lg">Atividade de Exames</h3>
-                  <p className="text-xs text-ink-400 uppercase font-bold tracking-widest">Últimos 7 dias</p>
+                  <h3 className="font-black text-ink-900 text-lg leading-none">Distribuição de Exames</h3>
+                  <p className="text-xs text-ink-400 uppercase font-black tracking-widest mt-1.5">Últimos 7 dias de produção</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-brand-500 animate-pulse" />
-                <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Live Updates</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Sincronizado</span>
               </div>
             </div>
 
-            <div className="flex items-end justify-between gap-4 h-48 pt-4">
+            {/* Styled Flex Bar Chart */}
+            <div className="flex items-end justify-between gap-3 h-52 pt-6 px-2">
               {stats.dailyActivity.map((day, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar">
-                  <div className="relative w-full flex flex-col items-center">
+                <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar relative">
+                  <div className="w-full flex flex-col items-center">
+                    {/* Glowing bar background halo for active days */}
+                    {day.count > 0 && (
+                      <div className="absolute bottom-10 w-full max-w-[44px] bg-brand-500/5 rounded-t-2xl filter blur-sm pointer-events-none transition-all" style={{ height: `${(day.count / (stats.maxDaily || 1)) * 140}px` }} />
+                    )}
+                    {/* Actual Bar */}
                     <div 
                       className={classNames(
-                        "w-full max-w-[40px] rounded-t-2xl transition-all duration-500 relative group-hover/bar:brightness-110",
-                        day.count > 0 ? "bg-gradient-to-t from-brand-600 to-brand-400 shadow-lg shadow-brand-500/20" : "bg-ink-50"
+                        "w-full max-w-[44px] rounded-t-2xl transition-all duration-700 relative group-hover/bar:scale-x-105 group-hover/bar:brightness-110 cursor-pointer",
+                        day.count > 0 ? "bg-gradient-to-t from-brand-600 via-brand-500 to-indigo-500 shadow-lg shadow-brand-500/10" : "bg-ink-50/70"
                       )}
-                      style={{ height: `${Math.max((day.count / (stats.maxDaily || 1)) * 140, 8)}px` }}
+                      style={{ height: `${Math.max((day.count / (stats.maxDaily || 1)) * 140, 10)}px` }}
                     >
+                      {/* Floating tooltip */}
                       {day.count > 0 && (
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-opacity bg-ink-900 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg z-10">
-                          {day.count}
+                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-300 scale-95 group-hover/bar:scale-100 bg-ink-900 text-white text-[10px] font-black px-2.5 py-1.5 rounded-xl shadow-xl z-20 whitespace-nowrap border border-white/5">
+                          {day.count} {day.count === 1 ? 'exame' : 'exames'}
                         </div>
                       )}
                     </div>
                   </div>
-                  <span className="text-[10px] text-ink-400 font-black uppercase tracking-widest">{day.label}</span>
+                  <span className="text-[10px] text-ink-400 font-black tracking-widest">{day.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Recent Exams List */}
-          <div className="bg-white rounded-[2rem] border border-ink-100 shadow-sm overflow-hidden">
-            <div className="px-8 py-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
-              <h3 className="font-black text-ink-900 text-lg flex items-center gap-3">
-                <LayoutList size={20} className="text-brand-500" /> Atividade Recente
-              </h3>
+          {/* Premium Recent Exams List Card */}
+          <div className="bg-white border border-ink-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+            <div className="px-8 py-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-600 shadow-inner">
+                  <LayoutList size={22} />
+                </div>
+                <div>
+                  <h3 className="font-black text-ink-900 text-lg leading-none">Atividade Recente</h3>
+                  <p className="text-xs text-ink-400 uppercase font-black tracking-widest mt-1.5">Últimos laudos criados ou alterados</p>
+                </div>
+              </div>
               <button 
-                onClick={() => setView({ name: 'worklist' })} 
-                className="text-xs font-black text-brand-600 hover:text-brand-700 uppercase tracking-widest flex items-center gap-1 group"
+                onClick={() => setView({ name: 'worklist' })}
+                className="h-10 px-4 rounded-xl border border-ink-200 hover:border-brand-300 hover:bg-brand-50/30 text-ink-600 hover:text-brand-700 font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 group"
               >
-                Ver tudo <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                Ver Worklist
+                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
-            
+
             <div className="divide-y divide-ink-50">
               {recentExams.length === 0 ? (
-                <div className="p-12 text-center">
-                  <FileText size={40} className="mx-auto text-ink-100 mb-4" />
-                  <p className="text-ink-400 font-medium italic">Nenhum exame recente registrado.</p>
+                <div className="p-16 text-center">
+                  <FileText size={44} className="mx-auto text-ink-200 mb-4 animate-bounce" />
+                  <p className="text-ink-500 font-bold italic">Nenhum exame recente registrado.</p>
                 </div>
               ) : (
                 recentExams.map(exam => {
                   const patient = patientMap.get(exam.patientId);
                   const area = EXAM_AREAS.find(a => a.id === exam.area);
+                  const genderGlow = patient?.gender === 'F' 
+                    ? 'ring-2 ring-pink-400/30 bg-pink-50 text-pink-700' 
+                    : patient?.gender === 'M' 
+                    ? 'ring-2 ring-blue-400/30 bg-blue-50 text-blue-700' 
+                    : 'ring-2 ring-brand-400/20 bg-brand-50 text-brand-700';
+
                   return (
                     <button
                       key={exam.id}
                       onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
-                      className="w-full flex items-center gap-4 p-6 hover:bg-ink-50/50 transition-all text-left group"
+                      className="w-full flex items-center gap-5 p-6 hover:bg-ink-50/40 transition-all text-left group"
                     >
-                      <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center font-black text-lg shrink-0 group-hover:scale-110 transition-transform shadow-inner">
-                        {patient?.name.charAt(0) || '?'}
+                      {/* Safety avatar initial with safe fallback optional chaining */}
+                      <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shrink-0 group-hover:scale-105 transition-transform shadow-inner", genderGlow)}>
+                        {patient?.name?.charAt(0) || '?'}
                       </div>
+                      
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h4 className="font-black text-ink-900 truncate group-hover:text-brand-600 transition-colors">{patient?.name || 'Paciente'}</h4>
-                          {area && <span className={classNames("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border", area.color.replace('bg-', 'bg-').replace('text-', 'text-'))}>{area.label}</span>}
+                          {area && <span className={classNames("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0", area.color)}>{area.label}</span>}
                         </div>
                         <p className="text-xs text-ink-500 flex items-center gap-2 truncate">
                           <AreaIcon area={exam.area} size={12} className="text-ink-400" />
                           {exam.examType}
                         </p>
                       </div>
-                      <div className="text-right shrink-0">
+
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                          <span className={classNames(
                            "text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border",
                            exam.status === 'finalizado' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
                            exam.status === 'em-andamento' ? "bg-brand-50 text-brand-700 border-brand-100" :
-                           "bg-amber-50 text-amber-700 border-amber-100"
+                           "bg-amber-50 text-amber-700 border-amber-100 animate-pulse"
                          )}>
                            {exam.status}
                          </span>
-                         <p className="text-[10px] text-ink-400 mt-2 font-bold uppercase tracking-tighter">{formatDateTime(exam.updatedAt || exam.createdAt)}</p>
+                         <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">{formatDateTime(exam.updatedAt || exam.createdAt)}</p>
                       </div>
                     </button>
                   );
@@ -298,57 +375,92 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Right Column: Actions & System Info */}
-        <div className="space-y-8">
+        {/* Right Column (1 col) - Sandboxes & Specialties */}
+        <div className="space-y-10">
           
-          {/* Action Cards Grid */}
-          <div className="grid grid-cols-1 gap-4">
-            <button 
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-4 p-6 rounded-[2rem] bg-brand-600 text-white shadow-premium hover:bg-brand-700 hover:shadow-xl transition-all group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:rotate-12 transition-transform">
-                <Zap size={24} />
+          {/* Interactive LAUD.IA Prompt Sandbox Widget */}
+          <div className="bg-gradient-to-br from-[#0c0c0e] to-[#121217] rounded-[2.5rem] p-8 text-white border border-white/5 shadow-2xl relative overflow-hidden group">
+            {/* Glow halo */}
+            <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-brand-500/10 rounded-full blur-[80px] group-hover:bg-brand-500/20 transition-all duration-700 pointer-events-none" />
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-brand-400 border border-white/5 shadow-inner">
+                <Terminal size={18} />
               </div>
-              <div className="text-left">
-                <p className="font-black text-lg leading-tight">Novo Laudo IA</p>
-                <p className="text-xs text-white/70">Fluxo ultra-rápido</p>
+              <div>
+                <h4 className="font-black text-lg tracking-tight">LAUD.IA Sandbox</h4>
+                <p className="text-[9px] text-brand-400 font-bold uppercase tracking-widest">Mimetizador Inteligente</p>
               </div>
-            </button>
+            </div>
 
-            <button 
-              onClick={() => setView({ name: 'patients' })}
-              className="flex items-center gap-4 p-6 rounded-[2rem] bg-white border border-ink-100 shadow-sm hover:border-brand-300 hover:shadow-md transition-all group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:-rotate-6 transition-transform">
-                <UserPlus size={24} />
+            <p className="text-xs text-ink-400 leading-relaxed mb-6 font-medium">
+              Selecione uma diretriz de análise abaixo para ver em tempo real como o motor do LAUD.IA estrutura e padroniza seus laudos:
+            </p>
+
+            <div className="space-y-3">
+              {sandboxOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => runSandbox(opt.id)}
+                  disabled={sandboxLoading}
+                  className={classNames(
+                    "w-full p-4 rounded-2xl text-left border text-xs transition-all relative flex flex-col gap-1.5 overflow-hidden",
+                    sandboxPreset === opt.id 
+                      ? "bg-brand-600/20 border-brand-500 text-white shadow-lg shadow-brand-500/5" 
+                      : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10 text-white"
+                  )}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-black tracking-wide">{opt.label}</span>
+                    <Zap size={12} className={classNames(sandboxPreset === opt.id ? "text-brand-400 animate-bounce" : "text-ink-500")} />
+                  </div>
+                  <span className="text-[10px] text-ink-400 font-medium leading-normal">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Live simulation response console */}
+            {(sandboxLoading || sandboxResult) && (
+              <div className="mt-6 p-5 rounded-2xl bg-black/60 border border-white/5 text-[11px] font-mono leading-relaxed text-ink-300 relative overflow-hidden animate-slide-up">
+                {sandboxLoading ? (
+                  <div className="flex items-center gap-2 py-2">
+                    <Loader2 size={14} className="animate-spin text-brand-400" />
+                    <span className="font-bold text-brand-400">Processando com mimetismo avançado...</span>
+                  </div>
+                ) : (
+                  <div 
+                    className="space-y-1 text-emerald-300"
+                    dangerouslySetInnerHTML={{ __html: sandboxResult || '' }}
+                  />
+                )}
               </div>
-              <div className="text-left">
-                <p className="font-black text-ink-900 text-lg leading-tight">Meus Pacientes</p>
-                <p className="text-xs text-ink-400">Gerenciar cadastros</p>
-              </div>
-            </button>
+            )}
           </div>
 
-          {/* Distribution Section */}
-          <div className="bg-white rounded-[2rem] border border-ink-100 p-8 shadow-sm">
+          {/* Specialty Progression Dial Card */}
+          <div className="bg-white rounded-[2.5rem] border border-ink-100 p-8 shadow-sm">
             <h3 className="font-black text-ink-900 uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
-              <TrendingUp size={14} className="text-brand-500" /> Especialidades
+              <TrendingUp size={14} className="text-brand-500 animate-pulse" /> Produção por Especialidade
             </h3>
+            
             <div className="space-y-5">
               {EXAM_AREAS.map(area => {
                 const count = stats.areaMap.get(area.id) || 0;
                 if (count === 0 && stats.total > 0) return null;
                 const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                
                 return (
                   <div key={area.id} className="group">
                     <div className="flex items-center justify-between text-[11px] mb-2">
-                      <span className="font-black text-ink-800 uppercase tracking-tight group-hover:text-brand-600 transition-colors">{area.label}</span>
-                      <span className="text-ink-400 font-bold">{count}</span>
+                      <span className="font-black text-ink-800 uppercase tracking-tight group-hover:text-brand-600 transition-colors flex items-center gap-2">
+                        <AreaIcon area={area.id} size={12} className="text-ink-400" />
+                        {area.label}
+                      </span>
+                      <span className="text-ink-400 font-bold">{count} {count === 1 ? 'laudo' : 'laudos'}</span>
                     </div>
-                    <div className="h-1.5 bg-ink-50 rounded-full overflow-hidden border border-ink-100/50">
+                    <div className="h-2 bg-ink-50 rounded-full overflow-hidden border border-ink-100/50">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-brand-400 to-indigo-500 transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(var(--brand-500-rgb),0.3)]"
+                        className={classNames("h-full rounded-full transition-all duration-1000 ease-out", area.color)}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -358,33 +470,31 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Platform Info */}
-          <div className="bg-ink-900 rounded-[2rem] p-8 text-white relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform" />
+          {/* Platform Security/Licensing info */}
+          <div className="bg-ink-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl group-hover:scale-120 transition-transform" />
             <div className="relative flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-brand-400 border border-white/10">
-                <Briefcase size={24} />
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-brand-400 border border-white/10 shadow-inner">
+                <Briefcase size={22} />
               </div>
               <div>
-                <h4 className="font-black text-xl tracking-tight">Status Global</h4>
-                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest">Workspace v6.2</p>
+                <h4 className="font-black text-lg tracking-tight">Status da Licença</h4>
+                <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest">Médico Autenticado</p>
               </div>
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1">Total Exames</p>
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1.5">Total Geral</p>
                 <p className="text-2xl font-black">{exams.length}</p>
               </div>
               <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1">Unidades</p>
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1.5">Clínicas</p>
                 <p className="text-2xl font-black">{clinics.length}</p>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {showCreateModal && <CreateExamModal onClose={() => setShowCreateModal(false)} />}
       </div>
     </div>
   );
@@ -398,10 +508,10 @@ function StatCard({ label, value, icon, color, onClick }: {
   onClick?: () => void;
 }) {
   const colorMap = {
-    amber: 'bg-white border-amber-100 hover:border-amber-400',
-    brand: 'bg-white border-brand-100 hover:border-brand-400',
-    emerald: 'bg-white border-emerald-100 hover:border-emerald-400',
-    indigo: 'bg-white border-indigo-100 hover:border-indigo-400',
+    amber: 'bg-white border-amber-100 hover:border-amber-400 hover:shadow-[0_20px_40px_rgba(245,158,11,0.08)]',
+    brand: 'bg-white border-brand-100 hover:border-brand-400 hover:shadow-[0_20px_40px_rgba(99,102,241,0.08)]',
+    emerald: 'bg-white border-emerald-100 hover:border-emerald-400 hover:shadow-[0_20px_40px_rgba(16,185,129,0.08)]',
+    indigo: 'bg-white border-indigo-100 hover:border-indigo-400 hover:shadow-[0_20px_40px_rgba(79,70,229,0.08)]',
   };
   const iconColors = {
     amber: 'bg-amber-50 text-amber-600',
@@ -414,21 +524,17 @@ function StatCard({ label, value, icon, color, onClick }: {
     <button
       onClick={onClick}
       className={classNames(
-        "p-6 rounded-[2rem] border text-left group hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300",
+        "p-6 rounded-[2.2rem] border text-left group hover:-translate-y-1.5 transition-all duration-300",
         colorMap[color]
       )}
     >
-      <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-inner group-hover:scale-110 transition-transform", iconColors[color])}>
+      <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-inner group-hover:scale-105 transition-transform", iconColors[color])}>
         {icon}
       </div>
       <div>
-        <p className="text-4xl font-black text-ink-900 leading-none mb-2">{value}</p>
+        <p className="text-4xl font-black text-ink-900 leading-none mb-2 tracking-tighter">{value}</p>
         <p className="text-[11px] font-black text-ink-400 uppercase tracking-widest">{label}</p>
       </div>
     </button>
   );
-}
-
-function UserPlus({ size, className }: { size: number; className?: string }) {
-  return <Users size={size} className={className} />;
 }
