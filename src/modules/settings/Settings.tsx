@@ -54,8 +54,8 @@ export function Settings() {
     <div className="module-container">
       <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
       <PageHeader
-        title="Configurações"
-        subtitle="Gerencie seu perfil, assinatura digital e parâmetros globais."
+        title="Meu Perfil"
+        subtitle="Gerencie sua identidade médica, assinatura digital e preferências de sistema."
         actions={
           <div className="flex items-center gap-3">
              <button onClick={() => setDraft(settings)} className="btn-ghost text-ink-400 h-11 px-5 rounded-2xl">
@@ -175,12 +175,9 @@ export function Settings() {
                   <p className="text-sm text-ink-500 mb-8">{user?.email}</p>
                   
                   <div className="space-y-3">
-                    <div className="p-3 rounded-2xl bg-ink-50 border border-ink-100 text-xs text-ink-600 font-bold uppercase tracking-widest">
-                      Assinatura: {draft.physicianCRM ? 'Ativa' : 'Pendente'}
+                    <div className="p-4 rounded-2xl bg-brand-50/50 border border-brand-100 text-xs text-brand-700 font-black uppercase tracking-widest leading-relaxed">
+                      Assinatura Médica: {draft.physicianCRM ? '✓ Ativa e Vinculada' : '⚠️ Pendente de Configuração'}
                     </div>
-                    <button onClick={signOut} className="w-full py-3 rounded-2xl bg-red-50 text-red-600 border border-red-100 font-bold text-sm hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2">
-                      <LogOut size={16} /> Encerrar Sessão
-                    </button>
                   </div>
                 </div>
               </div>

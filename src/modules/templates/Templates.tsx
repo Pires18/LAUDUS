@@ -3,7 +3,7 @@ import { useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ReportTemplate, EXAM_AREAS, Clinic, ExamArea } from '../../types';
-import { addItemWithId, deleteItem, genId, countWhere } from '../../store/db';
+import { addItemWithId, deleteItem, genId, countWhere, updateItem } from '../../store/db';
 import { useState, useMemo } from 'react';
 import { 
   Plus, Search, FileSignature, Trash2, Copy,
@@ -187,22 +187,44 @@ export function Templates() {
                 </button>
               </div>
             ) : (
-              sorted.map((template) => {
+              sorted.map((template: any) => {
                 const area = EXAM_AREAS.find(a => a.id === template.area);
                 const clinic = template.clinicId ? clinicMap.get(template.clinicId) : null;
+
+                async function handleTemplateClick() {
+                  if (template.isSystem) {
+                    showToast('Duplicando máscara oficial para sua biblioteca...', 'info');
+                    const id = genId();
+                    const { id: _, createdAt, updatedAt, isSystem, ...rest } = template;
+                    try {
+                      await addItemWithId('templates', id, {
+                        ...rest,
+                        name: `${template.name} (Personalizada)`,
+                        createdAt: Date.now(),
+                        updatedAt: Date.now()
+                      });
+                      showToast('Cópia criada! Agora você pode editá-la.', 'success');
+                      setView({ name: 'template-editor', templateId: id });
+                    } catch {
+                      showToast('Erro ao duplicar máscara', 'error');
+                    }
+                    return;
+                  }
+                  setView({ name: 'template-editor', templateId: template.id });
+                }
 
                 return (
                   <div
                     key={template.id}
-                    onClick={() => setView({ name: 'template-editor', templateId: template.id })}
+                    onClick={handleTemplateClick}
                     className="group bg-white p-6 rounded-3xl border border-ink-100 hover:border-brand-300 hover:shadow-premium transition-all cursor-pointer flex flex-col relative overflow-hidden"
                   >
                     <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                     
                     <div className="flex justify-between items-start mb-4">
-                    <div className={classNames("p-3 rounded-2xl shadow-inner", area?.color || "bg-ink-100 text-ink-400")}>
-                      <AreaIcon area={template.area} size={24} />
-                    </div>
+                      <div className={classNames("p-3 rounded-2xl shadow-inner", area?.color || "bg-ink-100 text-ink-400")}>
+                        <AreaIcon area={template.area} size={24} />
+                      </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button
                           onClick={(e) => handleDuplicate(template, e)}
@@ -211,13 +233,15 @@ export function Templates() {
                         >
                           <Copy size={16} />
                         </button>
-                        <button
-                          onClick={(e) => handleRequestDelete(template.id, template.name, e)}
-                          className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50"
-                          title="Excluir"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {!template.isSystem && (
+                          <button
+                            onClick={(e) => handleRequestDelete(template.id, template.name, e)}
+                            className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50"
+                            title="Excluir"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -225,13 +249,48 @@ export function Templates() {
                       {template.name}
                     </h4>
                     
-                    <div className="flex flex-wrap gap-2 mt-auto pt-4">
-                       {area && <span className={classNames("text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border", area.color)}>
-                         {area.label}
-                       </span>}
-                       {clinic && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-ink-50 text-ink-500 border border-ink-100">
-                         {clinic.name}
-                       </span>}
+                    <div className="flex items-center justify-between gap-2 mt-auto pt-4 border-t border-slate-50 flex-wrap">
+                      <div className="flex flex-wrap gap-1.5">
+                        {template.isSystem && (
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100/50 animate-pulse-subtle">
+                            Padrão
+                          </span>
+                        )}
+                        {!template.isSystem && !template.clinicId && (
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                            🌐 Todas as Clínicas
+                          </span>
+                        )}
+                        {area && (
+                          <span className={classNames("text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border", area.color)}>
+                            {area.label}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Inline Clinic Selector for private user-owned templates */}
+                      {!template.isSystem && (
+                        <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={template.clinicId || ''}
+                            onChange={async (e) => {
+                              const newClinicId = e.target.value || null;
+                              try {
+                                await updateItem('templates', template.id, { clinicId: newClinicId });
+                                showToast(newClinicId ? 'Máscara vinculada à clínica!' : 'Máscara disponível em todas as clínicas!', 'success');
+                              } catch {
+                                showToast('Erro ao atualizar vínculo da clínica', 'error');
+                              }
+                            }}
+                            className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 text-[10px] font-black text-slate-500 rounded-lg outline-none focus:border-brand-500 cursor-pointer"
+                          >
+                            <option value="">🌐 Todas as Clínicas</option>
+                            {clinics.map((c) => (
+                              <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

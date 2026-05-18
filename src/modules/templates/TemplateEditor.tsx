@@ -7,6 +7,7 @@ import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
 import { FileText, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, Building2 } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
 import { generateTemplateStructure } from '../ai/generateTemplate';
+import { auth } from '../../lib/firebase';
 
 interface Props {
   templateId?: string;
@@ -142,20 +143,26 @@ export function TemplateEditor({ templateId }: Props) {
                 <div>
                   <label className="label flex items-center gap-1.5">
                     <Building2 size={12} className="text-ink-400" />
-                    Clínica Específica
+                    Vínculo de Clínica
                   </label>
                   <select
                     className="input"
                     value={draft.clinicId || ''}
                     onChange={(e) => u('clinicId', e.target.value || undefined)}
                   >
-                    <option value="">Global (Disponível para todas)</option>
+                    {auth.currentUser?.email === 'matheuskpires@gmail.com' ? (
+                      <option value="">⭐ Padrão do Sistema (Todos os Médicos)</option>
+                    ) : (
+                      <option value="">🌐 Todas as minhas Clínicas (Padrão)</option>
+                    )}
                     {clinics.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
                     ))}
                   </select>
                   <p className="text-[10px] text-ink-400 mt-1">
-                    Selecione uma clínica se esta máscara for exclusiva dela.
+                    {auth.currentUser?.email === 'matheuskpires@gmail.com'
+                      ? "Defina se esta máscara estará disponível globalmente no sistema como padrão oficial."
+                      : "Defina se esta máscara estará disponível para todas as suas clínicas cadastradas ou restrita a uma delas."}
                   </p>
                 </div>
               </div>

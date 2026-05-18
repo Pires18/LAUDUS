@@ -225,6 +225,12 @@ export interface Plan {
   examLimit?: number; // null = ilimitado
   clinicLimit?: number;
   active: boolean;
+  
+  // Recursos e adequações clínicas do sistema
+  iaLimit?: number;         // Créditos Laud.IA/mês (null = ilimitado)
+  storageLimitGb?: number;  // Armazenamento de Imagens em GB (null = ilimitado)
+  voiceDictation: boolean;  // Permite Ditado por Voz clínico
+  customMasks: boolean;     // Permite criação de máscaras personalizadas
 }
 
 export interface SupportMessage {
@@ -247,3 +253,18 @@ export interface SupportTicket {
   createdAt: number;
   updatedAt: number;
 }
+
+/** Código de Licença comercial atrelado a planos */
+export interface License {
+  id: string;             // Ex: LAUD-XXXX-XXXX-XXXX
+  planId: string;         // ID do plano associado
+  planName: string;       // Nome do plano associado
+  durationMonths: number; // Duração (1, 3, 6, 12, 24 meses)
+  active: boolean;        // Se está ativa (não revogada)
+  createdAt: number;      // Data de geração
+  usedAt?: number;        // Data de ativação pelo usuário
+  usedByUid?: string;     // UID do médico que ativou
+  usedByEmail?: string;   // E-mail do médico que ativou
+  expiresAt?: number;     // Timestamp exato do fim do acesso
+}
+

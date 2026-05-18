@@ -39,7 +39,19 @@ export async function setUserActiveStatus(uid: string, active: boolean, adminId:
  * Cria um novo registro de usuário manualmente.
  * Nota: Isso não cria a conta no Firebase Auth, apenas o documento no Firestore.
  */
-export async function createUserDocument(userData: { name: string, email: string, role: UserRole }, adminId: string, adminName: string) {
+export async function createUserDocument(
+  userData: { 
+    name: string; 
+    email: string; 
+    role: UserRole;
+    licenseCode?: string;
+    licensePlanId?: string;
+    licensePlanName?: string;
+    licenseExpiresAt?: number | null;
+  }, 
+  adminId: string, 
+  adminName: string
+) {
   const colRef = collection(firestore, 'users');
   const now = Date.now();
   const docRef = await addDoc(colRef, {
@@ -49,11 +61,24 @@ export async function createUserDocument(userData: { name: string, email: string
     updatedAt: now
   });
 
+  // Se possui licença vinculada, consome ela imediatamente
+  if (userData.licenseCode) {
+    const licenseRef = doc(firestore, 'plans', `LICENSE_${userData.licenseCode}`);
+    await updateDoc(licenseRef, {
+      active: false,
+      usedByEmail: userData.email,
+      usedByUid: 'PENDING_ACTIVATION',
+      usedAt: now,
+      expiresAt: userData.licenseExpiresAt,
+      updatedAt: now
+    });
+  }
+
   await addAuditLog({
     userId: adminId,
     userName: adminName,
     action: 'CREATE_USER',
-    details: `Criado documento para usuário ${userData.email} (${docRef.id})`,
+    details: `Criado documento para usuário ${userData.email} (${docRef.id})${userData.licenseCode ? ` com licença ${userData.licenseCode}` : ''}`,
     module: 'ADMIN_USERS'
   });
   

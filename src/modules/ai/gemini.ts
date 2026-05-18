@@ -140,10 +140,11 @@ export function buildRefinePrompt({
     : '';
 
   const taskDescription = customPrompt 
-    ? `Sua tarefa é AJUSTAR o laudo médico conforme a seguinte instrução: "${customPrompt}".`
-    : `Sua tarefa é REFINAR e REVISAR um laudo médico que foi preenchido. 
-       O laudo atual pode conter placeholders "(...)" ou anotações rápidas inseridas pelo médico.
-       Transforme-o em um laudo final, elegante, profissional e sem erros, mantendo a estrutura padrão.`;
+    ? `Sua tarefa é AJUSTAR e REFINAR o laudo médico de acordo com o seguinte comando clínico: "${customPrompt}".`
+    : `Sua tarefa é REFINAR, REVISAR e SANITIZAR o laudo médico preenchido. 
+       O laudo atual pode conter anotações rápidas ou placeholders residuais como "(...)", "[...]", "___" ou campos vazios.
+       Substitua TODOS os placeholders pela Doutrina de Normalidade Habitual (ex: descreva como "habitual", "preservada" ou "ecotextura homogênea", mimetizando o estilo do médico).
+       NÃO deixe nenhum parêntese com reticências ou campos incompletos no laudo final.`;
 
   return `${masterPrompt}
 
@@ -154,7 +155,7 @@ ${previousContext}
 ${taskDescription}
 
 ═══════════════════════════════════════════
-ESTRUTURA OBRIGATÓRIA:
+ESTRUTURA OBRIGATÓRIA (Skeleton v7.0/v8.0):
 ═══════════════════════════════════════════
 ${structurePrompt}
 
@@ -172,7 +173,7 @@ ${patientBlock}
 ${clinicalIndication ? `\nIndicação clínica: ${clinicalIndication}` : ''}
 
 ═══════════════════════════════════════════
-INSTRUÇÕES ADICIONAIS:
+INSTRUÇÕES ADICIONAIS DE CONFORMIDADE:
 ═══════════════════════════════════════════
 ${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
 ${template.aiInstructions ? `\nINSTRUÇÕES DA MÁSCARA: ${template.aiInstructions}` : ''}
@@ -181,7 +182,7 @@ ${DEFAULT_ADVANCED_REASONING}
 
 ${rigidRules}
 
-Gere agora o laudo final REFINADO (apenas o HTML completo):`;
+Gere agora o laudo final REFINADO e higienizado com maestria (apenas o HTML completo, sem explicações adicionais, sem markdown):`;
 }
 
 /**
@@ -216,7 +217,16 @@ ${areaSpecificRules ? `═══════════════════
 
 ${previousContext}
 
-Sua tarefa agora é ATUALIZAR ou EDITAR um laudo existente com base em uma nova instrução do médico.
+Sua tarefa agora é ATUALIZAR ou EDITAR o laudo existente com base na nova instrução do médico de forma extremamente direta, sucinta, objetiva e puramente clínica. NUNCA utilize floreios, formalidades exageradas, saudações amigáveis (como "Olá colega" ou "Espero ajudar") ou explicações prolixas que desperdiçam o tempo do médico. Vá direto aos fatos e à conduta clínica.
+
+Sua resposta DEVE ser estruturada rigorosamente usando os marcadores exatos:
+
+=== CONVERSA ===
+[Forneça um resumo clínico extremamente direto, conciso e puramente técnico em formato de lista (bullets curtos) de exatamente o que você alterou, inseriu ou calculou no laudo. Evite introduções e vá direto aos pontos técnicos.]
+
+=== PROPOSTA ===
+[Forneça o código HTML COMPLETO do laudo atualizado contendo todas as alterações integradas perfeitamente, mantendo o padrão do Skeleton v7.0.]
+
 Mantenha rigorosamente a estrutura de tópicos (TÍTULO, TÉCNICA, ANÁLISE, CONCLUSÃO, etc).
 
 ═══════════════════════════════════════════
@@ -246,7 +256,7 @@ ${DEFAULT_ADVANCED_REASONING}
 
 ${rigidRules}
 
-Gere agora o laudo completo ATUALIZADO (apenas o HTML final):`;
+Gere agora a resposta completa estruturada com === CONVERSA === e === PROPOSTA === (sem blocos extras de código fora desses marcadores):`;
 }
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {

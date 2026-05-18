@@ -30,16 +30,16 @@ export function EditorToolbar({
         onClick={onRefine}
         disabled={isGenerating || status === 'finalizado'}
         className={classNames(
-          "h-10 px-6 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-lg transition-all flex items-center justify-center",
+          "h-10 px-6 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-lg transition-all flex items-center justify-center relative overflow-hidden border border-brand-500/20",
           isGenerating 
-            ? "bg-ink-100 text-ink-400 border-ink-200 cursor-not-allowed" 
-            : "bg-gradient-to-r from-brand-600 to-brand-700 text-white hover:from-brand-700 hover:to-brand-800 hover:shadow-brand-500/20 active:scale-95"
+            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" 
+            : "bg-gradient-to-r from-brand-600 via-brand-700 to-indigo-700 text-white hover:shadow-xl hover:shadow-brand-500/25 active:scale-95"
         )}
       >
         {isGenerating ? (
-          <Loader2 size={16} className="animate-spin" />
+          <Loader2 size={16} className="animate-spin text-brand-400" />
         ) : (
-          <Sparkles size={16} className="text-white/80" />
+          <Sparkles size={16} className="text-amber-300 fill-amber-300 animate-pulse" />
         )}
         Refinar com Laud.IA
       </button>

@@ -89,8 +89,9 @@ export function ClinicForm({ clinicId }: Props) {
       const url = await getDownloadURL(storageRef);
       u('logoUrl', url);
       showToast('Logo enviado com sucesso', 'success');
-    } catch (err) {
-      showToast('Erro ao enviar logo', 'error');
+    } catch (err: any) {
+      console.error('Erro de upload da logo:', err);
+      showToast('Erro de permissão no Storage. Cole a URL do logotipo abaixo como alternativa.', 'error');
     } finally {
       setUploading(false);
     }
@@ -298,7 +299,7 @@ export function ClinicForm({ clinicId }: Props) {
           {/* Logo Card */}
           <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 text-center">
             <h3 className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-6">Logotipo da Unidade</h3>
-            <div className="flex flex-col items-center gap-6">
+             <div className="flex flex-col items-center gap-6">
               <div className="relative group">
                 <div className="w-32 h-32 rounded-3xl bg-ink-50 border-2 border-dashed border-ink-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-brand-400">
                   {draft.logoUrl ? (
@@ -322,6 +323,17 @@ export function ClinicForm({ clinicId }: Props) {
                   if (file) handleLogoUpload(file);
                 }} />
               </label>
+
+              <div className="w-full text-left">
+                <label className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mb-1">Ou Cole a URL Direta</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-brand-500 text-[11px] font-bold text-slate-700 shadow-inner"
+                  placeholder="https://exemplo.com/logo.png"
+                  value={draft.logoUrl || ''}
+                  onChange={(e) => u('logoUrl', e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

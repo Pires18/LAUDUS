@@ -19,44 +19,7 @@ export function Dashboard() {
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
 
-  // Interactive AI Sandbox State
-  const [sandboxPreset, setSandboxPreset] = useState<string | null>(null);
-  const [sandboxLoading, setSandboxLoading] = useState(false);
-  const [sandboxResult, setSandboxResult] = useState<string | null>(null);
 
-  const sandboxOptions = [
-    { 
-      id: 'vocab', 
-      label: 'Polir Vocabulário', 
-      desc: 'Melhora o linguajar científico para termos acadêmicos radiológicos.', 
-      response: '<b>[LAUD.IA] Análise Semântica Aplicada:</b><br/>"Achados descritos com refinamento semântico. Substituídos termos vulgares por terminologia anatômica padronizada (ex: <i>\"líquido na barriga\"</i> por <i>\"ascite livre de volume moderado\"</i>) conforme normas CBR."' 
-    },
-    { 
-      id: 'cbr', 
-      label: 'Checar Diretrizes', 
-      desc: 'Verifica conformidade estrita com consensos do CBR/ACR.', 
-      response: '<b>[LAUD.IA] Validação de Conformidade:</b><br/>"Estruturas em conformidade estrita com o consenso de laudos BI-RADS 5ª Edição. Medidas de fluxos vasculares normais e mapeadas dentro de 1.5 desvio padrão clínico."' 
-    },
-    { 
-      id: 'conclusion', 
-      label: 'Criar Conclusão', 
-      desc: 'Gera síntese estruturada e diagnóstico conclusivo resumido.', 
-      response: '<b>[LAUD.IA] Conclusão Sugerida:</b><br/>1. Sinais ultrassonográficos compatíveis com esteatose hepática moderada (Grau II).<br/>2. Ausência de ectasia de vias biliares intra ou extra-hepáticas.' 
-    }
-  ];
-
-  function runSandbox(optionId: string) {
-    const opt = sandboxOptions.find(o => o.id === optionId);
-    if (!opt) return;
-    setSandboxPreset(optionId);
-    setSandboxLoading(true);
-    setSandboxResult(null);
-    setTimeout(() => {
-      setSandboxLoading(false);
-      setSandboxResult(opt.response);
-      showToast('Simulação LAUD.IA executada!', 'success');
-    }, 850);
-  }
 
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
@@ -376,64 +339,7 @@ export function Dashboard() {
         {/* Right Column (1 col) - Sandboxes & Specialties */}
         <div className="space-y-10">
           
-          {/* Interactive LAUD.IA Prompt Sandbox Widget */}
-          <div className="bg-gradient-to-br from-[#0c0c0e] to-[#121217] rounded-[2.5rem] p-8 text-white border border-white/5 shadow-2xl relative overflow-hidden group">
-            {/* Glow halo */}
-            <div className="absolute top-[-20%] right-[-20%] w-40 h-40 bg-brand-500/10 rounded-full blur-[80px] group-hover:bg-brand-500/20 transition-all duration-700 pointer-events-none" />
-            
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-brand-400 border border-white/5 shadow-inner">
-                <Terminal size={18} />
-              </div>
-              <div>
-                <h4 className="font-black text-lg tracking-tight">LAUD.IA Sandbox</h4>
-                <p className="text-[9px] text-brand-400 font-bold uppercase tracking-widest">Mimetizador Inteligente</p>
-              </div>
-            </div>
 
-            <p className="text-xs text-ink-400 leading-relaxed mb-6 font-medium">
-              Selecione uma diretriz de análise abaixo para ver em tempo real como o motor do LAUD.IA estrutura e padroniza seus laudos:
-            </p>
-
-            <div className="space-y-3">
-              {sandboxOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => runSandbox(opt.id)}
-                  disabled={sandboxLoading}
-                  className={classNames(
-                    "w-full p-4 rounded-2xl text-left border text-xs transition-all relative flex flex-col gap-1.5 overflow-hidden",
-                    sandboxPreset === opt.id 
-                      ? "bg-brand-600/20 border-brand-500 text-white shadow-lg shadow-brand-500/5" 
-                      : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10 text-white"
-                  )}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="font-black tracking-wide">{opt.label}</span>
-                    <Zap size={12} className={classNames(sandboxPreset === opt.id ? "text-brand-400 animate-bounce" : "text-ink-500")} />
-                  </div>
-                  <span className="text-[10px] text-ink-400 font-medium leading-normal">{opt.desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Live simulation response console */}
-            {(sandboxLoading || sandboxResult) && (
-              <div className="mt-6 p-5 rounded-2xl bg-black/60 border border-white/5 text-[11px] font-mono leading-relaxed text-ink-300 relative overflow-hidden animate-slide-up">
-                {sandboxLoading ? (
-                  <div className="flex items-center gap-2 py-2">
-                    <Loader2 size={14} className="animate-spin text-brand-400" />
-                    <span className="font-bold text-brand-400">Processando com mimetismo avançado...</span>
-                  </div>
-                ) : (
-                  <div 
-                    className="space-y-1 text-emerald-300"
-                    dangerouslySetInnerHTML={{ __html: sandboxResult || '' }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
 
           {/* Specialty Progression Dial Card */}
           <div className="bg-white rounded-[2.5rem] border border-ink-100 p-8 shadow-sm">

@@ -8,7 +8,7 @@ import {
   Sliders, LayoutList, FileText, Layout, ShieldCheck
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
-import { EXAM_AREAS, ExamArea } from '../../types';
+import { EXAM_AREAS, ExamArea, AppSettings } from '../../types';
 import { 
   DEFAULT_MASTER_PROMPT, 
   DEFAULT_GLOBAL_INSTRUCTIONS, 
@@ -26,6 +26,15 @@ export function LaudIA() {
   const [activeTab, setActiveTab] = useState<TabId>('prompts');
   const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [adminSettings, setAdminSettings] = useState<AppSettings | null>(null);
+
+  useEffect(() => {
+    import('../../store/db').then(({ getAdminSettings }) => {
+      getAdminSettings().then(admin => {
+        setAdminSettings(admin);
+      });
+    });
+  }, []);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -136,7 +145,23 @@ export function LaudIA() {
 
           {/* TAB: PROMPTS */}
           {activeTab === 'prompts' && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-8 animate-fade-in">
+              {/* Top Doctrine Context Information */}
+              <div className="p-5 bg-gradient-to-r from-brand-50 to-indigo-50/50 border border-brand-100/50 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest block">Sincronização de Doutrinas</span>
+                  <p className="text-[11px] text-slate-600 font-bold leading-relaxed max-w-2xl">
+                    Por padrão, você herda os prompts oficiais publicados pelo Administrador. Você pode personalizar qualquer diretriz a qualquer momento. Para voltar a seguir o administrador, basta clicar no botão de restauração.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="px-3 py-1 bg-white border border-slate-200 rounded-xl text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Admin Sync Ativo
+                  </div>
+                </div>
+              </div>
+
               {/* Master Prompt */}
               <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
@@ -145,16 +170,31 @@ export function LaudIA() {
                       <BrainCircuit size={20} />
                     </div>
                     <div>
-                      <h4 className="font-bold text-ink-900">Prompt Mestre</h4>
-                      <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest">Base de Personalidade da IA</p>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-ink-900">Prompt Mestre</h4>
+                        {(!localSettings.aiMasterPrompt || localSettings.aiMasterPrompt.trim() === (adminSettings?.aiMasterPrompt || DEFAULT_MASTER_PROMPT).trim()) ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
+                            <CheckCircle2 size={9} className="text-emerald-500" /> Herdado do Admin
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1 animate-pulse">
+                            <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado por Você
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Base de Personalidade da IA</p>
                     </div>
                   </div>
                   <button 
-                    onClick={() => setLocalSettings({...localSettings, aiMasterPrompt: DEFAULT_MASTER_PROMPT})}
-                    className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg transition-colors border border-brand-100"
-                    title="Restaurar Padrão"
+                    onClick={() => {
+                      setLocalSettings({...localSettings, aiMasterPrompt: adminSettings?.aiMasterPrompt || DEFAULT_MASTER_PROMPT});
+                      showToast('Prompt Mestre sincronizado com o Administrador', 'info');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
+                    title="Restaurar para a diretriz do Administrador"
                   >
-                    <RotateCcw size={16} />
+                    <RotateCcw size={12} />
+                    Restaurar do Admin
                   </button>
                 </div>
                 <div className="p-6">
@@ -162,7 +202,7 @@ export function LaudIA() {
                     value={localSettings.aiMasterPrompt}
                     onChange={(e) => setLocalSettings({ ...localSettings, aiMasterPrompt: e.target.value })}
                     rows={12}
-                    className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed"
+                    className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed shadow-inner"
                     placeholder="Defina o papel principal da IA..."
                   />
                 </div>
@@ -170,56 +210,118 @@ export function LaudIA() {
 
               {/* Instructions & Rules Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col">
-                  <div className="p-5 border-b border-ink-100 flex items-center justify-between">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
-                      <Zap size={14} className="text-amber-500" /> Instruções de Raciocínio
-                    </h4>
-                    <button onClick={() => setLocalSettings({...localSettings, aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS})} className="text-brand-600">
-                      <RotateCcw size={14} />
+                {/* Reasoning Instructions */}
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col overflow-hidden">
+                  <div className="p-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-ink-600 flex items-center gap-2">
+                          <Zap size={14} className="text-amber-500" /> Raciocínio Clínico
+                        </h4>
+                        {(!localSettings.aiGlobalInstructions || localSettings.aiGlobalInstructions.trim() === (adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS).trim()) ? (
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[7px] font-black uppercase tracking-wider border border-emerald-100/50">
+                            Herdado
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[7px] font-black uppercase tracking-wider border border-indigo-100/50">
+                            Customizado
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setLocalSettings({...localSettings, aiGlobalInstructions: adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS});
+                        showToast('Raciocínio Clínico sincronizado com o Administrador', 'info');
+                      }} 
+                      className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100/60 bg-white"
+                      title="Sincronizar com Administrador"
+                    >
+                      <RotateCcw size={12} />
                     </button>
                   </div>
                   <textarea
                     value={localSettings.aiGlobalInstructions}
                     onChange={(e) => setLocalSettings({ ...localSettings, aiGlobalInstructions: e.target.value })}
                     rows={10}
-                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl"
+                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl focus:outline-none"
                   />
                 </div>
 
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col">
-                  <div className="p-5 border-b border-ink-100 flex items-center justify-between">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
-                      <ShieldCheck size={14} className="text-red-500" /> Regras Inquebráveis
-                    </h4>
-                    <button onClick={() => setLocalSettings({...localSettings, aiRigidRules: DEFAULT_RIGID_RULES})} className="text-brand-600">
-                      <RotateCcw size={14} />
+                {/* Rigid Compliance Rules */}
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col overflow-hidden">
+                  <div className="p-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black uppercase tracking-widest text-ink-600 flex items-center gap-2">
+                          <ShieldCheck size={14} className="text-red-500" /> Regras Inquebráveis
+                        </h4>
+                        {(!localSettings.aiRigidRules || localSettings.aiRigidRules.trim() === (adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES).trim()) ? (
+                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[7px] font-black uppercase tracking-wider border border-emerald-100/50">
+                            Herdado
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[7px] font-black uppercase tracking-wider border border-indigo-100/50">
+                            Customizado
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setLocalSettings({...localSettings, aiRigidRules: adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES});
+                        showToast('Regras Inquebráveis sincronizadas com o Administrador', 'info');
+                      }} 
+                      className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100/60 bg-white"
+                      title="Sincronizar com Administrador"
+                    >
+                      <RotateCcw size={12} />
                     </button>
                   </div>
                   <textarea
                     value={localSettings.aiRigidRules}
                     onChange={(e) => setLocalSettings({ ...localSettings, aiRigidRules: e.target.value })}
                     rows={10}
-                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl"
+                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl focus:outline-none"
                   />
                 </div>
               </div>
 
               {/* Structure Prompt */}
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm">
-                <div className="p-5 border-b border-ink-100 flex items-center justify-between">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
-                    <Layout size={14} className="text-indigo-500" /> Estrutura Obrigatória (Skeleton)
-                  </h4>
-                  <button onClick={() => setLocalSettings({...localSettings, aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT})} className="text-brand-600">
-                    <RotateCcw size={14} />
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-ink-400 flex items-center gap-2">
+                        <Layout size={14} className="text-indigo-500" /> Estrutura Obrigatória (Skeleton)
+                      </h4>
+                      {(!localSettings.aiStructurePrompt || localSettings.aiStructurePrompt.trim() === (adminSettings?.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT).trim()) ? (
+                        <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[7px] font-black uppercase tracking-wider border border-emerald-100/50">
+                          Herdado
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[7px] font-black uppercase tracking-wider border border-indigo-100/50">
+                          Customizado
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setLocalSettings({...localSettings, aiStructurePrompt: adminSettings?.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT});
+                      showToast('Estrutura de Laudo sincronizada com o Administrador', 'info');
+                    }} 
+                    className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100/60 bg-white"
+                    title="Sincronizar com Administrador"
+                  >
+                    <RotateCcw size={12} />
                   </button>
                 </div>
                 <textarea
                   value={localSettings.aiStructurePrompt}
                   onChange={(e) => setLocalSettings({ ...localSettings, aiStructurePrompt: e.target.value })}
                   rows={8}
-                  className="w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl"
+                  className="w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl focus:outline-none"
                 />
               </div>
             </div>
@@ -248,17 +350,30 @@ export function LaudIA() {
               <div className="flex-1 p-8 space-y-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h4 className="text-xl font-black text-ink-900">Protocolos: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xl font-black text-ink-900">Protocolos: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}</h4>
+                      {(!localSettings.aiAreaPrompts?.[selectedArea] || localSettings.aiAreaPrompts?.[selectedArea]?.trim() === (adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea]).trim()) ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
+                          <CheckCircle2 size={9} className="text-emerald-500" /> Herdado
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1">
+                          <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-ink-500">Diretrizes específicas para análise e conclusão desta área.</p>
                   </div>
                   <button 
                     onClick={() => {
-                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: AREA_SPECIFIC_PROMPTS[selectedArea] };
+                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] };
                       setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+                      showToast(`Protocolo de ${selectedArea} restaurado para o padrão do administrador`, 'info');
                     }}
-                    className="p-2 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
                   >
-                    <RotateCcw size={16} />
+                    <RotateCcw size={12} />
+                    Sincronizar Admin
                   </button>
                 </div>
                 <textarea
@@ -268,7 +383,7 @@ export function LaudIA() {
                     setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
                   }}
                   rows={18}
-                  className="w-full rounded-2xl border-ink-100 font-mono text-sm p-6 bg-ink-50/30 focus:ring-brand-500 focus:border-brand-500 leading-relaxed"
+                  className="w-full rounded-2xl border-ink-100 font-mono text-sm p-6 bg-ink-50/30 focus:ring-brand-500 focus:border-brand-500 leading-relaxed shadow-inner"
                   placeholder={`Instruções clínicas para ${selectedArea}...`}
                 />
               </div>

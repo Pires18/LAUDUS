@@ -7,19 +7,21 @@ import { Clinic, ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature, 
   Calculator, Sparkles, Hospital, Sliders, PanelLeftClose, 
-  PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy
+  PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
+  Users, LogOut
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { CreateExamModal } from './CreateExamModal';
+import { LogoIcon } from './LogoIcon';
 
 const items = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, view: { name: 'dashboard' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'worklist', label: 'Worklist', icon: ClipboardList, view: { name: 'worklist' as const }, roles: ['admin', 'medico', 'recepcao'] },
-  { key: 'patients', label: 'Pacientes', icon: UserCircle, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin'] },
-  { key: 'settings', label: 'Configurações', icon: Sliders, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 
 export function Sidebar() {
@@ -27,7 +29,7 @@ export function Sidebar() {
     view, setView, selectedClinicId, setSelectedClinic, 
     showToast, setShowCreateExamModal, setShowSupportModal, settings 
   } = useApp();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
   const [collapsed, setCollapsed] = useState(false);
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
@@ -52,16 +54,13 @@ export function Sidebar() {
           collapsed ? 'justify-center' : 'gap-3'
         )}>
           <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-md shrink-0 ring-2 ring-brand-100 overflow-hidden">
-            <img src="/logo-icon.png" alt="LAUD.US" className="w-full h-full object-cover" />
+            <LogoIcon size={32} />
           </div>
           {!collapsed && (
-            <div className="animate-fade-in flex-1 min-w-0">
-              <h1 className="text-lg font-black text-ink-900 leading-tight tracking-tighter">
+            <div className="animate-fade-in flex-1 min-w-0 py-1">
+              <h1 className="text-xl font-black text-ink-900 leading-none tracking-tighter select-none">
                 LAUD<span className="text-brand-600">.US</span>
               </h1>
-              <p className="text-[9px] text-brand-600 font-bold uppercase tracking-[0.2em] -mt-0.5">
-                ULTRASOUND
-              </p>
             </div>
           )}
         </div>
@@ -200,9 +199,42 @@ export function Sidebar() {
 
       {/* User Profile + Collapse Toggle */}
       <div className="border-t border-ink-100 bg-ink-50/10">
+        {collapsed && (
+          <div className="flex flex-col items-center py-4 border-b border-ink-100/60 gap-3 animate-fade-in">
+            {user?.photoURL ? (
+              <img
+                src={user.photoURL}
+                onClick={() => setView({ name: 'settings' })}
+                alt=""
+                className="w-8 h-8 rounded-full border border-ink-200 object-cover cursor-pointer hover:scale-110 transition-transform shadow-sm"
+                title="Meu Perfil"
+              />
+            ) : (
+              <div
+                onClick={() => setView({ name: 'settings' })}
+                className="w-8 h-8 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-black shadow-inner text-xs cursor-pointer hover:scale-110 transition-transform border border-ink-200"
+                title="Meu Perfil"
+              >
+                {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              </div>
+            )}
+            <button
+              onClick={signOut}
+              className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all duration-300 flex items-center justify-center border border-rose-100 shadow-sm hover:scale-110 active:scale-95"
+              title="Sair da Conta"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
+        )}
+
         {!collapsed && (
           <div className="p-4 animate-fade-in">
-            <div className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white/50 transition-colors group cursor-pointer">
+            <div 
+              onClick={() => setView({ name: 'settings' })}
+              className="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-white border border-transparent hover:border-ink-200/50 hover:shadow-soft transition-all duration-300 group cursor-pointer"
+              title="Acessar Meu Perfil"
+            >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full border-2 border-white shadow-md object-cover group-hover:scale-105 transition-transform" />
               ) : (
@@ -211,10 +243,10 @@ export function Sidebar() {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-ink-900 truncate">
+                <p className="text-xs font-black text-ink-900 truncate group-hover:text-brand-600 transition-colors">
                   {user?.displayName || 'Usuário'}
                 </p>
-                <p className="text-[10px] text-ink-500 truncate font-medium">
+                <p className="text-[10px] text-ink-500 truncate font-semibold">
                   {user?.email}
                 </p>
               </div>
@@ -224,7 +256,7 @@ export function Sidebar() {
 
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-3 text-ink-400 hover:text-ink-800 hover:bg-ink-100/30 transition-all text-[10px] font-bold uppercase tracking-widest"
+          className="w-full flex items-center justify-center gap-2 px-3 py-3 text-ink-400 hover:text-ink-800 hover:bg-ink-100/30 transition-all text-[10px] font-bold uppercase tracking-widest border-t border-ink-100/30"
           title={collapsed ? 'Expandir menu' : 'Recolher menu'}
         >
           {collapsed ? <PanelLeftOpen size={18} /> : (
@@ -236,7 +268,7 @@ export function Sidebar() {
         </button>
 
         {!collapsed && (
-          <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2">
+          <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 text-[9px] bg-white text-ink-600 px-3 py-1.5 rounded-full font-black border border-ink-100 shadow-sm uppercase tracking-widest">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]" />
@@ -250,6 +282,15 @@ export function Sidebar() {
                 Suporte
               </button>
             </div>
+            
+            <button
+              onClick={signOut}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white font-black uppercase tracking-widest transition-all duration-300 border border-rose-100/60 shadow-sm hover:shadow-md active:scale-95 mt-1"
+              title="Encerrar Sessão"
+            >
+              <LogOut size={13} />
+              <span>Sair da Conta</span>
+            </button>
           </div>
         )}
       </div>

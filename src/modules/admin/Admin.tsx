@@ -5,7 +5,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { 
   ShieldCheck, Users, CreditCard, History, 
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
-  Megaphone, Trash2, Loader2
+  Megaphone, Trash2, Loader2, Key
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { setBroadcast } from '../../store/db';
@@ -17,8 +17,9 @@ import { AdminAudit } from './submodules/AdminAudit';
 import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
 import { AdminLaudIA } from './submodules/AdminLaudIA';
+import { AdminLicenses } from './submodules/AdminLicenses';
 
-type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'laud-ia';
+type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'laud-ia' | 'licenses';
 
 export function Admin() {
   const { view, setView } = useApp();
@@ -28,6 +29,7 @@ export function Admin() {
     { id: 'overview', label: 'Geral', icon: LayoutDashboard },
     { id: 'users', label: 'Usuários', icon: Users },
     { id: 'plans', label: 'Planos', icon: CreditCard },
+    { id: 'licenses', label: 'Licenças', icon: Key },
     { id: 'audit', label: 'Auditoria', icon: History },
     { id: 'support', label: 'Suporte', icon: LifeBuoy },
     { id: 'masks', label: 'Máscaras', icon: FileSignature },
@@ -67,6 +69,7 @@ export function Admin() {
           {activeTab === 'overview' && <AdminOverview onNavigate={setActiveTab} />}
           {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'plans' && <AdminPlans />}
+          {activeTab === 'licenses' && <AdminLicenses />}
           {activeTab === 'audit' && <AdminAudit />}
           {activeTab === 'support' && <AdminSupport />}
           {activeTab === 'masks' && <AdminMasks />}
@@ -85,7 +88,8 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
 
   // Live Metrics
   const { data: users } = useCollection<any>('users', { isGlobal: true });
-  const { data: plans } = useCollection<any>('plans', { isGlobal: true });
+  const { data: rawPlans } = useCollection<any>('plans', { isGlobal: true });
+  const plans = rawPlans.filter(p => !p.id.startsWith('LICENSE_'));
   const { data: tickets } = useCollection<any>('support_tickets', { isGlobal: true });
   const { data: auditLogs } = useCollection<any>('audit_logs', { isGlobal: true });
 

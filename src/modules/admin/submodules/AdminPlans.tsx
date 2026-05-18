@@ -5,7 +5,8 @@ import { useApp } from '../../../store/app';
 import { addItemGlobalWithId, updateGlobalItem, deleteGlobalItem, genId, addAuditLog } from '../../../store/db';
 import { 
   Plus, Check, DollarSign, Settings2, 
-  Trash2, Activity, Hospital, Loader2, X 
+  Trash2, Activity, Hospital, Loader2, X,
+  Sparkles, HardDrive, Mic, Sliders
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
@@ -16,7 +17,8 @@ export function AdminPlans() {
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: plans, loading } = useCollection<Plan>('plans', { isGlobal: true });
+  const { data: rawPlans, loading } = useCollection<any>('plans', { isGlobal: true });
+  const plans = rawPlans.filter((p: any) => !p.id.startsWith('LICENSE_')) as Plan[];
 
   async function handleSave() {
     if (!editingPlan?.name) {
@@ -29,16 +31,22 @@ export function AdminPlans() {
       const planData = {
         ...editingPlan,
         price: Number(editingPlan.price) || 0,
+        examLimit: editingPlan.examLimit !== undefined ? Number(editingPlan.examLimit) : null,
+        clinicLimit: editingPlan.clinicLimit !== undefined ? Number(editingPlan.clinicLimit) : null,
+        iaLimit: editingPlan.iaLimit !== undefined ? Number(editingPlan.iaLimit) : null,
+        storageLimitGb: editingPlan.storageLimitGb !== undefined ? Number(editingPlan.storageLimitGb) : null,
+        voiceDictation: !!editingPlan.voiceDictation,
+        customMasks: !!editingPlan.customMasks,
         active: editingPlan.active !== false,
       };
       
       if (editingPlan.id) {
         await updateGlobalItem('plans', id, planData);
-        await addAuditLog({ action: 'EDITAR_PLANO', details: `Plano ${planData.name} atualizado.`, module: 'AdminPlans' });
-        showToast('Plano atualizado', 'success');
+        await addAuditLog({ action: 'EDITAR_PLANO', details: `Plano ${planData.name} atualizado com novas adequações clínicas.`, module: 'AdminPlans' });
+        showToast('Plano atualizado com sucesso', 'success');
       } else {
         await addItemGlobalWithId('plans', id, planData);
-        await addAuditLog({ action: 'CRIAR_PLANO', details: `Plano ${planData.name} criado.`, module: 'AdminPlans' });
+        await addAuditLog({ action: 'CRIAR_PLANO', details: `Plano ${planData.name} criado com adequações clínicas.`, module: 'AdminPlans' });
         showToast('Plano criado com sucesso', 'success');
       }
       setEditingPlan(null);
@@ -143,10 +151,44 @@ export function AdminPlans() {
                       {plan.clinicLimit ? plan.clinicLimit : '1'}
                     </div>
                   </div>
+                  <div className="bg-ink-50/50 p-3 rounded-2xl border border-ink-100">
+                    <p className="text-[8px] font-black text-ink-400 uppercase tracking-widest mb-1">Laud.IA / Mês</p>
+                    <div className="flex items-center gap-2 text-xs font-black text-ink-900">
+                      <Sparkles size={14} className="text-brand-500 animate-pulse-subtle" />
+                      {plan.iaLimit ? `${plan.iaLimit} laudos` : 'Ilimitado'}
+                    </div>
+                  </div>
+                  <div className="bg-ink-50/50 p-3 rounded-2xl border border-ink-100">
+                    <p className="text-[8px] font-black text-ink-400 uppercase tracking-widest mb-1">Armazenamento</p>
+                    <div className="flex items-center gap-2 text-xs font-black text-ink-900">
+                      <HardDrive size={14} className="text-brand-500" />
+                      {plan.storageLimitGb ? `${plan.storageLimitGb} GB` : 'Ilimitado'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advanced Medical Options Indicators */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className={classNames(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border transition-all",
+                    plan.voiceDictation 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm" 
+                      : "bg-ink-50 text-ink-400 border-ink-100 opacity-60"
+                  )}>
+                    <Mic size={10} /> Ditado de Voz
+                  </span>
+                  <span className={classNames(
+                    "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border transition-all",
+                    plan.customMasks 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm" 
+                      : "bg-ink-50 text-ink-400 border-ink-100 opacity-60"
+                  )}>
+                    <Sliders size={10} /> Máscaras Custom
+                  </span>
                 </div>
 
                 <div className="space-y-2 pt-2">
-                   {plan.features.map((feature, idx) => (
+                   {plan.features?.map((feature, idx) => (
                     <div key={idx} className="flex items-center gap-2.5 text-xs text-ink-600 font-medium">
                       <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                         <Check size={10} strokeWidth={4} />
@@ -220,32 +262,81 @@ export function AdminPlans() {
                   <input
                     type="number"
                     value={editingPlan.clinicLimit || ''}
-                    onChange={e => setEditingPlan({...editingPlan, clinicLimit: Number(e.target.value)})}
+                    onChange={e => setEditingPlan({...editingPlan, clinicLimit: e.target.value ? Number(e.target.value) : undefined})}
+                    placeholder="Ex: 1"
+                    className="input h-14 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Laud.IA / Mês (Créditos AI)</label>
+                  <input
+                    type="number"
+                    value={editingPlan.iaLimit || ''}
+                    onChange={e => setEditingPlan({...editingPlan, iaLimit: e.target.value ? Number(e.target.value) : undefined})}
+                    placeholder="Vazio para Ilimitado"
+                    className="input h-14 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Armazenamento de Imagens (GB)</label>
+                  <input
+                    type="number"
+                    value={editingPlan.storageLimitGb || ''}
+                    onChange={e => setEditingPlan({...editingPlan, storageLimitGb: e.target.value ? Number(e.target.value) : undefined})}
+                    placeholder="Vazio para Ilimitado"
                     className="input h-14 font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Funcionalidades (uma por linha)</label>
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Funcionalidades Extras (uma por linha)</label>
                 <textarea
                   value={editingPlan.features?.join('\n')}
                   onChange={e => setEditingPlan({...editingPlan, features: e.target.value.split('\n').filter(Boolean)})}
-                  placeholder="Ex: Suporte 24h&#10;Laud.IA Ilimitado"
-                  rows={4}
+                  placeholder="Ex: Suporte 24h&#10;Laud.IA Premium"
+                  rows={3}
                   className="input p-4 font-medium"
                 />
               </div>
 
-              <div className="flex items-center gap-3 p-4 bg-ink-50 rounded-2xl border border-ink-100">
-                <input
-                  type="checkbox"
-                  id="plan-active"
-                  checked={editingPlan.active !== false}
-                  onChange={e => setEditingPlan({...editingPlan, active: e.target.checked})}
-                  className="w-5 h-5 rounded border-ink-200 text-brand-600 focus:ring-brand-500"
-                />
-                <label htmlFor="plan-active" className="text-sm font-bold text-ink-700">Este plano está disponível para novas assinaturas</label>
+              {/* Advanced Clinic Options Toggles */}
+              <div className="space-y-3 p-4 bg-ink-50 rounded-3xl border border-ink-100">
+                <p className="text-[9px] font-black uppercase tracking-widest text-ink-400 mb-1">Permissões Especiais do Sistema</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={!!editingPlan.voiceDictation}
+                      onChange={e => setEditingPlan({...editingPlan, voiceDictation: e.target.checked})}
+                      className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Ditado de Voz</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={!!editingPlan.customMasks}
+                      onChange={e => setEditingPlan({...editingPlan, customMasks: e.target.checked})}
+                      className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Máscaras Custom</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.active !== false}
+                      onChange={e => setEditingPlan({...editingPlan, active: e.target.checked})}
+                      className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Ativo</span>
+                  </label>
+                </div>
               </div>
             </div>
 

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { onSupportTicketsChange, addSupportMessage, updateGlobalItem } from '../../../store/db';
+import { onSupportTicketsChange, addSupportMessage, updateGlobalItem, clearAllSupportTickets } from '../../../store/db';
 import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
 import { useCollection, orderBy } from '../../../hooks/useFirestore';
 import { SupportTicket, SupportMessage } from '../../../types';
 import { 
   MessageSquare, AlertCircle, Search, 
-  Send, Loader2, User, Box, ArrowLeft
+  Send, Loader2, User, Box, ArrowLeft, Trash2
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
@@ -23,6 +23,25 @@ export function AdminSupport() {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isClearing, setIsClearing] = useState(false);
+
+  async function handleClearAllTickets() {
+    const confirmed = window.confirm(
+      'ATENÇÃO: Você tem certeza absoluta de que deseja excluir DEFINITIVAMENTE todo o histórico de chamados de suporte? Esta ação é irreversível.'
+    );
+    if (!confirmed) return;
+    
+    setIsClearing(true);
+    try {
+      await clearAllSupportTickets();
+      setSelectedTicketId(null);
+      showToast('Todo o histórico de chamados foi excluído com sucesso.', 'success');
+    } catch {
+      showToast('Erro ao limpar histórico de suporte.', 'error');
+    } finally {
+      setIsClearing(false);
+    }
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -78,7 +97,24 @@ export function AdminSupport() {
         selectedTicketId && "hidden lg:flex"
       )}>
         <div className="p-8 border-b border-ink-100">
-           <h3 className="text-xl font-black text-ink-900 mb-6">Central de Atendimento</h3>
+           <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-ink-900">Central de Atendimento</h3>
+              {tickets.length > 0 && (
+                <button
+                  onClick={handleClearAllTickets}
+                  disabled={isClearing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-red-100 transition-all active:scale-95 disabled:opacity-50"
+                  title="Excluir Todo o Histórico de Suporte"
+                >
+                  {isClearing ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={12} />
+                  )}
+                  <span>Limpar Tudo</span>
+                </button>
+              )}
+           </div>
            <div className="space-y-4">
               <div className="relative">
                 <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />

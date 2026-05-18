@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../store/app';
-import { LayoutDashboard, LayoutList, FilePlus, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, LayoutList, FilePlus, Users, UserCircle } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { CreateExamModal } from './CreateExamModal';
 
@@ -12,7 +12,7 @@ export function BottomNav() {
     { key: 'worklist', label: 'Exames', icon: LayoutList, view: { name: 'worklist' as const } },
     { key: 'new-exam', label: 'Novo', icon: FilePlus, onClick: () => setShowCreateExamModal(true) },
     { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const } },
-    { key: 'settings', label: 'Ajustes', icon: Settings, view: { name: 'settings' as const } },
+    { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const } },
   ];
 
   const activeKey = view.name.includes('patient') ? 'patients' : 

@@ -24,6 +24,9 @@ import {
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
 
+// Cache global para evitar múltiplas queries do UID do administrador
+let cachedAdminUid: string | null = null;
+
 // ─── Helpers ───
 
 function getUserPath(collectionName: string): string {
@@ -102,13 +105,52 @@ export async function getSettings(): Promise<AppSettings> {
   try {
     const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
     const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return snap.data() as AppSettings;
+    let data = snap.exists() ? (snap.data() as AppSettings) : { geminiModel: 'gemini-2.5-flash' };
+    
+    // Fallback de segurança para buscar prompts oficiais do administrador
+    if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+      const adminSettings = await getAdminSettings();
+      if (adminSettings) {
+        return {
+          ...adminSettings,
+          ...data, // Configurações locais do médico (CRM, RQE, nome) prevalecem
+          // Mas os prompts do sistema e do LAUD.IA publicados pelo administrador são herdados
+          aiMasterPrompt: data.aiMasterPrompt || adminSettings.aiMasterPrompt,
+          aiGlobalInstructions: data.aiGlobalInstructions || adminSettings.aiGlobalInstructions,
+          aiStructurePrompt: data.aiStructurePrompt || adminSettings.aiStructurePrompt,
+          aiRigidRules: data.aiRigidRules || adminSettings.aiRigidRules,
+          aiAreaPrompts: { ...adminSettings.aiAreaPrompts, ...data.aiAreaPrompts },
+        };
+      }
     }
+    return data;
   } catch (err) {
     console.warn('[DB] Erro ao carregar settings:', err);
   }
   return { geminiModel: 'gemini-2.5-flash' };
+}
+
+export async function getAdminSettings(): Promise<AppSettings | null> {
+  try {
+    if (!cachedAdminUid) {
+      const usersCol = collection(firestore, 'users');
+      const q = query(usersCol, where('email', '==', 'matheuskpires@gmail.com'));
+      const snapAdmin = await getDocs(q);
+      if (!snapAdmin.empty) {
+        cachedAdminUid = snapAdmin.docs[0].id;
+      }
+    }
+    if (cachedAdminUid) {
+      const adminDocRef = doc(firestore, `users/${cachedAdminUid}/settings`, SETTINGS_DOC_ID);
+      const adminSnap = await getDoc(adminDocRef);
+      if (adminSnap.exists()) {
+        return adminSnap.data() as AppSettings;
+      }
+    }
+  } catch (e) {
+    console.warn('[DB] Erro ao carregar settings do administrador:', e);
+  }
+  return null;
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
@@ -206,8 +248,37 @@ export async function getItem<T>(
 ): Promise<(T & { id: string }) | null> {
   const docRef = getDocRef(collectionName, id);
   const snap = await getDoc(docRef);
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as T & { id: string };
+  if (snap.exists()) {
+    return { id: snap.id, ...snap.data() } as T & { id: string };
+  }
+
+  // Fallback de segurança para buscar templates oficiais do administrador/sistema
+  if (collectionName === 'templates' && auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+    try {
+      // 1. Resolve o UID do administrador matheuskpires@gmail.com se não estiver em cache
+      if (!cachedAdminUid) {
+        const usersCol = collection(firestore, 'users');
+        const q = query(usersCol, where('email', '==', 'matheuskpires@gmail.com'));
+        const snapAdmin = await getDocs(q);
+        if (!snapAdmin.empty) {
+          cachedAdminUid = snapAdmin.docs[0].id;
+        }
+      }
+
+      // 2. Tenta carregar o template na coleção do administrador
+      if (cachedAdminUid) {
+        const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, id);
+        const adminSnap = await getDoc(adminDocRef);
+        if (adminSnap.exists()) {
+          return { id: adminSnap.id, ...adminSnap.data(), isSystem: true } as any;
+        }
+      }
+    } catch (e) {
+      console.warn('[DB] Erro no fallback de template do administrador:', e);
+    }
+  }
+
+  return null;
 }
 
 export async function getAll<T>(
@@ -364,3 +435,141 @@ export function onSupportTicketsChange(userId: string | null, callback: (tickets
     callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupportTicket)));
   });
 }
+
+/**
+ * Valida um código de licença e ativa a assinatura para o usuário logado.
+ */
+export async function validateAndActivateLicense(
+  code: string,
+  uid: string,
+  email: string,
+  displayName: string
+): Promise<void> {
+  const normalizedCode = code.trim().toUpperCase();
+  const licenseRef = doc(firestore, 'plans', `LICENSE_${normalizedCode}`);
+  const licenseSnap = await getDoc(licenseRef);
+
+  if (!licenseSnap.exists()) {
+    throw new Error('Código de licença não encontrado ou inválido.');
+  }
+
+  const licenseData = licenseSnap.data();
+  if (!licenseData.active || licenseData.usedByUid) {
+    throw new Error('Esta licença já foi utilizada ou está inativa.');
+  }
+
+  // Busca os dados do plano associado
+  const planRef = doc(firestore, 'plans', licenseData.planId);
+  const planSnap = await getDoc(planRef);
+  const planName = planSnap.exists() ? planSnap.data().name : licenseData.planName || 'Plano Personalizado';
+
+  const durationMonths = licenseData.durationMonths || 12;
+  const now = Date.now();
+  const expiresAt = durationMonths === 9999 ? null : now + durationMonths * 30 * 24 * 60 * 60 * 1000;
+
+  const batch = writeBatch(firestore);
+
+  // 1. Atualiza o status da licença
+  batch.update(licenseRef, {
+    usedByUid: uid,
+    usedByEmail: email,
+    usedAt: now,
+    expiresAt: expiresAt,
+    active: false, // Marca como consumida
+    updatedAt: now
+  });
+
+  // 2. Atualiza ou cria o documento do usuário
+  const userRef = doc(firestore, 'users', uid);
+  const userSnap = await getDoc(userRef);
+
+  const userPayload: Record<string, any> = {
+    name: displayName || userSnap.data()?.name || email.split('@')[0],
+    email: email,
+    role: userSnap.data()?.role || 'medico',
+    active: true,
+    licenseCode: normalizedCode,
+    licensePlanId: licenseData.planId,
+    licensePlanName: planName,
+    licenseExpiresAt: expiresAt,
+    updatedAt: now
+  };
+
+  if (!userSnap.exists()) {
+    userPayload.createdAt = now;
+  }
+
+  batch.set(userRef, userPayload, { merge: true });
+
+  // Commit das escritas atômicas
+  await batch.commit();
+
+  // 3. Grava log de auditoria
+  await addAuditLog({
+    action: 'ATIVAR_LICENCA',
+    details: `Licença ${normalizedCode} ativada para o e-mail ${email}. Plano: ${planName} (${durationMonths} meses).`,
+    module: 'LICENSE_MGR',
+    userId: uid,
+    userName: displayName || email
+  });
+}
+
+/**
+ * Helper para verificar o status de expiração da licença do usuário.
+ */
+export async function checkUserLicenseStatus(uid: string): Promise<{
+  active: boolean;
+  expired: boolean;
+  licenseExpiresAt?: number;
+  licensePlanName?: string;
+} | null> {
+  try {
+    const userRef = doc(firestore, 'users', uid);
+    const snap = await getDoc(userRef);
+
+    if (!snap.exists()) return null;
+
+    const data = snap.data();
+    if (data.email === 'matheuskpires@gmail.com') {
+      // Super Admin bypass
+      return { active: true, expired: false };
+    }
+
+    if (data.active === false) {
+      return { active: false, expired: false };
+    }
+
+    if (data.licenseExpiresAt && data.licenseExpiresAt < Date.now()) {
+      return {
+        active: false,
+        expired: true,
+        licenseExpiresAt: data.licenseExpiresAt,
+        licensePlanName: data.licensePlanName
+      };
+    }
+
+    return {
+      active: true,
+      expired: false,
+      licenseExpiresAt: data.licenseExpiresAt,
+      licensePlanName: data.licensePlanName
+    };
+  } catch (err) {
+    console.error('[License] Erro ao validar licença do usuário:', err);
+    return null;
+  }
+}
+
+/**
+ * Remove permanentemente todo o histórico de chamados de suporte do Firestore.
+ */
+export async function clearAllSupportTickets(): Promise<void> {
+  const colRef = collection(firestore, 'support_tickets');
+  const snap = await getDocs(colRef);
+  const batch = writeBatch(firestore);
+  snap.docs.forEach((docSnap) => {
+    batch.delete(docSnap.ref);
+  });
+  await batch.commit();
+}
+

@@ -44,8 +44,17 @@ export function AdminUsers() {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('medico');
+  const [selectedLicenseCode, setSelectedLicenseCode] = useState('');
 
   const { data: users, loading } = useCollection<SystemUser>('users', { isGlobal: true });
+  const { data: rawPlansAndLicenses } = useCollection<any>('plans', { isGlobal: true });
+
+  const availableLicenses = rawPlansAndLicenses
+    .filter((p: any) => p.id?.startsWith('LICENSE_') && p.active && !p.usedByUid)
+    .map((lic: any) => ({
+      ...lic,
+      cleanId: lic.id.replace('LICENSE_', '')
+    }));
 
   const filtered = users.filter(u => {
     const matchesSearch = 
@@ -59,16 +68,35 @@ export function AdminUsers() {
     if (!newName || !newEmail || !currentUser) return;
     setIsProcessing('creating');
     try {
+      const selectedLic = availableLicenses.find(l => l.cleanId === selectedLicenseCode);
+      
+      const licensePayload = selectedLic ? {
+        licenseCode: selectedLic.cleanId,
+        licensePlanId: selectedLic.planId,
+        licensePlanName: selectedLic.planName,
+        licenseExpiresAt: selectedLic.durationMonths === 9999 ? null : Date.now() + selectedLic.durationMonths * 30 * 24 * 60 * 60 * 1000
+      } : {};
+
       await createUserDocument(
-        { name: newName, email: newEmail, role: newRole },
+        { 
+          name: newName, 
+          email: newEmail, 
+          role: newRole,
+          ...licensePayload
+        },
         currentUser.uid,
         currentUser.displayName || currentUser.email || 'Admin'
       );
-      await addAuditLog({ action: 'CRIAR_USUARIO', details: `Usuário ${newName} (${newEmail}) criado como ${newRole}.`, module: 'AdminUsers' });
+      await addAuditLog({ 
+        action: 'CRIAR_USUARIO', 
+        details: `Usuário ${newName} (${newEmail}) criado como ${newRole}.${selectedLic ? ` Licença vinculada: ${selectedLic.cleanId}` : ''}`, 
+        module: 'AdminUsers' 
+      });
       showToast(`Usuário ${newName} criado com sucesso!`, 'success');
       setIsCreateModalOpen(false);
       setNewName('');
       setNewEmail('');
+      setSelectedLicenseCode('');
     } catch (err) {
       showToast('Erro ao criar usuário', 'error');
     } finally {
@@ -309,6 +337,28 @@ export function AdminUsers() {
                        <option value="admin">ADMIN (Gestão Total)</option>
                        <option value="recepcao">RECEPÇÃO (Agenda)</option>
                     </select>
+                 </div>
+                 <div>
+                    <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2 flex items-center gap-2">
+                       <CheckCircle2 size={14} className="text-brand-500" /> Vincular Licença Ativa (Opcional)
+                    </label>
+                    <select 
+                      value={selectedLicenseCode}
+                      onChange={e => setSelectedLicenseCode(e.target.value)}
+                      className="input h-14 font-bold"
+                    >
+                       <option value="">Nenhuma licença vinculada (ativar por chave depois)</option>
+                       {availableLicenses.map(lic => (
+                          <option key={lic.cleanId} value={lic.cleanId}>
+                             {lic.cleanId} ({lic.planName} — {lic.durationMonths === 9999 ? 'Vitalício' : `${lic.durationMonths} meses`})
+                          </option>
+                       ))}
+                    </select>
+                    {availableLicenses.length === 0 && (
+                      <p className="text-[10px] text-amber-600 font-bold mt-1.5 uppercase tracking-wider">
+                        ⚠️ Nenhuma licença ativa e disponível. Crie licenças na aba "Licenças".
+                      </p>
+                    )}
                  </div>
               </div>
 

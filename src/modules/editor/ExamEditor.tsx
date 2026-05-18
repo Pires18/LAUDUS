@@ -58,8 +58,7 @@ export function ExamEditor({ examId }: Props) {
   const [unlockReason, setUnlockReason] = useState('');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [showEditMetadata, setShowEditMetadata] = useState(false);
-  const [showCopilot, setShowCopilot] = useState(true); 
-  const [isCopilotDocked, setIsCopilotDocked] = useState(true); // Default docked on desktop
+  const [showCopilot, setShowCopilot] = useState(false); 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
   const [copilotPrompt, setCopilotPrompt] = useState('');
@@ -289,10 +288,7 @@ export function ExamEditor({ examId }: Props) {
 
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Main Workspace */}
-            <div className={classNames(
-              "flex-1 flex flex-col min-w-0 dock-sidebar-transition",
-              showCopilot && isCopilotDocked && currentRole !== 'recepcao' ? "mr-[400px]" : "mr-0"
-            )}>
+            <div className="flex-1 flex flex-col min-w-0 mr-0">
               {/* Section Progress Bar */}
               <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
                  <motion.div 
@@ -392,103 +388,40 @@ export function ExamEditor({ examId }: Props) {
           </div>
         </div>
 
-        {/* Copilot Sidebar (Docked) */}
+        {/* Floating Copilot (Non-Docked, Minimizable widget) */}
         <AnimatePresence>
-          {showCopilot && isCopilotDocked && exam.status !== 'finalizado' && currentRole !== 'recepcao' && (
+          {showCopilot && exam.status !== 'finalizado' && currentRole !== 'recepcao' && (
             <motion.aside 
-              initial={{ x: 400, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 400, opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-[400px] bg-white border-l border-ink-100 shadow-2xl z-[65] flex flex-col pt-[72px]" // Adjust pt for header
-            >
-              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-brand-500/20 flex items-center justify-center">
-                    <Sparkles size={16} className="text-brand-400" />
-                  </div>
-                  <div>
-                    <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copilot</span>
-                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter">Diagnostic Intelligence</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setIsCopilotDocked(false)}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
-                    title="Mudar para modo flutuante"
-                  >
-                    <Minimize2 size={18} />
-                  </button>
-                  <button 
-                    onClick={() => setShowCopilot(false)}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <LaudCopilot
-                  reportContent={reportContent}
-                  onUpdate={(newContent) => {
-                    setReportContent(newContent);
-                    debouncedSave(newContent);
-                  }}
-                  isGenerating={isCopilotGenerating}
-                  setIsGenerating={setIsCopilotGenerating}
-                  exam={exam}
-                  template={template}
-                  patient={patient}
-                  chatHistory={exam.chatHistory || []}
-                  onChatUpdate={(newHistory) => {
-                    updateItem('exams', examId, { chatHistory: newHistory });
-                  }}
-                  onShowCalculators={() => setShowCalculators(true)}
-                  prompt={copilotPrompt}
-                  onChangePrompt={setCopilotPrompt}
-                  isDocked={true}
-                />
-              </div>
-            </motion.aside>
-          )}
-        </AnimatePresence>
-
-        {/* Floating Copilot (Non-Docked) */}
-        <AnimatePresence>
-          {showCopilot && !isCopilotDocked && exam.status !== 'finalizado' && currentRole !== 'recepcao' && (
-            <motion.aside 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.94, y: 30 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="fixed bottom-24 right-6 lg:right-10 w-[92vw] sm:w-[420px] h-[75vh] max-h-[700px] bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-ink-100 flex flex-col z-[70] overflow-hidden"
+              exit={{ opacity: 0, scale: 0.94, y: 30 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="fixed bottom-24 right-6 lg:right-10 w-[92vw] sm:w-[420px] h-[72vh] max-h-[660px] bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[70] overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-brand-500/20 flex items-center justify-center">
-                    <Sparkles size={16} className="text-brand-400" />
+              {/* Premium Header with Mesh-style Gradient */}
+              <div className="px-6 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-brand-600/30 via-brand-800/10 to-transparent pointer-events-none" />
+                <div className="absolute top-[-50%] left-[-10%] w-[120%] h-[200%] bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.1),transparent_50%)] animate-pulse pointer-events-none" />
+                
+                <div className="relative flex items-center gap-3 z-10">
+                  <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg backdrop-blur-xl">
+                    <Sparkles size={16} className="text-brand-400 fill-brand-400/25 animate-pulse" />
                   </div>
                   <div>
-                    <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copilot</span>
-                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter">Diagnostic Intelligence</span>
+                    <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copiloto</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setIsCopilotDocked(true)}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
-                    title="Fixar lateralmente"
-                  >
-                    <Maximize2 size={18} />
-                  </button>
-                  <button 
-                    onClick={() => setShowCopilot(false)}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
+                
+                <button 
+                  onClick={() => setShowCopilot(false)}
+                  className="relative z-10 w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all border border-white/10 active:scale-95 shadow-inner"
+                  title="Minimizar Copiloto"
+                >
+                  <X size={16} />
+                </button>
               </div>
+
               <div className="flex-1 overflow-hidden flex flex-col">
                 <LaudCopilot
                   reportContent={reportContent}
