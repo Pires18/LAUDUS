@@ -326,14 +326,31 @@ export async function batchAdd<T extends Record<string, unknown>>(
 // Re-export for components
 export { where, orderBy, query } from 'firebase/firestore';
 
+const EXAM_AREAS_SET = new Set([
+  'medicina-interna',
+  'ginecologia',
+  'medicina-fetal',
+  'pequenas-partes',
+  'musculoesqueletico',
+  'vascular',
+  'reumatologico',
+  'pediatria',
+  'procedimentos',
+  'mastologia'
+]);
+
 /**
- * Busca os últimos laudos finalizados do mesmo template para contexto da IA.
+ * Busca os últimos laudos finalizados do mesmo template ou especialidade (área) para contexto da IA.
+ * Garante o escopo multi-tenant do usuário autenticado.
  */
-export async function getRecentFinalizedReports(templateId: string, limitCount: number = 3): Promise<string[]> {
+export async function getRecentFinalizedReports(templateIdOrArea: string, limitCount: number = 3): Promise<string[]> {
   try {
+    const isArea = EXAM_AREAS_SET.has(templateIdOrArea);
+    const filterField = isArea ? 'area' : 'templateId';
+
     const q = query(
-      collection(firestore, 'exams'),
-      where('templateId', '==', templateId),
+      getCollectionRef('exams'),
+      where(filterField, '==', templateIdOrArea),
       where('status', '==', 'finalizado'),
       orderBy('finalizedAt', 'desc'),
       limit(limitCount)

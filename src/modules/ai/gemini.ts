@@ -1,12 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
-import { DEFAULT_MASTER_PROMPT, DEFAULT_RIGID_RULES, DEFAULT_STRUCTURE_PROMPT, AREA_SPECIFIC_PROMPTS, DEFAULT_ADVANCED_REASONING } from './prompts';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, AREA_SPECIFIC_PROMPTS, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES } from './prompts';
 
 interface GenerateReportParams {
   template: ReportTemplate;
   patient: Patient | null;
   settings: AppSettings;
   clinicalIndication?: string;
+  requestingPhysician?: string;
   previousExams?: string[];
 }
 
@@ -14,7 +15,7 @@ interface CopilotParams {
   instruction: string;
   currentReport: string;
   patient: Patient | null;
-  exam: { examType: string; area: string; clinicalIndication?: string };
+  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string };
   settings: AppSettings;
   previousExams?: string[];
 }
@@ -25,64 +26,179 @@ interface RefineParams {
   patient: Patient | null;
   settings: AppSettings;
   clinicalIndication?: string;
+  requestingPhysician?: string;
   previousExams?: string[];
   customPrompt?: string;
+}
+
+/**
+ * Calcula a idade de forma inteligente a partir da data de nascimento.
+ * Suporta formatos pediátricos em meses se a idade for menor que 1 ano.
+ */
+function calculateAge(birthDateStr?: string): string {
+  if (!birthDateStr) return '';
+  try {
+    const birthDate = new Date(birthDateStr);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age === 0) {
+      const months = (today.getFullYear() - birthDate.getFullYear()) * 12 + today.getMonth() - birthDate.getMonth();
+      const finalMonths = months <= 0 ? 1 : months;
+      return `${finalMonths} ${finalMonths === 1 ? 'mês' : 'meses'}`;
+    }
+    return `${age} ${age === 1 ? 'ano' : 'anos'}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * Constrói um bloco rico de dados clínicos e cadastrais do paciente e exame.
+ */
+function buildPatientBlock(
+  patient: Patient | null,
+  examDate: string,
+  requestingPhysician?: string
+): string {
+  if (!patient) {
+    return `Paciente: Não informado
+Data do Exame: ${examDate}${requestingPhysician ? `\nMédico Solicitante: ${requestingPhysician}` : ''}`;
+  }
+
+  const patientAge = patient.birthDate ? calculateAge(patient.birthDate) : '';
+  const patientGenderMap = { 'M': 'Masculino', 'F': 'Feminino', 'O': 'Outro' };
+  const patientGender = patient.gender ? patientGenderMap[patient.gender] || patient.gender : '';
+
+  const lines = [
+    `Paciente: ${patient.name}`,
+    `Sexo: ${patientGender || 'Não informado'}`,
+    `Idade: ${patientAge || 'Não informada'} (Nascimento: ${patient.birthDate || 'Não informado'})`,
+  ];
+
+  if (patient.insurance) lines.push(`Convênio: ${patient.insurance}`);
+  if (patient.history) lines.push(`Histórico Clínico: ${patient.history}`);
+  if (patient.notes) lines.push(`Observações do Paciente: ${patient.notes}`);
+  lines.push(`Data do Exame: ${examDate}`);
+  if (requestingPhysician) lines.push(`Médico Solicitante: ${requestingPhysician}`);
+
+  return lines.join('\n');
 }
 
 /**
  * Constrói o prompt enviado ao Gemini para geração inicial do laudo.
  * O prompt força a IA a seguir EXATAMENTE a estrutura definida na Máscara.
  */
-export function buildPrompt({
-  template,
-  patient,
+/**
+ * Remove a tag <scratchpad>...</scratchpad> e todo o seu conteúdo (case-insensitive) do texto de saída.
+ * Se a tag estiver aberta mas não fechada ainda (durante streaming), oculta todo o conteúdo após a abertura.
+ */
+export function stripScratchpad(text: string): string {
+  if (!text) return '';
+  let cleaned = text;
+  const openIndex = cleaned.toLowerCase().indexOf('<scratchpad>');
+  const closeIndex = cleaned.toLowerCase().indexOf('</scratchpad>');
+
+  if (openIndex !== -1) {
+    if (closeIndex !== -1) {
+      cleaned = cleaned.replace(/<scratchpad>[\s\S]*?<\/scratchpad>/gi, '');
+    } else {
+      cleaned = cleaned.substring(0, openIndex);
+    }
+  }
+  
+  cleaned = cleaned.replace(/<\/?scratchpad>/gi, '');
+  return cleaned.trim();
+}
+
+/**
+ * Função centralizada para compilar o Master Prompt injetando dados nos placeholders v9.0 estruturados.
+ * Caso os placeholders não estejam no prompt customizado, faz fallback para compatibilidade.
+ */
+function compileMasterPrompt({
+  masterPrompt,
+  areaSpecificRules,
+  previousExams,
+  routingMode,
+  patientBlock,
   clinicalIndication,
-  settings,
-  previousExams = [],
-}: GenerateReportParams): string {
-  const patientBlock = patient
-    ? `Paciente: ${patient.name}${patient.birthDate ? ` (DN: ${patient.birthDate})` : ''}${patient.gender ? ` - ${patient.gender}` : ''}`
-    : '';
+  examType,
+  notes,
+  maskHtml,
+}: {
+  masterPrompt: string;
+  areaSpecificRules: string;
+  previousExams: string[];
+  routingMode: 'GERAÇÃO INICIAL' | 'REFINAMENTO / COPILOTO';
+  patientBlock: string;
+  clinicalIndication: string;
+  examType: string;
+  notes: string;
+  maskHtml: string;
+}): string {
+  const hasPlaceholders = masterPrompt.includes('[INJETAR_HTML_DA_MASCARA]');
 
-  const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
-  const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
-  const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
-  const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
-  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[template.area] || '';
+  if (hasPlaceholders) {
+    let compiled = masterPrompt;
+    compiled = compiled.replace('[INJETAR_REGRAS_DA_ESPECIALIDADE_AQUI]', areaSpecificRules || 'Nenhuma regra específica para esta área.');
+    compiled = compiled.replace('[INJETAR_EXEMPLOS_DA_ESPECIALIDADE_AQUI]', previousExams.length > 0 ? previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n') : 'Nenhum exemplo de ancoragem disponível.');
+    compiled = compiled.replace('[INJETAR_MODO_DE_ROTEAMENTO_AQUI]', routingMode);
+    compiled = compiled.replace('[INJETAR_DADOS_PACIENTE]', patientBlock);
+    compiled = compiled.replace('[INJETAR_INDICACAO_CLINICA]', clinicalIndication || 'Não informada.');
+    compiled = compiled.replace('[INJETAR_TIPO_DE_EXAME]', examType);
+    compiled = compiled.replace('[INJETAR_NOTAS_DO_MEDICO]', notes || 'Nenhuma nota adicional do médico.');
+    compiled = compiled.replace('[INJETAR_HTML_DA_MASCARA]', maskHtml);
+    return compiled;
+  }
 
+  // Fallback para Master Prompts legados customizados
   const previousContext = previousExams.length > 0 
-    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\nUse os exemplos abaixo como guia de estilo, vocabulário e padrão de recomendações:\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
+    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
     : '';
 
   return `${masterPrompt}
 
-${areaSpecificRules ? `═══════════════════════════════════════════\nREGRAS DA ÁREA (${template.area}):\n═══════════════════════════════════════════\n${areaSpecificRules}\n` : ''}
+${areaSpecificRules ? `═══════════════════════════════════════════\nREGRAS DA ÁREA:\n═══════════════════════════════════════════\n${areaSpecificRules}\n` : ''}
 
 ${previousContext}
 
-Sua tarefa é preencher uma "Máscara Aberta" (Open Mask) de laudo médico.
-NUNCA deixe placeholders "(...)" ou campos vazios no laudo final. 
-DETERMINISMO DE NORMALIDADE: Se uma medida ou dado não foi fornecido, você deve descrever a estrutura como "habitual", "preservada" ou "com dimensões habituais", mimetizando o estilo do médico.
-TRANSFORME os dados do contexto em um laudo fluido, denso e profissional.
+MODO OPERACIONAL: ${routingMode}
 
-═══════════════════════════════════════════
-ESTRUTURA OBRIGATÓRIA (Siga à risca):
-═══════════════════════════════════════════
-${structurePrompt}
-
-═══════════════════════════════════════════
 DADOS DO CONTEXTO:
-═══════════════════════════════════════════
-Tipo de exame: ${template.name}
-Área: ${template.area}
+Tipo de exame: ${examType}
 ${patientBlock}
 ${clinicalIndication ? `\nIndicação clínica: ${clinicalIndication}` : ''}
+Notas / Instruções do Médico: ${notes}
 
-═══════════════════════════════════════════
-MÁSCARA DE REFERÊNCIA (ESTRUTURA E CONTEÚDO):
-═══════════════════════════════════════════
+MÁSCARA DE REFERÊNCIA:
+${maskHtml}`;
+}
 
-TÍTULO: 
+/**
+ * Constrói o prompt enviado ao Gemini para geração inicial do laudo.
+ */
+export function buildPrompt({
+  template,
+  patient,
+  clinicalIndication,
+  requestingPhysician,
+  settings,
+  previousExams = [],
+}: GenerateReportParams): string {
+  const examDate = new Date().toLocaleDateString('pt-BR');
+  const patientBlock = buildPatientBlock(patient, examDate, requestingPhysician);
+
+  const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+  const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
+  const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+  const globalInstructions = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
+  const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
+  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[template.area] || '';
+
+  const maskHtml = `TÍTULO: 
 ${template.title}
 
 TÉCNICA:
@@ -97,24 +213,36 @@ ${template.conclusionTemplate}
 ${template.classificationTemplate ? `CLASSIFICAÇÃO:\n${template.classificationTemplate}\n` : ''}
 
 RECOMENDAÇÕES:
-${template.recommendationsTemplate}
+${template.recommendationsTemplate}`;
+
+  const compiled = compileMasterPrompt({
+    masterPrompt,
+    areaSpecificRules,
+    previousExams,
+    routingMode: 'GERAÇÃO INICIAL',
+    patientBlock,
+    clinicalIndication: clinicalIndication || '',
+    examType: template.name,
+    notes: clinicalIndication || '',
+    maskHtml,
+  });
+
+  return `${compiled}
 
 ═══════════════════════════════════════════
-INSTRUÇÕES ADICIONAIS:
+ESTRUTURA COMPLEMENTAR DE CONFORMIDADE:
 ═══════════════════════════════════════════
+${structurePrompt}
 ${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
 ${template.aiInstructions ? `\nINSTRUÇÕES DA MÁSCARA: ${template.aiInstructions}` : ''}
-${settings.aiGlobalInstructions ? `\nINSTRUÇÕES GLOBAIS: ${settings.aiGlobalInstructions}` : ''}
-${DEFAULT_ADVANCED_REASONING}
+\nINSTRUÇÕES GLOBAIS DE RACIOCÍNIO:\n${globalInstructions}
+\nREGRAS RÍGIDAS DE CONFORMIDADE CLÍNICA:\n${rigidRules}
 
-${rigidRules}
-
-Gere agora o laudo completo (apenas HTML):`;
+Gere agora o laudo completo (HTML dentro de tags ou diretamente, processe obrigatoriamente pelo <scratchpad>):`;
 }
 
 /**
  * Constrói o prompt para REFINAR o laudo.
- * Pega o laudo atual (que pode ter sido alterado pelo Copilot) e faz uma revisão final profissional.
  */
 export function buildRefinePrompt({
   currentReport,
@@ -122,72 +250,55 @@ export function buildRefinePrompt({
   patient,
   settings,
   clinicalIndication,
+  requestingPhysician,
   previousExams = [],
   customPrompt,
 }: RefineParams): string {
-  const patientBlock = patient
-    ? `Paciente: ${patient.name}${patient.birthDate ? ` (DN: ${patient.birthDate})` : ''}${patient.gender ? ` - ${patient.gender}` : ''}`
-    : '';
+  const examDate = new Date().toLocaleDateString('pt-BR');
+  const patientBlock = buildPatientBlock(patient, examDate, requestingPhysician);
 
   const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
   const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
   const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+  const globalInstructions = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
   const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
   const areaSpecificRules = AREA_SPECIFIC_PROMPTS[template.area] || '';
 
-  const previousContext = previousExams.length > 0
-    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\nSiga rigorosamente o estilo de fraseologia e padronização de condutas destes exemplos:\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
-    : '';
+  const notesText = customPrompt 
+    ? `AJUSTAR E REFINAR o laudo de acordo com o comando do médico: "${customPrompt}".
+       Mantenha a blindagem médico-legal, aplique a Cascata Tripartite e garanta que todas as novas medidas introduzidas sigam a padronização obrigatória da especialidade.`
+    : `REFINAR, REVISAR, SANITIZAR E HIGIENIZAR o laudo médico preenchido.
+       Substitua TODOS os placeholders residuais pela Doutrina de Normalidade Habitual.
+       Garanta a Cascata Tripartite perfeitamente alinhada e as 12 Regras do Guardian Core v9.0.`;
 
-  const taskDescription = customPrompt 
-    ? `Sua tarefa é AJUSTAR e REFINAR o laudo médico de acordo com o seguinte comando clínico: "${customPrompt}".`
-    : `Sua tarefa é REFINAR, REVISAR e SANITIZAR o laudo médico preenchido. 
-       O laudo atual pode conter anotações rápidas ou placeholders residuais como "(...)", "[...]", "___" ou campos vazios.
-       Substitua TODOS os placeholders pela Doutrina de Normalidade Habitual (ex: descreva como "habitual", "preservada" ou "ecotextura homogênea", mimetizando o estilo do médico).
-       NÃO deixe nenhum parêntese com reticências ou campos incompletos no laudo final.`;
+  const compiled = compileMasterPrompt({
+    masterPrompt,
+    areaSpecificRules,
+    previousExams,
+    routingMode: 'REFINAMENTO / COPILOTO',
+    patientBlock,
+    clinicalIndication: clinicalIndication || '',
+    examType: template.name,
+    notes: notesText,
+    maskHtml: currentReport,
+  });
 
-  return `${masterPrompt}
-
-${areaSpecificRules ? `═══════════════════════════════════════════\nREGRAS DA ÁREA (${template.area}):\n═══════════════════════════════════════════\n${areaSpecificRules}\n` : ''}
-
-${previousContext}
-
-${taskDescription}
+  return `${compiled}
 
 ═══════════════════════════════════════════
-ESTRUTURA OBRIGATÓRIA (Skeleton v7.0/v8.0):
+ESTRUTURA COMPLEMENTAR DE CONFORMIDADE:
 ═══════════════════════════════════════════
 ${structurePrompt}
-
-═══════════════════════════════════════════
-LAUDO PARA REFINAR (CONTEÚDO ATUAL):
-═══════════════════════════════════════════
-${currentReport}
-
-═══════════════════════════════════════════
-DADOS DO CONTEXTO:
-═══════════════════════════════════════════
-Tipo de exame: ${template.name}
-Área: ${template.area}
-${patientBlock}
-${clinicalIndication ? `\nIndicação clínica: ${clinicalIndication}` : ''}
-
-═══════════════════════════════════════════
-INSTRUÇÕES ADICIONAIS DE CONFORMIDADE:
-═══════════════════════════════════════════
 ${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
 ${template.aiInstructions ? `\nINSTRUÇÕES DA MÁSCARA: ${template.aiInstructions}` : ''}
-${settings.aiGlobalInstructions ? `\nINSTRUÇÕES GLOBAIS: ${settings.aiGlobalInstructions}` : ''}
-${DEFAULT_ADVANCED_REASONING}
+\nINSTRUÇÕES GLOBAIS DE RACIOCÍNIO:\n${globalInstructions}
+\nREGRAS RÍGIDAS DE CONFORMIDADE CLÍNICA:\n${rigidRules}
 
-${rigidRules}
-
-Gere agora o laudo final REFINADO e higienizado com maestria (apenas o HTML completo, sem explicações adicionais, sem markdown):`;
+Gere agora o laudo final REFINADO e higienizado com maestria (processe obrigatoriamente pelo <scratchpad>):`;
 }
 
 /**
  * Constrói o prompt para o Copilot IA.
- * Recebe o laudo atual e uma instrução do médico.
  */
 export function buildCopilotPrompt({
   instruction,
@@ -197,66 +308,50 @@ export function buildCopilotPrompt({
   settings,
   previousExams = [],
 }: CopilotParams): string {
-  const patientBlock = patient
-    ? `Paciente: ${patient.name}${patient.birthDate ? ` (DN: ${patient.birthDate})` : ''}${patient.gender ? ` - ${patient.gender}` : ''}`
-    : '';
+  const examDate = new Date().toLocaleDateString('pt-BR');
+  const patientBlock = buildPatientBlock(patient, examDate, exam.requestingPhysician);
 
   const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
   const areaInstructions = settings.aiAreaPrompts?.[exam.area as ExamArea] || '';
   const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+  const globalInstructions = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
   const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
   const areaSpecificRules = AREA_SPECIFIC_PROMPTS[exam.area as ExamArea] || '';
 
-  const previousContext = previousExams.length > 0
-    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\nUse estes exemplos para guiar a forma de inserir novos dados e manter a consistência:\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
-    : '';
+  const compiled = compileMasterPrompt({
+    masterPrompt,
+    areaSpecificRules,
+    previousExams,
+    routingMode: 'REFINAMENTO / COPILOTO',
+    patientBlock,
+    clinicalIndication: exam.clinicalIndication || '',
+    examType: exam.examType,
+    notes: instruction,
+    maskHtml: currentReport,
+  });
 
-  return `${masterPrompt}
+  return `${compiled}
 
-${areaSpecificRules ? `═══════════════════════════════════════════\nREGRAS DA ÁREA (${exam.area}):\n═══════════════════════════════════════════\n${areaSpecificRules}\n` : ''}
+═══════════════════════════════════════════════════════════════
+CO-AUTORIA / COPILOTO FORMAT INTEGRATION
+═══════════════════════════════════════════════════════════════
+Sua tarefa agora é ATUALIZAR ou EDITAR o laudo existente com base na nova instrução do médico de forma extremamente direta, sucinta, objetiva e puramente clínica. NUNCA utilize floreios, formalidades exageradas, saudações amigáveis ou explicações prolixas. Vá direto aos fatos e à conduta clínica.
 
-${previousContext}
-
-Sua tarefa agora é ATUALIZAR ou EDITAR o laudo existente com base na nova instrução do médico de forma extremamente direta, sucinta, objetiva e puramente clínica. NUNCA utilize floreios, formalidades exageradas, saudações amigáveis (como "Olá colega" ou "Espero ajudar") ou explicações prolixas que desperdiçam o tempo do médico. Vá direto aos fatos e à conduta clínica.
-
-Sua resposta DEVE ser estruturada rigorosamente usando os marcadores exatos:
+Sua resposta DEVE ser estruturada rigorosamente usando os marcadores exatos (dentro ou fora do scratchpad, mas o HTML final da proposta de laudo deve vir sob === PROPOSTA ===):
 
 === CONVERSA ===
-[Forneça um resumo clínico extremamente direto, conciso e puramente técnico em formato de lista (bullets curtos) de exatamente o que você alterou, inseriu ou calculou no laudo. Evite introduções e vá direto aos pontos técnicos.]
+[Forneça apenas UMA única frase extremamente curta (máximo 15 palavras) resumindo de forma ultra-direta e puramente clínica a alteração feita no laudo (ex: "Vesícula biliar alterada para ausente por cirurgia prévia."). NÃO use mais do que uma frase. NUNCA faça saudações, introduções ou explicações prolixas.]
 
 === PROPOSTA ===
-[Forneça o código HTML COMPLETO do laudo atualizado contendo todas as alterações integradas perfeitamente, mantendo o padrão do Skeleton v7.0.]
+[Forneça o código HTML COMPLETO do laudo atualizado contendo todas as alterações integradas perfeitamente, mantendo o padrão do Skeleton v9.0.]
 
 Mantenha rigorosamente a estrutura de tópicos (TÍTULO, TÉCNICA, ANÁLISE, CONCLUSÃO, etc).
+${structurePrompt ? `\nESTRUTURA COMPLEMENTAR DE CONFORMIDADE:\n${structurePrompt}` : ''}
+${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
+\nINSTRUÇÕES GLOBAIS DE RACIOCÍNIO:\n${globalInstructions}
+\nREGRAS RÍGIDAS DE CONFORMIDADE CLÍNICA:\n${rigidRules}
 
-═══════════════════════════════════════════
-${structurePrompt}
-═══════════════════════════════════════════
-
-DADOS DO CONTEXTO:
-Tipo de exame: ${exam.examType}
-Área: ${exam.area}
-${patientBlock}
-${exam.clinicalIndication ? `\nIndicação clínica: ${exam.clinicalIndication}` : ''}
-
-═══════════════════════════════════════════
-LAUDO ATUAL (CONTEÚDO PARA EDITAR):
-═══════════════════════════════════════════
-${currentReport}
-
-═══════════════════════════════════════════
-INSTRUÇÃO DO MÉDICO (O QUE MUDAR):
-═══════════════════════════════════════════
->>> ${instruction} <<<
-
-${settings.aiGlobalInstructions ? `═══════════════════════════════════════════\nINSTRUÇÕES GLOBAIS AVANÇADAS\n═══════════════════════════════════════════\n\n${settings.aiGlobalInstructions}\n` : ''}
-${areaInstructions ? `═══════════════════════════════════════════\nCOMPORTAMENTO DA ÁREA\n═══════════════════════════════════════════\n\n${areaInstructions}\n` : ''}
-
-${DEFAULT_ADVANCED_REASONING}
-
-${rigidRules}
-
-Gere agora a resposta completa estruturada com === CONVERSA === e === PROPOSTA === (sem blocos extras de código fora desses marcadores):`;
+Gere agora a resposta completa estruturada with === CONVERSA === and === PROPOSTA === (sem blocos extras de código fora desses marcadores):`;
 }
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
@@ -276,7 +371,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
 
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
   const model = genAI.getGenerativeModel({
-    model: settings.geminiModel || 'gemini-2.0-flash-exp',
+    model: settings.geminiModel || 'gemini-2.0-flash',
     generationConfig: {
       temperature: settings.aiTemperature ?? 0.3,
       topP: 0.9,
@@ -289,6 +384,9 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
 
   text = text.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
   text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+  // Strip scratchpad tags from final report
+  text = stripScratchpad(text);
 
   return text;
 }
@@ -313,7 +411,7 @@ export async function generateReportStream(
 
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
   const model = genAI.getGenerativeModel({
-    model: settings.geminiModel || 'gemini-2.0-flash-exp',
+    model: settings.geminiModel || 'gemini-2.0-flash',
     generationConfig: {
       temperature: settings.aiTemperature ?? 0.3,
       topP: 0.9,
@@ -329,11 +427,18 @@ export async function generateReportStream(
     
     let cleanText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
     cleanText = cleanText.replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+    
+    // Dynamically strip <scratchpad>...</scratchpad>
+    cleanText = stripScratchpad(cleanText);
+    
     onChunk(cleanText);
   }
 
   fullText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
   fullText = fullText.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+  
+  // Strip scratchpad tags from final streamed output
+  fullText = stripScratchpad(fullText);
   
   return fullText;
 }

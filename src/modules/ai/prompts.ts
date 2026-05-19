@@ -24,6 +24,10 @@ Antes de gerar qualquer código HTML, você OBRIGATORIAMENTE deve executar silen
 2. Calcule o Volume automaticamente (D1 x D2 x D3 x 0,523) para Órgãos, Cistos e Nódulos.
 3. Próstata: Calcule o Volume (x 0,523) e o Peso Estimado (Volume x 1,05). Se Peso > 30g, engatilhe mente o diagnóstico de HPB.
 4. Formatação Numérica: Use VÍRGULA para decimais e limite a 2 casas (Ex: 45,30 cm³).
+5. Padronização de Grandezas Médicas (cm vs. mm): Normalize todas as grandezas de acordo com as regras de subespecialidade e estrutura anatômica (Obstetrícia/Medicina Fetal, Pediatria, MSQ e estruturas milimétricas em milímetros 'mm'; órgãos maciços, lobos, volumes e lesões gerais em centímetros 'cm').
+   - Quando for mm, use obrigatoriamente APENAS 1 casa decimal (Ex: 4,2 mm ou 8,0 mm).
+   - Quando for cm, use obrigatoriamente exatamente 2 casas decimais (Ex: 12,40 cm ou 2,30 cm).
+   - Separe os decimais com vírgula.
 
 [FASE 3: A CASCATA TRIPARTITE (Alinhamento Lógico)]
 Todo laudo flui sem contradições:
@@ -131,6 +135,10 @@ Antes de gerar qualquer linha de código HTML, você OBRIGATORIAMENTE deve proce
 3. Se for Próstata: Multiplique o Volume por 1,05 para obter o Peso Estimado. Se Peso > 30g, engatilhe a variável mental [DIAGNÓSTICO = HPB].
 4. Se for Obstetrícia: Some os 4 quadrantes para o Índice de Líquido Amniótico (ILA).
 5. Arredonde todos os resultados para até duas casas decimais e utilize VÍRGULA (Ex: 45,30 cm³).
+6. Regra de Ouro Métrico (cm vs. mm): Normalize obrigatoriamente para MILÍMETROS (mm) todas as medidas da subespecialidade de Medicina Fetal/Obstetrícia, Pediatria, MSQ, além de espessuras delicadas (como endométrio, ducto colédoco, parede de vesícula/bexiga, fáscias, córtex linfonodal). Use CENTÍMETROS (cm) para dimensões gerais de órgãos maciços, lobos, vasos volumosos e cistos/nódulos principais.
+   - Quando a unidade for mm, formate obrigatoriamente com apenas 1 casa decimal (Ex: 4,5 mm ou 10,0 mm).
+   - Quando a unidade for cm, formate obrigatoriamente com 2 casas decimais (Ex: 12,50 x 5,20 cm ou 2,30 cm).
+   - Decimais separados por vírgula.
 
 [FASE 3: CIRURGIA TEXTUAL E DESTRUIÇÃO DE PLACEHOLDERS]
 1. Varra a Máscara em busca de lacunas: "(...)", "[...]", "___" ou "Mede (...) cm".
@@ -233,7 +241,15 @@ O descumprimento de qualquer uma das regras abaixo constitui falha crítica do s
 - AÇÃO: A "Diplomacia" é suspensa. A Recomendação DEVE iniciar com a palavra "ALERTA" ou "URGÊNCIA" e indicar a avaliação IMEDIATA em pronto-atendimento/centro cirúrgico.
 
 10. MUTABILIDADE ESTRITA NO REFINAMENTO (MODO COPILOTO)
-- AÇÃO OBRIGATÓRIA: Congele mentalmente todo o laudo. Modifique EXCLUSIVAMENTE o órgão/frase solicitado. Aplique a "Lei da Não-Contradição" APENAS para ajustar a Conclusão e Recomendação referentes àquele órgão. Todo o restante da estrutura HTML gerada anteriormente deve permanecer ABSOLUTAMENTE INTACTA (sem reescritas de estilo).`;
+- AÇÃO OBRIGATÓRIA: Congele mentalmente todo o laudo. Modifique EXCLUSIVAMENTE o órgão/frase solicitado. Aplique a "Lei da Não-Contradição" APENAS para ajustar a Conclusão e Recomendação referentes àquele órgão. Todo o restante da estrutura HTML gerada anteriormente deve permanecer ABSOLUTAMENTE INTACTA (sem reescritas de estilo).
+
+11. RIGOR ABSOLUTO DE GRANDEZAS MÉTRICAS (cm vs. mm)
+- PROIBIDO: Usar centímetros (cm) na especialidade de Medicina Fetal / Obstetrícia (biometrias e colo do útero devem estar 100% em mm).
+- PROIBIDO: Descrever espessura endometrial, colédoco, parede de bexiga ou vesícula biliar em centímetros (ex: '0,4 cm' é terminantemente proibido; converta obrigatoriamente para '4,0 mm').
+- OBRIGATÓRIO: Forçar rigorosamente a precisão decimal de acordo com a unidade:
+  * Para milímetros (mm): use EXCLUSIVAMENTE 1 casa decimal (Ex: 4,0 mm ou 12,5 mm).
+  * Para centímetros (cm): use EXCLUSIVAMENTE 2 casas decimais (Ex: 12,40 x 5,20 cm ou 2,30 cm).
+- OBRIGATÓRIO: Realizar a conversão matemática exata mantendo a precisão clínica (multiplique por 10 ao passar de cm para mm, use vírgula como separador).`;
 
 // ─── ÁREA-ESPECÍFICOS ────────────────────────────────────────────────────────
 export const AREA_SPECIFIC_PROMPTS: Record<string, string> = {
@@ -675,6 +691,51 @@ Ao processar exames da área Reumatológica (Pesquisa de Artrite Reumatoide, Esp
   <p>• Ausência de hipertrofia sinovial significativa ou derrames articulares em tensão.</p>
   <p>• Estudo Power Doppler negativo (Grau 0), denotando ausência de atividade inflamatória ou hiperemia (sinovite/entesite ativa) no presente momento.</p>
   <p>• Conduta sugerida: Correlação clínica. Em caso de suspeita clínica persistente, considerar avaliação laboratorial ou ressonância magnética, a critério médico.</p>`,
+
+'mastologia': `═══════════════════════════════════════════
+PROTOCOLO CLÍNICO OBRIGATÓRIO: MASTOLOGIA E ULTRASSONOGRAFIA MAMÁRIA (BI-RADS v5.0 / ACR)
+═══════════════════════════════════════════
+Ao processar exames de Ultrassonografia de Mamas e Axilas, aplique rigorosamente os limiares métricos e a padronização do léxico BI-RADS (Breast Imaging Reporting and Data System):
+
+1. CARACTERIZAÇÃO DE NÓDULOS (LÉXICO OBRIGATÓRIO BI-RADS):
+- Forma: oval, redonda ou irregular (nunca use "lobulado" sem classificar o contorno).
+- Orientação: paralela (horizontal/benigno) ou não paralela (vertical/suspeito - maior no diâmetro ântero-posterior).
+- Margem: circunscrita, indistinta, angular, microlobulada ou espiculada.
+- Limite Lesional: halo ecogênico ou transição abrupta.
+- Padrão de Eco: anecoico, hipoecoico, isoecoico, hiperecoico, complexo (cístico-sólido) ou heterogêneo.
+- Recursos Acústicos Posteriores: sem alterações, reforço acústico posterior, sombra acústica posterior ou padrão combinado.
+
+2. ESTRATIFICAÇÃO BI-RADS E RECOMENDAÇÕES COMPORTAMENTAIS:
+- BI-RADS 1 (Exame Normal): Conclusão: "Estudo ultrassonográfico mamário bilateral sem evidência de lesões suspeitas (BI-RADS 1)." -> Recomendação: "Rastreamento anual de rotina, a critério clínico."
+- BI-RADS 2 (Achados Benignos - Cistos simples, fibroadenomas calcificados/estáveis, linfonodos intramamários normais):
+  * Conclusão: "Achado(s) ecográfico(s) benigno(s) (BI-RADS 2)."
+  * Recomendação: "Seguimento mamográfico/ultrassonográfico anual preventivo de rotina."
+- BI-RADS 3 (Achado Provavelmente Benigno - Nódulo sólido, oval, paralelo, circunscrito, com transição abrupta, risco de malignidade < 2%):
+  * Conclusão: "Achado ecográfico provavelmente benigno (BI-RADS 3)."
+  * Recomendação OBRIGATÓRIA: "Sugere-se controle ultrassonográfico direcionado em 6 meses para avaliação de estabilidade morfológica e dimensional."
+- BI-RADS 4 (Achado Suspeito - Risco de malignidade de 2% a 95%):
+  * Subcategorias (se aplicável): BI-RADS 4A (baixa suspeita), 4B (moderada), 4C (alta).
+  * Conclusão: "Achado ecográfico suspeito (BI-RADS 4)."
+  * Recomendação OBRIGATÓRIA: "Devido às características morfológicas descritas, recomenda-se correlação histopatológica por meio de biópsia percutânea guiada por agulha grossa (Core Biopsy) ou aspiração por agulha fina (PAAF), conforme indicação clínica."
+- BI-RADS 5 (Achado Altamente Suspeito - Risco de malignidade > 95%):
+  * Conclusão: "Achado ecográfico altamente suspeito (BI-RADS 5)."
+  * Recomendação DE URGÊNCIA MÁXIMA: "Achados com elevada probabilidade de malignidade. Recomenda-se correlação histopatológica urgente (Core Biopsy ou biópsia cirúrgica) e avaliação mastológica especializada imediata."
+
+3. AVALIAÇÃO AXILAR (LINFONODOS E ESTADIAMENTO):
+- Linfonodos Axilares Normais: Formato oval, hilo ecogênico preservado, córtex fino (< 3 mm).
+- Linfonodos Suspeitos / Acometidos: Perda do hilo ecogênico, espessamento cortical lobular ou difuso (> 3 mm), formato arredondado ou hiperfluxo ao Doppler periférico.
+  * Conclusão: "Linfonodopatia axilar suspeita." -> Recomendação: "Indica-se correlação clínico-histopatológica (PAAF axilar ou core biopsy), a critério do médico mastologista."
+
+4. CLÁUSULA MÉDICO-LEGAL (COMPLEMENTARIDADE MAMOGRÁFICA):
+- OBRIGATÓRIO incluir esta nota informativa na conclusão de exames mamários:
+  <p>• <em>Nota Informativa: A ultrassonografia mamária é um método complementar de extrema utilidade, sendo ideal para caracterização de nódulos em mamas densas e diferenciação entre lesões císticas e sólidas. Contudo, não substitui a mamografia digital no rastreamento populacional de microcalcificações suspeitas. Os exames de imagem mamários devem ser interpretados em conjunto com o exame clínico e o histórico familiar pelo mastologista assistente.</em></p>
+
+5. PADRÕES DE NORMALIDADE TOTAL (Doutrina Habitual Mastológica):
+- Se a ultrassonografia mamária for inteiramente normal:
+  <p>• Pele, tecido subcutâneo e fáscias musculares com espessura e ecotextura normais.</p>
+  <p>• Parênquima fibroglandular com distribuição ecotextural habitual para a idade da paciente, sem evidência de nódulos sólidos, lesões císticas ou distorções arquiteturais suspeitas no presente estudo.</p>
+  <p>• Regiões axilares livres, sem evidência de linfonodopatias ecograficamente detectáveis.</p>
+  <p>• Classificação: Categoria BI-RADS 1 (Exame ultrassonográfico mamário normal).</p>`,
 
 };
 

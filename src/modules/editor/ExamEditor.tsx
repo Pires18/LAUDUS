@@ -34,7 +34,7 @@ export function ExamEditor({ examId }: Props) {
 
   // Firestore realtime listeners
   const { data: exam } = useDocument<import('../../types').ExamRequest>('exams', examId);
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const { data: patient } = useDocument<Patient>('patients', exam?.patientId || '');
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -42,14 +42,13 @@ export function ExamEditor({ examId }: Props) {
   // Load related data
   useEffect(() => {
     if (!exam) return;
-    getItem<Patient>('patients', exam.patientId).then((p) => setPatient(p));
     if (exam.templateId) {
       getItem<ReportTemplate>('templates', exam.templateId).then((t) => setTemplate(t));
     }
     if (exam.clinicId) {
       getItem<Clinic>('clinics', exam.clinicId).then((c) => setClinic(c));
     }
-  }, [exam?.patientId, exam?.templateId, exam?.clinicId]);
+  }, [exam?.templateId, exam?.clinicId]);
 
   const [reportContent, setReportContent] = useState(exam?.reportContent || '');
   const [initialized, setInitialized] = useState(false);
@@ -105,7 +104,8 @@ export function ExamEditor({ examId }: Props) {
     onReportChange: (html) => setReportContent(html),
     patient,
     template,
-    clinicalIndication: exam?.clinicalIndication
+    clinicalIndication: exam?.clinicalIndication,
+    requestingPhysician: exam?.requestingPhysician
   });
 
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
@@ -396,7 +396,7 @@ export function ExamEditor({ examId }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 30 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed bottom-24 right-6 lg:right-10 w-[92vw] sm:w-[420px] h-[72vh] max-h-[660px] bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[70] overflow-hidden"
+              className="fixed inset-0 w-full h-full rounded-none sm:inset-auto sm:bottom-24 sm:right-6 lg:right-10 sm:w-[420px] sm:h-[72vh] sm:max-h-[660px] bg-white sm:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[120] overflow-hidden"
             >
               {/* Premium Header with Mesh-style Gradient */}
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
@@ -453,7 +453,7 @@ export function ExamEditor({ examId }: Props) {
           <button
             onClick={() => setShowCopilot(!showCopilot)}
             className={classNames(
-              "fixed bottom-8 right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2",
+              "fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2",
               showCopilot 
                 ? "bg-white text-ink-900 border-ink-100" 
                 : "bg-brand-600 text-white border-brand-500 shadow-brand-500/30"
@@ -547,6 +547,7 @@ export function ExamEditor({ examId }: Props) {
                   patient,
                   settings,
                   clinicalIndication: exam?.clinicalIndication,
+                  requestingPhysician: exam?.requestingPhysician,
                 })}
               </pre>
             </div>
@@ -561,6 +562,7 @@ export function ExamEditor({ examId }: Props) {
                     patient,
                     settings,
                     clinicalIndication: exam?.clinicalIndication,
+                    requestingPhysician: exam?.requestingPhysician,
                   }));
                   showToast('Prompt copiado!', 'success');
                 }}

@@ -10,7 +10,8 @@ export type ExamArea =
   | 'vascular'
   | 'reumatologico'
   | 'pediatria'
-  | 'procedimentos';
+  | 'procedimentos'
+  | 'mastologia';
 
 export const EXAM_AREAS: { id: ExamArea; label: string; color: string; icon: string }[] = [
   { id: 'medicina-interna', label: 'Medicina Interna', color: 'bg-blue-100 text-blue-700', icon: 'Stethoscope' },
@@ -22,6 +23,7 @@ export const EXAM_AREAS: { id: ExamArea; label: string; color: string; icon: str
   { id: 'pediatria', label: 'Pediatria', color: 'bg-cyan-100 text-cyan-700', icon: 'ToyBrick' },
   { id: 'procedimentos', label: 'Procedimentos', color: 'bg-slate-100 text-slate-700', icon: 'Syringe' },
   { id: 'reumatologico', label: 'Reumatológico', color: 'bg-amber-100 text-amber-700', icon: 'Dna' },
+  { id: 'mastologia', label: 'Mastologia', color: 'bg-rose-100 text-rose-700', icon: 'Ribbon' },
 ];
 
 /** Status possíveis de um exame no fluxo de trabalho */

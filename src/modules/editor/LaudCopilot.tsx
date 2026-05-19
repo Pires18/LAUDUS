@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../store/app';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
-import { generateReportStream } from '../ai/gemini';
+import { generateReportStream, stripScratchpad } from '../ai/gemini';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -59,6 +59,7 @@ export function LaudCopilot({
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formStructures, setFormStructures] = useState<StructureFields[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
 
   // Parser avançado de máscara HTML para formulário com múltiplos inputs por placeholders
   const parseTemplateToFormFields = (html: string, area: string): StructureFields[] => {
@@ -156,6 +157,15 @@ export function LaudCopilot({
       }
       
       if (!parsedStructures.some(s => s.name === name)) {
+        if (fields.length === 0) {
+          fields.push({
+            id: `field_${blockIdx}_desc`,
+            label: 'Descrição / Achados',
+            placeholder: 'Ex: Aspecto habitual',
+            defaultValue: '',
+            currentValue: ''
+          });
+        }
         parsedStructures.push({
           name,
           status: 'Normal',
@@ -201,13 +211,7 @@ export function LaudCopilot({
   const recognitionRef = useRef<any>(null);
   const [voiceVolume, setVoiceVolume] = useState(0);
 
-  // Sugestões inteligentes baseadas na área
-  const hints = {
-    'abdomen': ['Fígado de dimensões normais', 'Vesícula biliar normodistendida', 'Rins sem hidronefrose'],
-    'obstetrico': ['BCF presente e rítmico', 'Placenta normoinserida', 'ILA normal'],
-    'mamas': ['BI-RADS 1 - Ausência de achados', 'Nódulo sólido QSE', 'Cistos simples esparsos'],
-    'tireoide': ['Volume normal', 'Nódulo TI-RADS 3', 'Vascularização preservada']
-  }[exam.area.toLowerCase()] || ['Refinar conclusão', 'Corrigir termos', 'Nota clínica'];
+  // Sugestões inteligentes removidas para interface limpa
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -344,12 +348,107 @@ export function LaudCopilot({
     if (content.includes('=== PROPOSTA ===')) {
       const parts = content.split('=== PROPOSTA ===');
       conversation = parts[0].replace('=== CONVERSA ===', '').trim();
-      proposal = parts[1].trim();
+      let rawProposal = parts[1].trim();
+      // Limpa delimitadores de código markdown residual (como ```html ... ```)
+      proposal = rawProposal
+        .replace(/^```html\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
     } else if (content.includes('=== CONVERSA ===')) {
       conversation = content.replace('=== CONVERSA ===', '').trim();
     }
 
+    // Strip scratchpad case-insensitively from both conversation and proposal
+    conversation = stripScratchpad(conversation);
+    proposal = stripScratchpad(proposal);
+
     return { conversation, proposal };
+  };
+
+  const renderInlineFormat = (text: string) => {
+    // Highlight bold text **bold** and metrics like "X,X mm" or "X,XX cm" or "X,XX cm³" or "X,XX mL" or "X,XX g" or "X,XX cc"
+    const parts = text.split(/(\*\*.*?\*\*|\d+(?:,\d+)?\s*(?:mm|cm³|cm|g|ml|cc|mL))/gi);
+    
+    return parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={idx} className="font-extrabold text-slate-900 bg-brand-50/60 px-1 py-0.5 rounded border border-brand-100/30">
+            {part.slice(2, -2)}
+          </strong>
+        );
+      }
+      
+      const metricRegex = /^(\d+(?:,\d+)?)\s*(mm|cm³|cm|g|ml|cc|mL)$/i;
+      const match = part.match(metricRegex);
+      if (match) {
+        const [, val, unit] = match;
+        const isMm = unit.toLowerCase() === 'mm';
+        return (
+          <span 
+            key={idx} 
+            className={classNames(
+              "px-1.5 py-0.5 rounded-md font-black text-[10px] inline-flex items-center border shadow-sm mx-0.5 whitespace-nowrap",
+              isMm
+                ? "bg-amber-50 text-amber-800 border-amber-200/50 shadow-amber-500/[0.03]" 
+                : "bg-brand-50 text-brand-800 border-brand-200/50 shadow-brand-500/[0.03]"
+            )}
+          >
+            {val} {unit}
+          </span>
+        );
+      }
+      
+      return part;
+    });
+  };
+
+  const renderRichClinicalContent = (text: string, isUser: boolean) => {
+    if (isUser) {
+      return <p className="text-xs font-bold leading-relaxed">{text}</p>;
+    }
+
+    // Split text into paragraphs
+    const paragraphs = text.split('\n\n');
+
+    return (
+      <div className="space-y-3">
+        {paragraphs.map((para, pIdx) => {
+          // If the paragraph is a list of items starting with • or - or *
+          const lines = para.split('\n');
+          const isBulletList = lines.length > 0 && lines.every(line => {
+            const trimmed = line.trim();
+            return !trimmed || trimmed.startsWith('•') || trimmed.startsWith('-') || trimmed.startsWith('*');
+          });
+
+          if (isBulletList) {
+            return (
+              <ul key={pIdx} className="space-y-2 my-1.5">
+                {lines.map((line, lIdx) => {
+                  const trimmed = line.trim();
+                  if (!trimmed) return null;
+                  const cleanLine = trimmed.replace(/^[•\-*]\s*/, '').trim();
+                  return (
+                    <li key={lIdx} className="flex items-start gap-2.5 text-xs text-slate-700 font-semibold leading-relaxed">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-500 mt-2 shrink-0 shadow-sm shadow-brand-500/30" />
+                      <span className="flex-1">{renderInlineFormat(cleanLine)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          }
+
+          // Regular paragraph
+          return (
+            <p key={pIdx} className="text-xs text-slate-700 font-semibold leading-relaxed">
+              {renderInlineFormat(para)}
+            </p>
+          );
+        })}
+      </div>
+    );
   };
 
   const handleSend = async (customPrompt?: string) => {
@@ -385,7 +484,8 @@ export function LaudCopilot({
         exam: {
           examType: exam.examType,
           area: exam.area,
-          clinicalIndication: exam.clinicalIndication
+          clinicalIndication: exam.clinicalIndication,
+          requestingPhysician: exam.requestingPhysician
         },
         settings,
         previousExams
@@ -395,6 +495,15 @@ export function LaudCopilot({
       });
 
       onChatUpdate([...newHistory, { role: 'assistant', content: finalHtml }]);
+
+      // AUTO-APPLY: Se o copiloto gerou uma proposta, aplica ela automaticamente no editor
+      const { proposal } = parseMessageContent(finalHtml);
+      if (proposal) {
+        onUpdate(proposal);
+        const assistantMsgIndex = newHistory.length;
+        setAppliedIndices(prev => [...prev, assistantMsgIndex]);
+        showToast('Alterações integradas automaticamente ao laudo!', 'success');
+      }
     } catch (error) {
       console.error(error);
       showToast('Erro no processamento IA', 'error');
@@ -437,8 +546,8 @@ export function LaudCopilot({
 
   return (
     <div className={classNames(
-      "flex flex-col h-full bg-slate-50/50 relative overflow-hidden",
-      isDocked ? "shadow-none" : "rounded-b-[2.5rem]"
+      "flex flex-col h-full bg-slate-50 relative overflow-hidden",
+      isDocked ? "shadow-none" : "rounded-none md:rounded-b-[2.5rem]"
     )}>
       {/* Tab Navigation */}
       <div className="flex border-b border-slate-100 bg-white p-1.5 shrink-0 select-none z-10 shadow-sm">
@@ -499,28 +608,34 @@ export function LaudCopilot({
                   </div>
                </div>
 
-               <div className="w-full space-y-4 px-4">
-                  <div className="flex items-center gap-2 mb-1">
-                     <Zap size={14} className="text-amber-500 fill-amber-500" />
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Achados Rápidos (Atalhos)</span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2.5">
-                     {hints.map((hint, i) => (
-                       <motion.button
-                         key={i}
-                         initial={{ opacity: 0, x: -10 }}
-                         animate={{ opacity: 1, x: 0 }}
-                         transition={{ delay: i * 0.1 }}
-                         onClick={() => handleSend(hint)}
-                         className="flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-100 hover:border-brand-400 hover:bg-brand-50/20 hover:shadow-lg hover:shadow-brand-500/5 transition-all text-left group shadow-sm"
-                       >
-                         <span className="text-[11px] font-bold text-slate-600 group-hover:text-brand-700 truncate pr-4">{hint}</span>
-                         <div className="w-6 h-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-brand-600 group-hover:text-white transition-all">
-                           <ChevronRight size={14} />
-                         </div>
-                       </motion.button>
-                     ))}
-                  </div>
+               <div className="w-full max-w-[320px] space-y-3 px-4">
+                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block text-center mb-1">
+                   Sugestões de Comandos Clínicos
+                 </span>
+                 <div className="grid grid-cols-2 gap-2">
+                   {[
+                     { label: 'Cisto Renal', text: 'Adicionar cisto renal simples de 15 mm no rim direito.' },
+                     { label: 'Histerectomia', text: 'Alterar o status do útero para ausente por cirurgia prévia.' },
+                     { label: 'Colelitíase', text: 'Descrever vesícula biliar contendo cálculo móvel de 12 mm, sem inflamação.' },
+                     { label: 'Refino de Estilo', text: 'Refinar o tom deste laudo inteiro para um padrão acadêmico sênior.' },
+                   ].map((sug, i) => (
+                     <button
+                       key={i}
+                       onClick={() => {
+                         onChangePrompt(sug.text);
+                         handleSend(sug.text);
+                       }}
+                       className="p-3 bg-white hover:bg-brand-50 border border-slate-100 hover:border-brand-200 rounded-xl text-left transition-all active:scale-95 group shadow-sm flex flex-col justify-between min-h-[72px]"
+                     >
+                       <span className="text-[9px] font-black text-slate-800 uppercase tracking-tight group-hover:text-brand-700 transition-colors">
+                         {sug.label}
+                       </span>
+                       <span className="text-[8px] text-slate-400 font-bold leading-normal mt-1 line-clamp-2">
+                         {sug.text}
+                       </span>
+                     </button>
+                   ))}
+                 </div>
                </div>
             </motion.div>
           ) : (
@@ -651,7 +766,7 @@ export function LaudCopilot({
                 >
                   <div className={classNames(
                     "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm border-2",
-                    isUser ? "bg-brand-600 text-white border-brand-500 shadow-brand-500/10" : "bg-white border-slate-100 text-brand-600"
+                    isUser ? "bg-slate-900 text-white border-slate-800 shadow-slate-900/10" : "bg-white border-slate-100 text-brand-600 shadow-sm"
                   )}>
                     {isUser ? <User size={18} /> : <Bot size={18} />}
                   </div>
@@ -659,12 +774,12 @@ export function LaudCopilot({
                   <div className="flex flex-col gap-2 max-w-[82%]">
                     {/* Balão de Conversa Premium */}
                     <div className={classNames(
-                      "p-4 rounded-2xl text-xs font-bold leading-relaxed shadow-sm border",
+                      "p-4 rounded-2xl text-xs leading-relaxed shadow-sm border transition-all hover:shadow-md",
                       isUser 
-                        ? "bg-brand-600 text-white border-brand-500 rounded-tr-none shadow-brand-500/5" 
-                        : "bg-white border-slate-100 text-slate-800 rounded-tl-none"
+                        ? "bg-gradient-to-br from-slate-800 to-slate-950 text-slate-100 border-slate-900 rounded-tr-none shadow-md shadow-slate-950/10" 
+                        : "bg-white border-slate-100 text-slate-850 rounded-tl-none shadow-slate-500/[0.02]"
                     )}>
-                      {conversation}
+                      {renderRichClinicalContent(conversation, isUser)}
                     </div>
 
                     {/* Proposta de laudo interativa e elegante (Apenas para respostas do Assistente com proposta gerada) */}
@@ -680,24 +795,61 @@ export function LaudCopilot({
                             <Sparkles size={11} className="text-brand-500 animate-pulse" />
                             Alteração Proposta da Laud.IA
                           </span>
-                          <span className="text-[8px] bg-brand-500/20 border border-brand-500/30 text-brand-800 font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                            Revisão Disponível
+                          <span className={classNames(
+                            "text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider border transition-all duration-300",
+                            appliedIndices.includes(idx)
+                              ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-800"
+                              : "bg-brand-500/20 border-brand-500/30 text-brand-800"
+                          )}>
+                            {appliedIndices.includes(idx) ? "Aplicado Automaticamente" : "Revisão Disponível"}
                           </span>
                         </div>
                         
                         <p className="text-[10px] text-slate-500 font-semibold leading-relaxed relative z-10">
-                          A IA estruturou e refinou as novas informações diagnósticas. Clique no botão abaixo para consolidar essas alterações no editor de laudo principal.
+                          {appliedIndices.includes(idx)
+                            ? "Estas alterações já foram integradas ao laudo. Você pode reaplicar se tiver feito edições adicionais no chat."
+                            : "A IA estruturou e refinou as novas informações diagnósticas. Clique no botão abaixo para consolidar essas alterações no editor de laudo principal."
+                          }
                         </p>
 
                         <button
+                          disabled={isGenerating}
                           onClick={() => {
+                            if (isGenerating) return;
                             onUpdate(proposal);
+                            if (!appliedIndices.includes(idx)) {
+                              setAppliedIndices(prev => [...prev, idx]);
+                            }
                             showToast('Alterações do Copiloto consolidadas no laudo!', 'success');
                           }}
-                          className="h-10 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 active:scale-95 text-white text-[10px] font-black uppercase tracking-widest shadow-md hover:shadow-brand-500/25 transition-all flex items-center justify-center gap-2 group relative z-10"
+                          className={classNames(
+                            "h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2 group relative z-10",
+                            isGenerating
+                              ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed shadow-none active:scale-100"
+                              : "active:scale-95",
+                            !isGenerating && appliedIndices.includes(idx)
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10"
+                              : !isGenerating
+                                ? "bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white shadow-brand-500/25"
+                                : ""
+                          )}
                         >
-                          <Zap size={13} className="fill-white group-hover:scale-115 transition-transform" />
-                          Aplicar Alterações ao Laudo
+                          {isGenerating ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin text-slate-400" />
+                              Processando Alterações...
+                            </>
+                          ) : appliedIndices.includes(idx) ? (
+                            <>
+                              <CheckCircle2 size={13} className="text-white" />
+                              Reaplicar Alterações
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={13} className="fill-white group-hover:scale-115 transition-transform" />
+                              Aplicar Alterações ao Laudo
+                            </>
+                          )}
                         </button>
                       </motion.div>
                     )}
@@ -767,37 +919,26 @@ export function LaudCopilot({
           )}
         </AnimatePresence>
 
-        {/* Quick Action Pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide select-none">
-          {[
-            { label: 'Refinar Laudo', text: 'Refine este laudo otimizando a clareza e precisão da linguagem radiológica.' },
-            { label: 'Tudo Habitual', text: 'Preencha todas as estruturas pendentes do laudo como normais/habituais.' },
-            { label: 'Corrigir Gramática', text: 'Corrija erros de digitação, ortografia e pontuação mantendo todos os termos médicos originais.' },
-            { label: 'Sugerir Conduta', text: 'Sugira recomendações clínicas ou intervalos de controle radiológico adequados aos achados.' }
-          ].map((qa, i) => (
-            <button
-              key={i}
-              onClick={() => handleSend(qa.text)}
-              disabled={isGenerating}
-              className="px-3 py-1.5 bg-slate-50 hover:bg-brand-50 border border-slate-100 hover:border-brand-200/50 rounded-xl text-[9px] font-black text-slate-500 hover:text-brand-700 uppercase tracking-widest transition-all whitespace-nowrap active:scale-95 shrink-0 flex items-center gap-1 hover:shadow-sm"
-            >
-              <Sparkles size={10} className="text-brand-500/80" />
-              {qa.label}
-            </button>
-          ))}
-        </div>
+        {/* Quick Action Pills removidos para interface limpa */}
 
         <div className="flex items-end gap-3">
           <button 
             onClick={toggleListening}
             className={classNames(
-              "w-14 h-14 rounded-2xl flex items-center justify-center transition-all shrink-0 border-2",
+              "w-14 h-14 rounded-2xl flex items-center justify-center transition-all shrink-0 border-2 relative overflow-hidden",
               isListening 
-                ? "bg-red-500 text-white border-red-400 shadow-xl shadow-red-200" 
+                ? "bg-red-500 text-white border-red-400 shadow-xl shadow-red-500/25" 
                 : "bg-slate-50 text-slate-400 border-slate-100 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-100 active:scale-95"
             )}
           >
-            {isListening ? <MicOff size={24} /> : <Mic size={24} />}
+            {isListening ? (
+              <>
+                <span className="absolute inset-0 rounded-2xl bg-red-400/30 animate-ping" />
+                <MicOff size={24} className="relative z-10" />
+              </>
+            ) : (
+              <Mic size={24} />
+            )}
           </button>
 
           <div className="flex-1 relative group">
@@ -810,7 +951,7 @@ export function LaudCopilot({
                   handleSend();
                 }
               }}
-              placeholder="Descreva o achado técnico..."
+              placeholder="Digite um comando (ex: cisto de 15 mm no rim direito) ou clique no microfone para ditar..."
               className="w-full p-4 pr-14 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-[1.8rem] outline-none transition-all text-xs font-bold leading-relaxed resize-none max-h-40 min-h-[56px] shadow-inner text-slate-800"
             />
             <button 

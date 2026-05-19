@@ -57,7 +57,8 @@ REGRAS PARA CADA CAMPO:
 
 3. analysisTemplate: Descrição de um exame COMPLETAMENTE NORMAL. Regras:
    - Use <p><strong>NOME DO ÓRGÃO:</strong> descrição normal detalhada.</p> para cada estrutura.
-   - Use "(…)" APENAS para campos de medidas numéricas que variam por paciente (ex: "medindo (…) x (…) x (…) cm").
+   - Use "(…)" APENAS para campos de medidas numéricas que variam por paciente (ex: "medindo (…) x (…) x (…) cm" ou "medindo (…) x (…) x (…) mm" para a área de medicina-fetal).
+   - Para exames da área "medicina-fetal", TODAS as medidas anatômicas, biométricas e anexiais DEVEM ser obrigatoriamente padronizadas em milímetros (mm), sendo terminantemente proibido o uso de centímetros (cm).
    - Para estruturas qualitativas normais, escreva a descrição completa (não use placeholder).
    - Inclua TODAS as estruturas relevantes para este tipo de exame, na ordem anatômica lógica.
    - Nível de detalhe: denso, técnico, equivalente a um laudo real de especialista.

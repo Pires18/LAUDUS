@@ -140,7 +140,7 @@ export function Worklist() {
   return (
     <div className="module-container">
       {/* Sleek Glass Header Block */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 bg-white border border-ink-100 p-8 rounded-[2.5rem] shadow-sm shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6 sm:mb-10 bg-white border border-ink-100 p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm">
         <div>
           <h1 className="text-3xl font-black text-ink-900 tracking-tight leading-none">Fila de Exames</h1>
           <p className="text-sm text-ink-500 font-medium mt-2">Gerencie, acompanhe e redija laudos clínicos assistidos por IA em tempo real.</p>
@@ -154,7 +154,7 @@ export function Worklist() {
       </div>
 
       {/* Stats Quick Filter Bar */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10 shrink-0">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-10">
         {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map(s => {
           const isActive = statusFilter === s;
           const sColors = {
@@ -170,7 +170,7 @@ export function Worklist() {
               key={s}
               onClick={() => setStatusFilter(s)}
               className={classNames(
-                "p-6 rounded-[2.2rem] border transition-all text-left group hover:-translate-y-1 hover:shadow-md",
+                "p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2.2rem] border transition-all text-left group hover:-translate-y-1 hover:shadow-md",
                 sColors[s]
               )}
             >
@@ -189,7 +189,7 @@ export function Worklist() {
       </div>
 
       {/* Advanced Clinical Filter Panel */}
-      <div className="bg-white border border-ink-100 rounded-[2.5rem] p-8 mb-10 shadow-sm shrink-0">
+      <div className="bg-white border border-ink-100 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 mb-6 sm:mb-10 shadow-sm">
         <div className="flex flex-col xl:flex-row items-center gap-6">
           <div className="relative flex-1 w-full">
             <Search size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -266,17 +266,18 @@ export function Worklist() {
       </div>
 
       {/* Impeccable Glass Table Workstation */}
-      <div className="bg-white border border-ink-100 rounded-[2.5rem] overflow-hidden shadow-sm shrink-0">
-        <div className="w-full">
-          <table className="w-full text-left border-collapse">
+      <div className="bg-white border border-ink-100 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-sm">
+        <div className="w-full overflow-hidden">
+          {/* Desktop Table View */}
+          <table className="hidden md:table w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-ink-50/20 border-b border-ink-100">
-                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Paciente</th>
-                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Exame & Especialidade</th>
-                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-center">Status</th>
-                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Unidade</th>
-                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em]">Data / Hora</th>
-                <th className="px-4 xl:px-6 py-5 text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-right">Ações</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[24%]">Paciente</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[24%]">Exame & Especialidade</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-center w-[12%]">Status</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[15%]">Unidade</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[12%]">Data / Hora</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-right w-[13%]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">
@@ -320,81 +321,81 @@ export function Worklist() {
                         setView({ name: 'exam-editor', examId: exam.id });
                       }}
                     >
-                      <td className="px-4 xl:px-6 py-5">
-                        <div className="flex items-center gap-4">
+                      <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-5">
+                        <div className="flex items-center gap-2 lg:gap-4">
                           {/* Safe patient initial with safe optional chaining */}
-                          <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shadow-inner transition-all duration-500 shrink-0", genderHalo)}>
+                          <div className={classNames("w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl flex items-center justify-center font-black text-sm lg:text-base shadow-inner transition-all duration-500 shrink-0", genderHalo)}>
                             {patient?.name?.charAt(0) || '?'}
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-black text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px]">{patient?.name || 'Não identificado'}</p>
-                            <p className="text-[10px] font-mono text-ink-400 font-bold uppercase tracking-tight mt-0.5">ID: {exam.friendlyId || '—'}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-black text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-full text-xs lg:text-sm">{patient?.name || 'Não identificado'}</p>
+                            <p className="text-[9px] lg:text-[10px] font-mono text-ink-400 font-bold uppercase tracking-tight mt-0.5">ID: {exam.friendlyId || '—'}</p>
                           </div>
                         </div>
                       </td>
                       
-                      <td className="px-4 xl:px-6 py-5">
-                        <p className="font-black text-ink-800 text-sm leading-snug mb-1.5 truncate max-w-[220px]">{exam.examType}</p>
-                        {area && <span className={classNames("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0", area.color)}>{area.label}</span>}
+                      <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-5">
+                        <p className="font-black text-ink-800 text-xs lg:text-sm leading-snug mb-1 truncate max-w-full">{exam.examType}</p>
+                        {area && <span className={classNames("text-[8px] lg:text-[9px] font-black px-1.5 lg:px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0", area.color)}>{area.label}</span>}
                       </td>
                       
-                      <td className="px-4 xl:px-6 py-5 text-center">
-                         <div className={classNames("badge shadow-sm border", status.class)}>
-                           <div className={classNames("w-1.5 h-1.5 rounded-full shrink-0", status.dot)} />
+                      <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-center">
+                         <div className={classNames("badge shadow-sm border scale-90 lg:scale-100", status.class)}>
+                           <div className={classNames("w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full shrink-0", status.dot)} />
                            {status.label}
                          </div>
                       </td>
                       
-                      <td className="px-4 xl:px-6 py-5">
-                        <div className="flex items-center gap-2 text-ink-600 text-xs font-bold">
-                          <Building2 size={14} className="text-ink-400 shrink-0" />
-                          <span className="truncate max-w-[120px]">{clinic?.name || 'Geral / Sem Unidade'}</span>
+                      <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-5">
+                        <div className="flex items-center gap-1.5 lg:gap-2 text-ink-600 text-[10px] lg:text-xs font-bold min-w-0">
+                          <Building2 className="w-3.5 h-3.5 text-ink-400 shrink-0" />
+                          <span className="truncate max-w-full">{clinic?.name || 'Geral / Sem Unidade'}</span>
                         </div>
                       </td>
                       
-                      <td className="px-4 xl:px-6 py-5">
-                        <p className="text-xs font-black text-ink-800 leading-none">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
-                        <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-1">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
+                      <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-5">
+                        <p className="text-[10px] lg:text-xs font-black text-ink-800 leading-none">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
+                        <p className="text-[8px] lg:text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-1">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
                       </td>
                       
-                      <td className="px-4 xl:px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-2">
-                            {exam.googleDocUrl && (
-                             <a
-                               href={exam.googleDocUrl}
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               className="p-3 rounded-2xl text-blue-500 hover:text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all shadow-sm shrink-0 flex items-center justify-center"
-                               title="Abrir no Google Docs"
-                             >
-                               <FileText size={18} />
-                             </a>
-                           )}
-                           <button
-                             onClick={() => {
-                               setEditData({
-                                 requestingPhysician: exam.requestingPhysician || '',
-                                 clinicalIndication: exam.clinicalIndication || '',
-                                 clinicId: exam.clinicId || '',
-                                 status: exam.status
-                               });
-                               setEditExamId(exam.id);
-                             }}
-                             className="p-3 rounded-2xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 border border-transparent hover:border-brand-100 transition-all shadow-sm shrink-0"
-                             title="Ajustar Metadados"
-                           >
-                             <UserCog size={18} />
-                           </button>
-                           <button
-                             onClick={() => setDeleteId(exam.id)}
-                             className="p-3 rounded-2xl text-ink-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all shadow-sm shrink-0"
-                             title="Excluir Registro"
-                           >
-                             <Trash2 size={18} />
-                           </button>
-                           <div className="w-9 h-9 rounded-xl bg-ink-50 text-ink-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
-                             <ChevronRight size={18} />
-                           </div>
+                      <td className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1 lg:gap-2">
+                             {exam.googleDocUrl && (
+                              <a
+                                href={exam.googleDocUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-blue-500 hover:text-blue-700 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all shadow-sm shrink-0 flex items-center justify-center"
+                                title="Abrir no Google Docs"
+                              >
+                                <FileText className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
+                              </a>
+                            )}
+                            <button
+                              onClick={() => {
+                                setEditData({
+                                  requestingPhysician: exam.requestingPhysician || '',
+                                  clinicalIndication: exam.clinicalIndication || '',
+                                  clinicId: exam.clinicId || '',
+                                  status: exam.status
+                                });
+                                setEditExamId(exam.id);
+                              }}
+                              className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 border border-transparent hover:border-brand-100 transition-all shadow-sm shrink-0"
+                              title="Ajustar Metadados"
+                            >
+                              <UserCog className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(exam.id)}
+                              className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-ink-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all shadow-sm shrink-0"
+                              title="Excluir Registro"
+                            >
+                              <Trash2 className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
+                            </button>
+                            <div className="hidden xl:flex w-9 h-9 rounded-xl bg-ink-50 text-ink-400 items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                              <ChevronRight className="w-[18px] h-[18px]" />
+                            </div>
                         </div>
                       </td>
                     </tr>
@@ -403,6 +404,114 @@ export function Worklist() {
               )}
             </tbody>
           </table>
+
+          {/* Mobile Card List View */}
+          <div className="md:hidden divide-y divide-ink-50">
+            {examsLoading ? (
+              [1, 2, 3, 4].map(i => (
+                <div key={i} className="p-4"><Skeleton className="h-24 w-full rounded-xl" /></div>
+              ))
+            ) : filtered.length === 0 ? (
+              <div className="px-6 py-16 text-center">
+                <div className="empty-state border-none shadow-none bg-transparent py-0">
+                  <div className="empty-state-icon bg-ink-50/50 mx-auto">
+                    <LayoutList size={36} />
+                  </div>
+                  <h3 className="empty-state-title mt-4">Sem Exames na Fila</h3>
+                  <p className="empty-state-text text-sm text-ink-400">Nenhum laudo clínico preenche os critérios dos filtros ativos.</p>
+                </div>
+              </div>
+            ) : (
+              filtered.map(exam => {
+                const patient = patientMap.get(exam.patientId);
+                const clinic = clinicMap.get(exam.clinicId || '');
+                const area = EXAM_AREAS.find(a => a.id === exam.area);
+                const status = STATUS_META[exam.status];
+                const genderHalo = patient?.gender === 'F'
+                  ? 'ring-2 ring-pink-400/40 bg-pink-50 text-pink-700'
+                  : patient?.gender === 'M'
+                  ? 'ring-2 ring-blue-400/40 bg-blue-50 text-blue-700'
+                  : 'ring-2 ring-brand-400/20 bg-brand-50 text-brand-700';
+
+                return (
+                  <div 
+                    key={exam.id}
+                    onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
+                    className="p-5 hover:bg-brand-50/30 active:bg-brand-50/50 transition-all duration-300 cursor-pointer flex flex-col gap-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className={classNames("w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shadow-inner shrink-0", genderHalo)}>
+                          {patient?.name?.charAt(0) || '?'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-black text-ink-900 truncate text-sm leading-snug">{patient?.name || 'Não identificado'}</p>
+                          <p className="text-[9px] font-mono text-ink-400 font-bold uppercase tracking-tight mt-0.5">ID: {exam.friendlyId || '—'}</p>
+                        </div>
+                      </div>
+                      <div className={classNames("badge shadow-sm border shrink-0 scale-90 origin-top-right", status.class)}>
+                        <div className={classNames("w-1 h-1 rounded-full shrink-0", status.dot)} />
+                        {status.label}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-ink-600 gap-4">
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink-800 truncate text-sm leading-snug">{exam.examType}</p>
+                        {area && <span className={classNames("inline-block text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border mt-1.5 shrink-0", area.color)}>{area.label}</span>}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-black text-ink-800 leading-none">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
+                        <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-1">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-ink-50 pt-3 text-[10px] text-ink-400 font-bold uppercase tracking-wide">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Building2 size={12} className="text-ink-400 shrink-0" />
+                        <span className="truncate max-w-[140px] text-ink-600 font-bold text-xs">{clinic?.name || 'Geral / Sem Unidade'}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {exam.googleDocUrl && (
+                          <a
+                            href={exam.googleDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2.5 rounded-xl text-blue-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"
+                            title="Abrir no Google Docs"
+                          >
+                            <FileText size={16} />
+                          </a>
+                        )}
+                        <button
+                          onClick={() => {
+                            setEditData({
+                              requestingPhysician: exam.requestingPhysician || '',
+                              clinicalIndication: exam.clinicalIndication || '',
+                              clinicId: exam.clinicId || '',
+                              status: exam.status
+                            });
+                            setEditExamId(exam.id);
+                          }}
+                          className="p-2.5 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          title="Ajustar Metadados"
+                        >
+                          <UserCog size={16} />
+                        </button>
+                        <button
+                          onClick={() => setDeleteId(exam.id)}
+                          className="p-2.5 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Excluir Registro"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
 

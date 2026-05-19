@@ -17,6 +17,8 @@ import { BroadcastBanner } from './components/BroadcastBanner';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
+import { classNames } from './utils/format';
+
 // ── Eager loads (critical path) ──
 import { Dashboard } from './modules/dashboard/Dashboard';
 import { Worklist } from './modules/worklist/Worklist';
@@ -50,23 +52,26 @@ function ViewRenderer() {
     dashboard: <Dashboard />,
     worklist: <Worklist />,
     patients: <Suspense fallback={<LazyFallback />}><Patients /></Suspense>,
-    'patient-detail': view.name === 'patient-detail' ? <Suspense fallback={<LazyFallback />}><PatientDetail patientId={view.patientId} /></Suspense> : null,
-    'exam-editor': view.name === 'exam-editor' ? <ExamEditor examId={view.examId} /> : null,
+    'patient-detail': view.name === 'patient-detail' ? <Suspense fallback={<LazyFallback />}><PatientDetail key={view.patientId} patientId={view.patientId} /></Suspense> : null,
+    'exam-editor': view.name === 'exam-editor' ? <ExamEditor key={view.examId} examId={view.examId} /> : null,
     templates: <Suspense fallback={<LazyFallback />}><Templates /></Suspense>,
-    'template-editor': view.name === 'template-editor' ? <Suspense fallback={<LazyFallback />}><TemplateEditor templateId={view.templateId} /></Suspense> : null,
+    'template-editor': view.name === 'template-editor' ? <Suspense fallback={<LazyFallback />}><TemplateEditor key={view.templateId} templateId={view.templateId} /></Suspense> : null,
     settings: <Suspense fallback={<LazyFallback />}><Settings /></Suspense>,
     'laud-ia': <Suspense fallback={<LazyFallback />}><LaudIA /></Suspense>,
     calculators: <Suspense fallback={<LazyFallback />}><Calculators /></Suspense>,
     clinics: <Suspense fallback={<LazyFallback />}><Clinics /></Suspense>,
-    'clinic-detail': view.name === 'clinic-detail' ? <Suspense fallback={<LazyFallback />}><ClinicDetail clinicId={view.clinicId} /></Suspense> : null,
-    'clinic-form': view.name === 'clinic-form' ? <Suspense fallback={<LazyFallback />}><ClinicForm clinicId={view.clinicId} /></Suspense> : null,
+    'clinic-detail': view.name === 'clinic-detail' ? <Suspense fallback={<LazyFallback />}><ClinicDetail key={view.clinicId} clinicId={view.clinicId} /></Suspense> : null,
+    'clinic-form': view.name === 'clinic-form' ? <Suspense fallback={<LazyFallback />}><ClinicForm key={view.clinicId} clinicId={view.clinicId} /></Suspense> : null,
     admin: <Suspense fallback={<LazyFallback />}><Admin /></Suspense>,
   };
 
   const isFullBleed = view.name === 'exam-editor';
 
   return (
-    <main className="flex-1 min-w-0 relative flex flex-col min-h-0 overflow-hidden">
+    <main className={classNames(
+      "flex-1 min-w-0 relative flex flex-col min-h-0 h-full",
+      isFullBleed ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+    )}>
       <AnimatePresence mode="wait">
         <PageTransition key={view.name} id={view.name}>
           {views[view.name] ?? null}

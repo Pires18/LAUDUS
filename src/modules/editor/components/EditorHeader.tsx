@@ -30,48 +30,48 @@ export function EditorHeader({
 
   return (
     <header className="h-[72px] bg-ink-900 border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-[100] backdrop-blur-md">
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 sm:gap-5 min-w-0">
         <button 
           onClick={onBack}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-ink-300 hover:text-white hover:bg-white/10 transition-all group"
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 text-ink-300 hover:text-white hover:bg-white/10 transition-all group shrink-0"
           title="Voltar à Worklist"
         >
           <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
         </button>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <div className={classNames(
-            "w-11 h-11 rounded-xl flex items-center justify-center shadow-lg transition-transform",
+            "w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-lg transition-transform shrink-0",
             area?.color || 'bg-brand-500'
           )}>
             <AreaIcon area={exam.area} size={24} className="text-white" />
           </div>
           
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-3">
-              <h1 className="text-base font-black text-white tracking-tight uppercase max-w-[240px] truncate">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <h1 className="text-sm sm:text-base font-black text-white tracking-tight uppercase max-w-[100px] xs:max-w-[140px] sm:max-w-[240px] truncate">
                 {patient.name}
               </h1>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10">
+              <div className="hidden xs:flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 border border-white/10 shrink-0">
                 <User size={10} className="text-brand-400" />
                 <span className="text-[9px] font-black text-ink-200 uppercase tracking-widest">
                   {age ? `${age} anos` : 'Idade N/I'}
                 </span>
               </div>
               <span className={classNames(
-                "text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border",
+                "text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border shrink-0 hidden sm:inline",
                 exam.status === 'finalizado' ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-brand-500/20 text-brand-400 border-brand-500/30"
               )}>
                 {exam.status}
               </span>
             </div>
             
-            <div className="flex items-center gap-4 text-[9px] font-bold text-ink-400 uppercase tracking-[0.15em]">
-              <div className="flex items-center gap-1.5">
-                <Activity size={11} className="text-brand-500" />
-                <span className="text-ink-200">{exam.examType}</span>
+            <div className="flex items-center gap-2 sm:gap-4 text-[9px] font-bold text-ink-400 uppercase tracking-[0.15em] min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0 truncate">
+                <Activity size={11} className="text-brand-500 shrink-0" />
+                <span className="text-ink-200 truncate">{exam.examType}</span>
               </div>
-              <div className="flex items-center gap-1.5 max-w-[300px] truncate">
+              <div className="hidden sm:flex items-center gap-1.5 max-w-[300px] truncate">
                 <Info size={11} className="text-amber-500" />
                 <span className="text-ink-500 italic lowercase tracking-normal">
                   {exam.clinicalIndication || 'Indicação não informada'}
@@ -82,7 +82,7 @@ export function EditorHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <div className="hidden xl:flex flex-col items-end gap-0.5 px-4 border-r border-white/5 mr-2">
            <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Sincronização Cloud</span>
            <div className="flex items-center gap-1.5">
@@ -93,31 +93,35 @@ export function EditorHeader({
 
         <button
           onClick={onEditMetadata}
-          className="h-10 px-4 rounded-xl bg-white/5 text-ink-200 hover:text-white hover:bg-white/10 border border-white/5 transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest"
+          className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-white/5 text-ink-200 hover:text-white hover:bg-white/10 border border-white/5 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+          title="Configurar Metadados"
         >
-          <Settings size={16} /> Config
+          <Settings size={16} />
+          <span className="hidden md:inline">Config</span>
         </button>
 
         {exam.status === 'finalizado' ? (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-4 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-               <CheckCircle2 size={14} className="text-emerald-400" />
-               <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Finalizado</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center justify-center gap-2 px-2.5 sm:px-4 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+               <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+               <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest hidden xs:inline">Finalizado</span>
             </div>
             <button
               onClick={onUnlock}
-              className="h-10 px-4 rounded-xl bg-white/5 text-ink-300 hover:text-white hover:bg-white/10 transition-all font-black text-[10px] uppercase tracking-widest"
+              className="h-10 px-3 sm:px-4 rounded-xl bg-white/5 text-ink-300 hover:text-white hover:bg-white/10 transition-all font-black text-[10px] uppercase tracking-widest shrink-0"
             >
               Unlock
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => onStatusChange('finalizado')}
-              className="h-10 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-black text-[10px] uppercase tracking-widest hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-900/40 transition-all flex items-center gap-2"
+              className="h-10 px-3 md:px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-black text-[10px] uppercase tracking-widest hover:from-emerald-500 hover:to-emerald-600 shadow-lg shadow-emerald-900/40 transition-all flex items-center justify-center gap-2"
             >
-              <CheckCircle2 size={16} /> Finalizar Laudo
+              <CheckCircle2 size={16} className="shrink-0" />
+              <span className="hidden md:inline">Finalizar Laudo</span>
+              <span className="md:hidden">Finalizar</span>
             </button>
           </div>
         )}

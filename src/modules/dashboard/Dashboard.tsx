@@ -92,7 +92,7 @@ export function Dashboard() {
   return (
     <div className="module-container">
       {/* Premium Glassmorphic Hero Welcome Banner */}
-      <section className="relative overflow-hidden shrink-0 rounded-[2.5rem] bg-[#0c0c0e] p-8 sm:p-12 shadow-[0_24px_60px_rgba(0,0,0,0.4)] border border-white/5 mb-10 group">
+      <section className="relative overflow-hidden shrink-0 rounded-[2rem] sm:rounded-[2.5rem] bg-[#0c0c0e] p-6 sm:p-12 shadow-[0_24px_60px_rgba(0,0,0,0.4)] border border-white/5 mb-6 sm:mb-10 group">
         {/* Ambient Glows */}
         <div className="absolute inset-0 opacity-30 pointer-events-none">
           <div className="absolute top-[-30%] left-[-10%] w-[60%] h-[120%] bg-brand-600 rounded-full blur-[140px] animate-pulse" />
@@ -172,7 +172,7 @@ export function Dashboard() {
       </section>
 
       {/* Main Stats Neon Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10 shrink-0">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-10 shrink-0">
         <StatCard
           label="Aguardando"
           value={stats.pending}
@@ -204,7 +204,7 @@ export function Dashboard() {
       </div>
 
       {/* Layout Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-10 items-start shrink-0">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-10 items-start">
         
         {/* Left Column (2 cols) - Charts and Feeds */}
         <div className="xl:col-span-2 space-y-10">
@@ -428,11 +428,11 @@ function StatCard({ label, value, icon, color, onClick }: {
     <button
       onClick={onClick}
       className={classNames(
-        "p-6 rounded-[2.2rem] border text-left group hover:-translate-y-1.5 transition-all duration-300",
+        "p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2.2rem] border text-left group hover:-translate-y-1.5 transition-all duration-300",
         colorMap[color]
       )}
     >
-      <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-inner group-hover:scale-105 transition-transform", iconColors[color])}>
+      <div className={classNames("w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-6 shadow-inner group-hover:scale-105 transition-transform", iconColors[color])}>
         {icon}
       </div>
       <div>

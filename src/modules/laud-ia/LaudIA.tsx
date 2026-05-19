@@ -11,9 +11,7 @@ import { classNames } from '../../utils/format';
 import { EXAM_AREAS, ExamArea, AppSettings } from '../../types';
 import { 
   DEFAULT_MASTER_PROMPT, 
-  DEFAULT_GLOBAL_INSTRUCTIONS, 
   DEFAULT_STRUCTURE_PROMPT, 
-  DEFAULT_RIGID_RULES,
   AREA_SPECIFIC_PROMPTS,
 } from '../ai/prompts';
 
@@ -208,84 +206,6 @@ export function LaudIA() {
                 </div>
               </div>
 
-              {/* Instructions & Rules Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Reasoning Instructions */}
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col overflow-hidden">
-                  <div className="p-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-black uppercase tracking-widest text-ink-600 flex items-center gap-2">
-                          <Zap size={14} className="text-amber-500" /> Raciocínio Clínico
-                        </h4>
-                        {(!localSettings.aiGlobalInstructions || localSettings.aiGlobalInstructions.trim() === (adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS).trim()) ? (
-                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[7px] font-black uppercase tracking-wider border border-emerald-100/50">
-                            Herdado
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[7px] font-black uppercase tracking-wider border border-indigo-100/50">
-                            Customizado
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setLocalSettings({...localSettings, aiGlobalInstructions: adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS});
-                        showToast('Raciocínio Clínico sincronizado com o Administrador', 'info');
-                      }} 
-                      className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100/60 bg-white"
-                      title="Sincronizar com Administrador"
-                    >
-                      <RotateCcw size={12} />
-                    </button>
-                  </div>
-                  <textarea
-                    value={localSettings.aiGlobalInstructions}
-                    onChange={(e) => setLocalSettings({ ...localSettings, aiGlobalInstructions: e.target.value })}
-                    rows={10}
-                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl focus:outline-none"
-                  />
-                </div>
-
-                {/* Rigid Compliance Rules */}
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm flex flex-col overflow-hidden">
-                  <div className="p-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-black uppercase tracking-widest text-ink-600 flex items-center gap-2">
-                          <ShieldCheck size={14} className="text-red-500" /> Regras Inquebráveis
-                        </h4>
-                        {(!localSettings.aiRigidRules || localSettings.aiRigidRules.trim() === (adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES).trim()) ? (
-                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[7px] font-black uppercase tracking-wider border border-emerald-100/50">
-                            Herdado
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[7px] font-black uppercase tracking-wider border border-indigo-100/50">
-                            Customizado
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setLocalSettings({...localSettings, aiRigidRules: adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES});
-                        showToast('Regras Inquebráveis sincronizadas com o Administrador', 'info');
-                      }} 
-                      className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg border border-brand-100/60 bg-white"
-                      title="Sincronizar com Administrador"
-                    >
-                      <RotateCcw size={12} />
-                    </button>
-                  </div>
-                  <textarea
-                    value={localSettings.aiRigidRules}
-                    onChange={(e) => setLocalSettings({ ...localSettings, aiRigidRules: e.target.value })}
-                    rows={10}
-                    className="flex-1 w-full border-none focus:ring-0 font-mono text-xs p-6 bg-ink-50/30 rounded-b-3xl focus:outline-none"
-                  />
-                </div>
-              </div>
 
               {/* Structure Prompt */}
               <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">

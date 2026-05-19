@@ -13,10 +13,10 @@ import { EXAM_AREAS, ExamArea, ReportTemplate } from '../../../types';
 import { generateReport } from '../../ai/gemini';
 import { 
   DEFAULT_MASTER_PROMPT, 
-  DEFAULT_GLOBAL_INSTRUCTIONS, 
   DEFAULT_STRUCTURE_PROMPT, 
-  DEFAULT_RIGID_RULES,
   AREA_SPECIFIC_PROMPTS,
+  DEFAULT_GLOBAL_INSTRUCTIONS,
+  DEFAULT_RIGID_RULES,
 } from '../../ai/prompts';
 
 type TabId = 'prompts' | 'areas' | 'engine' | 'training';
@@ -169,6 +169,7 @@ export function AdminLaudIA() {
   const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
 
 
 
@@ -289,90 +290,145 @@ export function AdminLaudIA() {
             <div className="space-y-8 animate-fade-in-up">
               {/* Primary Master Prompt Editor */}
               <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl overflow-hidden p-6 md:p-8 space-y-6">
-                <div className="flex items-center justify-between border-b border-ink-50 pb-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ink-50 pb-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/50 shadow-inner">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/50 shadow-inner shrink-0">
                       <BrainCircuit size={28} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-black text-ink-900 uppercase tracking-wider">Prompt Mestre (Master Directive)</h4>
-                      <p className="text-[10px] text-ink-400 font-bold uppercase tracking-[0.15em] mt-0.5">Doutrina e Personalidade Base da Inteligência Artificial</p>
+                      <h4 className="text-sm font-black text-ink-900 uppercase tracking-wider">Diretrizes Operacionais do LAUD.IA</h4>
+                      <p className="text-[10px] text-ink-400 font-bold uppercase tracking-[0.15em] mt-0.5">Doutrina, Raciocínio, Skeleton e Compliance Médico-Legal</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wider">
-                      PRIMARY DEFENSE
-                    </span>
+                  
+                  {/* Prompt Sub-Selector Pills */}
+                  <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 border border-slate-200/50 rounded-2xl shrink-0">
+                    <button
+                      onClick={() => setActivePromptSubTab('master')}
+                      className={classNames(
+                        "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                        activePromptSubTab === 'master' 
+                          ? "bg-white text-indigo-650 shadow-sm" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      Prompt Mestre
+                    </button>
+                    <button
+                      onClick={() => setActivePromptSubTab('global')}
+                      className={classNames(
+                        "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                        activePromptSubTab === 'global' 
+                          ? "bg-white text-emerald-650 shadow-sm" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      Instruções Globais
+                    </button>
+                    <button
+                      onClick={() => setActivePromptSubTab('structure')}
+                      className={classNames(
+                        "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                        activePromptSubTab === 'structure' 
+                          ? "bg-white text-amber-650 shadow-sm" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      Skeleton (Estrutura)
+                    </button>
+                    <button
+                      onClick={() => setActivePromptSubTab('rigid')}
+                      className={classNames(
+                        "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                        activePromptSubTab === 'rigid' 
+                          ? "bg-white text-rose-650 shadow-sm" 
+                          : "text-slate-500 hover:text-slate-800"
+                      )}
+                    >
+                      Regras Rígidas
+                    </button>
                   </div>
                 </div>
 
-                <CognitiveCodeEditor
-                  value={localSettings.aiMasterPrompt || ''}
-                  onChange={(val) => setLocalSettings({ ...localSettings, aiMasterPrompt: val })}
-                  fileName="master_prompt.md"
-                  badge="CENTRAL DIRECTIVE"
-                  glowColor="brand"
-                  placeholder="Defina o papel principal, tom e escopo da IA..."
-                  onRestore={() => {
-                    setLocalSettings({...localSettings, aiMasterPrompt: DEFAULT_MASTER_PROMPT});
-                    showToast('Prompt Mestre restaurado para o padrão', 'info');
-                  }}
-                />
-              </div>
-
-              {/* Sub-Directives Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Reasoning Instructions */}
-                <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl p-6 md:p-8 flex flex-col space-y-6">
-                  <div className="flex items-center justify-between border-b border-ink-50 pb-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-ink-900 flex items-center gap-2">
-                      <Zap size={16} className="text-amber-500 animate-pulse" /> Instruções de Raciocínio
-                    </h4>
-                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest">
-                      LOGIC FLOW
-                    </span>
+                {activePromptSubTab === 'master' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-indigo-50/50 rounded-2xl text-[11px] text-indigo-900 font-semibold leading-relaxed">
+                      💡 <strong>Prompt Mestre (Doutrina):</strong> Define a personalidade central da IA como radiologista sênior, a cascata tripartite, o mimetismo de estilo e a tradução semântica de notas rápidas.
+                    </div>
+                    <CognitiveCodeEditor
+                      value={localSettings.aiMasterPrompt || ''}
+                      onChange={(val) => setLocalSettings({ ...localSettings, aiMasterPrompt: val })}
+                      fileName="master_prompt.md"
+                      badge="CENTRAL MASTER DIRECTIVE"
+                      glowColor="brand"
+                      placeholder="Defina o papel principal, tom e escopo da IA..."
+                      onRestore={() => {
+                        setLocalSettings({...localSettings, aiMasterPrompt: DEFAULT_MASTER_PROMPT});
+                        showToast('Prompt Mestre restaurado para o padrão', 'info');
+                      }}
+                    />
                   </div>
-                  <div className="flex-1">
+                )}
+
+                {activePromptSubTab === 'global' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-emerald-50/50 rounded-2xl text-[11px] text-emerald-950 font-semibold leading-relaxed">
+                      💡 <strong>Instruções Globais (Raciocínio Clínico):</strong> Regula o motor de cognição em 5 fases sequenciais (ancoragem, normalidade habitual, autocalculo e matemática de eixos, etc.) e as regras métricas (1 casa para mm, 2 para cm).
+                    </div>
                     <CognitiveCodeEditor
                       value={localSettings.aiGlobalInstructions || ''}
                       onChange={(val) => setLocalSettings({ ...localSettings, aiGlobalInstructions: val })}
-                      fileName="reasoning_rules.txt"
-                      badge="COGNITIVE SHIELD"
-                      glowColor="amber"
-                      placeholder="Instruções de estruturação lógica de raciocínio..."
+                      fileName="global_instructions.md"
+                      badge="GLOBAL REASONING SYSTEM"
+                      glowColor="emerald"
+                      placeholder="Defina as instruções de raciocínio lógico e matemático global..."
                       onRestore={() => {
                         setLocalSettings({...localSettings, aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS});
-                        showToast('Instruções de Raciocínio restauradas', 'info');
+                        showToast('Instruções Globais restauradas para o padrão', 'info');
                       }}
                     />
                   </div>
-                </div>
+                )}
 
-                {/* Rigid Compliance Rules */}
-                <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl p-6 md:p-8 flex flex-col space-y-6">
-                  <div className="flex items-center justify-between border-b border-ink-50 pb-4">
-                    <h4 className="text-xs font-black uppercase tracking-wider text-ink-900 flex items-center gap-2">
-                      <ShieldCheck size={16} className="text-rose-500" /> Regras Inquebráveis
-                    </h4>
-                    <span className="px-2.5 py-0.5 rounded-lg bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest">
-                      STRICT COMPLIANCE
-                    </span>
+                {activePromptSubTab === 'structure' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-amber-50/50 rounded-2xl text-[11px] text-amber-950 font-semibold leading-relaxed">
+                      💡 <strong>Arquitetura Obrigatória (Skeleton):</strong> Define a formatação das tags de marcação HTML e os tópicos obrigatórios (TÍTULO, TÉCNICA, ANÁLISE, CONCLUSÃO, RECOMENDAÇÕES) que protegem a integridade do editor.
+                    </div>
+                    <CognitiveCodeEditor
+                      value={localSettings.aiStructurePrompt || ''}
+                      onChange={(val) => setLocalSettings({ ...localSettings, aiStructurePrompt: val })}
+                      fileName="structure_prompt.md"
+                      badge="SKELETON CODE SPECIFICATION"
+                      glowColor="amber"
+                      placeholder="Defina as diretrizes obrigatórias de formatação e tags do laudo..."
+                      onRestore={() => {
+                        setLocalSettings({...localSettings, aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT});
+                        showToast('Skeleton estrutural restaurado para o padrão', 'info');
+                      }}
+                    />
                   </div>
-                  <div className="flex-1">
+                )}
+
+                {activePromptSubTab === 'rigid' && (
+                  <div className="space-y-4 animate-fade-in">
+                    <div className="p-4 bg-rose-50/50 rounded-2xl text-[11px] text-rose-950 font-semibold leading-relaxed">
+                      💡 <strong>Regras Rígidas (Compliance & Segurança):</strong> Regras inquebráveis e proibitivas de blindagem médico-legal, tratamento de red flags e urgências clínicas, e proibição absoluta de prescrição de condutas cirúrgicas diretas.
+                    </div>
                     <CognitiveCodeEditor
                       value={localSettings.aiRigidRules || ''}
                       onChange={(val) => setLocalSettings({ ...localSettings, aiRigidRules: val })}
-                      fileName="rigid_rules.txt"
-                      badge="COMPLIANCE SHIELD"
+                      fileName="rigid_rules.md"
+                      badge="LAUD.IA SECURITY GUARDIAN"
                       glowColor="rose"
-                      placeholder="Regras estritas médico-legais e limitações da IA..."
+                      placeholder="Defina as regras restritivas que a IA sob nenhuma hipótese pode violar..."
                       onRestore={() => {
                         setLocalSettings({...localSettings, aiRigidRules: DEFAULT_RIGID_RULES});
-                        showToast('Regras Inquebráveis restauradas', 'info');
+                        showToast('Regras Rígidas de Segurança restauradas para o padrão', 'info');
                       }}
                     />
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}

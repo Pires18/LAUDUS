@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { CALCULATORS } from './registry';
 import { 
-  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X
+  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, Zap, CheckCircle2
 } from 'lucide-react';
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
@@ -179,31 +179,33 @@ export function Calculators() {
 
       {/* Modal da Calculadora */}
       {selectedCalcId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-4 lg:p-8 animate-in fade-in duration-200 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100 flex flex-col">
-            <div className="px-8 py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20">
-                  <Calculator size={24} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-2 sm:p-4 lg:p-8 animate-in fade-in duration-200 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100 flex flex-col">
+            <div className="px-5 py-4 sm:px-8 sm:py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20 shrink-0">
+                  <Calculator size={20} />
                 </div>
                 <div>
-                  <h3 className="font-black text-ink-900 text-lg">{activeCalc?.name}</h3>
-                  <p className="text-xs text-ink-400 font-bold uppercase tracking-widest">Módulo de Cálculo Clínico</p>
+                  <h3 className="font-black text-ink-900 text-sm sm:text-lg truncate max-w-[200px] sm:max-w-none">{activeCalc?.name}</h3>
+                  <p className="text-[9px] sm:text-xs text-ink-400 font-bold uppercase tracking-widest">Módulo de Cálculo Clínico</p>
                 </div>
               </div>
               <button 
                 onClick={() => { setSelectedCalcId(null); setCalcResult(null); }} 
-                className="p-3 hover:bg-ink-100 rounded-2xl text-ink-400 hover:text-ink-900 transition-all border border-ink-100"
+                className="p-2 sm:p-3 hover:bg-ink-100 rounded-xl sm:rounded-2xl text-ink-400 hover:text-ink-900 transition-all border border-ink-100"
               >
-                <X size={24} />
+                <X size={20} />
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              {activeCalc && React.createElement(activeCalc.component, {
-                value: calcResult ?? {},
-                onChange: (res: Record<string, unknown>) => setCalcResult(res)
-              })}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-6 shadow-sm">
+                {activeCalc && React.createElement(activeCalc.component, {
+                  value: calcResult ?? {},
+                  onChange: (res: Record<string, unknown>) => setCalcResult(res)
+                })}
+              </div>
               
               {activeCalc?.reference && (
                 <CalculatorReference 
@@ -212,34 +214,64 @@ export function Calculators() {
                 />
               )}
               
-              {calcResult && (
-                <div className="mt-8 p-8 bg-brand-50 rounded-[2.5rem] border border-brand-100 animate-in slide-in-from-bottom-4">
-                  <h4 className="text-xs font-black text-brand-600 uppercase tracking-widest mb-4">Resultado da Análise</h4>
-                  <div className="text-ink-900 font-bold whitespace-pre-wrap leading-relaxed">
-                    {typeof calcResult === 'string' ? calcResult : JSON.stringify(calcResult, null, 2)}
+              {calcResult && (calcResult._summary || Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0) && (
+                <div className="p-4 sm:p-6 bg-brand-50/50 rounded-[1.5rem] sm:rounded-[2rem] border border-brand-100 animate-in slide-in-from-bottom-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                     <Activity size={16} className="text-brand-600" />
+                     <h4 className="text-[10px] sm:text-xs font-black text-brand-600 uppercase tracking-widest">Resultado Técnico</h4>
                   </div>
+                  
+                  {calcResult._summary && (
+                     <div className="p-4 rounded-xl bg-white border border-brand-100/50 shadow-sm">
+                        <p className="text-xs sm:text-sm font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">{calcResult._summary}</p>
+                     </div>
+                  )}
+
+                  {Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0 && (
+                     <div className="space-y-2">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Métricas Detalhadas:</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                           {Object.entries(calcResult).filter(([k]) => !k.startsWith('_')).map(([k, v]) => (
+                             <div key={k} className="flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-slate-100 shadow-inner">
+                                <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-tight">{k}</span>
+                                <span className="text-[10px] sm:text-[11px] font-black text-slate-700">{String(v)}</span>
+                             </div>
+                           ))}
+                        </div>
+                     </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="px-8 py-6 bg-ink-50/50 border-t border-ink-100 flex justify-end gap-3 shrink-0">
+            <div className="px-5 py-4 sm:px-8 sm:py-6 bg-ink-50/50 border-t border-ink-100 flex justify-end gap-2.5 sm:gap-3 shrink-0">
               <button 
                 onClick={() => { setSelectedCalcId(null); setCalcResult(null); }}
-                className="px-6 py-3 rounded-2xl text-sm font-black text-ink-600 hover:bg-ink-100 transition-all uppercase tracking-widest"
+                className="px-5 py-3 rounded-xl sm:rounded-2xl text-xs font-black text-ink-600 hover:bg-ink-100 transition-all uppercase tracking-widest"
               >
                 Fechar
               </button>
-              {calcResult && (
+              {calcResult && (calcResult._summary || Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0) && (
                 <button 
-                  className="px-8 py-3 rounded-2xl text-sm font-black text-white bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all uppercase tracking-widest"
+                  className="px-6 py-3 rounded-xl sm:rounded-2xl text-xs font-black text-white bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all uppercase tracking-widest flex items-center gap-2 active:scale-95"
                   onClick={() => {
-                    // Aqui iria a lógica de copiar para o laudo
-                    alert('Resultado copiado para o clipboard!');
+                    const cleanData = { ...calcResult };
+                    Object.keys(cleanData).forEach(key => {
+                      if (key.startsWith('_')) delete cleanData[key];
+                    });
+
+                    const finalMessage = `[RESULTADO TÉCNICO: ${activeCalc?.name}]\n\n` +
+                      (calcResult?._summary ? `CONCLUSÃO: ${calcResult._summary}\n\n` : '') +
+                      `MÉTRICAS COLETADAS:\n${Object.entries(cleanData).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`;
+
+                    navigator.clipboard.writeText(finalMessage);
+                    alert('Resultado técnico copiado com sucesso para a área de transferência!');
                     setSelectedCalcId(null);
                     setCalcResult(null);
                   }}
                 >
-                  Usar no Laudo
+                  <Zap size={14} className="fill-white" />
+                  Copiar Resultado
                 </button>
               )}
             </div>

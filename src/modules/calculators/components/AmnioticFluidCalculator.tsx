@@ -30,24 +30,24 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
       const depths = pockets.map(p => Number(p.depth)).filter(d => d > 0);
       if (depths.length > 0) {
         result = Math.max(...depths);
-        if (result < 2) classification = 'Oligoâmnio (MBV < 2cm)';
-        else if (result <= 8) classification = 'Volume normal (2-8cm)';
-        else classification = 'Polidrâmnio (MBV > 8cm)';
+        if (result < 20) classification = 'Oligoâmnio (MBV < 20mm)';
+        else if (result <= 80) classification = 'Volume normal (20-80mm)';
+        else classification = 'Polidrâmnio (MBV > 80mm)';
       }
     } else {
       // ILA = Índice de Líquido Amniótico (4 quadrants)
       if (q1 && q2 && q3 && q4) {
         result = Number(q1) + Number(q2) + Number(q3) + Number(q4);
-        if (result < 5) classification = 'Oligoâmnio (ILA < 5cm)';
-        else if (result <= 8) classification = 'Líquido reduzido (5-8cm)';
-        else if (result <= 18) classification = 'Volume normal (8-18cm)';
-        else if (result <= 24) classification = 'Líquido aumentado (18-24cm)';
-        else classification = 'Polidrâmnio (ILA > 24cm)';
+        if (result < 50) classification = 'Oligoâmnio (ILA < 50mm)';
+        else if (result <= 80) classification = 'Líquido reduzido (50-80mm)';
+        else if (result <= 180) classification = 'Volume normal (80-180mm)';
+        else if (result <= 240) classification = 'Líquido aumentado (180-240mm)';
+        else classification = 'Polidrâmnio (ILA > 240mm)';
       }
     }
 
     const summary = result !== null
-      ? `Líquido Amniótico (${method === 'mbv' ? 'MBV' : 'ILA'}): ${result.toFixed(1)}cm. ${classification}.`
+      ? `Líquido Amniótico (${method === 'mbv' ? 'MBV' : 'ILA'}): ${result.toFixed(0)}mm. ${classification}.`
       : null;
 
     onChange({ method, pockets, q1, q2, q3, q4, result, classification, _summary: summary });
@@ -119,7 +119,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
                     value={p.depth} 
                     onChange={e => updatePocket(p.id, e.target.value)} 
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-ink-300 uppercase">cm</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-ink-300 uppercase">mm</span>
                 </div>
                 {pockets.length > 1 && (
                   <button 
@@ -156,7 +156,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
                     value={q.val} 
                     onChange={e => q.set(e.target.value)} 
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-ink-300 uppercase">cm</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-ink-300 uppercase">mm</span>
                 </div>
               </div>
             ))}
@@ -175,7 +175,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
                 Resultado ({method === 'mbv' ? 'MBV' : 'ILA'})
               </span>
               <span className="text-3xl font-black leading-none">
-                {value.result.toFixed(1)} <small className="text-sm opacity-70">cm</small>
+                {value.result.toFixed(0)} <small className="text-sm opacity-70">mm</small>
               </span>
             </div>
             <div className="text-right max-w-[55%]">
