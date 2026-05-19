@@ -142,6 +142,9 @@ export interface AppSettings {
   currentRole?: UserRole;
   geminiApiKey?: string;
   geminiModel: string;
+  aiProvider?: 'gemini' | 'anthropic';
+  anthropicApiKey?: string;
+  anthropicModel?: string;
   /** Nome completo do médico (para assinatura) */
   physicianName?: string;
   physicianCRM?: string;

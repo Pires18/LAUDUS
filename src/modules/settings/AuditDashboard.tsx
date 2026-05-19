@@ -24,12 +24,13 @@ export function AuditDashboard() {
     const newResults: AuditResult[] = [];
 
     // 1. API Key Check
-    if (!settings.geminiApiKey) {
+    const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+    if (!hasKey) {
       newResults.push({
         id: 'api-key',
         category: 'security',
         status: 'error',
-        title: 'Gemini API Key Ausente',
+        title: `API Key do ${settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} Ausente`,
         message: 'O sistema está operando em modo demo. Configure a API Key para habilitar a IA.',
         icon: <Key size={18} />
       });
@@ -39,7 +40,7 @@ export function AuditDashboard() {
         category: 'security',
         status: 'ok',
         title: 'IA Conectada',
-        message: 'API Key configurada e motor Gemini pronto para uso.',
+        message: `API Key configurada e motor ${settings.aiProvider === 'anthropic' ? 'Claude' : 'Gemini'} pronto para uso.`,
         icon: <Key size={18} />
       });
     }

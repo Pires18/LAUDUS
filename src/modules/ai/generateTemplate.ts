@@ -20,8 +20,10 @@ export async function generateTemplateStructure(
   examName: string,
   settings: AppSettings
 ): Promise<GeneratedTemplate> {
-  if (!settings.geminiApiKey) {
-    throw new Error('API Key do Gemini não configurada. Vá em Configurações para adicionar.');
+  const provider = settings.aiProvider || 'gemini';
+  const hasKey = provider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+  if (!hasKey) {
+    throw new Error(`API Key do ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada. Vá em Configurações para adicionar.`);
   }
 
   // Busca exemplos de laudos da mesma área para mimetizar o estilo
@@ -86,18 +88,44 @@ FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
   "classificationTemplate": "HTML da classificação ou string vazia"
 }`;
 
-  const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
-  const model = genAI.getGenerativeModel({
-    model: settings.geminiModel || 'gemini-2.0-flash-exp',
-    generationConfig: {
-      temperature: 0.2,
-      topP: 0.9,
-      maxOutputTokens: 4096,
-    }
-  });
+  let text = '';
+  if (provider === 'gemini') {
+    const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
+    const model = genAI.getGenerativeModel({
+      model: settings.geminiModel || 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.9,
+        maxOutputTokens: 4096,
+      }
+    });
 
-  const result = await model.generateContent(prompt);
-  let text = result.response.text();
+    const result = await model.generateContent(prompt);
+    text = result.response.text();
+  } else {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': settings.anthropicApiKey || '',
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
+    }
+
+    const result = await response.json();
+    text = result.content?.[0]?.text || '';
+  }
 
   // Clean markdown code blocks if present
   text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();

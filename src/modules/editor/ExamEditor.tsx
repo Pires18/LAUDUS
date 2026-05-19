@@ -278,10 +278,11 @@ export function ExamEditor({ examId }: Props) {
           />
 
           {/* AVISO API KEY */}
-          {!settings.geminiApiKey && (
+          {((settings.aiProvider === 'anthropic' && !settings.anthropicApiKey) || 
+            ((settings.aiProvider === 'gemini' || !settings.aiProvider) && !settings.geminiApiKey)) && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
               <AlertCircle size={12} />
-              <span>API Key não configurada — geração em <strong>modo demo</strong>.</span>
+              <span>API Key do {settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada — geração em <strong>modo demo</strong>.</span>
               <button className="underline ml-1 font-medium" onClick={() => setView({ name: 'settings' })}>Configurar</button>
             </div>
           )}
@@ -319,7 +320,11 @@ export function ExamEditor({ examId }: Props) {
                 }}
                 onShowHistory={() => setShowHistoryModal(true)}
                 saveState={saveState}
-                geminiModel={settings.geminiModel || 'gemini-1.5-flash'}
+                geminiModel={
+                  settings.aiProvider === 'anthropic'
+                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                    : (settings.geminiModel || 'gemini-2.5-flash')
+                }
               />
 
           <div className="flex-1 overflow-hidden relative flex flex-col">
@@ -536,7 +541,11 @@ export function ExamEditor({ examId }: Props) {
             <div className="px-5 py-3.5 border-b border-ink-100 flex items-center justify-between shrink-0">
               <div>
                 <h3 className="font-semibold text-ink-900 flex items-center gap-2"><Eye size={16} className="text-brand-500" /> Prompt Preview</h3>
-                <p className="text-xs text-ink-500 mt-0.5">Prompt exato enviado ao modelo {settings.geminiModel}</p>
+                <p className="text-xs text-ink-500 mt-0.5">Prompt exato enviado ao modelo {
+                  settings.aiProvider === 'anthropic'
+                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                    : (settings.geminiModel || 'gemini-2.5-flash')
+                }</p>
               </div>
               <button onClick={() => setShowPromptPreview(false)} className="p-1.5 rounded-lg hover:bg-ink-100 text-ink-400"><X size={18} /></button>
             </div>
@@ -553,7 +562,11 @@ export function ExamEditor({ examId }: Props) {
             </div>
             <div className="px-5 py-3 border-t border-ink-100 flex items-center justify-between bg-ink-50/50 shrink-0">
               <span className="text-[10px] text-ink-400">
-                Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {settings.geminiModel}
+                Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {
+                  settings.aiProvider === 'anthropic'
+                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                    : (settings.geminiModel || 'gemini-2.5-flash')
+                }
               </span>
               <button
                 onClick={() => {

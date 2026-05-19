@@ -454,8 +454,9 @@ export function LaudCopilot({
   const handleSend = async (customPrompt?: string) => {
     const messageToSend = customPrompt || prompt;
     if (!messageToSend.trim() || isGenerating) return;
-    if (!settings.geminiApiKey) {
-      showToast('Configure a API do Gemini', 'error');
+    const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+    if (!hasKey) {
+      showToast(`Configure a API do ${settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'}`, 'error');
       return;
     }
 

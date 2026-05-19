@@ -101,7 +101,8 @@ export function useExamActions({
         ? await getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
         : [];
       let html: string;
-      if (settings.geminiApiKey) {
+      const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+      if (hasKey) {
         html = await generateReportStream({
           currentReport,
           template,

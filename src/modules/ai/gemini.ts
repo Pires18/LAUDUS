@@ -144,7 +144,10 @@ function compileMasterPrompt({
   if (hasPlaceholders) {
     let compiled = masterPrompt;
     compiled = compiled.replace('[INJETAR_REGRAS_DA_ESPECIALIDADE_AQUI]', areaSpecificRules || 'Nenhuma regra específica para esta área.');
-    compiled = compiled.replace('[INJETAR_EXEMPLOS_DA_ESPECIALIDADE_AQUI]', previousExams.length > 0 ? previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n') : 'Nenhum exemplo de ancoragem disponível.');
+    const safeExamples = previousExams.length > 0 
+      ? `[ATENÇÃO MÁXIMA: Os laudos abaixo são EXCLUSIVAMENTE para referência do SEU ESTILO DE ESCRITA e formatação visual. SOB NENHUMA HIPÓTESE você deve copiar achados patológicos, nomes, datas, medidas ou diagnósticos destes exemplos para o laudo atual do paciente. Isole completamente as informações clínicas.]\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}`
+      : 'Nenhum exemplo de ancoragem disponível.';
+    compiled = compiled.replace('[INJETAR_EXEMPLOS_DA_ESPECIALIDADE_AQUI]', safeExamples);
     compiled = compiled.replace('[INJETAR_MODO_DE_ROTEAMENTO_AQUI]', routingMode);
     compiled = compiled.replace('[INJETAR_DADOS_PACIENTE]', patientBlock);
     compiled = compiled.replace('[INJETAR_INDICACAO_CLINICA]', clinicalIndication || 'Não informada.');
@@ -156,7 +159,7 @@ function compileMasterPrompt({
 
   // Fallback para Master Prompts legados customizados
   const previousContext = previousExams.length > 0 
-    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES):\n═══════════════════════════════════════════\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
+    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES - ISOLAMENTO DE DADOS):\n═══════════════════════════════════════════\n[ATENÇÃO MÁXIMA: Os laudos abaixo são EXCLUSIVAMENTE para referência do SEU ESTILO DE ESCRITA. SOB NENHUMA HIPÓTESE você deve copiar achados patológicos, medidas ou diagnósticos destes exemplos para o laudo atual. O laudo atual deve conter APENAS o que o médico informou no contexto clínico abaixo.]\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
     : '';
 
   return `${masterPrompt}
@@ -266,10 +269,11 @@ export function buildRefinePrompt({
 
   const notesText = customPrompt 
     ? `AJUSTAR E REFINAR o laudo de acordo com o comando do médico: "${customPrompt}".
-       Mantenha a blindagem médico-legal, aplique a Cascata Tripartite e garanta que todas as novas medidas introduzidas sigam a padronização obrigatória da especialidade.`
-    : `REFINAR, REVISAR, SANITIZAR E HIGIENIZAR o laudo médico preenchido.
+       Mantenha a blindagem médico-legal, aplique a Cascata Tripartite e garanta que todas as novas medidas introduzidas sigam a padronização obrigatória da especialidade. Entenda e traduza adequadamente todas as abreviações médicas (ex: DUM, IG, CCN, BCF, ILA). Revise O LAUDO COMPLETO, adequando frases, ajustes e recomendações para que fiquem 100% coesos com as mudanças.`
+    : `REFINAR, REVISAR, SANITIZAR E HIGIENIZAR O LAUDO COMPLETO.
        Substitua TODOS os placeholders residuais pela Doutrina de Normalidade Habitual.
-       Garanta a Cascata Tripartite perfeitamente alinhada e as 12 Regras do Guardian Core v9.0.`;
+       Garanta a Cascata Tripartite perfeitamente alinhada e as 12 Regras do Guardian Core v9.0.
+       Melhore as frases, ajuste recomendações e traduza abreviações médicas (DUM, IG, etc.) adequadamente.`;
 
   const compiled = compileMasterPrompt({
     masterPrompt,
@@ -356,9 +360,7 @@ Gere agora a resposta completa estruturada with === CONVERSA === and === PROPOST
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
   const { settings } = params;
-  if (!settings.geminiApiKey) {
-    throw new Error('API Key do Gemini não configurada. Vá em Configurações para adicionar.');
-  }
+  const provider = settings.aiProvider || 'gemini';
 
   let prompt: string;
   if ('instruction' in params) {
@@ -369,26 +371,60 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     prompt = buildPrompt(params as GenerateReportParams);
   }
 
-  const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
-  const model = genAI.getGenerativeModel({
-    model: settings.geminiModel || 'gemini-2.0-flash',
-    generationConfig: {
-      temperature: settings.aiTemperature ?? 0.3,
-      topP: 0.9,
-      maxOutputTokens: 4096,
+  if (provider === 'gemini') {
+    if (!settings.geminiApiKey) {
+      throw new Error('API Key do Gemini não configurada. Vá em Configurações para adicionar.');
     }
-  });
 
-  const result = await model.generateContent(prompt);
-  let text = result.response.text();
+    const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
+    const model = genAI.getGenerativeModel({
+      model: settings.geminiModel || 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: settings.aiTemperature ?? 0.3,
+        topP: 0.9,
+        maxOutputTokens: 4096,
+      }
+    });
 
-  text = text.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-  text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const result = await model.generateContent(prompt);
+    let text = result.response.text();
 
-  // Strip scratchpad tags from final report
-  text = stripScratchpad(text);
+    text = text.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+    text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    text = stripScratchpad(text);
+    return text;
+  } else {
+    if (!settings.anthropicApiKey) {
+      throw new Error('API Key do Anthropic não configurada. Vá em Configurações para adicionar.');
+    }
 
-  return text;
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': settings.anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: settings.aiTemperature ?? 0.3
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
+    }
+
+    const result = await response.json();
+    let text = result.content?.[0]?.text || '';
+    text = text.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+    text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    text = stripScratchpad(text);
+    return text;
+  }
 }
 
 export async function generateReportStream(
@@ -396,9 +432,7 @@ export async function generateReportStream(
   onChunk: (text: string) => void
 ): Promise<string> {
   const { settings } = params;
-  if (!settings.geminiApiKey) {
-    throw new Error('API Key do Gemini não configurada. Vá em Configurações para adicionar.');
-  }
+  const provider = settings.aiProvider || 'gemini';
 
   let prompt: string;
   if ('instruction' in params) {
@@ -409,38 +443,108 @@ export async function generateReportStream(
     prompt = buildPrompt(params as GenerateReportParams);
   }
 
-  const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
-  const model = genAI.getGenerativeModel({
-    model: settings.geminiModel || 'gemini-2.0-flash',
-    generationConfig: {
-      temperature: settings.aiTemperature ?? 0.3,
-      topP: 0.9,
-      maxOutputTokens: 4096,
+  if (provider === 'gemini') {
+    if (!settings.geminiApiKey) {
+      throw new Error('API Key do Gemini não configurada. Vá em Configurações para adicionar.');
     }
-  });
 
-  const result = await model.generateContentStream(prompt);
-  let fullText = '';
-  for await (const chunk of result.stream) {
-    const chunkText = chunk.text();
-    fullText += chunkText;
-    
-    let cleanText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
-    cleanText = cleanText.replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-    
-    // Dynamically strip <scratchpad>...</scratchpad>
-    cleanText = stripScratchpad(cleanText);
-    
-    onChunk(cleanText);
+    const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
+    const model = genAI.getGenerativeModel({
+      model: settings.geminiModel || 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: settings.aiTemperature ?? 0.3,
+        topP: 0.9,
+        maxOutputTokens: 4096,
+      }
+    });
+
+    const result = await model.generateContentStream(prompt);
+    let fullText = '';
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      fullText += chunkText;
+      
+      let cleanText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
+      cleanText = cleanText.replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+      cleanText = stripScratchpad(cleanText);
+      onChunk(cleanText);
+    }
+
+    fullText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+    fullText = fullText.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    fullText = stripScratchpad(fullText);
+    return fullText;
+  } else {
+    if (!settings.anthropicApiKey) {
+      throw new Error('API Key do Anthropic não configurada. Vá em Configurações para adicionar.');
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': settings.anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: settings.aiTemperature ?? 0.3,
+        stream: true
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Não foi possível inicializar o leitor de stream.');
+    }
+
+    const decoder = new TextDecoder('utf-8');
+    let fullText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (!cleanLine || !cleanLine.startsWith('data:')) continue;
+
+        const dataStr = cleanLine.slice(5).trim();
+        if (dataStr === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            fullText += parsed.delta.text;
+            
+            let cleanText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
+            cleanText = cleanText.replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+            cleanText = stripScratchpad(cleanText);
+            onChunk(cleanText);
+          }
+        } catch (e) {
+          // Ignorar erros de parseamento de JSON malformatados ou de outros tipos de eventos
+        }
+      }
+    }
+
+    fullText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
+    fullText = fullText.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    fullText = stripScratchpad(fullText);
+    return fullText;
   }
-
-  fullText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-  fullText = fullText.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-  
-  // Strip scratchpad tags from final streamed output
-  fullText = stripScratchpad(fullText);
-  
-  return fullText;
 }
 
 /**

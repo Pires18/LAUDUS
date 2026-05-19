@@ -105,13 +105,19 @@ export async function getSettings(): Promise<AppSettings> {
   try {
     const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
     const snap = await getDoc(docRef);
-    let data = snap.exists() ? (snap.data() as AppSettings) : { geminiModel: 'gemini-2.5-flash' };
+    let defaultSettings: AppSettings = { 
+      geminiModel: 'gemini-2.5-flash', 
+      aiProvider: 'gemini', 
+      anthropicModel: 'claude-3-5-sonnet-latest' 
+    };
+    let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
     
     // Fallback de segurança para buscar prompts oficiais do administrador
     if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
       const adminSettings = await getAdminSettings();
       if (adminSettings) {
         return {
+          ...defaultSettings,
           ...adminSettings,
           ...data, // Configurações locais do médico (CRM, RQE, nome) prevalecem
           // Mas os prompts do sistema e do LAUD.IA publicados pelo administrador são herdados
@@ -123,11 +129,15 @@ export async function getSettings(): Promise<AppSettings> {
         };
       }
     }
-    return data;
+    return { ...defaultSettings, ...data };
   } catch (err) {
     console.warn('[DB] Erro ao carregar settings:', err);
   }
-  return { geminiModel: 'gemini-2.5-flash' };
+  return { 
+    geminiModel: 'gemini-2.5-flash', 
+    aiProvider: 'gemini', 
+    anthropicModel: 'claude-3-5-sonnet-latest' 
+  };
 }
 
 export async function getAdminSettings(): Promise<AppSettings | null> {

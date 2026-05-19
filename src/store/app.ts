@@ -65,7 +65,11 @@ export const useApp = create<AppState>((set, get) => ({
   setSelectedClinic: (id) => set({ selectedClinicId: id }),
 
   // ── Settings ──
-  settings: { geminiModel: 'gemini-2.5-flash' },
+  settings: { 
+    geminiModel: 'gemini-2.5-flash', 
+    aiProvider: 'gemini', 
+    anthropicModel: 'claude-3-5-sonnet-latest' 
+  },
   loadSettings: async () => {
     try {
       const s = await getSettings();
