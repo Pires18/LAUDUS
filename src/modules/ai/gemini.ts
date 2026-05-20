@@ -8,6 +8,7 @@ interface GenerateReportParams {
   settings: AppSettings;
   clinicalIndication?: string;
   requestingPhysician?: string;
+  anamnesis?: string;
   previousExams?: string[];
 }
 
@@ -15,7 +16,7 @@ interface CopilotParams {
   instruction: string;
   currentReport: string;
   patient: Patient | null;
-  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string };
+  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string };
   settings: AppSettings;
   previousExams?: string[];
 }
@@ -27,14 +28,21 @@ interface RefineParams {
   settings: AppSettings;
   clinicalIndication?: string;
   requestingPhysician?: string;
+  anamnesis?: string;
   previousExams?: string[];
   customPrompt?: string;
 }
 
 /**
- * Calcula a idade de forma inteligente a partir da data de nascimento.
- * Suporta formatos pediátricos em meses se a idade for menor que 1 ano.
+ * Separação entre contexto de sistema (cacheável) e mensagem do usuário (dinâmica).
+ * O systemContext é enviado como `systemInstruction` no Gemini e `system[]` no Anthropic,
+ * permitindo cache automático de tokens — redução de 30-40% no custo por chamada.
  */
+interface BuiltPrompt {
+  systemContext: string;
+  userMessage: string;
+}
+
 function calculateAge(birthDateStr?: string): string {
   if (!birthDateStr) return '';
   try {
@@ -51,201 +59,194 @@ function calculateAge(birthDateStr?: string): string {
       return `${finalMonths} ${finalMonths === 1 ? 'mês' : 'meses'}`;
     }
     return `${age} ${age === 1 ? 'ano' : 'anos'}`;
-  } catch (e) {
+  } catch {
     return '';
   }
 }
 
 /**
- * Constrói um bloco rico de dados clínicos e cadastrais do paciente e exame.
+ * Monta o contexto do sistema (Blocos 1-4 + regras de área).
+ * Este bloco é ESTÁTICO por chamada — ideal para cache de API.
+ * Gemini → systemInstruction | Anthropic → system[] com cache_control.
  */
-function buildPatientBlock(
-  patient: Patient | null,
-  examDate: string,
-  requestingPhysician?: string
-): string {
-  if (!patient) {
-    return `Paciente: Não informado
-Data do Exame: ${examDate}${requestingPhysician ? `\nMédico Solicitante: ${requestingPhysician}` : ''}`;
+function buildSystemContext(settings: AppSettings, area: string): string {
+  const master = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+  const global = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
+  const skeleton = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+  const rules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
+  const areaRules = AREA_SPECIFIC_PROMPTS[area] || '';
+  const areaExtra = settings.aiAreaPrompts?.[area as ExamArea] || '';
+
+  const parts = [master, global, skeleton, rules];
+  if (areaRules) {
+    parts.push(`═══════════════════════════════════════════\nPROTOCOLO DE ÁREA ATIVO:\n═══════════════════════════════════════════\n${areaRules}`);
   }
+  if (areaExtra) {
+    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES PERSONALIZADAS DA ÁREA:\n═══════════════════════════════════════════\n${areaExtra}`);
+  }
+  return parts.join('\n\n');
+}
 
-  const patientAge = patient.birthDate ? calculateAge(patient.birthDate) : '';
-  const patientGenderMap = { 'M': 'Masculino', 'F': 'Feminino', 'O': 'Outro' };
-  const patientGender = patient.gender ? patientGenderMap[patient.gender] || patient.gender : '';
-
-  const lines = [
-    `Paciente: ${patient.name}`,
-    `Sexo: ${patientGender || 'Não informado'}`,
-    `Idade: ${patientAge || 'Não informada'} (Nascimento: ${patient.birthDate || 'Não informado'})`,
+/**
+ * Serializa a máscara HTML em bloco de texto para o prompt.
+ */
+function buildMaskHtml(template: ReportTemplate): string {
+  const parts = [
+    `TÍTULO:\n${template.title}`,
+    `TÉCNICA:\n${template.technique}`,
+    `ANÁLISE:\n${template.analysisTemplate}`,
+    `CONCLUSÃO:\n${template.conclusionTemplate}`,
   ];
-
-  if (patient.insurance) lines.push(`Convênio: ${patient.insurance}`);
-  if (patient.history) lines.push(`Histórico Clínico: ${patient.history}`);
-  if (patient.notes) lines.push(`Observações do Paciente: ${patient.notes}`);
-  lines.push(`Data do Exame: ${examDate}`);
-  if (requestingPhysician) lines.push(`Médico Solicitante: ${requestingPhysician}`);
-
-  return lines.join('\n');
-}
-
-/**
- * Constrói o prompt enviado ao Gemini para geração inicial do laudo.
- * O prompt força a IA a seguir EXATAMENTE a estrutura definida na Máscara.
- */
-/**
- * Remove a tag <scratchpad>...</scratchpad> e todo o seu conteúdo (case-insensitive) do texto de saída.
- * Se a tag estiver aberta mas não fechada ainda (durante streaming), oculta todo o conteúdo após a abertura.
- */
-export function stripScratchpad(text: string): string {
-  if (!text) return '';
-  let cleaned = text;
-  const openIndex = cleaned.toLowerCase().indexOf('<scratchpad>');
-  const closeIndex = cleaned.toLowerCase().indexOf('</scratchpad>');
-
-  if (openIndex !== -1) {
-    if (closeIndex !== -1) {
-      cleaned = cleaned.replace(/<scratchpad>[\s\S]*?<\/scratchpad>/gi, '');
-    } else {
-      cleaned = cleaned.substring(0, openIndex);
-    }
+  if (template.classificationTemplate) {
+    parts.push(`CLASSIFICAÇÃO:\n${template.classificationTemplate}`);
   }
-  
-  cleaned = cleaned.replace(/<\/?scratchpad>/gi, '');
-  return cleaned.trim();
+  parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
+  if (template.aiInstructions) {
+    parts.push(`INSTRUÇÕES ESPECÍFICAS DA MÁSCARA:\n${template.aiInstructions}`);
+  }
+  return parts.join('\n\n');
 }
 
 /**
- * Função centralizada para compilar o Master Prompt injetando dados nos placeholders v9.0 estruturados.
- * Caso os placeholders não estejam no prompt customizado, faz fallback para compatibilidade.
+ * Monta a mensagem de contexto clínico — formato mínimo BLOCO 3.
+ * Esta é a parte DINÂMICA — varia por paciente/exame/notas.
  */
-function compileMasterPrompt({
-  masterPrompt,
-  areaSpecificRules,
-  previousExams,
-  routingMode,
-  patientBlock,
-  clinicalIndication,
+function buildContextMessage({
+  mode,
   examType,
+  patient,
+  clinicalIndication,
+  anamnesis,
   notes,
   maskHtml,
+  requestingPhysician,
+  previousExams = [],
 }: {
-  masterPrompt: string;
-  areaSpecificRules: string;
-  previousExams: string[];
-  routingMode: 'GERAÇÃO INICIAL' | 'REFINAMENTO / COPILOTO';
-  patientBlock: string;
-  clinicalIndication: string;
+  mode: 'GERAÇÃO INICIAL' | 'REFINAMENTO';
   examType: string;
+  patient: Patient | null;
+  clinicalIndication: string;
+  anamnesis?: string;
   notes: string;
   maskHtml: string;
+  requestingPhysician?: string;
+  previousExams?: string[];
 }): string {
-  const hasPlaceholders = masterPrompt.includes('[INJETAR_HTML_DA_MASCARA]');
+  const examDate = new Date().toLocaleDateString('pt-BR');
+  const patientAge = patient?.birthDate ? calculateAge(patient.birthDate) : 'Não informada';
+  const genderMap = { M: 'Masculino', F: 'Feminino', O: 'Outro' } as const;
+  const patientGender = patient?.gender ? genderMap[patient.gender as keyof typeof genderMap] || 'Não informado' : 'Não informado';
 
-  if (hasPlaceholders) {
-    let compiled = masterPrompt;
-    compiled = compiled.replace('[INJETAR_REGRAS_DA_ESPECIALIDADE_AQUI]', areaSpecificRules || 'Nenhuma regra específica para esta área.');
-    const safeExamples = previousExams.length > 0 
-      ? `[ATENÇÃO MÁXIMA: Os laudos abaixo são EXCLUSIVAMENTE para referência do SEU ESTILO DE ESCRITA e formatação visual. SOB NENHUMA HIPÓTESE você deve copiar achados patológicos, nomes, datas, medidas ou diagnósticos destes exemplos para o laudo atual do paciente. Isole completamente as informações clínicas.]\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}`
-      : 'Nenhum exemplo de ancoragem disponível.';
-    compiled = compiled.replace('[INJETAR_EXEMPLOS_DA_ESPECIALIDADE_AQUI]', safeExamples);
-    compiled = compiled.replace('[INJETAR_MODO_DE_ROTEAMENTO_AQUI]', routingMode);
-    compiled = compiled.replace('[INJETAR_DADOS_PACIENTE]', patientBlock);
-    compiled = compiled.replace('[INJETAR_INDICACAO_CLINICA]', clinicalIndication || 'Não informada.');
-    compiled = compiled.replace('[INJETAR_TIPO_DE_EXAME]', examType);
-    compiled = compiled.replace('[INJETAR_NOTAS_DO_MEDICO]', notes || 'Nenhuma nota adicional do médico.');
-    compiled = compiled.replace('[INJETAR_HTML_DA_MASCARA]', maskHtml);
-    return compiled;
+  const lines: string[] = [
+    `MODO: ${mode}`,
+    `EXAME: ${examType}`,
+    `DATA: ${examDate}`,
+    `PACIENTE: ${patient?.name || 'Não informado'}, ${patientAge}, ${patientGender}`,
+  ];
+  if (patient?.insurance) lines.push(`CONVÊNIO: ${patient.insurance}`);
+  if (patient?.history) lines.push(`HISTÓRICO CLÍNICO: ${patient.history}`);
+  lines.push(`INDICAÇÃO: ${clinicalIndication || 'Não informada'}`);
+  if (requestingPhysician) lines.push(`MÉDICO SOLICITANTE: ${requestingPhysician}`);
+
+  // Anamnese — contexto clínico detalhado coletado na consulta
+  if (anamnesis && anamnesis.trim()) {
+    lines.push(`\nANAMNESE DO PACIENTE (dados da consulta — usar como contexto clínico prioritário para calibrar descrição, conclusão e recomendações):\n${anamnesis.trim()}`);
   }
 
-  // Fallback para Master Prompts legados customizados
-  const previousContext = previousExams.length > 0 
-    ? `\n═══════════════════════════════════════════\nREFERÊNCIA DE ESTILO (LAUDOS ANTERIORES - ISOLAMENTO DE DADOS):\n═══════════════════════════════════════════\n[ATENÇÃO MÁXIMA: Os laudos abaixo são EXCLUSIVAMENTE para referência do SEU ESTILO DE ESCRITA. SOB NENHUMA HIPÓTESE você deve copiar achados patológicos, medidas ou diagnósticos destes exemplos para o laudo atual. O laudo atual deve conter APENAS o que o médico informou no contexto clínico abaixo.]\n\n${previousExams.join('\n\n--- NEXT EXAMPLE ---\n\n')}\n`
+  lines.push(`NOTAS DO MÉDICO: ${notes || 'Nenhuma nota adicional.'}`);
+
+  const prevContext = previousExams.length > 0
+    ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${previousExams.join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
     : '';
 
-  return `${masterPrompt}
-
-${areaSpecificRules ? `═══════════════════════════════════════════\nREGRAS DA ÁREA:\n═══════════════════════════════════════════\n${areaSpecificRules}\n` : ''}
-
-${previousContext}
-
-MODO OPERACIONAL: ${routingMode}
-
-DADOS DO CONTEXTO:
-Tipo de exame: ${examType}
-${patientBlock}
-${clinicalIndication ? `\nIndicação clínica: ${clinicalIndication}` : ''}
-Notas / Instruções do Médico: ${notes}
+  return `${lines.join('\n')}${prevContext}
 
 MÁSCARA DE REFERÊNCIA:
 ${maskHtml}`;
 }
 
 /**
- * Constrói o prompt enviado ao Gemini para geração inicial do laudo.
+ * Remove raciocínio interno do modelo do output — defesa multicamada.
+ * Captura: <scratchpad>...</scratchpad>, blocos tool_code/python, e
+ * qualquer texto antes da primeira tag <h1> (defesa de última linha).
+ */
+export function stripScratchpad(text: string): string {
+  if (!text) return '';
+
+  let cleaned = text;
+
+  // Camada 1: Remove blocos <scratchpad>...</scratchpad> (formato XML)
+  cleaned = cleaned.replace(/<scratchpad>[\s\S]*?<\/scratchpad>/gi, '');
+
+  // Camada 2: Remove blocos tool_code / python / code completos com conteúdo
+  // Captura ```tool_code ... ```, ```python ... ```, ``` ... ``` no início do texto
+  cleaned = cleaned.replace(/```(?:tool_code|python|code)?[\s\S]*?```/gi, '');
+
+  // Camada 3: Remove <scratchpad> aberto sem fechamento (streaming)
+  const openXmlIndex = cleaned.toLowerCase().indexOf('<scratchpad>');
+  if (openXmlIndex !== -1) {
+    cleaned = cleaned.substring(0, openXmlIndex);
+  }
+
+  // Camada 4: Remove tags órfãs residuais
+  cleaned = cleaned.replace(/<\/?scratchpad>/gi, '');
+
+  // Camada 5 (defesa final): Remove qualquer texto antes do primeiro <h1>
+  // Se o modelo vazou raciocínio antes do HTML, descarta tudo antes do <h1>
+  const h1Index = cleaned.search(/<h1[\s>]/i);
+  if (h1Index > 0) {
+    // Há conteúdo antes do <h1> — verificar se parece texto de raciocínio
+    const before = cleaned.substring(0, h1Index).trim();
+    // Se tem mais de 20 caracteres antes do h1, é provável raciocínio vazado
+    if (before.length > 20) {
+      cleaned = cleaned.substring(h1Index);
+    }
+  }
+
+  return cleaned.trim();
+}
+
+/**
+ * Prompt de GERAÇÃO INICIAL — laudo construído do zero a partir da máscara.
+ * Retorna { systemContext, userMessage } para aproveitamento de cache de API.
  */
 export function buildPrompt({
   template,
   patient,
   clinicalIndication,
   requestingPhysician,
+  anamnesis,
   settings,
   previousExams = [],
-}: GenerateReportParams): string {
-  const examDate = new Date().toLocaleDateString('pt-BR');
-  const patientBlock = buildPatientBlock(patient, examDate, requestingPhysician);
-
-  const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
-  const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
-  const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
-  const globalInstructions = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
-  const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
-  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[template.area] || '';
-
-  const maskHtml = `TÍTULO: 
-${template.title}
-
-TÉCNICA:
-${template.technique}
-
-ANÁLISE:
-${template.analysisTemplate}
-
-CONCLUSÃO:
-${template.conclusionTemplate}
-
-${template.classificationTemplate ? `CLASSIFICAÇÃO:\n${template.classificationTemplate}\n` : ''}
-
-RECOMENDAÇÕES:
-${template.recommendationsTemplate}`;
-
-  const compiled = compileMasterPrompt({
-    masterPrompt,
-    areaSpecificRules,
-    previousExams,
-    routingMode: 'GERAÇÃO INICIAL',
-    patientBlock,
-    clinicalIndication: clinicalIndication || '',
+}: GenerateReportParams): BuiltPrompt {
+  const systemContext = buildSystemContext(settings, template.area);
+  const maskHtml = buildMaskHtml(template);
+  const contextMessage = buildContextMessage({
+    mode: 'GERAÇÃO INICIAL',
     examType: template.name,
-    notes: clinicalIndication || '',
+    patient,
+    clinicalIndication: clinicalIndication || '',
+    anamnesis,
+    notes: clinicalIndication || 'Nenhuma nota adicional do médico.',
     maskHtml,
+    requestingPhysician,
+    previousExams,
   });
 
-  return `${compiled}
+  const userMessage = `═══════════════════════════════════════════════════════════════
+INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
+═══════════════════════════════════════════════════════════════
+${contextMessage}
 
-═══════════════════════════════════════════
-ESTRUTURA COMPLEMENTAR DE CONFORMIDADE:
-═══════════════════════════════════════════
-${structurePrompt}
-${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
-${template.aiInstructions ? `\nINSTRUÇÕES DA MÁSCARA: ${template.aiInstructions}` : ''}
-\nINSTRUÇÕES GLOBAIS DE RACIOCÍNIO:\n${globalInstructions}
-\nREGRAS RÍGIDAS DE CONFORMIDADE CLÍNICA:\n${rigidRules}
+Gere agora o laudo completo em HTML puro. O output deve começar diretamente com <h1>. Zero texto antes do HTML.`;
 
-Gere agora o laudo completo (HTML dentro de tags ou diretamente, processe obrigatoriamente pelo <scratchpad>):`;
+  return { systemContext, userMessage };
 }
 
 /**
- * Constrói o prompt para REFINAR o laudo.
+ * Prompt de REFINAMENTO — higienização e/ou edição cirúrgica de laudo existente.
+ * Aplica R10 (Congelamento): altera apenas o trecho solicitado.
+ * Retorna { systemContext, userMessage } para aproveitamento de cache de API.
  */
 export function buildRefinePrompt({
   currentReport,
@@ -254,55 +255,62 @@ export function buildRefinePrompt({
   settings,
   clinicalIndication,
   requestingPhysician,
+  anamnesis,
   previousExams = [],
   customPrompt,
-}: RefineParams): string {
-  const examDate = new Date().toLocaleDateString('pt-BR');
-  const patientBlock = buildPatientBlock(patient, examDate, requestingPhysician);
+}: RefineParams): BuiltPrompt {
+  const systemContext = buildSystemContext(settings, template.area);
 
-  const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
-  const areaInstructions = settings.aiAreaPrompts?.[template.area] || '';
-  const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
-  const globalInstructions = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
-  const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
-  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[template.area] || '';
+  const refineNote = customPrompt
+    ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"
+[REGRAS DE OURO DO REFINAMENTO — EXECUÇÃO OBRIGATÓRIA:
+• Aplicar a instrução em TODOS os locais que ela afeta no laudo.
+• Atualizar OBRIGATORIAMENTE as 3 seções impactadas:
+  1. ANÁLISE: descrição morfológica correta e adequada do achado.
+  2. CONCLUSÃO: bullet específico e clinicamente preciso para o achado.
+  3. RECOMENDAÇÕES: conduta adequada ao achado (N1/N2/N3/N4) seguindo
+     o nível de urgência clínica correto.
+• Cascata Análise→Conclusão→Recomendação deve ser íntegra após a mudança.
+• Achado patológico adicionado → criar bullet de conclusão + conduta correspondente.
+• Achado removido ou normalizado → remover seu bullet de conclusão e conduta.
+• Usar anamnese e contexto clínico do paciente para calibrar a conduta.
+• PROIBIDO alterar qualquer linha não relacionada à instrução acima.
+• PROIBIDO adicionar bullets extras além dos derivados da instrução.
+• PROIBIDO reformatar ou reescrever seções não afetadas.]`
+    : `INSTRUÇÃO: Sanitizar e higienizar o laudo completo.
+• Eliminar todos os placeholders (R1: "(...)", "[___]", unidades sem valor).
+• Garantir Cascata Tripartite completa (Análise→Conclusão→Recomendação).
+• Aplicar normalidade habitual para estruturas sem dado fornecido.
+• Aplicar Lei da Conclusão Enxuta: colapsar normalidades em 1 bullet de síntese.
+• Manter fidelidade ao contexto clínico do paciente (indicação, sexo, idade).
+• Usar anamnese fornecida para calibrar recomendações e contexto diagnóstico.`;
 
-  const notesText = customPrompt 
-    ? `AJUSTAR E REFINAR o laudo de acordo com o comando do médico: "${customPrompt}".
-       Mantenha a blindagem médico-legal, aplique a Cascata Tripartite e garanta que todas as novas medidas introduzidas sigam a padronização obrigatória da especialidade. Entenda e traduza adequadamente todas as abreviações médicas (ex: DUM, IG, CCN, BCF, ILA). Revise O LAUDO COMPLETO, adequando frases, ajustes e recomendações para que fiquem 100% coesos com as mudanças.`
-    : `REFINAR, REVISAR, SANITIZAR E HIGIENIZAR O LAUDO COMPLETO.
-       Substitua TODOS os placeholders residuais pela Doutrina de Normalidade Habitual.
-       Garanta a Cascata Tripartite perfeitamente alinhada e as 12 Regras do Guardian Core v9.0.
-       Melhore as frases, ajuste recomendações e traduza abreviações médicas (DUM, IG, etc.) adequadamente.`;
-
-  const compiled = compileMasterPrompt({
-    masterPrompt,
-    areaSpecificRules,
-    previousExams,
-    routingMode: 'REFINAMENTO / COPILOTO',
-    patientBlock,
-    clinicalIndication: clinicalIndication || '',
+  const contextMessage = buildContextMessage({
+    mode: 'REFINAMENTO',
     examType: template.name,
-    notes: notesText,
+    patient,
+    clinicalIndication: clinicalIndication || '',
+    anamnesis,
+    notes: refineNote,
     maskHtml: currentReport,
+    requestingPhysician,
+    previousExams,
   });
 
-  return `${compiled}
+  const userMessage = `═══════════════════════════════════════════════════════════════
+INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
+═══════════════════════════════════════════════════════════════
+${contextMessage}
 
-═══════════════════════════════════════════
-ESTRUTURA COMPLEMENTAR DE CONFORMIDADE:
-═══════════════════════════════════════════
-${structurePrompt}
-${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
-${template.aiInstructions ? `\nINSTRUÇÕES DA MÁSCARA: ${template.aiInstructions}` : ''}
-\nINSTRUÇÕES GLOBAIS DE RACIOCÍNIO:\n${globalInstructions}
-\nREGRAS RÍGIDAS DE CONFORMIDADE CLÍNICA:\n${rigidRules}
+Gere agora o laudo REFINADO completo em HTML puro. O output deve começar diretamente com <h1>. Zero texto antes do HTML.`;
 
-Gere agora o laudo final REFINADO e higienizado com maestria (processe obrigatoriamente pelo <scratchpad>):`;
+  return { systemContext, userMessage };
 }
 
 /**
- * Constrói o prompt para o Copilot IA.
+ * Prompt do COPILOTO — edição incremental com resposta estruturada em dois blocos.
+ * Aplica R10 (Congelamento) + formato === CONVERSA === / === PROPOSTA ===.
+ * Retorna { systemContext, userMessage } para aproveitamento de cache de API.
  */
 export function buildCopilotPrompt({
   instruction,
@@ -311,64 +319,72 @@ export function buildCopilotPrompt({
   exam,
   settings,
   previousExams = [],
-}: CopilotParams): string {
-  const examDate = new Date().toLocaleDateString('pt-BR');
-  const patientBlock = buildPatientBlock(patient, examDate, exam.requestingPhysician);
+}: CopilotParams): BuiltPrompt {
+  const systemContext = buildSystemContext(settings, exam.area);
 
-  const masterPrompt = settings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
-  const areaInstructions = settings.aiAreaPrompts?.[exam.area as ExamArea] || '';
-  const structurePrompt = settings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
-  const globalInstructions = settings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
-  const rigidRules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
-  const areaSpecificRules = AREA_SPECIFIC_PROMPTS[exam.area as ExamArea] || '';
-
-  const compiled = compileMasterPrompt({
-    masterPrompt,
-    areaSpecificRules,
-    previousExams,
-    routingMode: 'REFINAMENTO / COPILOTO',
-    patientBlock,
-    clinicalIndication: exam.clinicalIndication || '',
-    examType: exam.examType,
-    notes: instruction,
-    maskHtml: currentReport,
-  });
-
-  return `${compiled}
-
+  const copilotFormat = `═══════════════════════════════════════════════════════════════
+MODO COPILOTO — FORMATO DE RESPOSTA OBRIGATÓRIO
 ═══════════════════════════════════════════════════════════════
-CO-AUTORIA / COPILOTO FORMAT INTEGRATION
-═══════════════════════════════════════════════════════════════
-Sua tarefa agora é ATUALIZAR ou EDITAR o laudo existente com base na nova instrução do médico de forma extremamente direta, sucinta, objetiva e puramente clínica. NUNCA utilize floreios, formalidades exageradas, saudações amigáveis ou explicações prolixas. Vá direto aos fatos e à conduta clínica.
-
-Sua resposta DEVE ser estruturada rigorosamente usando os marcadores exatos (dentro ou fora do scratchpad, mas o HTML final da proposta de laudo deve vir sob === PROPOSTA ===):
+Responda EXCLUSIVAMENTE nesta estrutura:
 
 === CONVERSA ===
-[Forneça apenas UMA única frase extremamente curta (máximo 15 palavras) resumindo de forma ultra-direta e puramente clínica a alteração feita no laudo (ex: "Vesícula biliar alterada para ausente por cirurgia prévia."). NÃO use mais do que uma frase. NUNCA faça saudações, introduções ou explicações prolixas.]
+[UMA única frase (máx. 15 palavras) descrevendo a alteração clínica feita.
+Exemplo: "Vesícula biliar alterada para ausente por cirurgia prévia."
+SEM saudações. SEM explicações prolixas. Puramente clínica.]
 
 === PROPOSTA ===
-[Forneça o código HTML COMPLETO do laudo atualizado contendo todas as alterações integradas perfeitamente, mantendo o padrão do Skeleton v9.0.]
+[HTML COMPLETO do laudo com a alteração integrada.
+REGRAS DE OURO DO COPILOTO:
+• Atualizar ANÁLISE (descrição morfológica adequada do achado).
+• Atualizar CONCLUSÃO (bullet específico e preciso para o achado).
+• Atualizar RECOMENDAÇÕES (conduta N1-N4 adequada ao achado e contexto clínico).
+• A cascata Análise→Conclusão→Recomendação deve ser íntegra.
+• Achado patológico → bullet de conclusão obrigatório + conduta.
+• Usar anamnese e contexto clínico para calibrar recomendações.
+• PROIBIDO alterar qualquer seção não relacionada à instrução.
+• Todo o restante permanece byte a byte idêntico ao laudo original.]`;
 
-Mantenha rigorosamente a estrutura de tópicos (TÍTULO, TÉCNICA, ANÁLISE, CONCLUSÃO, etc).
-${structurePrompt ? `\nESTRUTURA COMPLEMENTAR DE CONFORMIDADE:\n${structurePrompt}` : ''}
-${areaInstructions ? `\nCOMPORTAMENTO DA ÁREA: ${areaInstructions}` : ''}
-\nINSTRUÇÕES GLOBAIS DE RACIOCÍNIO:\n${globalInstructions}
-\nREGRAS RÍGIDAS DE CONFORMIDADE CLÍNICA:\n${rigidRules}
+  const contextMessage = buildContextMessage({
+    mode: 'REFINAMENTO',
+    examType: exam.examType,
+    patient,
+    clinicalIndication: exam.clinicalIndication || '',
+    anamnesis: exam.anamnesis,
+    notes: instruction,
+    maskHtml: currentReport,
+    requestingPhysician: exam.requestingPhysician,
+    previousExams,
+  });
 
-Gere agora a resposta completa estruturada with === CONVERSA === and === PROPOSTA === (sem blocos extras de código fora desses marcadores):`;
+  const userMessage = `${copilotFormat}
+
+═══════════════════════════════════════════════════════════════
+INPUT CLÍNICO:
+═══════════════════════════════════════════════════════════════
+${contextMessage}`;
+
+  return { systemContext, userMessage };
+}
+
+function cleanMarkdownFromResponse(text: string): string {
+  return text
+    .replace(/^```html\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
 }
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
   const { settings } = params;
   const provider = settings.aiProvider || 'gemini';
 
-  let prompt: string;
+  let built: BuiltPrompt;
   if ('instruction' in params) {
-    prompt = buildCopilotPrompt(params as CopilotParams);
+    built = buildCopilotPrompt(params as CopilotParams);
   } else if ('currentReport' in params && 'template' in params) {
-    prompt = buildRefinePrompt(params as RefineParams);
+    built = buildRefinePrompt(params as RefineParams);
   } else {
-    prompt = buildPrompt(params as GenerateReportParams);
+    built = buildPrompt(params as GenerateReportParams);
   }
 
   if (provider === 'gemini') {
@@ -377,8 +393,10 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     }
 
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
+    // systemInstruction separado → ativação automática de cache de tokens no Gemini 2.5
     const model = genAI.getGenerativeModel({
       model: settings.geminiModel || 'gemini-2.5-flash',
+      systemInstruction: built.systemContext,
       generationConfig: {
         temperature: settings.aiTemperature ?? 0.3,
         topP: 0.9,
@@ -386,29 +404,34 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       }
     });
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text();
-
-    text = text.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = stripScratchpad(text);
-    return text;
+    const result = await model.generateContent(built.userMessage);
+    let text = cleanMarkdownFromResponse(result.response.text());
+    return stripScratchpad(text);
   } else {
     if (!settings.anthropicApiKey) {
       throw new Error('API Key do Anthropic não configurada. Vá em Configurações para adicionar.');
     }
 
+    // system[] com cache_control → tokens de sistema cobrados ~10x mais barato
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': settings.anthropicApiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-1-0',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
         max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }],
+        system: [
+          {
+            type: 'text',
+            text: built.systemContext,
+            cache_control: { type: 'ephemeral' }
+          }
+        ],
+        messages: [{ role: 'user', content: built.userMessage }],
         temperature: settings.aiTemperature ?? 0.3
       })
     });
@@ -419,11 +442,8 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     }
 
     const result = await response.json();
-    let text = result.content?.[0]?.text || '';
-    text = text.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    text = stripScratchpad(text);
-    return text;
+    let text = cleanMarkdownFromResponse(result.content?.[0]?.text || '');
+    return stripScratchpad(text);
   }
 }
 
@@ -434,13 +454,13 @@ export async function generateReportStream(
   const { settings } = params;
   const provider = settings.aiProvider || 'gemini';
 
-  let prompt: string;
+  let built: BuiltPrompt;
   if ('instruction' in params) {
-    prompt = buildCopilotPrompt(params as CopilotParams);
+    built = buildCopilotPrompt(params as CopilotParams);
   } else if ('currentReport' in params && 'template' in params) {
-    prompt = buildRefinePrompt(params as RefineParams);
+    built = buildRefinePrompt(params as RefineParams);
   } else {
-    prompt = buildPrompt(params as GenerateReportParams);
+    built = buildPrompt(params as GenerateReportParams);
   }
 
   if (provider === 'gemini') {
@@ -449,8 +469,10 @@ export async function generateReportStream(
     }
 
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
+    // systemInstruction separado → ativação automática de cache de tokens no Gemini 2.5
     const model = genAI.getGenerativeModel({
       model: settings.geminiModel || 'gemini-2.5-flash',
+      systemInstruction: built.systemContext,
       generationConfig: {
         temperature: settings.aiTemperature ?? 0.3,
         topP: 0.9,
@@ -458,38 +480,41 @@ export async function generateReportStream(
       }
     });
 
-    const result = await model.generateContentStream(prompt);
+    const result = await model.generateContentStream(built.userMessage);
     let fullText = '';
+
     for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      fullText += chunkText;
-      
-      let cleanText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
-      cleanText = cleanText.replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-      cleanText = stripScratchpad(cleanText);
-      onChunk(cleanText);
+      fullText += chunk.text();
+      onChunk(stripScratchpad(cleanMarkdownFromResponse(fullText)));
     }
 
-    fullText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-    fullText = fullText.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    fullText = stripScratchpad(fullText);
+    fullText = stripScratchpad(cleanMarkdownFromResponse(fullText));
     return fullText;
   } else {
     if (!settings.anthropicApiKey) {
       throw new Error('API Key do Anthropic não configurada. Vá em Configurações para adicionar.');
     }
 
+    // system[] com cache_control + stream
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': settings.anthropicApiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-1-0',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
         max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }],
+        system: [
+          {
+            type: 'text',
+            text: built.systemContext,
+            cache_control: { type: 'ephemeral' }
+          }
+        ],
+        messages: [{ role: 'user', content: built.userMessage }],
         temperature: settings.aiTemperature ?? 0.3,
         stream: true
       })
@@ -528,42 +553,29 @@ export async function generateReportStream(
           const parsed = JSON.parse(dataStr);
           if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
             fullText += parsed.delta.text;
-            
-            let cleanText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
-            cleanText = cleanText.replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-            cleanText = stripScratchpad(cleanText);
-            onChunk(cleanText);
+            onChunk(stripScratchpad(cleanMarkdownFromResponse(fullText)));
           }
-        } catch (e) {
-          // Ignorar erros de parseamento de JSON malformatados ou de outros tipos de eventos
+        } catch {
+          // Ignorar eventos não-JSON (SSE de controle)
         }
       }
     }
 
-    fullText = fullText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '').trim();
-    fullText = fullText.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-    fullText = stripScratchpad(fullText);
+    fullText = stripScratchpad(cleanMarkdownFromResponse(fullText));
     return fullText;
   }
 }
 
-/**
- * Versão de teste sem chamar a API: gera um laudo "fake" baseado na máscara,
- * útil quando ainda não há API key.
- */
 export function generateMockReport(params: GenerateReportParams): string {
   const { template } = params;
-  
-  return `<h2>${template.title}</h2>
-<h2>TÉCNICA</h2>
-<p>${template.technique}</p>
+
+  return `<h1>${template.title}</h1>
 <h2>ANÁLISE</h2>
 ${template.analysisTemplate}
-<h2>CLASSIFICAÇÕES</h2>
-<p>${template.classificationTemplate || '(...)'}</p>
 <h2>CONCLUSÃO</h2>
-<p>${template.conclusionTemplate}</p>
+${template.conclusionTemplate}
 <h2>RECOMENDAÇÕES</h2>
-<p>${template.recommendationsTemplate}</p>
-<p><em>[Laudo gerado em modo de demonstração — configure a API Key do Gemini em Configurações para usar IA real]</em></p>`;
+${template.recommendationsTemplate}
+<h2>OBSERVAÇÕES METODOLÓGICAS</h2>
+<p><em>[Laudo gerado em modo de demonstração — configure a API Key do Gemini ou Anthropic em Configurações para usar IA real]</em></p>`;
 }

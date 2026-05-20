@@ -3,12 +3,13 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
-import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck } from 'lucide-react';
 import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
 import { useState, useMemo } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
 import { where } from 'firebase/firestore';
+import { AnamnesisConsentModal } from '../editor/components/AnamnesisConsentModal';
 
 interface Props {
   patientId: string;
@@ -17,6 +18,8 @@ interface Props {
 export function PatientDetail({ patientId }: Props) {
   const { setView, showToast, selectedClinicId, setShowCreateExamModal, setCreateExamDefaultPatient } = useApp();
   const [editing, setEditing] = useState(false);
+  const [selectedExamForModal, setSelectedExamForModal] = useState<ExamRequest | null>(null);
+  const [modalTab, setModalTab] = useState<'anamnesis' | 'consent'>('anamnesis');
 
   const { data: patient, loading: patientLoading } = useDocument<Patient>('patients', patientId);
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams', {
@@ -271,12 +274,38 @@ export function PatientDetail({ patientId }: Props) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     {area && (
                       <span className={`chip ${area.color} hidden md:inline-flex`}>
                         {area.label}
                       </span>
                     )}
+                    <button
+                      onClick={() => {
+                        setSelectedExamForModal(exam);
+                        setModalTab('anamnesis');
+                      }}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-brand-50 hover:text-brand-600 text-slate-600 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                      title="Visualizar Anamnese"
+                    >
+                      <ClipboardList size={12} />
+                      <span className="hidden sm:inline">Anamnese</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedExamForModal(exam);
+                        setModalTab('consent');
+                      }}
+                      className={`h-8 px-2.5 rounded-lg border transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider shadow-sm ${
+                        exam.consentAccepted
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600'
+                      }`}
+                      title={exam.consentAccepted ? 'Termo Assinado' : 'Pendente de Assinatura'}
+                    >
+                      <ShieldCheck size={12} />
+                      <span className="hidden sm:inline">Termo</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -292,6 +321,16 @@ export function PatientDetail({ patientId }: Props) {
           onCancel={() => setEditing(false)}
         />
       </Modal>
+
+      {selectedExamForModal && patient && (
+        <AnamnesisConsentModal
+          open={!!selectedExamForModal}
+          onClose={() => setSelectedExamForModal(null)}
+          exam={selectedExamForModal}
+          patient={patient}
+          initialTab={modalTab}
+        />
+      )}
       </div>
     </div>
   );

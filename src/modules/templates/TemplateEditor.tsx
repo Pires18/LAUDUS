@@ -4,10 +4,11 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { updateItem } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
-import { FileText, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, Building2 } from 'lucide-react';
+import { FileText, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList, Sparkles } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
-import { generateTemplateStructure } from '../ai/generateTemplate';
+import { generateTemplateStructure, generateTemplateField } from '../ai/generateTemplate';
 import { auth } from '../../lib/firebase';
+import { parseAnamnesis, serializeAnamnesis } from '../editor/components/AnamnesisConsentModal';
 
 interface Props {
   templateId?: string;
@@ -15,9 +16,13 @@ interface Props {
 
 export function TemplateEditor({ templateId }: Props) {
   const { setView, showToast, settings } = useApp();
-  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'ai'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'copilot'>('info');
   const [draft, setDraft] = useState<ReportTemplate | null>(null);
   const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
+  const [isGeneratingCustomForm, setIsGeneratingCustomForm] = useState(false);
+  const [isGeneratingAnamnesis, setIsGeneratingAnamnesis] = useState(false);
+  const [isGeneratingConsent, setIsGeneratingConsent] = useState(false);
+  const [viewModeAnamnesis, setViewModeAnamnesis] = useState<'form' | 'text'>('form');
 
   const { data: template, loading } = useDocument<ReportTemplate>('templates', templateId);
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -25,6 +30,14 @@ export function TemplateEditor({ templateId }: Props) {
   useEffect(() => {
     if (template) setDraft(template);
   }, [template]);
+
+  useEffect(() => {
+    if (draft?.anamnesisTemplate) {
+      const fields = parseAnamnesis(draft.anamnesisTemplate);
+      const hasStructured = fields.some(f => f.isStructured);
+      setViewModeAnamnesis(hasStructured ? 'form' : 'text');
+    }
+  }, [draft?.id]);
 
   if (loading) {
     return (
@@ -61,7 +74,7 @@ export function TemplateEditor({ templateId }: Props) {
   const tabs = [
     { id: 'info', label: 'Informações Básicas' },
     { id: 'structure', label: 'Estrutura do Laudo' },
-    { id: 'ai', label: 'Configuração de IA' },
+    { id: 'copilot', label: 'Formulário & Fichas' },
   ] as const;
 
   return (
@@ -263,19 +276,231 @@ export function TemplateEditor({ templateId }: Props) {
         )}
 
 
-        {activeTab === 'ai' && (
-          <div className="max-w-4xl space-y-4">
-            <div className="card p-5">
-              <h3 className="font-semibold text-ink-900 mb-2">Instruções Customizadas para IA</h3>
-              <p className="text-sm text-ink-500 mb-4">
-                Adicione instruções específicas que a IA ({settings.geminiModel}) deve seguir apenas para esta máscara.
-                Isso sobrescreve ou complementa as instruções globais.
+        {activeTab === 'copilot' && (
+          <div className="max-w-4xl space-y-6">
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                  <ClipboardList size={16} className="text-brand-500" />
+                  Formulário do Copiloto (Caixa de Texto)
+                </h3>
+                <button
+                  onClick={async () => {
+                    if (draft.customForm && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
+                    setIsGeneratingCustomForm(true);
+                    try {
+                      const result = await generateTemplateField(draft.area, draft.name, 'customForm', settings);
+                      u('customForm', result);
+                      showToast('Formulário gerado!', 'success');
+                    } catch (err: unknown) {
+                      const message = err instanceof Error ? err.message : 'Erro ao gerar formulário';
+                      showToast(message, 'error');
+                    } finally {
+                      setIsGeneratingCustomForm(false);
+                    }
+                  }}
+                  disabled={isGeneratingCustomForm}
+                  className="btn btn-secondary h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                >
+                  {isGeneratingCustomForm ? (
+                    <Loader2 size={12} className="animate-spin text-brand-600" />
+                  ) : (
+                    <Sparkles size={12} className="text-brand-500" />
+                  )}
+                  Gerar com LAUD.IA
+                </button>
+              </div>
+              <p className="text-xs text-ink-500 leading-relaxed">
+                Defina a estrutura padrão de texto que o médico preencherá na aba "Formulário" do Copiloto para este exame.
               </p>
               <textarea
-                className="input min-h-[200px] font-mono text-sm"
-                value={draft.aiInstructions || ''}
-                onChange={(e) => u('aiInstructions', e.target.value)}
-                placeholder="Ex: Não mencione ovários se eles não forem visualizados. Use sempre termos técnicos específicos da área fetal..."
+                className="input min-h-[180px] font-mono text-xs p-4 bg-slate-50 border border-slate-200 focus:bg-white transition-all rounded-xl"
+                value={draft.customForm || ''}
+                onChange={(e) => u('customForm', e.target.value)}
+                placeholder={"Ex:\nFígado: [Aspecto habitual]\nRins: [Normais, sem dilatação]\nBexiga: [Cheia, com paredes finas]"}
+              />
+            </div>
+
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    <FileText size={16} className="text-brand-500" />
+                    Anamnese Padrão do Exame
+                  </h3>
+                  
+                  {(() => {
+                    const fields = parseAnamnesis(draft.anamnesisTemplate || '');
+                    const hasStructured = fields.some(f => f.isStructured);
+                    if (!hasStructured) return null;
+                    return (
+                      <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setViewModeAnamnesis('form')}
+                          className={`px-2 py-1 font-bold rounded-md transition-all ${
+                            viewModeAnamnesis === 'form'
+                              ? 'bg-white text-brand-650 shadow-sm border border-slate-200/50'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Formulário
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewModeAnamnesis('text')}
+                          className={`px-2 py-1 font-bold rounded-md transition-all ${
+                            viewModeAnamnesis === 'text'
+                              ? 'bg-white text-brand-650 shadow-sm border border-slate-200/50'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          Texto Livre
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (draft.anamnesisTemplate && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
+                    setIsGeneratingAnamnesis(true);
+                    try {
+                      const result = await generateTemplateField(draft.area, draft.name, 'anamnesis', settings);
+                      u('anamnesisTemplate', result);
+                      showToast('Anamnese gerada!', 'success');
+                    } catch (err: unknown) {
+                      const message = err instanceof Error ? err.message : 'Erro ao gerar anamnese';
+                      showToast(message, 'error');
+                    } finally {
+                      setIsGeneratingAnamnesis(false);
+                    }
+                  }}
+                  disabled={isGeneratingAnamnesis}
+                  className="btn btn-secondary h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                >
+                  {isGeneratingAnamnesis ? (
+                    <Loader2 size={12} className="animate-spin text-brand-600" />
+                  ) : (
+                    <Sparkles size={12} className="text-brand-500" />
+                  )}
+                  Gerar com LAUD.IA
+                </button>
+              </div>
+              <p className="text-xs text-ink-500 leading-relaxed">
+                Texto padrão de anamnese que será associado ao exame e ficará disponível para preenchimento ou consulta.
+              </p>
+
+              {(() => {
+                const fields = parseAnamnesis(draft.anamnesisTemplate || '');
+                const hasStructured = fields.some(f => f.isStructured);
+                
+                if (viewModeAnamnesis === 'form' && hasStructured) {
+                  const unstructuredLines = fields.filter(f => !f.isStructured).map(f => f.value).join('\n').trim();
+                  
+                  const handleFieldChange = (idx: number, newVal: string) => {
+                    const updated = [...fields];
+                    updated[idx].value = newVal;
+                    u('anamnesisTemplate', serializeAnamnesis(updated));
+                  };
+                  
+                  const handleUnstructuredChange = (newUnstructured: string) => {
+                    const structuredPart = fields
+                      .filter(f => f.isStructured)
+                      .map(f => `${f.label}: [${f.value}]`)
+                      .join('\n');
+                    const newText = structuredPart ? structuredPart + '\n' + newUnstructured : newUnstructured;
+                    u('anamnesisTemplate', newText);
+                  };
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        {fields.map((field, idx) => {
+                          if (!field.isStructured) return null;
+                          return (
+                            <div key={idx} className="flex flex-col space-y-1.5">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                                {field.label}
+                              </label>
+                              <input
+                                type="text"
+                                value={field.value}
+                                onChange={(e) => handleFieldChange(idx, e.target.value)}
+                                className="h-10 px-3 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm"
+                                placeholder={`Definir valor padrão para ${field.label.toLowerCase()}...`}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-col space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                          Observações Adicionais / Texto Fixo
+                        </label>
+                        <textarea
+                          value={unstructuredLines}
+                          onChange={(e) => handleUnstructuredChange(e.target.value)}
+                          placeholder="Anotações adicionais da anamnese..."
+                          className="w-full min-h-[80px] p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850"
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <textarea
+                    className="input min-h-[120px] text-xs p-4 bg-slate-50 border border-slate-200 focus:bg-white transition-all rounded-xl font-semibold text-slate-850 leading-relaxed"
+                    value={draft.anamnesisTemplate || ''}
+                    onChange={(e) => u('anamnesisTemplate', e.target.value)}
+                    placeholder="Ex: Paciente refere dor abdominal no quadrante superior direito há 3 dias. Nega cirurgias prévias."
+                  />
+                );
+              })()}
+            </div>
+
+            <div className="card p-6 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                  <FileText size={16} className="text-indigo-500" />
+                  Termo de Consentimento Padrão
+                </h3>
+                <button
+                  onClick={async () => {
+                    if (draft.consentTemplate && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
+                    setIsGeneratingConsent(true);
+                    try {
+                      const result = await generateTemplateField(draft.area, draft.name, 'consent', settings);
+                      u('consentTemplate', result);
+                      showToast('Termo de consentimento gerado!', 'success');
+                    } catch (err: unknown) {
+                      const message = err instanceof Error ? err.message : 'Erro ao gerar termo';
+                      showToast(message, 'error');
+                    } finally {
+                      setIsGeneratingConsent(false);
+                    }
+                  }}
+                  disabled={isGeneratingConsent}
+                  className="btn btn-secondary h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                >
+                  {isGeneratingConsent ? (
+                    <Loader2 size={12} className="animate-spin text-brand-600" />
+                  ) : (
+                    <Sparkles size={12} className="text-brand-500" />
+                  )}
+                  Gerar com LAUD.IA
+                </button>
+              </div>
+              <p className="text-xs text-ink-500 leading-relaxed">
+                Termo de consentimento informado para este exame específico.
+              </p>
+              <textarea
+                className="input min-h-[180px] text-xs p-4 bg-slate-50 border border-slate-200 focus:bg-white transition-all rounded-xl"
+                value={draft.consentTemplate || ''}
+                onChange={(e) => u('consentTemplate', e.target.value)}
+                placeholder="Ex: Eu, [Nome do Paciente], autorizo a realização do exame..."
               />
             </div>
           </div>

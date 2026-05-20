@@ -105,6 +105,16 @@ export interface ExamRequest {
   unlockHistory?: { date: number; reason: string }[];
   /** Histórico de mensagens do Copiloto IA */
   chatHistory?: ChatMessage[];
+  /** Valor preenchido do formulário de caixa de texto */
+  customFormValue?: string;
+  /** Texto da anamnese preenchida do exame */
+  anamnesis?: string;
+  /** Texto do termo de consentimento gerado para o exame */
+  consentTerm?: string;
+  /** Se o paciente assinou/consentiu com o termo */
+  consentAccepted?: boolean;
+  /** Quando o termo foi assinado */
+  consentAcceptedAt?: number;
 }
 
 /** Estrutura de uma máscara (template) de laudo */
@@ -128,6 +138,12 @@ export interface ReportTemplate {
 
   /** Instruções específicas para o motor de IA */
   aiInstructions?: string;
+  /** Estrutura de texto padrão do formulário do copiloto */
+  customForm?: string;
+  /** Texto de anamnese padrão para o exame */
+  anamnesisTemplate?: string;
+  /** Texto de termo de consentimento padrão para o exame */
+  consentTemplate?: string;
 
   createdAt: number;
   updatedAt: number;

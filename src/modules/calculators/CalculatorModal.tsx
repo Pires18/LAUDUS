@@ -111,10 +111,15 @@ export function CalculatorModal({ area, onClose, onSendToCopilot }: Props) {
                     className="group flex flex-col text-left p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 bg-white hover:border-brand-500 hover:shadow-xl hover:shadow-brand-500/5 transition-all relative overflow-hidden shadow-sm"
                   >
                     <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-brand-600 group-hover:text-white transition-all shadow-inner border border-slate-100">
-                      <AreaIcon area={area || calc.areas[0]} size={24} />
+                      <AreaIcon area={showAll ? calc.areas[0] : (area || calc.areas[0])} size={24} />
                     </div>
                     <h4 className="font-black text-slate-800 text-base sm:text-lg mb-1.5 sm:mb-2 group-hover:text-brand-700 transition-colors uppercase tracking-tight">{calc.name}</h4>
                     <p className="text-xs text-slate-500 leading-relaxed font-semibold line-clamp-3">{calc.description}</p>
+                    {showAll && area && !calc.areas.includes(area) && (
+                      <span className="mt-2 text-[8px] font-black text-amber-700 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 w-fit">
+                        Outra área
+                      </span>
+                    )}
                     
                     <div className="mt-auto pt-4 sm:pt-6 flex items-center justify-between">
                        <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">Abrir Módulo</span>
@@ -151,7 +156,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot }: Props) {
                     {selectedCalc && (
                       <>
                         <selectedCalc.component 
-                          value={{}} 
+                          value={calcResult || {}} 
                           onChange={(val: any) => setCalcResult(val)} 
                         />
                         {selectedCalc.reference && (

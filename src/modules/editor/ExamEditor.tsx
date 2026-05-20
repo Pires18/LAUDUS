@@ -23,6 +23,7 @@ import { EditorHeader } from './components/EditorHeader';
 import { EditorToolbar } from './components/EditorToolbar';
 import { getInitialReportContent } from '../templates/utils';
 import { ExamHistoryModal } from './components/ExamHistoryModal';
+import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
 
 interface Props {
   examId: string;
@@ -33,7 +34,7 @@ export function ExamEditor({ examId }: Props) {
   const currentRole = settings.currentRole || 'medico';
 
   // Firestore realtime listeners
-  const { data: exam } = useDocument<import('../../types').ExamRequest>('exams', examId);
+  const { data: exam } = useDocument<ExamRequest>('exams', examId);
   const { data: patient } = useDocument<Patient>('patients', exam?.patientId || '');
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
@@ -60,6 +61,7 @@ export function ExamEditor({ examId }: Props) {
   const [showCopilot, setShowCopilot] = useState(false); 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
+  const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
   const [copilotPrompt, setCopilotPrompt] = useState('');
   
   // Metadata Edit State
@@ -105,7 +107,8 @@ export function ExamEditor({ examId }: Props) {
     patient,
     template,
     clinicalIndication: exam?.clinicalIndication,
-    requestingPhysician: exam?.requestingPhysician
+    requestingPhysician: exam?.requestingPhysician,
+    anamnesis: exam?.anamnesis
   });
 
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
@@ -275,6 +278,7 @@ export function ExamEditor({ examId }: Props) {
               });
               setShowEditMetadata(true);
             }}
+            onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
           />
 
           {/* AVISO API KEY */}
@@ -551,13 +555,17 @@ export function ExamEditor({ examId }: Props) {
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               <pre className="text-xs font-mono text-ink-700 whitespace-pre-wrap leading-relaxed bg-ink-50 p-4 rounded-xl border border-ink-200">
-                {buildPrompt({
-                  template,
-                  patient,
-                  settings,
-                  clinicalIndication: exam?.clinicalIndication,
-                  requestingPhysician: exam?.requestingPhysician,
-                })}
+                {(() => {
+                  const { systemContext, userMessage } = buildPrompt({
+                    template,
+                    patient,
+                    settings,
+                    clinicalIndication: exam?.clinicalIndication,
+                    requestingPhysician: exam?.requestingPhysician,
+                    anamnesis: exam?.anamnesis,
+                  });
+                  return `══ SYSTEM CONTEXT ══\n${systemContext}\n\n══ USER MESSAGE ══\n${userMessage}`;
+                })()}
               </pre>
             </div>
             <div className="px-5 py-3 border-t border-ink-100 flex items-center justify-between bg-ink-50/50 shrink-0">
@@ -570,13 +578,15 @@ export function ExamEditor({ examId }: Props) {
               </span>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(buildPrompt({
+                  const { systemContext, userMessage } = buildPrompt({
                     template,
                     patient,
                     settings,
                     clinicalIndication: exam?.clinicalIndication,
                     requestingPhysician: exam?.requestingPhysician,
-                  }));
+                    anamnesis: exam?.anamnesis,
+                  });
+                  navigator.clipboard.writeText(`══ SYSTEM CONTEXT ══\n${systemContext}\n\n══ USER MESSAGE ══\n${userMessage}`);
                   showToast('Prompt copiado!', 'success');
                 }}
                 className="btn-secondary text-xs py-1.5"
@@ -697,6 +707,16 @@ export function ExamEditor({ examId }: Props) {
           />
         )}
       </AnimatePresence>
+
+      {showAnamnesisConsent && exam && patient && (
+        <AnamnesisConsentModal
+          open={showAnamnesisConsent}
+          onClose={() => setShowAnamnesisConsent(false)}
+          exam={exam}
+          patient={patient}
+          template={template}
+        />
+      )}
 
       <PrintLayout
         patient={patient}

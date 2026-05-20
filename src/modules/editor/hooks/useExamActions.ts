@@ -12,6 +12,7 @@ interface UseExamActionsProps {
   template: ReportTemplate | null;
   clinicalIndication?: string;
   requestingPhysician?: string;
+  anamnesis?: string;
 }
 
 export function useExamActions({
@@ -22,7 +23,8 @@ export function useExamActions({
   patient,
   template,
   clinicalIndication,
-  requestingPhysician
+  requestingPhysician,
+  anamnesis
 }: UseExamActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -79,6 +81,7 @@ export function useExamActions({
         settings,
         clinicalIndication,
         requestingPhysician,
+        anamnesis,
         previousExams
       });
       onReportChange(html);
@@ -90,7 +93,7 @@ export function useExamActions({
     } finally {
       setIsGenerating(false);
     }
-  }, [template, patient, settings, clinicalIndication, requestingPhysician, examId, onReportChange, showToast]);
+  }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, onReportChange, showToast]);
 
   const handleRefine = useCallback(async (currentReport: string) => {
     if (!template || !patient) return;
@@ -110,6 +113,7 @@ export function useExamActions({
           settings,
           clinicalIndication,
           requestingPhysician,
+          anamnesis,
           previousExams
         }, (chunk) => {
           onReportChange(chunk);
@@ -132,7 +136,7 @@ export function useExamActions({
     } finally {
       setIsGenerating(false);
     }
-  }, [template, patient, settings, examId, onReportChange, showToast]);
+  }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, onReportChange, showToast]);
 
   const updateStatus = useCallback(async (status: ExamStatus) => {
     try {
