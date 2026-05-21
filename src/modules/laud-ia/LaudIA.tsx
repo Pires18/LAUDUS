@@ -8,6 +8,8 @@ import {
   Sliders, LayoutList, FileText, Layout, ShieldCheck,
   Code, Copy, Check, Plus, Trash2, Pencil, X,
   BookOpen, Sparkles, ChevronDown, ChevronUp,
+  Activity, Cpu, Database, Wifi, WifiOff,
+  TrendingUp, FlaskConical,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { EXAM_AREAS, ExamArea, AppSettings } from '../../types';
@@ -20,7 +22,7 @@ import {
 } from '../ai/prompts';
 import { genId } from '../../store/db';
 
-type TabId = 'prompts' | 'areas' | 'snippets' | 'engine' | 'training';
+type TabId = 'prompts' | 'areas' | 'snippets' | 'engine' | 'training' | 'status';
 type PromptSubTab = 'master' | 'global' | 'structure' | 'rigid' | 'doctrine';
 
 // ==========================================
@@ -155,15 +157,63 @@ function CodeEditor({
 // ==========================================
 // MAIN LAUD.IA MODULE
 // ==========================================
+// ── localStorage keys ──────────────────────────────────────────────
+const LS_TAB    = 'laudia:tab';
+const LS_SUBTAB = 'laudia:subtab';
+const LS_AREA   = 'laudia:area';
+
+function readLS<T extends string>(key: string, fallback: T, valid: readonly T[]): T {
+  try {
+    const v = localStorage.getItem(key) as T | null;
+    return v && valid.includes(v) ? v : fallback;
+  } catch { return fallback; }
+}
+
 export function LaudIA() {
   const { settings, updateSettings, showToast } = useApp();
   const [isSaving, setIsSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
-  const [activeTab, setActiveTab] = useState<TabId>('prompts');
-  const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
+  // Track whether the user has unsaved local edits — prevents Firestore pushes
+  // from silently overwriting work-in-progress.
+  const isDirty = useRef(false);
+
+  // ── Navigation state — persisted across unmounts via localStorage ──
+  const ALL_TABS:    readonly TabId[]       = ['prompts','areas','snippets','engine','training','status'];
+  const ALL_SUBTABS: readonly PromptSubTab[] = ['master','global','structure','rigid','doctrine'];
+  const ALL_AREAS    = EXAM_AREAS.map(a => a.id) as readonly ExamArea[];
+
+  const [activeTab, _setActiveTab] = useState<TabId>(
+    () => readLS(LS_TAB, 'prompts', ALL_TABS)
+  );
+  const [activePromptSubTab, _setActivePromptSubTab] = useState<PromptSubTab>(
+    () => readLS(LS_SUBTAB, 'master', ALL_SUBTABS)
+  );
+  const [selectedArea, _setSelectedArea] = useState<ExamArea>(
+    () => readLS(LS_AREA, EXAM_AREAS[0].id, ALL_AREAS)
+  );
+
+  // Wrappers that persist to localStorage
+  function setActiveTab(tab: TabId) {
+    _setActiveTab(tab);
+    try { localStorage.setItem(LS_TAB, tab); } catch { /* ignore */ }
+  }
+  function setActivePromptSubTab(sub: PromptSubTab) {
+    _setActivePromptSubTab(sub);
+    try { localStorage.setItem(LS_SUBTAB, sub); } catch { /* ignore */ }
+  }
+  function setSelectedArea(area: ExamArea) {
+    _setSelectedArea(area);
+    try { localStorage.setItem(LS_AREA, area); } catch { /* ignore */ }
+  }
+
+  // ── Dirty-aware settings mutator ──────────────────────────────────
+  function patchLocal(patch: Partial<AppSettings>) {
+    isDirty.current = true;
+    setLocalSettings(prev => ({ ...prev, ...patch }));
+  }
+
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [adminSettings, setAdminSettings] = useState<AppSettings | null>(null);
-  const [activePromptSubTab, setActivePromptSubTab] = useState<PromptSubTab>('master');
 
   // AI improvement for area prompts
   const [isImprovingArea, setIsImprovingArea] = useState(false);
@@ -182,14 +232,19 @@ export function LaudIA() {
     });
   }, []);
 
+  // Sync Firestore → local only when there are no pending local edits.
+  // This prevents a real-time snapshot arriving mid-edit from wiping work.
   useEffect(() => {
-    setLocalSettings(settings);
+    if (!isDirty.current) {
+      setLocalSettings(settings);
+    }
   }, [settings]);
 
   async function handleSave() {
     setIsSaving(true);
     try {
       await updateSettings(localSettings);
+      isDirty.current = false;
       showToast('Configurações da IA salvas com sucesso', 'success');
     } catch {
       showToast('Erro ao salvar configurações', 'error');
@@ -234,7 +289,7 @@ export function LaudIA() {
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+            model: localSettings.anthropicModel || 'claude-sonnet-4-5',
             messages: [{ role: 'user', content: 'Say OK' }],
             max_tokens: 1,
           }),
@@ -288,7 +343,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       const improved = result.response.text().trim();
       if (improved) {
         const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: improved };
-        setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+        patchLocal({ aiAreaPrompts: updated });
         showToast('Prompt melhorado com sucesso pela IA!', 'success');
         setShowImprovePanel(false);
         setAreaImprovePrompt('');
@@ -332,13 +387,13 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
     } else {
       updated = [...snippets, { id: genId(), title: snippetForm.title.trim(), content: snippetForm.content.trim(), area: snippetForm.area || undefined }];
     }
-    setLocalSettings({ ...localSettings, snippets: updated });
+    patchLocal({ snippets: updated });
     setShowSnippetForm(false);
     showToast(snippetEditId ? 'Frase atualizada!' : 'Frase adicionada!', 'success');
   }
 
   function deleteSnippet(id: string) {
-    setLocalSettings({ ...localSettings, snippets: snippets.filter(s => s.id !== id) });
+    patchLocal({ snippets: snippets.filter(s => s.id !== id) });
     showToast('Frase removida.', 'info');
   }
 
@@ -355,6 +410,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
     { id: 'snippets',  label: 'Frases Prontas',      icon: BookOpen },
     { id: 'engine',    label: 'Motor & API',          icon: Sliders },
     { id: 'training',  label: 'Aprendizado IA',       icon: GraduationCap },
+    { id: 'status',    label: 'Status da IA',         icon: Activity },
   ] as const;
 
   const promptSubTabs: { id: PromptSubTab; label: string; color: string; icon: React.ElementType }[] = [
@@ -437,10 +493,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
             glowColor={glowColor}
             placeholder={placeholder}
             value={(localSettings[field] as string | undefined) || ''}
-            onChange={(v) => setLocalSettings({ ...localSettings, [field]: v })}
+            onChange={(v) => patchLocal({ [field]: v })}
             onRestore={() => {
               const restored = (adminSettings?.[field] as string | undefined) || defaultVal;
-              setLocalSettings({ ...localSettings, [field]: restored });
+              patchLocal({ [field]: restored });
               showToast(`${title} restaurado para o padrão oficial.`, 'info');
             }}
           />
@@ -458,7 +514,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
           icon={BrainCircuit}
           actions={
             <div className="flex items-center gap-3">
-              <button onClick={() => setLocalSettings(settings)} className="btn-ghost text-ink-400">
+              <button onClick={() => { setLocalSettings(settings); isDirty.current = false; }} className="btn-ghost text-ink-400">
                 <RotateCcw size={16} />
                 Descartar
               </button>
@@ -636,9 +692,9 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                         glowColor="teal"
                         placeholder={`Exemplo:\n- Rins com dimensões normais para a faixa etária entre 9-12cm\n- Espessura do endométrio em menacme até 14mm\n- Resistência das artérias renais: IR < 0.70\n- Volume prostático normal até 30ml antes dos 60 anos...`}
                         value={localSettings.normalDoctrine || ''}
-                        onChange={(v) => setLocalSettings({ ...localSettings, normalDoctrine: v })}
+                        onChange={(v) => patchLocal({ normalDoctrine: v })}
                         onRestore={() => {
-                          setLocalSettings({ ...localSettings, normalDoctrine: '' });
+                          patchLocal({ normalDoctrine: '' });
                           showToast('Doutrina de normalidade removida.', 'info');
                         }}
                       />
@@ -700,7 +756,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                       <button
                         onClick={() => {
                           const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] };
-                          setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+                          patchLocal({ aiAreaPrompts: updated });
                           showToast(`Protocolo de ${selectedArea} restaurado.`, 'info');
                         }}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
@@ -758,7 +814,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     value={localSettings.aiAreaPrompts?.[selectedArea] || ''}
                     onChange={(v) => {
                       const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: v };
-                      setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+                      patchLocal({ aiAreaPrompts: updated });
                     }}
                   />
                 </div>
@@ -927,11 +983,11 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                       <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Provedor de Inteligência Artificial</label>
                       <select
                         value={localSettings.aiProvider || 'gemini'}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiProvider: e.target.value as 'gemini' | 'anthropic' })}
+                        onChange={(e) => patchLocal({ aiProvider: e.target.value as 'gemini' | 'anthropic' })}
                         className="input h-14"
                       >
-                        <option value="gemini">Google Gemini (Modelos 2.0+)</option>
-                        <option value="anthropic">Anthropic Claude (Modelos Sonnet/Haiku)</option>
+                        <option value="gemini">Google Gemini (Modelos 2.5+)</option>
+                        <option value="anthropic">Anthropic Claude (Modelos Claude 3.5 / 3.7 / 4)</option>
                       </select>
                     </div>
 
@@ -943,7 +999,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                             <input
                               type="password"
                               value={localSettings.geminiApiKey || ''}
-                              onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
+                              onChange={(e) => patchLocal({ geminiApiKey: e.target.value })}
                               placeholder="AIzaSy..."
                               className="input flex-1 font-mono text-sm h-14"
                             />
@@ -962,18 +1018,40 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                                testStatus === 'error'   ? <AlertCircle size={20} /> : <Zap size={20} />}
                             </button>
                           </div>
+                          <p className="text-[10px] text-ink-400 mt-2 ml-1">Obtenha em <span className="font-bold text-brand-600">aistudio.google.com/apikey</span></p>
                         </div>
                         <div>
                           <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Gemini Principal</label>
                           <select
                             value={localSettings.geminiModel}
-                            onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
+                            onChange={(e) => patchLocal({ geminiModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Última Geração - Recomendado)</option>
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Mais Rápido)</option>
-                            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Raciocínio Clínico Avançado)</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash — Última Geração (Recomendado)</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro — Raciocínio Clínico Premium</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash — Velocidade Máxima</option>
+                            <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking — Experimental</option>
                           </select>
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            {[
+                              { model: 'gemini-2.5-flash', label: '2.5 Flash', desc: 'Velocidade + Qualidade', color: 'brand' },
+                              { model: 'gemini-2.5-pro', label: '2.5 Pro', desc: 'Máxima Precisão', color: 'violet' },
+                            ].map(m => (
+                              <button
+                                key={m.model}
+                                onClick={() => patchLocal({ geminiModel: m.model })}
+                                className={classNames(
+                                  'p-3 rounded-2xl border text-left transition-all',
+                                  localSettings.geminiModel === m.model
+                                    ? 'bg-brand-50 border-brand-300 text-brand-800'
+                                    : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
+                                )}
+                              >
+                                <span className="text-[10px] font-black uppercase tracking-widest block">{m.label}</span>
+                                <span className="text-[9px] text-ink-500 mt-0.5 block">{m.desc}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </>
                     ) : (
@@ -984,7 +1062,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                             <input
                               type="password"
                               value={localSettings.anthropicApiKey || ''}
-                              onChange={(e) => setLocalSettings({ ...localSettings, anthropicApiKey: e.target.value })}
+                              onChange={(e) => patchLocal({ anthropicApiKey: e.target.value })}
                               placeholder="sk-ant-..."
                               className="input flex-1 font-mono text-sm h-14"
                             />
@@ -1003,18 +1081,48 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                                testStatus === 'error'   ? <AlertCircle size={20} /> : <Zap size={20} />}
                             </button>
                           </div>
+                          <p className="text-[10px] text-ink-400 mt-2 ml-1">Obtenha em <span className="font-bold text-brand-600">console.anthropic.com</span></p>
                         </div>
                         <div>
                           <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Claude Principal</label>
                           <select
-                            value={localSettings.anthropicModel || 'claude-3-5-sonnet-latest'}
-                            onChange={(e) => setLocalSettings({ ...localSettings, anthropicModel: e.target.value })}
+                            value={localSettings.anthropicModel || 'claude-sonnet-4-5'}
+                            onChange={(e) => patchLocal({ anthropicModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Recomendado)</option>
-                            <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Rápido e Preciso)</option>
-                            <option value="claude-3-opus-latest">Claude 3 Opus (Complexidade Máxima)</option>
+                            <optgroup label="Claude 4 (Última Geração)">
+                              <option value="claude-opus-4-5">Claude Opus 4 — Máxima Inteligência Clínica</option>
+                              <option value="claude-sonnet-4-5">Claude Sonnet 4 — Equilíbrio Premium (Recomendado)</option>
+                            </optgroup>
+                            <optgroup label="Claude 3.7">
+                              <option value="claude-3-7-sonnet-latest">Claude 3.7 Sonnet — Thinking Mode</option>
+                            </optgroup>
+                            <optgroup label="Claude 3.5">
+                              <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet — Alta Qualidade</option>
+                              <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku — Mais Rápido</option>
+                            </optgroup>
                           </select>
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            {[
+                              { model: 'claude-sonnet-4-5', label: 'Sonnet 4', desc: 'Recomendado', color: 'brand' },
+                              { model: 'claude-opus-4-5', label: 'Opus 4', desc: 'Mais Poderoso', color: 'violet' },
+                              { model: 'claude-3-7-sonnet-latest', label: '3.7 Sonnet', desc: 'Raciocínio', color: 'amber' },
+                            ].map(m => (
+                              <button
+                                key={m.model}
+                                onClick={() => patchLocal({ anthropicModel: m.model })}
+                                className={classNames(
+                                  'p-3 rounded-2xl border text-left transition-all',
+                                  (localSettings.anthropicModel || 'claude-sonnet-4-5') === m.model
+                                    ? 'bg-brand-50 border-brand-300 text-brand-800'
+                                    : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
+                                )}
+                              >
+                                <span className="text-[10px] font-black uppercase tracking-widest block">{m.label}</span>
+                                <span className="text-[9px] text-ink-500 mt-0.5 block">{m.desc}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </>
                     )}
@@ -1030,12 +1138,34 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                         max="1"
                         step="0.1"
                         value={localSettings.aiTemperature ?? 0.3}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiTemperature: parseFloat(e.target.value) })}
+                        onChange={(e) => patchLocal({ aiTemperature: parseFloat(e.target.value) })}
                         className="w-full h-3 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-brand-600"
                       />
                       <div className="flex justify-between text-[10px] text-ink-400 font-bold uppercase mt-3 tracking-widest">
                         <span>Literal / Preciso</span>
                         <span>Criativo / Fluído</span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        {[
+                          { val: 0.1, label: 'Clínico', desc: 'Máxima fidelidade' },
+                          { val: 0.3, label: 'Balanceado', desc: 'Recomendado' },
+                          { val: 0.7, label: 'Criativo', desc: 'Estilo pessoal' },
+                        ].map(t => (
+                          <button
+                            key={t.val}
+                            onClick={() => patchLocal({ aiTemperature: t.val })}
+                            className={classNames(
+                              'p-3 rounded-2xl border text-center transition-all',
+                              (localSettings.aiTemperature ?? 0.3) === t.val
+                                ? 'bg-brand-50 border-brand-300 text-brand-800'
+                                : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
+                            )}
+                          >
+                            <span className="text-[11px] font-black block">{t.label}</span>
+                            <span className="text-[9px] text-ink-400 block">{t.desc}</span>
+                            <span className="text-[10px] font-black text-brand-600 block mt-0.5">{t.val}</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1046,6 +1176,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
             {/* ═══ TAB: TRAINING ═══ */}
             {activeTab === 'training' && (
               <div className="max-w-3xl space-y-6 animate-fade-in">
+                {/* Toggle Card */}
                 <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
                   <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
@@ -1058,7 +1189,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                       </div>
                     </div>
                     <button
-                      onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
+                      onClick={() => patchLocal({ aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
                       className={classNames(
                         'relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
                         localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
@@ -1076,6 +1207,22 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                       <strong>Como funciona:</strong> Ao habilitar esta função, o LAUD.IA enviará seus últimos exames finalizados da mesma especialidade como contexto. Isso garante que a IA utilize o seu vocabulário, estilo de pontuação e estrutura preferida.
                     </div>
 
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { icon: Database, label: 'Laudos no Banco', value: '—', sub: 'Finalizados', color: 'indigo' },
+                        { icon: TrendingUp, label: 'Mimetismo Ativo', value: localSettings.aiTrainingContextSize || 3, sub: 'exames p/ geração', color: 'violet' },
+                        { icon: FlaskConical, label: 'Qualidade Est.', value: localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 5 ? 'Alta' : localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 3 ? 'Média' : 'Baixa', sub: 'calibração', color: 'emerald' },
+                      ].map((stat) => (
+                        <div key={stat.label} className={`p-4 bg-${stat.color}-50 border border-${stat.color}-100 rounded-2xl text-center`}>
+                          <stat.icon size={20} className={`text-${stat.color}-600 mx-auto mb-2`} />
+                          <span className={`text-xl font-black text-${stat.color}-900 block`}>{stat.value}</span>
+                          <span className={`text-[9px] font-black text-${stat.color}-600 uppercase tracking-widest block`}>{stat.label}</span>
+                          <span className={`text-[9px] text-${stat.color}-400 block mt-0.5`}>{stat.sub}</span>
+                        </div>
+                      ))}
+                    </div>
+
                     <div className="space-y-4 pt-4">
                       <label className="block text-sm font-bold text-ink-700 flex items-center gap-2">
                         Quantidade de Exames Contextuais
@@ -1086,11 +1233,193 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                         min="1"
                         max="10"
                         value={localSettings.aiTrainingContextSize || 3}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiTrainingContextSize: parseInt(e.target.value) })}
+                        onChange={(e) => patchLocal({ aiTrainingContextSize: parseInt(e.target.value) })}
                         className="w-full h-3 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                       />
+                      <div className="flex justify-between text-[9px] text-ink-400 font-bold uppercase tracking-widest">
+                        <span>1 — Rápido</span>
+                        <span className="text-indigo-600">3-5 Ideal</span>
+                        <span>10 — Lento</span>
+                      </div>
                       <p className="text-xs text-ink-400 italic">Recomendado: 3 a 5 exames para o melhor equilíbrio entre fidelidade e velocidade.</p>
                     </div>
+
+                    {/* Impacto Qualitativo */}
+                    <div className="pt-4 border-t border-ink-100">
+                      <h5 className="text-[10px] font-black text-ink-600 uppercase tracking-widest mb-3">O que a IA aprende com seus laudos</h5>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: 'Estilo de Escrita', desc: 'Tom, pontuação e fraseologia típica do médico' },
+                          { label: 'Vocabulário CBR', desc: 'Termos preferenciais para cada órgão e achado' },
+                          { label: 'Nível de Detalhe', desc: 'Densidade descritiva da análise morfológica' },
+                          { label: 'Padrão de Conduta', desc: 'Verbos e estrutura das recomendações N1-N4' },
+                        ].map(item => (
+                          <div key={item.label} className="p-4 bg-ink-50 border border-ink-100 rounded-2xl">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                              <span className="text-[10px] font-black text-ink-800">{item.label}</span>
+                            </div>
+                            <p className="text-[10px] text-ink-500 leading-relaxed">{item.desc}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ TAB: STATUS ═══ */}
+            {activeTab === 'status' && (
+              <div className="max-w-3xl space-y-6 animate-fade-in">
+                {/* Connection Status */}
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                      <Activity size={28} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black text-ink-900">Status da IA</h4>
+                      <p className="text-sm text-ink-500">Diagnóstico de conexão e configuração do motor.</p>
+                    </div>
+                  </div>
+
+                  {/* Provider Status */}
+                  <div className="space-y-4 mb-8">
+                    <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Provedor Ativo</h5>
+                    {[
+                      {
+                        name: 'Google Gemini',
+                        provider: 'gemini',
+                        icon: Cpu,
+                        color: 'brand',
+                        hasKey: !!localSettings.geminiApiKey,
+                        model: localSettings.geminiModel || 'gemini-2.5-flash',
+                        isActive: (localSettings.aiProvider || 'gemini') === 'gemini',
+                      },
+                      {
+                        name: 'Anthropic Claude',
+                        provider: 'anthropic',
+                        icon: BrainCircuit,
+                        color: 'violet',
+                        hasKey: !!localSettings.anthropicApiKey,
+                        model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+                        isActive: localSettings.aiProvider === 'anthropic',
+                      },
+                    ].map((prov) => (
+                      <div
+                        key={prov.provider}
+                        className={classNames(
+                          'p-5 rounded-2xl border flex items-center justify-between transition-all',
+                          prov.isActive
+                            ? 'bg-brand-50/50 border-brand-200/50'
+                            : 'bg-ink-50/30 border-ink-100'
+                        )}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={classNames(
+                            'w-10 h-10 rounded-xl flex items-center justify-center',
+                            prov.isActive ? 'bg-brand-100 text-brand-600' : 'bg-ink-100 text-ink-400'
+                          )}>
+                            <prov.icon size={20} />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-sm text-ink-900">{prov.name}</span>
+                              {prov.isActive && (
+                                <span className="px-2 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full">Ativo</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-ink-500 font-mono">{prov.model}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {prov.hasKey ? (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                              <Wifi size={12} className="text-emerald-600" />
+                              <span className="text-[10px] font-black text-emerald-700 uppercase">Configurado</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl">
+                              <WifiOff size={12} className="text-red-500" />
+                              <span className="text-[10px] font-black text-red-600 uppercase">Sem API Key</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Quick Test */}
+                  <div className="pt-6 border-t border-ink-100">
+                    <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-4">Teste de Conectividade</h5>
+                    <div className="flex items-center gap-4">
+                      <button
+                        onClick={testConnection}
+                        disabled={testStatus === 'testing'}
+                        className={classNames(
+                          'flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black transition-all border',
+                          testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                          testStatus === 'error'   ? 'bg-red-50 text-red-700 border-red-200' :
+                          testStatus === 'testing' ? 'bg-brand-50 text-brand-600 border-brand-200' :
+                                                     'bg-ink-50 text-ink-700 border-ink-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200'
+                        )}
+                      >
+                        {testStatus === 'testing' ? (
+                          <><Loader2 size={16} className="animate-spin" /> Testando Conexão...</>
+                        ) : testStatus === 'success' ? (
+                          <><CheckCircle2 size={16} /> Conexão OK!</>
+                        ) : testStatus === 'error' ? (
+                          <><AlertCircle size={16} /> Falha na Conexão</>
+                        ) : (
+                          <><Zap size={16} /> Testar Agora</>
+                        )}
+                      </button>
+                      {testStatus !== 'idle' && (
+                        <button
+                          onClick={() => setTestStatus('idle')}
+                          className="text-sm text-ink-400 hover:text-ink-600 font-bold"
+                        >
+                          Resetar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Config Summary */}
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                  <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-6">Resumo de Configuração</h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { label: 'Motor', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
+                      { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-2.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
+                      { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
+                      { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
+                      { label: 'Doutrina', value: localSettings.normalDoctrine?.trim() ? 'Configurada' : 'Padrão (Admin)', icon: ShieldAlert },
+                      { label: 'Snippets', value: `${(localSettings.snippets || []).length} frases cadastradas`, icon: BookOpen },
+                    ].map(item => (
+                      <div key={item.label} className="p-4 bg-ink-50 rounded-2xl border border-ink-100">
+                        <div className="flex items-center gap-2 mb-1">
+                          <item.icon size={14} className="text-ink-400" />
+                          <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">{item.label}</span>
+                        </div>
+                        <span className="text-sm font-bold text-ink-800 leading-tight">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Versão */}
+                <div className="bg-gradient-to-r from-brand-50 to-indigo-50/50 border border-brand-100/50 rounded-2xl p-5 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest block">Laud.IA Core</span>
+                    <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+                      Motor cognitivo radiológico v10.1 — Cascata Tripartite + Regras Rígidas + Aprendizado por Estilo.
+                    </p>
+                  </div>
+                  <div className="px-4 py-2 bg-white border border-brand-200 rounded-xl text-[10px] font-black text-brand-700 shadow-sm">
+                    v10.1 PROD
                   </div>
                 </div>
               </div>
