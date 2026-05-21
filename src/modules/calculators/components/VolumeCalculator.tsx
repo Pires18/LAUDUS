@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Ruler, Sparkles, Maximize2 } from 'lucide-react';
+import { Ruler, Maximize2 } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
 
 export function VolumeCalculator({ value, onChange }: CalculatorProps) {
@@ -11,17 +11,22 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
   const [unit, setUnit] = useState<string>(value?.unit ?? 'cm');
 
   useEffect(() => {
-    let volume = 0;
-    if (typeof d1 === 'number' && typeof d2 === 'number' && typeof d3 === 'number') {
-      volume = d1 * d2 * d3 * 0.523;
+    let volumeCm3 = 0;
+    if (typeof d1 === 'number' && typeof d2 === 'number' && typeof d3 === 'number' && d1 > 0 && d2 > 0 && d3 > 0) {
+      const rawVolume = d1 * d2 * d3 * 0.523;
+      // Se unidade for mm, converter mm³ → cm³ (÷ 1000). Se cm, já está em cm³.
+      volumeCm3 = unit === 'mm' ? rawVolume / 1000 : rawVolume;
     }
-    
+
     const name = structureName.trim() || 'Estrutura';
-    
+    const displayVol = volumeCm3 ? volumeCm3.toFixed(2) : null;
+
     onChange({
       structureName, d1, d2, d3, unit,
-      volume: volume ? parseFloat(volume.toFixed(1)) : null,
-      _summary: volume ? `${name} medindo ${d1} x ${d2} x ${d3} ${unit}, com volume estimado de ${volume.toFixed(1)} ${unit}³.` : null
+      volume: displayVol ? parseFloat(displayVol) : null,
+      _summary: displayVol
+        ? `${name}: ${d1} × ${d2} × ${d3} ${unit}. Volume estimado: ${displayVol} cm³ (${displayVol} mL).`
+        : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structureName, d1, d2, d3, unit]);
@@ -36,18 +41,18 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
         </div>
         <div>
           <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Cálculo Volumétrico</h3>
-          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Fórmula de Elipsóide (D1 x D2 x D3 x 0.523)</p>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Fórmula do Elipsóide (D1 × D2 × D3 × 0.523)</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <CalculatorInput 
-          label="Identificação da Estrutura" 
-          placeholder="Ex: Próstata, Nódulo, Tireoide..." 
-          value={structureName} 
-          onChange={setStructureName} 
+        <CalculatorInput
+          label="Identificação da Estrutura"
+          placeholder="Ex: Próstata, Nódulo, Tireoide..."
+          value={structureName}
+          onChange={setStructureName}
         />
-        
+
         <div className="space-y-1.5">
           <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Unidade de Medida</label>
           <div className="flex gap-2">
@@ -63,6 +68,9 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
               </button>
             ))}
           </div>
+          <p className="text-[9px] text-ink-400 font-medium ml-1">
+            Resultado sempre exibido em cm³ (mL).
+          </p>
         </div>
       </div>
 
@@ -72,21 +80,21 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
           <span className="text-[10px] font-black text-ink-900 uppercase tracking-widest">Dimensões do Elipsóide</span>
         </div>
         <div className="grid grid-cols-3 gap-4">
-          <CalculatorInput type="number" label="D1 (Long)" placeholder="0.0" value={d1} onChange={(v: any) => setD1(v ? Number(v) : '')} suffix={unit} />
-          <CalculatorInput type="number" label="D2 (Trans)" placeholder="0.0" value={d2} onChange={(v: any) => setD2(v ? Number(v) : '')} suffix={unit} />
-          <CalculatorInput type="number" label="D3 (AP)" placeholder="0.0" value={d3} onChange={(v: any) => setD3(v ? Number(v) : '')} suffix={unit} />
+          <CalculatorInput type="number" label={`D1 — Long (${unit})`} placeholder="0.0" value={d1} onChange={(v: any) => setD1(v ? Number(v) : '')} suffix={unit} />
+          <CalculatorInput type="number" label={`D2 — Trans (${unit})`} placeholder="0.0" value={d2} onChange={(v: any) => setD2(v ? Number(v) : '')} suffix={unit} />
+          <CalculatorInput type="number" label={`D3 — AP (${unit})`} placeholder="0.0" value={d3} onChange={(v: any) => setD3(v ? Number(v) : '')} suffix={unit} />
         </div>
       </div>
 
       {volume ? (
-        <ResultCard 
-          label={`Volume Estimado (${structureName.trim() || 'Estrutura'})`} 
-          value={`${volume.toFixed(1)} ${unit}³`} 
+        <ResultCard
+          label={`Volume Estimado — ${structureName.trim() || 'Estrutura'}`}
+          value={`${volume.toFixed(2)} cm³ (mL)`}
           variant="brand"
         />
       ) : (
         <div className="py-10 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center">
-           <p className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Aguardando medidas para cálculo</p>
+          <p className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Aguardando medidas para cálculo</p>
         </div>
       )}
     </div>

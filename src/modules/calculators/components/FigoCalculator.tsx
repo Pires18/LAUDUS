@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity, Zap } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Activity, Zap } from 'lucide-react';
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 
@@ -40,10 +40,10 @@ const LOCATIONS = [
 ];
 
 const ECHOGENICITY = [
-  { label: 'Hipoeconico' },
-  { label: 'Isoeconico' },
-  { label: 'Hipereconico' },
-  { label: 'Heterogeneo' },
+  { label: 'Hipoecogênico' },
+  { label: 'Isoecogênico' },
+  { label: 'Hiperecogênico' },
+  { label: 'Heterogêneo' },
 ];
 
 export function FigoCalculator({ value, onChange }: CalculatorProps) {
@@ -89,7 +89,7 @@ export function FigoCalculator({ value, onChange }: CalculatorProps) {
     const id = genId();
     setMyomas([...myomas, {
       id, location: 'Parede Anterior', d1: '', d2: '', d3: '',
-      type1: null, type2: null, vascularity: 1, echogenicity: 'Hipoeconico',
+      type1: null, type2: null, vascularity: 1, echogenicity: 'Hipoecogênico',
       classification: null, description: null
     }]);
     setExpandedId(id);

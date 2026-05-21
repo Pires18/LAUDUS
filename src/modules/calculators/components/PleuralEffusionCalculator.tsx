@@ -4,30 +4,26 @@ import { Droplets, Info, AlertCircle } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 export function PleuralEffusionCalculator({ value, onChange }: CalculatorProps) {
-  const [method, setMethod] = useState<'balik' | 'simple'>(value?.method || 'balik');
   const [depth, setDepth] = useState(value?.depth || ''); // mm
-  
-  // Balik method: Vol (ml) = 20 * depth (mm)
-  // Simple: depth in cm * something? Usually Balik is the most accepted for supine.
 
   const [volume, setVolume] = useState<number | null>(null);
 
   useEffect(() => {
     const d = Number(depth);
     let vol: number | null = null;
-    
-    if (d) {
+
+    if (d > 0) {
       vol = 20 * d;
     }
 
     setVolume(vol);
 
     onChange({
-      method, depth, volume: vol,
+      method: 'balik', depth, volume: vol,
       _summary: vol ? `Derrame Pleural (Fórmula de Balik): Lâmina de ${depth}mm → Volume estimado de ${vol}ml.` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, depth]);
+  }, [depth]);
 
   return (
     <div className="space-y-6">

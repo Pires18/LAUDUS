@@ -3,15 +3,17 @@ import { CalculatorProps } from '../registry';
 import { Activity, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
-// Arduini & Rizzo 1990 UA PI
+// Arduini & Rizzo 1990 — AU PI
 const UA_REF: Record<number,[number,number]> = {
   20:[1.54,0.37],22:[1.41,0.32],24:[1.30,0.28],26:[1.20,0.25],28:[1.12,0.23],30:[1.05,0.21],
   32:[0.99,0.19],34:[0.94,0.18],36:[0.90,0.17],38:[0.87,0.17],40:[0.85,0.16]
 };
+// Mari & Deter 1992 — ACM PI
 const MCA_REF: Record<number,[number,number]> = {
   20:[1.60,0.30],22:[1.65,0.32],24:[1.71,0.33],26:[1.77,0.34],28:[1.82,0.35],30:[1.84,0.36],
   32:[1.83,0.36],34:[1.79,0.35],36:[1.71,0.34],38:[1.60,0.32],40:[1.45,0.29]
 };
+// Gomez 2008 — Uterinas PI
 const UTA_REF: Record<number,[number,number]> = {
   20:[1.20,0.32],22:[1.12,0.30],24:[1.04,0.28],26:[0.98,0.26],28:[0.92,0.25],30:[0.87,0.24],
   32:[0.83,0.23],34:[0.79,0.22],36:[0.76,0.21],38:[0.73,0.20],40:[0.71,0.20]
@@ -50,77 +52,163 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   const calc = useMemo(() => {
     let rcp: number|null = null;
     let auP: number|null = null, acmP: number|null = null, utaP: number|null = null;
+
     if (auPi && ga>=20 && ga<=40) { const [m,s]=getRef(UA_REF,ga); auP=zToP((Number(auPi)-m)/s); }
     if (acmPi && ga>=20 && ga<=40) { const [m,s]=getRef(MCA_REF,ga); acmP=zToP((Number(acmPi)-m)/s); }
     if (utaPi && ga>=20 && ga<=40) { const [m,s]=getRef(UTA_REF,ga); utaP=zToP((Number(utaPi)-m)/s); }
     if (auPi && acmPi) rcp = Number(acmPi)/Number(auPi);
 
-    let stage=0, stageDesc='Normal', rec='Seguimento habitual.';
-    if (dvWave==='rav') { stage=4; stageDesc='ESTÁGIO IV'; rec='Morte fetal iminente. Parto imediato.'; }
-    else if (auFlow==='redf') { stage=3; stageDesc='ESTÁGIO III'; rec='Acidose fetal. Internação. Parto 24-48h.'; }
-    else if (auFlow==='aedf') { stage=2; stageDesc='ESTÁGIO II'; rec='Insuf. placentária grave. Monitor 2-3x/sem.'; }
-    else if ((efwPercentile && Number(efwPercentile)<3) || (auP!==null && auP>95) || (rcp!==null && rcp<1.0)) { stage=1; stageDesc='ESTÁGIO I'; rec='Insuf. placentária leve. Monitor semanal.'; }
+    // Estadiamento Gratacós (Barcelona 2014) — pode ser determinado SEM RCP
+    let stage=0, stageDesc='Normal', rec='Seguimento habitual conforme protocolo.';
+    if (dvWave==='rav') {
+      stage=4; stageDesc='ESTÁGIO IV';
+      rec='Onda "a" reversa no DV. Morte fetal iminente — parto imediato se viabilidade.';
+    } else if (auFlow==='redf') {
+      stage=3; stageDesc='ESTÁGIO III';
+      rec='Diástole reversa na AU (REDF). Risco de acidose. Internação. Parto em 24-48h.';
+    } else if (auFlow==='aedf') {
+      stage=2; stageDesc='ESTÁGIO II';
+      rec='Diástole zero na AU (AEDF). Insuf. placentária grave. Monitoramento 2-3×/semana.';
+    } else if (
+      (efwPercentile && Number(efwPercentile)<3) ||
+      (auP!==null && auP>95) ||
+      (rcp!==null && rcp<1.0) ||
+      (acmP!==null && acmP<5)
+    ) {
+      stage=1; stageDesc='ESTÁGIO I';
+      rec='Insuf. placentária leve (AU p>95, RCP<1,0 ou PFE<p3). Monitoramento semanal. Parto ≥ 37s.';
+    }
+
     return { rcp, auP, acmP, utaP, stage, stageDesc, rec };
   }, [auPi,acmPi,utaPi,dvPi,auFlow,dvWave,efwPercentile,ga]);
 
+  // Determina se há dados suficientes para exibir resultado
+  const hasData = !!(auPi || acmPi || utaPi || efwPercentile || auFlow !== 'normal' || dvWave !== 'not_evaluated');
+
   useEffect(() => {
-    const summary = calc.rcp ? `Doppler Barcelona: AU p${calc.auP||'?'}, ACM p${calc.acmP||'?'}, RCP ${calc.rcp.toFixed(2)}. ${calc.stageDesc}.` : null;
+    const parts: string[] = [];
+    if (gaWeeks) parts.push(`IG: ${gaWeeks}s ${gaDays||0}d`);
+    if (calc.auP !== null) parts.push(`AU PI: ${auPi} (p${calc.auP})`);
+    if (calc.acmP !== null) parts.push(`ACM PI: ${acmPi} (p${calc.acmP})`);
+    if (calc.utaP !== null) parts.push(`UtA PI: ${utaPi} (p${calc.utaP})`);
+    if (calc.rcp !== null) parts.push(`RCP: ${calc.rcp.toFixed(2)}${calc.rcp<1.0?' (ALTERADA)':' (normal)'}`);
+    if (auFlow !== 'normal') parts.push(`Diástole AU: ${auFlow === 'aedf' ? 'Zero (AEDF)' : 'Reversa (REDF)'}`);
+    if (dvWave === 'rav') parts.push("DV: Onda 'a' Reversa");
+
+    const summary = parts.length > 0
+      ? `Doppler Barcelona (Gratacós): ${parts.join('. ')}. ${calc.stageDesc}.`
+      : null;
+
     onChange({ gaWeeks, gaDays, auPi, acmPi, utaPi, dvPi, auFlow, dvWave, efwPercentile, ...calc, _summary: summary });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gaWeeks,gaDays,auPi,acmPi,utaPi,dvPi,auFlow,dvWave,efwPercentile,calc]);
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
+    <div className="bg-white border border-ink-200 rounded-xl overflow-hidden shadow-sm">
       <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5"><Activity size={14} className="text-blue-600"/><h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Doppler Barcelona (Gratacós)</h3></div>
+        <div className="flex items-center gap-1.5">
+          <Activity size={14} className="text-blue-600"/>
+          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Doppler Barcelona (Gratacós)</h3>
+        </div>
         <div className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase">FGR Staging</div>
       </div>
+
       <div className="p-3 space-y-3">
         <div className="grid grid-cols-3 gap-2">
-          <div><label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">IG (Sem)</label><input type="number" className="input text-xs h-8" value={gaWeeks} onChange={e=>setGaWeeks(e.target.value)}/></div>
-          <div><label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">Dias</label><input type="number" className="input text-xs h-8" value={gaDays} onChange={e=>setGaDays(e.target.value)}/></div>
-          <div><label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">Peso (p%)</label><input type="number" className="input text-xs h-8" value={efwPercentile} onChange={e=>setEfwPercentile(e.target.value)}/></div>
+          <div>
+            <label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">IG (Sem)</label>
+            <input type="number" className="input text-xs h-8" value={gaWeeks} onChange={e=>setGaWeeks(e.target.value)}/>
+          </div>
+          <div>
+            <label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">Dias</label>
+            <input type="number" min={0} max={6} className="input text-xs h-8" value={gaDays} onChange={e=>setGaDays(e.target.value)}/>
+          </div>
+          <div>
+            <label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">PFE (p%)</label>
+            <input type="number" className="input text-xs h-8" placeholder="ex: 8" value={efwPercentile} onChange={e=>setEfwPercentile(e.target.value)}/>
+          </div>
         </div>
+
         <div className="grid grid-cols-2 gap-2">
-          <DI label="AU PI" value={auPi} onChange={setAuPi} p={calc.auP}/>
-          <DI label="ACM PI" value={acmPi} onChange={setAcmPi} p={calc.acmP}/>
-          <DI label="UtA PI (Médio)" value={utaPi} onChange={setUtaPi} p={calc.utaP}/>
-          <DI label="DV PIV" value={dvPi} onChange={setDvPi} p={null}/>
+          <DI label="AU PI" value={auPi} onChange={setAuPi} p={calc.auP} abnormal={calc.auP !== null && calc.auP > 95}/>
+          <DI label="ACM PI" value={acmPi} onChange={setAcmPi} p={calc.acmP} abnormal={calc.acmP !== null && calc.acmP < 5}/>
+          <DI label="UtA PI (médio)" value={utaPi} onChange={setUtaPi} p={calc.utaP} abnormal={calc.utaP !== null && calc.utaP > 95}/>
+          <DI label="DV PIV" value={dvPi} onChange={setDvPi} p={null} abnormal={false}/>
         </div>
+
+        {calc.rcp !== null && (
+          <div className={classNames(
+            "flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-black",
+            calc.rcp < 1.0 ? "bg-red-50 border-red-200 text-red-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          )}>
+            <span className="text-[9px] font-bold uppercase">RCP (ACM/AU)</span>
+            <span>{calc.rcp.toFixed(2)} — {calc.rcp < 1.0 ? '⚠ ALTERADA' : 'Normal'}</span>
+          </div>
+        )}
+
         <div className="space-y-2 pt-2 border-t border-ink-100">
-          <div><label className="text-[9px] font-bold text-ink-500 uppercase block mb-1 text-center">Fluxo Diastólico AU</label>
+          <div>
+            <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1 text-center">Fluxo Diastólico AU</label>
             <div className="flex gap-1">
-              {[{id:'normal',l:'Presente',c:'bg-blue-600'},{id:'aedf',l:'Zero (AEDF)',c:'bg-orange-500'},{id:'redf',l:'Reverso (REDF)',c:'bg-red-600'}].map(o=>
-                <button key={o.id} onClick={()=>setAuFlow(o.id as any)} className={classNames("flex-1 py-1.5 text-[8px] font-bold rounded border transition-all uppercase",auFlow===o.id?`${o.c} text-white border-transparent shadow-sm`:"bg-white text-ink-500 border-ink-100")}>{o.l}</button>
+              {[
+                {id:'normal',l:'Presente',c:'bg-blue-600'},
+                {id:'aedf',l:'Zero (AEDF)',c:'bg-orange-500'},
+                {id:'redf',l:'Reverso (REDF)',c:'bg-red-600'}
+              ].map(o=>
+                <button key={o.id} onClick={()=>setAuFlow(o.id as any)}
+                  className={classNames("flex-1 py-1.5 text-[8px] font-bold rounded border transition-all uppercase",
+                    auFlow===o.id?`${o.c} text-white border-transparent shadow-sm`:"bg-white text-ink-500 border-ink-100"
+                  )}>
+                  {o.l}
+                </button>
               )}
             </div>
           </div>
-          <div><label className="text-[9px] font-bold text-ink-500 uppercase block mb-1 text-center">Onda 'a' Ducto Venoso</label>
+          <div>
+            <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1 text-center">Onda 'a' — Ducto Venoso</label>
             <div className="flex gap-1">
               {[
                 {id:'not_evaluated',l:'Não Avaliada',c:'bg-ink-600'},
                 {id:'normal',l:'Normal/Positiva',c:'bg-blue-600'},
                 {id:'rav',l:'Reversa (RAV)',c:'bg-red-800'}
               ].map(o=>
-                <button key={o.id} onClick={()=>setDvWave(o.id as any)} className={classNames("flex-1 py-1.5 text-[8px] font-bold rounded border transition-all uppercase",dvWave===o.id?`${o.c} text-white border-transparent shadow-sm`:"bg-white text-ink-500 border-ink-100")}>{o.l}</button>
+                <button key={o.id} onClick={()=>setDvWave(o.id as any)}
+                  className={classNames("flex-1 py-1.5 text-[8px] font-bold rounded border transition-all uppercase",
+                    dvWave===o.id?`${o.c} text-white border-transparent shadow-sm`:"bg-white text-ink-500 border-ink-100"
+                  )}>
+                  {o.l}
+                </button>
               )}
             </div>
           </div>
         </div>
-        {calc.rcp !== null && (
-          <div className={classNames("rounded-xl p-3 border shadow-md",calc.stage===0?"bg-emerald-50 border-emerald-200":calc.stage<=2?"bg-amber-50 border-amber-200":"bg-red-50 border-red-200")}>
+
+        {/* Resultado de estadiamento — mostra com qualquer dado relevante */}
+        {hasData && (
+          <div className={classNames(
+            "rounded-xl p-3 border shadow-md",
+            calc.stage===0 ? "bg-emerald-50 border-emerald-200"
+            : calc.stage===1 ? "bg-blue-50 border-blue-200"
+            : calc.stage===2 ? "bg-amber-50 border-amber-200"
+            : calc.stage===3 ? "bg-orange-50 border-orange-200"
+            : "bg-red-50 border-red-200"
+          )}>
             <div className="flex justify-between items-start mb-2">
               <div>
-                <span className="text-[8px] font-bold uppercase tracking-widest block mb-0.5 opacity-60">Estágio Gratacós</span>
+                <span className="text-[8px] font-bold uppercase tracking-widest block mb-0.5 opacity-60">Estadiamento Barcelona (Gratacós)</span>
                 <div className="text-lg font-black">{calc.stageDesc}</div>
               </div>
-              <div className="text-right">
-                <span className="text-[8px] font-bold text-ink-500 uppercase block">RCP</span>
-                <span className="text-sm font-black">{calc.rcp.toFixed(2)}</span>
-              </div>
+              {calc.rcp !== null && (
+                <div className="text-right">
+                  <span className="text-[8px] font-bold text-ink-500 uppercase block">RCP</span>
+                  <span className="text-sm font-black">{calc.rcp.toFixed(2)}</span>
+                </div>
+              )}
             </div>
             <div className="bg-white/80 p-2 rounded-lg text-[10px] font-medium flex gap-2">
-              {calc.stage>=1?<AlertTriangle size={14} className="shrink-0 text-amber-500"/>:<ShieldCheck size={14} className="shrink-0 text-emerald-500"/>}
+              {calc.stage>=1
+                ? <AlertTriangle size={14} className="shrink-0 text-amber-500"/>
+                : <ShieldCheck size={14} className="shrink-0 text-emerald-500"/>}
               {calc.rec}
             </div>
           </div>
@@ -130,12 +218,22 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   );
 }
 
-function DI({ label, value, onChange, p }: { label:string, value:any, onChange:(v:string)=>void, p:number|null }) {
+function DI({ label, value, onChange, p, abnormal }: {
+  label: string;
+  value: any;
+  onChange: (v:string)=>void;
+  p: number|null;
+  abnormal: boolean;
+}) {
   return (
     <div>
       <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">{label}</label>
       <input type="number" step="0.01" className="input text-center text-xs h-8 focus:border-blue-500" value={value} onChange={e=>onChange(e.target.value)}/>
-      {p!==null && <span className={classNames("text-[8px] font-bold block text-center mt-0.5",p>95||p<5?"text-red-600":"text-emerald-600")}>p{p}</span>}
+      {p!==null && (
+        <span className={classNames("text-[8px] font-bold block text-center mt-0.5", abnormal ? "text-red-600" : "text-emerald-600")}>
+          p{p}{abnormal ? ' ⚠' : ''}
+        </span>
+      )}
     </div>
   );
 }

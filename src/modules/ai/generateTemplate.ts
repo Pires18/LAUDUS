@@ -96,7 +96,7 @@ FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
       generationConfig: {
         temperature: 0.2,
         topP: 0.9,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
       }
     });
 
@@ -112,7 +112,7 @@ FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2
       })
@@ -227,7 +227,7 @@ Regras importantes:
       generationConfig: {
         temperature: 0.3,
         topP: 0.9,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
       }
     });
 
@@ -243,7 +243,7 @@ Regras importantes:
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3
       })

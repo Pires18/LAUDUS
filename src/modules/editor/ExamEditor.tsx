@@ -8,7 +8,7 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
@@ -58,11 +58,20 @@ export function ExamEditor({ examId }: Props) {
   const [unlockReason, setUnlockReason] = useState('');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [showEditMetadata, setShowEditMetadata] = useState(false);
-  const [showCopilot, setShowCopilot] = useState(false); 
+  const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
   const [copilotPrompt, setCopilotPrompt] = useState('');
+  const [showSnippets, setShowSnippets] = useState(false);
+  const [snippetSearch, setSnippetSearch] = useState('');
+
+  // Estado LOCAL do histórico do copiloto — evita spam de escritas no Firestore
+  // durante o streaming (sem isso, cada chunk geraria uma escrita no Firestore).
+  // O Firestore é atualizado de forma debounced a cada 1500ms sem novas mudanças.
+  const [localChatHistory, setLocalChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const chatHistoryInitialized = useRef(false);
+  const chatSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Metadata Edit State
   const [editData, setEditData] = useState({
@@ -77,6 +86,23 @@ export function ExamEditor({ examId }: Props) {
   const editorRef = useRef<RichEditorRef>(null);
   const reportContentRef = useRef(reportContent);
   reportContentRef.current = reportContent;
+
+  // Inicializa o histórico local do copiloto UMA vez quando o exam carrega
+  useEffect(() => {
+    if (exam && !chatHistoryInitialized.current) {
+      chatHistoryInitialized.current = true;
+      setLocalChatHistory(
+        (exam.chatHistory || []) as Array<{ role: 'user' | 'assistant'; content: string }>
+      );
+    }
+  }, [exam]);
+
+  // Limpa o timer de salvamento do chat ao desmontar
+  useEffect(() => {
+    return () => {
+      if (chatSaveTimerRef.current) clearTimeout(chatSaveTimerRef.current);
+    };
+  }, []);
 
   // Sync initial content when data loads
   useEffect(() => {
@@ -113,6 +139,22 @@ export function ExamEditor({ examId }: Props) {
 
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
 
+  /**
+   * Atualização do histórico do copiloto com escrita debounced no Firestore.
+   * Durante streaming, React re-renderiza imediatamente via estado local,
+   * mas Firestore só é escrito 1500ms após o último chunk — evita spam.
+   */
+  const handleChatUpdate = useCallback(
+    (newHistory: Array<{ role: 'user' | 'assistant'; content: string }>) => {
+      setLocalChatHistory(newHistory);
+      if (chatSaveTimerRef.current) clearTimeout(chatSaveTimerRef.current);
+      chatSaveTimerRef.current = setTimeout(() => {
+        updateItem('exams', examId, { chatHistory: newHistory });
+      }, 1500);
+    },
+    [examId]
+  );
+
   // Google Docs Hook
   const { createGoogleDoc, deleteGoogleDoc } = useGoogleDocs({
     examId,
@@ -123,8 +165,8 @@ export function ExamEditor({ examId }: Props) {
     showToast
   });
 
-  // Status Change logic
-  const handleStatusChange = async (newStatus: ExamStatus) => {
+  // Status Change — useCallback evita re-registro do keyboard listener a cada render
+  const handleStatusChange = useCallback(async (newStatus: ExamStatus) => {
     if (newStatus === 'finalizado' && clinic?.googleDocsTemplateId && exam && patient) {
       const needsNewDoc = !exam.googleDocId || exam.status !== 'finalizado';
       if (needsNewDoc) {
@@ -141,9 +183,9 @@ export function ExamEditor({ examId }: Props) {
       }
     }
     await updateStatus(newStatus);
-  };
+  }, [clinic?.googleDocsTemplateId, exam, patient, createGoogleDoc, showToast, updateStatus]);
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (!exam || !patient || !reportContent) return;
     try {
       await copyReportToClipboard(reportContent, patient, exam, settings);
@@ -152,7 +194,7 @@ export function ExamEditor({ examId }: Props) {
       const message = e instanceof Error ? e.message : 'Erro desconhecido';
       showToast('Erro ao copiar: ' + message, 'error');
     }
-  };
+  }, [exam, patient, reportContent, settings, showToast]);
 
   const handleReset = useCallback(async () => {
     if (!template) return;
@@ -303,9 +345,10 @@ export function ExamEditor({ examId }: Props) {
                  />
               </div>
 
-              <EditorToolbar 
+              <EditorToolbar
                 isGenerating={isGenerating}
                 hasReport={!!reportContent}
+                isTemplateMask={/\(…\)/.test(reportContent)}
                 status={exam.status}
                 onRefine={() => {
                   if (currentRole === 'recepcao') {
@@ -323,6 +366,9 @@ export function ExamEditor({ examId }: Props) {
                   handleReset();
                 }}
                 onShowHistory={() => setShowHistoryModal(true)}
+                onToggleSnippets={() => { setShowSnippets(s => !s); setSnippetSearch(''); }}
+                snippetsOpen={showSnippets}
+                snippetCount={settings.snippets?.length ?? 0}
                 saveState={saveState}
                 geminiModel={
                   settings.aiProvider === 'anthropic'
@@ -330,6 +376,70 @@ export function ExamEditor({ examId }: Props) {
                     : (settings.geminiModel || 'gemini-2.5-flash')
                 }
               />
+
+              {/* ── Snippet Picker Panel ── */}
+              {showSnippets && (
+                <div className="border-b border-amber-100 bg-amber-50/60 px-4 py-3 space-y-2 shrink-0 animate-fade-in">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <BookOpen size={13} className="text-amber-600" />
+                      <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider">Frases Prontas</span>
+                      <span className="text-[9px] text-amber-500">— clique para inserir no cursor</span>
+                    </div>
+                    <button onClick={() => setShowSnippets(false)} className="p-1 rounded-lg hover:bg-amber-100 text-amber-500">
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-400" />
+                    <input
+                      value={snippetSearch}
+                      onChange={e => setSnippetSearch(e.target.value)}
+                      className="w-full pl-7 pr-3 py-1.5 rounded-xl border border-amber-200 bg-white text-[11px] focus:ring-amber-400 focus:border-amber-400 placeholder-amber-300"
+                      placeholder="Buscar frase..."
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto py-0.5">
+                    {(settings.snippets || [])
+                      .filter(s => {
+                        if (snippetSearch.trim()) {
+                          const q = snippetSearch.toLowerCase();
+                          return s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q);
+                        }
+                        // Show area-filtered first, then all
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const examArea = exam?.area || '';
+                        const aMatch = a.area === examArea ? -1 : 0;
+                        const bMatch = b.area === examArea ? -1 : 0;
+                        return aMatch - bMatch;
+                      })
+                      .map(snippet => (
+                        <button
+                          key={snippet.id}
+                          onClick={() => {
+                            editorRef.current?.insertContent(snippet.content);
+                            showToast(`"${snippet.title}" inserido`, 'success');
+                          }}
+                          title={snippet.content}
+                          className="px-2.5 py-1 rounded-xl bg-white border border-amber-200 text-[10px] font-bold text-amber-800 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all active:scale-95 shadow-sm"
+                        >
+                          {snippet.title}
+                        </button>
+                      ))
+                    }
+                    {(settings.snippets || []).filter(s => {
+                      if (!snippetSearch.trim()) return true;
+                      const q = snippetSearch.toLowerCase();
+                      return s.title.toLowerCase().includes(q) || s.content.toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <p className="text-[10px] text-amber-400 italic">Nenhuma frase encontrada.</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
           <div className="flex-1 overflow-hidden relative flex flex-col">
             <AnimatePresence>
@@ -443,10 +553,8 @@ export function ExamEditor({ examId }: Props) {
                   exam={exam}
                   template={template}
                   patient={patient}
-                  chatHistory={exam.chatHistory || []}
-                  onChatUpdate={(newHistory) => {
-                    updateItem('exams', examId, { chatHistory: newHistory });
-                  }}
+                  chatHistory={localChatHistory}
+                  onChatUpdate={handleChatUpdate}
                   onShowCalculators={() => setShowCalculators(true)}
                   prompt={copilotPrompt}
                   onChangePrompt={setCopilotPrompt}
@@ -677,10 +785,9 @@ export function ExamEditor({ examId }: Props) {
         </div>
       )}
 
-      {showHistoryModal && exam && template && patient && (
-        <ExamHistoryModal 
-          patientId={patient.id}
-          templateId={template.id}
+      {showHistoryModal && exam && patient && (
+        <ExamHistoryModal
+          patient={patient}
           currentExamId={exam.id}
           currentContent={reportContent}
           onClose={() => setShowHistoryModal(false)}

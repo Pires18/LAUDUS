@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Activity } from 'lucide-react';
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 

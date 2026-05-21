@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { BookOpen, Info, CheckCircle2, AlertCircle } from 'lucide-react';
 import { classNames } from '../../../utils/format';
@@ -49,7 +49,7 @@ export function OrganReferenceCalculator({ value, onChange }: CalculatorProps) {
 
   const ref = REFS[selected];
   const val = Number(measure);
-  
+
   let status: 'normal' | 'alert' | 'none' = 'none';
   if (measure) {
     if (selected === 'liver') status = val > 15.5 ? 'alert' : 'normal';
@@ -58,6 +58,19 @@ export function OrganReferenceCalculator({ value, onChange }: CalculatorProps) {
     if (selected === 'gallbladder') status = val > 3.0 ? 'alert' : 'normal';
     if (selected === 'prostate') status = val > 30 ? 'alert' : 'normal';
   }
+
+  useEffect(() => {
+    const statusLabel = status === 'alert' ? 'AUMENTADO/ALTERADO' : status === 'normal' ? 'Normal' : null;
+    onChange({
+      selected: ref.label,
+      measure,
+      status,
+      _summary: measure && statusLabel
+        ? `Ref: ${ref.label} = ${measure}${ref.unit} (${statusLabel})`
+        : null,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, measure]);
 
   return (
     <div className="bg-white border border-ink-200 rounded-xl overflow-hidden shadow-sm">
@@ -106,10 +119,7 @@ export function OrganReferenceCalculator({ value, onChange }: CalculatorProps) {
                   className="input h-12 text-xl font-black" 
                   placeholder="0.0"
                   value={measure}
-                  onChange={e => {
-                    setMeasure(e.target.value);
-                    onChange({ selected: ref.label, measure: e.target.value, _summary: e.target.value ? `Ref: ${ref.label} = ${e.target.value}${ref.unit}` : null });
-                  }}
+                  onChange={e => setMeasure(e.target.value)}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-ink-300 text-sm">{ref.unit}</span>
               </div>

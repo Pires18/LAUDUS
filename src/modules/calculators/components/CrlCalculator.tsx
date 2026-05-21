@@ -72,6 +72,17 @@ export function CrlCalculator({ value, onChange }: CalculatorProps) {
           </div>
         </div>
 
+        {crl && (Number(crl) < 10 || Number(crl) > 84) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center gap-2">
+            <Info size={14} className="text-amber-500 shrink-0" />
+            <span className="text-[9px] text-amber-700 font-medium leading-tight">
+              {Number(crl) < 10
+                ? 'CCN < 10mm: fora do intervalo de validação da fórmula de Hadlock (10–84mm). Resultado estimado.'
+                : 'CCN > 84mm: prefira datação por biometria (DBP/CC) nesta fase gestacional.'}
+            </span>
+          </div>
+        )}
+
         {value?.ga ? (
           <div className="bg-gradient-to-br from-cyan-50 to-white border border-cyan-200 rounded-xl p-3 shadow-inner">
             <div className="flex items-center justify-between">
@@ -97,7 +108,7 @@ export function CrlCalculator({ value, onChange }: CalculatorProps) {
               <Info size={14} className="text-ink-400" />
             </div>
             <span className="text-[10px] text-ink-500 leading-tight">
-              Insira o valor do CCN entre 2mm e 85mm para obter a datação fetal precisa.
+              Insira o valor do CCN (10–84mm) para obter a datação fetal precisa.
             </span>
           </div>
         )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Calendar, Sparkles, Clock, MapPin } from 'lucide-react';
-import { CalculatorInput, ResultCard, CategorySelector } from './CalculatorUI';
+import { Calendar, Clock } from 'lucide-react';
+import { CalculatorInput, ResultCard } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 
 export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Ruler, Activity } from 'lucide-react';
+import { Ruler, Activity, Info } from 'lucide-react';
 
 export function MsdCalculator({ value, onChange }: CalculatorProps) {
   const [d1, setD1] = useState(value?.d1 || '');
@@ -54,6 +54,17 @@ export function MsdCalculator({ value, onChange }: CalculatorProps) {
           </div>
         </div>
 
+        {value?.msd && (value.msd < 5 || value.msd > 25) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center gap-2">
+            <Info size={13} className="text-amber-500 shrink-0" />
+            <span className="text-[9px] text-amber-700 font-medium leading-tight">
+              {value.msd < 5
+                ? 'DMSG < 5mm: abaixo do intervalo de validação. Confirmar com USG transvaginal.'
+                : 'DMSG > 25mm: embrião já deve ser visível. Prefira datação pelo CCN.'}
+            </span>
+          </div>
+        )}
+
         {value?.msd ? (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 flex items-center justify-between">
             <div>
@@ -67,7 +78,7 @@ export function MsdCalculator({ value, onChange }: CalculatorProps) {
           </div>
         ) : (
           <div className="bg-ink-50 rounded-md p-2 text-center text-[10px] text-ink-400 border border-dashed border-ink-200">
-            Insira os 3 diâmetros do saco gestacional.
+            Insira os 3 diâmetros do saco gestacional (5–25mm).
           </div>
         )}
       </div>

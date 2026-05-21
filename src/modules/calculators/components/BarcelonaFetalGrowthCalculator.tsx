@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CalculatorProps } from '../registry';
-import { Activity, Info, AlertTriangle, ShieldCheck, ChevronRight, ChevronLeft, Calendar, Ruler, Zap, BarChart3, Baby } from 'lucide-react';
+import { Activity, AlertTriangle, ShieldCheck, ChevronRight, ChevronLeft, BarChart3, Baby } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 type Step = 'ga' | 'biometry' | 'doppler' | 'result';
@@ -135,7 +135,6 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     let utaP: number|null = null;
     let dvP: number|null = null;
     let rcp: number|null = null;
-    let rcpP: number|null = null;
 
     let bpdP: number|null = null;
     let hcP: number|null = null;
@@ -180,7 +179,6 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     }
     if (auPi && acmPi) {
       rcp = Number(acmPi)/Number(auPi);
-      if (auP !== null && acmP !== null) rcpP = Math.round((acmP/auP)*50);
     }
 
     // Staging (Gratacós 2014)
@@ -190,7 +188,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     else if (auFlow === 'aedf') stage = 2;
     else if ((efwP !== null && efwP < 3) || (auP !== null && auP > 95) || (acmP !== null && acmP < 5) || (rcp !== null && rcp < 1.0)) stage = 1;
 
-    return { efw, efwP, auP, acmP, utaP, dvP, rcp, rcpP, stage, bpdP, hcP, acP, flP };
+    return { efw, efwP, auP, acmP, utaP, dvP, rcp, stage, bpdP, hcP, acP, flP };
   }, [bpd,hc,ac,fl,auPi,acmPi,utaPi,dvPi,auFlow,dvWave,gaWeeks,gaDays,gaDecimal,gaRound]);
 
   useEffect(() => {

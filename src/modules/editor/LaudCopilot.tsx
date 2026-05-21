@@ -89,6 +89,8 @@ export function LaudCopilot({
   promptRef.current = prompt;
   const onChangePromptRef = useRef(onChangePrompt);
   onChangePromptRef.current = onChangePrompt;
+  // Ref para evitar stale closure no useEffect de auto-submit da calculadora
+  const handleSendRef = useRef<(customPrompt?: string) => Promise<void>>(async () => {});
 
   // Sugestões inteligentes removidas para interface limpa
 
@@ -161,9 +163,10 @@ export function LaudCopilot({
   };
 
   // Auto-submit de resultados das Calculadoras
+  // Usa handleSendRef para evitar stale closure (handleSend captura chatHistory, etc.)
   useEffect(() => {
     if (prompt && prompt.startsWith('[RESULTADO TÉCNICO:')) {
-      handleSend(prompt);
+      handleSendRef.current(prompt);
     }
   }, [prompt]);
 
@@ -201,24 +204,36 @@ export function LaudCopilot({
     const titleMatch = content.match(/\[DADOS DE FORMULÁRIO COMPILADOS:\s*(.*?)\]/);
     const title = titleMatch ? titleMatch[1] : 'Formulário';
 
-    const lines = content.split('\n');
+    // Extraí a parte do conteúdo após o cabeçalho
+    const bodyStart = content.indexOf(']\n\n');
+    const body = bodyStart !== -1 ? content.substring(bodyStart + 3) : '';
+
     const items: Array<{ structure: string; status: 'Normal' | 'Alterado'; details: string }> = [];
 
+    // Tenta parsear linhas no formato "- Estrutura: valor"
+    const lines = body.split('\n');
     lines.forEach(line => {
-      if (line.startsWith('- ')) {
-        const text = line.substring(2);
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // Formato estruturado: "- Structure: rest"
+      if (trimmed.startsWith('- ')) {
+        const text = trimmed.substring(2);
         const parts = text.split(': ');
         if (parts.length >= 2) {
           const structure = parts[0].trim();
           const rest = parts.slice(1).join(': ').trim();
-          const isAlterado = rest.toLowerCase().includes('alterado');
+          const isAlterado = rest.toLowerCase().includes('alterado') || rest.toLowerCase().includes('patolog') || rest.toLowerCase().includes('alteraç');
           const details = rest.replace(/alterado/i, '').replace(/normal/i, '').replace(/^(\s*-\s*|\s*\(\s*\)\s*)/, '').trim();
-          items.push({
-            structure,
-            status: isAlterado ? 'Alterado' : 'Normal',
-            details
-          });
+          items.push({ structure, status: isAlterado ? 'Alterado' : 'Normal', details });
+          return;
         }
+      }
+
+      // Formato livre: linha de texto simples → usa como item único
+      if (trimmed.length > 3 && items.length < 20) {
+        const isAlterado = /alterado|patolog|anormal|ectásic|aumentad|diminuíd|calcif|cistos?|nódulo/i.test(trimmed);
+        items.push({ structure: trimmed.substring(0, 60) + (trimmed.length > 60 ? '...' : ''), status: isAlterado ? 'Alterado' : 'Normal', details: '' });
       }
     });
 
@@ -337,6 +352,7 @@ export function LaudCopilot({
   };
 
   const handleSend = async (customPrompt?: string) => {
+    // handleSendRef.current é atualizado abaixo para que o useEffect não tenha stale closure
     const messageToSend = customPrompt || prompt;
     if (!messageToSend.trim() || isGenerating) return;
 
@@ -386,9 +402,13 @@ export function LaudCopilot({
         previousExams
       }, (chunk) => {
         currentResponse = chunk;
+        // Durante o stream: o parseMessageContent já sabe lidar com texto parcial
+        // (o marcador === CONVERSA === é removido, === PROPOSTA === ainda não apareceu)
+        // → o usuário vê a frase clínica sendo digitada em tempo real, sem ruído de markup
         onChatUpdate([...newHistory, { role: 'assistant', content: currentResponse }]);
       });
 
+      // Garante que o estado final use o texto completo retornado (idêntico ao último chunk)
       onChatUpdate([...newHistory, { role: 'assistant', content: finalHtml }]);
 
       // AUTO-APPLY: Se o copiloto gerou uma proposta, aplica ela automaticamente no editor
@@ -400,20 +420,34 @@ export function LaudCopilot({
         showToast('Alterações integradas automaticamente ao laudo!', 'success');
       }
     } catch (error) {
-      console.error(error);
-      showToast('Erro no processamento IA', 'error');
-      onChatUpdate([...newHistory, { role: 'assistant', content: 'Desculpe, ocorreu um erro ao tentar processar sua solicitação.' }]);
+      console.error('[LaudCopilot] handleSend error:', error);
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      // Mensagem amigável para erros comuns de API
+      const friendlyMsg = msg.includes('API Key') || msg.includes('api key')
+        ? 'Chave de API não configurada. Acesse Configurações para adicionar.'
+        : msg.includes('429') || msg.includes('quota')
+          ? 'Limite de requisições da API atingido. Aguarde alguns segundos.'
+          : msg.includes('network') || msg.includes('Failed to fetch')
+            ? 'Erro de conexão. Verifique sua internet e tente novamente.'
+            : `Erro na IA: ${msg.substring(0, 80)}`;
+      showToast(friendlyMsg, 'error');
+      onChatUpdate([...newHistory, { role: 'assistant', content: `Erro ao processar: ${friendlyMsg}` }]);
     } finally {
       setIsGenerating(false);
     }
   };
+
+  // Mantém ref sempre atualizado com a versão mais recente de handleSend
+  handleSendRef.current = handleSend;
 
   const handleCompileForm = () => {
     if (!formText.trim()) {
       showToast('Preencha o formulário antes de compilar.', 'info');
       return;
     }
-    const findingsSummary = `[DADOS DE FORMULÁRIO DO EXAME]\n\n${formText.trim()}`;
+    // Prefix DEVE corresponder ao que parseFormMessage espera (startsWith check na linha 199)
+    const templateName = template?.name || exam.examType || 'Formulário';
+    const findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]\n\n${formText.trim()}`;
     setActiveTab('chat');
     handleSend(findingsSummary);
   };
@@ -855,7 +889,7 @@ export function LaudCopilot({
               </div>
               <div className="flex items-center gap-2 px-2.5 py-1.5 bg-brand-50 rounded-xl border border-brand-100/50">
                 <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
-                <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider">Laud.IA Core v8.0</span>
+                <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider">Laud.IA Core v10.1</span>
               </div>
             </div>
           </div>

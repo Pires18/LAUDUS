@@ -1,47 +1,33 @@
-import { useState, useEffect, useCallback } from 'react';
-import {
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-  GoogleAuthProvider,
-  User,
-} from 'firebase/auth';
+import { useState, useCallback } from 'react';
+import { signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
+import { useApp } from '../store/app';
 
-interface AuthState {
-  user: User | null;
-  loading: boolean;
-  error: string | null;
-}
-
+/**
+ * Hook de autenticação.
+ *
+ * `user` é lido do store global (useApp) — única fonte de verdade gerenciada
+ * pelo listener onAuthStateChanged em App.tsx/AuthRouter — evitando um segundo
+ * listener duplicado.
+ *
+ * `loading` e `error` são estados locais que representam apenas o andamento
+ * da ação de signIn (popup Google OAuth), não o estado inicial de carregamento.
+ */
 export function useAuth() {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    loading: true,
-    error: null,
-  });
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (user) => {
-        setState({ user, loading: false, error: null });
-      },
-      (error) => {
-        console.error('[Auth] State change error:', error);
-        setState({ user: null, loading: false, error: error.message });
-      }
-    );
-    return unsubscribe;
-  }, []);
+  const { user } = useApp();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const signIn = useCallback(async () => {
     try {
-      setState((s) => ({ ...s, loading: true, error: null }));
+      setLoading(true);
+      setError(null);
       await signInWithPopup(auth, googleProvider);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao entrar com Google';
-      setState((s) => ({ ...s, loading: false, error: message }));
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -50,36 +36,15 @@ export function useAuth() {
       await firebaseSignOut(auth);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao sair';
-      setState((s) => ({ ...s, error: message }));
-    }
-  }, []);
-
-  /**
-   * Obtém o access token OAuth do Google (necessário para Google Docs/Drive APIs).
-   * Requer que o usuário esteja autenticado.
-   */
-  const getGoogleAccessToken = useCallback(async (): Promise<string | null> => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return null;
-
-    // O token OAuth fica disponível no credential do provedor
-    // Para obter um token fresco, podemos usar getIdToken ou re-autenticar
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      return credential?.accessToken ?? null;
-    } catch {
-      return null;
+      setError(message);
     }
   }, []);
 
   return {
-    user: state.user,
-    loading: state.loading,
-    error: state.error,
+    user,
+    loading,
+    error,
     signIn,
     signOut: signOutUser,
-    getGoogleAccessToken,
   };
 }
-

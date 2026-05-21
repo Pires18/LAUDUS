@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../store/app';
 import { PageHeader } from '../../components/PageHeader';
 import {
   BrainCircuit, ShieldAlert,
   Settings2, Save, RotateCcw, Zap,
   GraduationCap, CheckCircle2, AlertCircle, Loader2,
-  Sliders, LayoutList, FileText, Layout, ShieldCheck
+  Sliders, LayoutList, FileText, Layout, ShieldCheck,
+  Code, Copy, Check, Plus, Trash2, Pencil, X,
+  BookOpen, Sparkles, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { EXAM_AREAS, ExamArea, AppSettings } from '../../types';
@@ -16,9 +18,143 @@ import {
   DEFAULT_GLOBAL_INSTRUCTIONS,
   DEFAULT_RIGID_RULES,
 } from '../ai/prompts';
+import { genId } from '../../store/db';
 
-type TabId = 'prompts' | 'areas' | 'engine' | 'training';
+type TabId = 'prompts' | 'areas' | 'snippets' | 'engine' | 'training';
+type PromptSubTab = 'master' | 'global' | 'structure' | 'rigid' | 'doctrine';
 
+// ==========================================
+// IDE CODE EDITOR COMPONENT
+// ==========================================
+interface CodeEditorProps {
+  value: string;
+  onChange: (val: string) => void;
+  fileName: string;
+  badge?: string;
+  placeholder?: string;
+  rows?: number;
+  onRestore?: () => void;
+  glowColor?: 'brand' | 'amber' | 'rose' | 'emerald' | 'violet' | 'teal';
+  extraActions?: React.ReactNode;
+}
+
+function CodeEditor({
+  value = '',
+  onChange,
+  fileName,
+  badge = 'CONFIG FILE',
+  placeholder = 'Digite as instruções aqui...',
+  rows = 12,
+  onRestore,
+  glowColor = 'brand',
+  extraActions,
+}: CodeEditorProps) {
+  const lineRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const lineCount = Math.max(value.split('\n').length, rows);
+  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+
+  const glowStyles: Record<string, string> = {
+    brand:   'focus-within:ring-2 focus-within:ring-brand-500/30 focus-within:shadow-[0_0_30px_rgba(99,102,241,0.15)] border-zinc-800 focus-within:border-brand-500/50',
+    amber:   'focus-within:ring-2 focus-within:ring-amber-500/30 focus-within:shadow-[0_0_30px_rgba(245,158,11,0.15)] border-zinc-800 focus-within:border-amber-500/50',
+    rose:    'focus-within:ring-2 focus-within:ring-rose-500/30 focus-within:shadow-[0_0_30px_rgba(244,63,94,0.15)] border-zinc-800 focus-within:border-rose-500/50',
+    emerald: 'focus-within:ring-2 focus-within:ring-emerald-500/30 focus-within:shadow-[0_0_30px_rgba(16,185,129,0.15)] border-zinc-800 focus-within:border-emerald-500/50',
+    violet:  'focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:shadow-[0_0_30px_rgba(139,92,246,0.15)] border-zinc-800 focus-within:border-violet-500/50',
+    teal:    'focus-within:ring-2 focus-within:ring-teal-500/30 focus-within:shadow-[0_0_30px_rgba(20,184,166,0.15)] border-zinc-800 focus-within:border-teal-500/50',
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div className={classNames(
+      'bg-zinc-950 rounded-3xl border transition-all duration-300 overflow-hidden flex flex-col shadow-2xl',
+      glowStyles[glowColor]
+    )}>
+      {/* Header bar */}
+      <div className="bg-zinc-900/90 px-6 py-4 flex items-center justify-between border-b border-zinc-800/80 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1.5 mr-2">
+            <span className="w-3 h-3 rounded-full bg-rose-500/85" />
+            <span className="w-3 h-3 rounded-full bg-amber-500/85" />
+            <span className="w-3 h-3 rounded-full bg-emerald-500/85" />
+          </div>
+          <div className="bg-zinc-950 px-4 py-2 rounded-xl border border-zinc-800/80 flex items-center gap-2">
+            <Code size={13} className="text-zinc-400" />
+            <span className="text-xs font-mono font-semibold text-zinc-200">{fileName}</span>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-lg bg-zinc-800/80 text-[9px] font-black tracking-widest text-zinc-400 uppercase">
+            {badge}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {extraActions}
+          {onRestore && (
+            <button
+              onClick={onRestore}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95"
+            >
+              <RotateCcw size={12} />
+              Restaurar
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80 rounded-xl transition-all"
+            title="Copiar"
+          >
+            {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Editor Body */}
+      <div className="flex font-mono text-xs overflow-hidden h-[480px] relative bg-zinc-950">
+        <div
+          ref={lineRef}
+          className="w-12 py-4 select-none text-right pr-3 text-zinc-600 bg-zinc-950 border-r border-zinc-900 overflow-y-hidden font-mono"
+        >
+          {lineNumbers.map((n) => (
+            <div key={n} className="h-6 leading-6 text-[10px] pr-0.5">{String(n).padStart(2, '0')}</div>
+          ))}
+        </div>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onScroll={(e) => {
+            if (lineRef.current) lineRef.current.scrollTop = e.currentTarget.scrollTop;
+          }}
+          className="flex-1 h-full py-4 px-5 bg-transparent border-0 focus:ring-0 focus:outline-none text-zinc-300 font-mono text-xs leading-6 resize-none overflow-y-auto selection:bg-brand-500/20 selection:text-white"
+          placeholder={placeholder}
+          style={{ lineHeight: '24px' }}
+        />
+      </div>
+
+      {/* Footer Status Bar */}
+      <div className="bg-zinc-900/60 px-6 py-2 flex items-center justify-between border-t border-zinc-900 text-[10px] text-zinc-500 font-mono">
+        <div className="flex items-center gap-4">
+          <span>UTF-8</span>
+          <span>Markdown / Prompt</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span>LINHAS: {value.split('\n').length}</span>
+          <span>CHARS: {value.length}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// MAIN LAUD.IA MODULE
+// ==========================================
 export function LaudIA() {
   const { settings, updateSettings, showToast } = useApp();
   const [isSaving, setIsSaving] = useState(false);
@@ -27,13 +163,22 @@ export function LaudIA() {
   const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [adminSettings, setAdminSettings] = useState<AppSettings | null>(null);
-  const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
+  const [activePromptSubTab, setActivePromptSubTab] = useState<PromptSubTab>('master');
+
+  // AI improvement for area prompts
+  const [isImprovingArea, setIsImprovingArea] = useState(false);
+  const [areaImprovePrompt, setAreaImprovePrompt] = useState('');
+  const [showImprovePanel, setShowImprovePanel] = useState(false);
+
+  // Snippets state
+  const [snippetEditId, setSnippetEditId] = useState<string | null>(null);
+  const [snippetForm, setSnippetForm] = useState({ title: '', content: '', area: '' });
+  const [showSnippetForm, setShowSnippetForm] = useState(false);
+  const [snippetSearch, setSnippetSearch] = useState('');
 
   useEffect(() => {
     import('../../store/db').then(({ getAdminSettings }) => {
-      getAdminSettings().then(admin => {
-        setAdminSettings(admin);
-      });
+      getAdminSettings().then(admin => setAdminSettings(admin));
     });
   }, []);
 
@@ -66,12 +211,11 @@ export function LaudIA() {
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
         const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
         const result = await model.generateContent('Responda apenas: OK');
-        const text = result.response.text();
-        if (text) {
+        if (result.response.text()) {
           setTestStatus('success');
           showToast('Conexão validada com o Gemini!', 'success');
         }
-      } catch (err: unknown) {
+      } catch {
         setTestStatus('error');
         showToast('Falha na conexão com o Gemini', 'error');
       }
@@ -82,48 +226,228 @@ export function LaudIA() {
       }
       setTestStatus('testing');
       try {
-        // Devido a restrições de CORS no navegador para a API da Anthropic, tentamos uma requisição direta.
-        // Se falhar por rede/CORS mas a chave existir, validamos como configurada.
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'x-api-key': localSettings.anthropicApiKey || '',
             'anthropic-version': '2023-06-01',
-            'content-type': 'application/json'
+            'content-type': 'application/json',
           },
           body: JSON.stringify({
             model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
             messages: [{ role: 'user', content: 'Say OK' }],
-            max_tokens: 1
-          })
+            max_tokens: 1,
+          }),
         });
-        if (response.status === 200 || response.status === 400 || response.status === 401) {
-          // Status 400/401 indica que o servidor da Anthropic respondeu (a chave bateu ou foi rejeitada, mas a rede está OK)
-          if (response.status === 401) {
-            setTestStatus('error');
-            showToast('Chave Anthropic Inválida', 'error');
-          } else {
-            setTestStatus('success');
-            showToast('Conexão validada com a Anthropic!', 'success');
-          }
-        } else {
+        if (response.status === 401) {
           setTestStatus('error');
-          showToast('Erro ao contatar API da Anthropic', 'error');
+          showToast('Chave Anthropic Inválida', 'error');
+        } else {
+          setTestStatus('success');
+          showToast('Conexão validada com a Anthropic!', 'success');
         }
-      } catch (err: unknown) {
-        // Se der erro de CORS/Rede (TypeError: Failed to fetch) mas a API Key está preenchida, consideramos salvo e alertamos sobre CORS.
+      } catch {
         setTestStatus('success');
         showToast('Chave salva! (Validação concluída com bypass de CORS)', 'success');
       }
     }
   }
 
+  // ── AI Improve Area Prompt ──────────────────────────────────────
+  async function handleImproveAreaPrompt() {
+    const apiKey = localSettings.geminiApiKey;
+    if (!apiKey) {
+      showToast('Configure sua API Key Gemini no Motor & API antes de usar este recurso.', 'error');
+      return;
+    }
+    const currentPrompt = localSettings.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] || '';
+    if (!currentPrompt.trim()) {
+      showToast('Não há prompt de área para melhorar. Adicione instruções primeiro.', 'error');
+      return;
+    }
+    setIsImprovingArea(true);
+    try {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
+
+      const areaLabel = EXAM_AREAS.find(a => a.id === selectedArea)?.label || selectedArea;
+      const userRequest = areaImprovePrompt.trim()
+        ? `\n\nInstrução adicional do médico: "${areaImprovePrompt.trim()}"`
+        : '';
+
+      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é melhorar o prompt de área de ${areaLabel} a seguir, tornando-o mais completo,
+claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
+Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: `${systemMsg}\n\nPROMPT ATUAL:\n${currentPrompt}` }] }],
+      });
+
+      const improved = result.response.text().trim();
+      if (improved) {
+        const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: improved };
+        setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+        showToast('Prompt melhorado com sucesso pela IA!', 'success');
+        setShowImprovePanel(false);
+        setAreaImprovePrompt('');
+      }
+    } catch {
+      showToast('Erro ao melhorar prompt com IA. Verifique sua API Key.', 'error');
+    } finally {
+      setIsImprovingArea(false);
+    }
+  }
+
+  // ── Snippets helpers ────────────────────────────────────────────
+  const snippets = localSettings.snippets || [];
+
+  function openNewSnippet() {
+    setSnippetEditId(null);
+    setSnippetForm({ title: '', content: '', area: '' });
+    setShowSnippetForm(true);
+  }
+
+  function openEditSnippet(id: string) {
+    const s = snippets.find(x => x.id === id);
+    if (!s) return;
+    setSnippetEditId(id);
+    setSnippetForm({ title: s.title, content: s.content, area: s.area || '' });
+    setShowSnippetForm(true);
+  }
+
+  function saveSnippet() {
+    if (!snippetForm.title.trim() || !snippetForm.content.trim()) {
+      showToast('Preencha o título e o conteúdo da frase.', 'error');
+      return;
+    }
+    let updated;
+    if (snippetEditId) {
+      updated = snippets.map(s =>
+        s.id === snippetEditId
+          ? { ...s, title: snippetForm.title.trim(), content: snippetForm.content.trim(), area: snippetForm.area || undefined }
+          : s
+      );
+    } else {
+      updated = [...snippets, { id: genId(), title: snippetForm.title.trim(), content: snippetForm.content.trim(), area: snippetForm.area || undefined }];
+    }
+    setLocalSettings({ ...localSettings, snippets: updated });
+    setShowSnippetForm(false);
+    showToast(snippetEditId ? 'Frase atualizada!' : 'Frase adicionada!', 'success');
+  }
+
+  function deleteSnippet(id: string) {
+    setLocalSettings({ ...localSettings, snippets: snippets.filter(s => s.id !== id) });
+    showToast('Frase removida.', 'info');
+  }
+
+  const filteredSnippets = snippets.filter(s =>
+    s.title.toLowerCase().includes(snippetSearch.toLowerCase()) ||
+    s.content.toLowerCase().includes(snippetSearch.toLowerCase()) ||
+    (s.area || '').toLowerCase().includes(snippetSearch.toLowerCase())
+  );
+
+  // ── Sidebar items ───────────────────────────────────────────────
   const sidebarItems = [
-    { id: 'prompts', label: 'Doutrina & Prompts', icon: ShieldAlert },
-    { id: 'areas', label: 'Especialidades', icon: LayoutList },
-    { id: 'engine', label: 'Motor & API', icon: Sliders },
-    { id: 'training', label: 'Aprendizado IA', icon: GraduationCap },
+    { id: 'prompts',   label: 'Doutrina & Prompts', icon: ShieldAlert },
+    { id: 'areas',     label: 'Especialidades',      icon: LayoutList },
+    { id: 'snippets',  label: 'Frases Prontas',      icon: BookOpen },
+    { id: 'engine',    label: 'Motor & API',          icon: Sliders },
+    { id: 'training',  label: 'Aprendizado IA',       icon: GraduationCap },
   ] as const;
+
+  const promptSubTabs: { id: PromptSubTab; label: string; color: string; icon: React.ElementType }[] = [
+    { id: 'master',    label: 'Prompt Mestre',       color: 'brand',   icon: BrainCircuit },
+    { id: 'global',    label: 'Instruções Globais',  color: 'emerald', icon: FileText },
+    { id: 'structure', label: 'Skeleton',             color: 'amber',   icon: Layout },
+    { id: 'rigid',     label: 'Regras Rígidas',       color: 'rose',    icon: ShieldCheck },
+    { id: 'doctrine',  label: 'Doutrina Normal',      color: 'teal',    icon: Settings2 },
+  ];
+
+  // ── Helpers ─────────────────────────────────────────────────────
+  function isPromptInherited(field: keyof AppSettings, defaultVal: string): boolean {
+    const val = localSettings[field] as string | undefined;
+    const adminVal = adminSettings?.[field] as string | undefined;
+    return !val || val.trim() === (adminVal || defaultVal).trim();
+  }
+
+  function isAreaInherited(area: ExamArea): boolean {
+    const val = localSettings.aiAreaPrompts?.[area];
+    const adminVal = adminSettings?.aiAreaPrompts?.[area];
+    return !val || val.trim() === (adminVal || AREA_SPECIFIC_PROMPTS[area] || '').trim();
+  }
+
+  function InheritedBadge({ inherited }: { inherited: boolean }) {
+    return inherited ? (
+      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
+        <CheckCircle2 size={9} /> Herdado
+      </span>
+    ) : (
+      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1 animate-pulse">
+        <Zap size={9} className="fill-indigo-500/10" /> Customizado
+      </span>
+    );
+  }
+
+  // ── Prompt Section builder ───────────────────────────────────────
+  function PromptSection({
+    subTab,
+    field,
+    defaultVal,
+    title,
+    subtitle,
+    glowColor,
+    placeholder,
+    fileName,
+    icon: Icon,
+  }: {
+    subTab: PromptSubTab;
+    field: keyof AppSettings;
+    defaultVal: string;
+    title: string;
+    subtitle: string;
+    glowColor: 'brand' | 'amber' | 'rose' | 'emerald' | 'violet' | 'teal';
+    placeholder: string;
+    fileName: string;
+    icon: React.ElementType;
+  }) {
+    if (activePromptSubTab !== subTab) return null;
+    const inherited = isPromptInherited(field, defaultVal);
+    return (
+      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
+        <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
+          <div className="flex items-center gap-3">
+            <div className={classNames('w-10 h-10 rounded-xl flex items-center justify-center', `bg-${glowColor}-100 text-${glowColor}-600`)}>
+              <Icon size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-ink-900">{title}</h4>
+                <InheritedBadge inherited={inherited} />
+              </div>
+              <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">{subtitle}</p>
+            </div>
+          </div>
+        </div>
+        <div className="p-6">
+          <CodeEditor
+            fileName={fileName}
+            badge="PROMPT CONFIG"
+            glowColor={glowColor}
+            placeholder={placeholder}
+            value={(localSettings[field] as string | undefined) || ''}
+            onChange={(v) => setLocalSettings({ ...localSettings, [field]: v })}
+            onRestore={() => {
+              const restored = (adminSettings?.[field] as string | undefined) || defaultVal;
+              setLocalSettings({ ...localSettings, [field]: restored });
+              showToast(`${title} restaurado para o padrão oficial.`, 'info');
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="module-container">
@@ -155,13 +479,13 @@ export function LaudIA() {
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={classNames(
-                  "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3",
+                  'w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3',
                   activeTab === item.id
-                    ? "bg-brand-50 text-brand-700 shadow-sm border border-brand-100"
-                    : "text-ink-600 hover:bg-ink-50"
+                    ? 'bg-brand-50 text-brand-700 shadow-sm border border-brand-100'
+                    : 'text-ink-600 hover:bg-ink-50'
                 )}
               >
-                <div className={classNames("p-1.5 rounded-lg", activeTab === item.id ? "bg-brand-100 text-brand-600" : "bg-ink-50 text-ink-400")}>
+                <div className={classNames('p-1.5 rounded-lg', activeTab === item.id ? 'bg-brand-100 text-brand-600' : 'bg-ink-50 text-ink-400')}>
                   <item.icon size={16} />
                 </div>
                 {item.label}
@@ -177,8 +501,8 @@ export function LaudIA() {
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
                   className={classNames(
-                    "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2",
-                    activeTab === item.id ? "bg-brand-600 text-white border-brand-600" : "bg-white text-ink-600 border-ink-100"
+                    'px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2',
+                    activeTab === item.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-100'
                   )}
                 >
                   <item.icon size={14} />
@@ -187,15 +511,15 @@ export function LaudIA() {
               ))}
             </div>
 
-            {/* TAB: PROMPTS */}
+            {/* ═══ TAB: PROMPTS ═══ */}
             {activeTab === 'prompts' && (
               <div className="space-y-8 animate-fade-in">
-                {/* Top Doctrine Context Information */}
+                {/* Sync banner */}
                 <div className="p-5 bg-gradient-to-r from-brand-50 to-indigo-50/50 border border-brand-100/50 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest block">Sincronização de Doutrinas</span>
                     <p className="text-[11px] text-slate-600 font-bold leading-relaxed max-w-2xl">
-                      Por padrão, você herda os prompts oficiais publicados pelo Administrador. Você pode personalizar qualquer diretriz a qualquer momento. Para voltar a seguir o administrador, basta clicar no botão de restauração.
+                      Por padrão você herda os prompts oficiais publicados pelo Administrador. Personalize qualquer diretriz a qualquer momento — clique em Restaurar para voltar ao padrão.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -206,241 +530,117 @@ export function LaudIA() {
                   </div>
                 </div>
 
-                {/* Prompt Sub-Selector Pills */}
-                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 border border-slate-200/50 rounded-2xl shrink-0 w-fit">
-                  <button
-                    onClick={() => setActivePromptSubTab('master')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'master' 
-                        ? "bg-white text-indigo-650 shadow-sm" 
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Prompt Mestre
-                  </button>
-                  <button
-                    onClick={() => setActivePromptSubTab('global')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'global' 
-                        ? "bg-white text-emerald-650 shadow-sm" 
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Instruções Globais
-                  </button>
-                  <button
-                    onClick={() => setActivePromptSubTab('structure')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'structure' 
-                        ? "bg-white text-amber-650 shadow-sm" 
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Skeleton (Estrutura)
-                  </button>
-                  <button
-                    onClick={() => setActivePromptSubTab('rigid')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'rigid' 
-                        ? "bg-white text-rose-650 shadow-sm" 
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Regras Rígidas
-                  </button>
+                {/* Sub-tab pills */}
+                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 border border-slate-200/50 rounded-2xl w-fit">
+                  {promptSubTabs.map((sub) => (
+                    <button
+                      key={sub.id}
+                      onClick={() => setActivePromptSubTab(sub.id)}
+                      className={classNames(
+                        'px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5',
+                        activePromptSubTab === sub.id
+                          ? 'bg-white text-ink-800 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      )}
+                    >
+                      <sub.icon size={11} />
+                      {sub.label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Master Prompt */}
-                {activePromptSubTab === 'master' && (
-                  <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
-                    <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                          <BrainCircuit size={20} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-ink-900">Prompt Mestre</h4>
-                            {(!localSettings.aiMasterPrompt || localSettings.aiMasterPrompt.trim() === (adminSettings?.aiMasterPrompt || DEFAULT_MASTER_PROMPT).trim()) ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
-                                <CheckCircle2 size={9} className="text-emerald-500" /> Herdado do Admin
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1 animate-pulse">
-                                <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado por Você
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Base de Personalidade da IA</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setLocalSettings({ ...localSettings, aiMasterPrompt: adminSettings?.aiMasterPrompt || DEFAULT_MASTER_PROMPT });
-                          showToast('Prompt Mestre restaurado para o padrão V10.0', 'info');
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
-                        title="Restaurar para o padrão V10.0"
-                      >
-                        <RotateCcw size={12} />
-                        Restaurar Padrão V10.0
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      <textarea
-                        value={localSettings.aiMasterPrompt || ''}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiMasterPrompt: e.target.value })}
-                        rows={14}
-                        className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed shadow-inner"
-                        placeholder="Defina o papel principal da IA..."
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Prompt Mestre */}
+                <PromptSection
+                  subTab="master"
+                  field="aiMasterPrompt"
+                  defaultVal={DEFAULT_MASTER_PROMPT}
+                  title="Prompt Mestre"
+                  subtitle="Base de Personalidade da IA"
+                  glowColor="brand"
+                  placeholder="Defina o papel principal da IA..."
+                  fileName="master_prompt.md"
+                  icon={BrainCircuit}
+                />
 
-                {/* Global Instructions */}
-                {activePromptSubTab === 'global' && (
-                  <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
-                    <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                          <FileText size={20} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-ink-900">Instruções Globais</h4>
-                            {(!localSettings.aiGlobalInstructions || localSettings.aiGlobalInstructions.trim() === (adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS).trim()) ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
-                                <CheckCircle2 size={9} className="text-emerald-500" /> Herdado do Admin
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1 animate-pulse">
-                                <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado por Você
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Raciocínio Clínico Global</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setLocalSettings({ ...localSettings, aiGlobalInstructions: adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS });
-                          showToast('Instruções Globais restauradas para o padrão V10.0', 'info');
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
-                        title="Restaurar para o padrão V10.0"
-                      >
-                        <RotateCcw size={12} />
-                        Restaurar Padrão V10.0
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      <textarea
-                        value={localSettings.aiGlobalInstructions || ''}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiGlobalInstructions: e.target.value })}
-                        rows={14}
-                        className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed shadow-inner"
-                        placeholder="Defina as instruções de raciocínio clínico global..."
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Instruções Globais */}
+                <PromptSection
+                  subTab="global"
+                  field="aiGlobalInstructions"
+                  defaultVal={DEFAULT_GLOBAL_INSTRUCTIONS}
+                  title="Instruções Globais"
+                  subtitle="Raciocínio Clínico Global"
+                  glowColor="emerald"
+                  placeholder="Defina as instruções de raciocínio clínico global..."
+                  fileName="global_instructions.md"
+                  icon={FileText}
+                />
 
-                {/* Structure Prompt */}
-                {activePromptSubTab === 'structure' && (
-                  <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
-                    <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-                          <Layout size={20} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-ink-900">Skeleton (Estrutura)</h4>
-                            {(!localSettings.aiStructurePrompt || localSettings.aiStructurePrompt.trim() === (adminSettings?.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT).trim()) ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
-                                <CheckCircle2 size={9} className="text-emerald-500" /> Herdado do Admin
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1 animate-pulse">
-                                <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado por Você
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Estrutura Obrigatória do Laudo</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setLocalSettings({ ...localSettings, aiStructurePrompt: adminSettings?.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT });
-                          showToast('Estrutura do laudo restaurada para o padrão V10.0', 'info');
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
-                        title="Restaurar para o padrão V10.0"
-                      >
-                        <RotateCcw size={12} />
-                        Restaurar Padrão V10.0
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      <textarea
-                        value={localSettings.aiStructurePrompt || ''}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiStructurePrompt: e.target.value })}
-                        rows={14}
-                        className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed shadow-inner"
-                        placeholder="Defina as diretrizes obrigatórias de formatação e tags do laudo..."
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Skeleton */}
+                <PromptSection
+                  subTab="structure"
+                  field="aiStructurePrompt"
+                  defaultVal={DEFAULT_STRUCTURE_PROMPT}
+                  title="Skeleton (Estrutura)"
+                  subtitle="Estrutura Obrigatória do Laudo"
+                  glowColor="amber"
+                  placeholder="Defina as diretrizes obrigatórias de formatação e tags do laudo..."
+                  fileName="structure_prompt.md"
+                  icon={Layout}
+                />
 
-                {/* Rigid Rules */}
-                {activePromptSubTab === 'rigid' && (
+                {/* Regras Rígidas */}
+                <PromptSection
+                  subTab="rigid"
+                  field="aiRigidRules"
+                  defaultVal={DEFAULT_RIGID_RULES}
+                  title="Regras Rígidas"
+                  subtitle="Compliance e Segurança Médico-Legal"
+                  glowColor="rose"
+                  placeholder="Defina as regras restritivas que a IA não pode violar..."
+                  fileName="rigid_rules.md"
+                  icon={ShieldAlert}
+                />
+
+                {/* Doutrina Normal */}
+                {activePromptSubTab === 'doctrine' && (
                   <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
-                    <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
+                    <div className="p-6 border-b border-ink-100 flex items-start justify-between bg-ink-50/30">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
-                          <ShieldAlert size={20} />
+                        <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center">
+                          <Settings2 size={20} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-ink-900">Regras Rígidas</h4>
-                            {(!localSettings.aiRigidRules || localSettings.aiRigidRules.trim() === (adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES).trim()) ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
-                                <CheckCircle2 size={9} className="text-emerald-500" /> Herdado do Admin
+                            <h4 className="font-bold text-ink-900">Doutrina de Normalidade</h4>
+                            {!localSettings.normalDoctrine?.trim() ? (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 text-[8px] font-black uppercase tracking-wider border border-slate-200 flex items-center gap-1">
+                                Não configurada
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1 animate-pulse">
-                                <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado por Você
+                              <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 text-[8px] font-black uppercase tracking-wider border border-teal-100/60 flex items-center gap-1">
+                                <CheckCircle2 size={9} /> Ativa
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Compliance e Segurança Médico-Legal</p>
+                          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Padrões de Normalidade do Seu Serviço</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => {
-                          setLocalSettings({ ...localSettings, aiRigidRules: adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES });
-                          showToast('Regras Rígidas restauradas para o padrão V10.0', 'info');
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
-                        title="Restaurar para o padrão V10.0"
-                      >
-                        <RotateCcw size={12} />
-                        Restaurar Padrão V10.0
-                      </button>
                     </div>
-                    <div className="p-6">
-                      <textarea
-                        value={localSettings.aiRigidRules || ''}
-                        onChange={(e) => setLocalSettings({ ...localSettings, aiRigidRules: e.target.value })}
-                        rows={14}
-                        className="w-full rounded-2xl border-ink-200 font-mono text-sm focus:ring-brand-500 focus:border-brand-500 bg-ink-900 text-brand-50 p-6 leading-relaxed shadow-inner"
-                        placeholder="Defina as regras restritivas que a IA não pode violar..."
+                    <div className="p-6 space-y-4">
+                      <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl text-[11px] text-teal-900 leading-relaxed">
+                        <strong>Para que serve:</strong> Descreva aqui os valores de normalidade habituais do seu serviço, padrões anatômicos esperados, faixas etárias, parâmetros Doppler de referência e qualquer critério clínico que a IA deve incorporar automaticamente em todos os laudos. Este bloco é injetado diretamente no contexto da IA antes de cada geração.
+                      </div>
+                      <CodeEditor
+                        fileName="normal_doctrine.md"
+                        badge="DOUTRINA ATIVA"
+                        glowColor="teal"
+                        placeholder={`Exemplo:\n- Rins com dimensões normais para a faixa etária entre 9-12cm\n- Espessura do endométrio em menacme até 14mm\n- Resistência das artérias renais: IR < 0.70\n- Volume prostático normal até 30ml antes dos 60 anos...`}
+                        value={localSettings.normalDoctrine || ''}
+                        onChange={(v) => setLocalSettings({ ...localSettings, normalDoctrine: v })}
+                        onRestore={() => {
+                          setLocalSettings({ ...localSettings, normalDoctrine: '' });
+                          showToast('Doutrina de normalidade removida.', 'info');
+                        }}
                       />
                     </div>
                   </div>
@@ -448,70 +648,273 @@ export function LaudIA() {
               </div>
             )}
 
-            {/* TAB: AREAS */}
+            {/* ═══ TAB: AREAS (Especialidades) ═══ */}
             {activeTab === 'areas' && (
-              <div className="flex flex-col lg:flex-row bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden min-h-[600px] animate-fade-in">
-                <div className="w-full lg:w-72 bg-ink-50/50 border-r border-ink-100 p-4 space-y-1">
+              <div className="flex flex-col lg:flex-row bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden min-h-[700px] animate-fade-in">
+                {/* Area list */}
+                <div className="w-full lg:w-64 bg-ink-50/50 border-r border-ink-100 p-4 space-y-1">
                   <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Áreas Médicas</p>
                   {EXAM_AREAS.map((area) => (
                     <button
                       key={area.id}
-                      onClick={() => setSelectedArea(area.id)}
+                      onClick={() => { setSelectedArea(area.id); setShowImprovePanel(false); }}
                       className={classNames(
-                        "w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all",
-                        selectedArea === area.id
-                          ? "bg-brand-600 text-white shadow-md"
-                          : "text-ink-600 hover:bg-ink-100"
+                        'w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between',
+                        selectedArea === area.id ? 'bg-brand-600 text-white shadow-md' : 'text-ink-600 hover:bg-ink-100'
                       )}
                     >
-                      {area.label}
+                      <span>{area.label}</span>
+                      {!isAreaInherited(area.id) && (
+                        <span className="w-2 h-2 rounded-full bg-indigo-300 shrink-0" title="Customizado" />
+                      )}
                     </button>
                   ))}
                 </div>
+
+                {/* Editor panel */}
                 <div className="flex-1 p-8 space-y-6">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xl font-black text-ink-900">Protocolos: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}</h4>
-                        {(!localSettings.aiAreaPrompts?.[selectedArea] || localSettings.aiAreaPrompts?.[selectedArea]?.trim() === (adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea]).trim()) ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-wider border border-emerald-100/60 flex items-center gap-1">
-                            <CheckCircle2 size={9} className="text-emerald-500" /> Herdado
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100/60 flex items-center gap-1">
-                            <Zap size={9} className="text-indigo-500 fill-indigo-500/10" /> Customizado
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xl font-black text-ink-900">
+                          {EXAM_AREAS.find(a => a.id === selectedArea)?.label}
+                        </h4>
+                        <InheritedBadge inherited={isAreaInherited(selectedArea)} />
                       </div>
-                      <p className="text-sm text-ink-500">Diretrizes específicas para análise e conclusão desta área.</p>
+                      <p className="text-sm text-ink-500 mt-0.5">Diretrizes específicas para análise e conclusão desta área.</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] };
-                        setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
-                        showToast(`Protocolo de ${selectedArea} restaurado para o padrão do administrador`, 'info');
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
-                    >
-                      <RotateCcw size={12} />
-                      Sincronizar Admin
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setShowImprovePanel(!showImprovePanel)}
+                        className={classNames(
+                          'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm',
+                          showImprovePanel
+                            ? 'bg-violet-600 text-white border-violet-700'
+                            : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+                        )}
+                      >
+                        <Sparkles size={12} />
+                        Melhorar com IA
+                        {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] };
+                          setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
+                          showToast(`Protocolo de ${selectedArea} restaurado.`, 'info');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
+                      >
+                        <RotateCcw size={12} />
+                        Sincronizar Admin
+                      </button>
+                    </div>
                   </div>
-                  <textarea
+
+                  {/* AI Improve Panel */}
+                  {showImprovePanel && (
+                    <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-violet-600" />
+                        <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
+                      </div>
+                      <p className="text-[11px] text-violet-700 leading-relaxed">
+                        A IA analisará o prompt atual desta área e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
+                      </p>
+                      <textarea
+                        value={areaImprovePrompt}
+                        onChange={(e) => setAreaImprovePrompt(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
+                        placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BIRADS, melhorar conclusão para tireoide...)"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleImproveAreaPrompt}
+                          disabled={isImprovingArea}
+                          className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
+                        >
+                          {isImprovingArea ? (
+                            <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
+                          ) : (
+                            <><Sparkles size={16} /> Melhorar Prompt</>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => { setShowImprovePanel(false); setAreaImprovePrompt(''); }}
+                          className="text-sm text-violet-500 hover:underline"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <CodeEditor
+                    fileName={`${selectedArea.toLowerCase().replace(/\s+/g, '_')}_protocol.md`}
+                    badge="ÁREA PROTOCOL"
+                    glowColor="brand"
+                    placeholder={`Instruções clínicas para ${EXAM_AREAS.find(a => a.id === selectedArea)?.label}...`}
                     value={localSettings.aiAreaPrompts?.[selectedArea] || ''}
-                    onChange={(e) => {
-                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: e.target.value };
+                    onChange={(v) => {
+                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: v };
                       setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
                     }}
-                    rows={18}
-                    className="w-full rounded-2xl border-ink-100 font-mono text-sm p-6 bg-ink-50/30 focus:ring-brand-500 focus:border-brand-500 leading-relaxed shadow-inner"
-                    placeholder={`Instruções clínicas para ${selectedArea}...`}
                   />
                 </div>
               </div>
             )}
 
-            {/* TAB: ENGINE */}
+            {/* ═══ TAB: SNIPPETS (Frases Prontas) ═══ */}
+            {activeTab === 'snippets' && (
+              <div className="space-y-6 animate-fade-in">
+                {/* Header */}
+                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                      <BookOpen size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-black text-ink-900">Banco de Frases Prontas</h4>
+                      <p className="text-sm text-ink-500">
+                        {snippets.length} {snippets.length === 1 ? 'frase cadastrada' : 'frases cadastradas'} — insira rapidamente durante a laudagem.
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={openNewSnippet} className="btn-primary flex items-center gap-2">
+                    <Plus size={16} /> Nova Frase
+                  </button>
+                </div>
+
+                {/* Form modal inline */}
+                {showSnippetForm && (
+                  <div className="bg-white rounded-3xl border border-brand-200 shadow-lg p-6 space-y-5 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-black text-ink-900 text-base">
+                        {snippetEditId ? 'Editar Frase' : 'Nova Frase Pronta'}
+                      </h5>
+                      <button onClick={() => setShowSnippetForm(false)} className="p-1.5 rounded-xl hover:bg-ink-100 text-ink-500">
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="label text-[10px] uppercase tracking-widest">Título / Atalho *</label>
+                        <input
+                          value={snippetForm.title}
+                          onChange={(e) => setSnippetForm({ ...snippetForm, title: e.target.value })}
+                          className="input h-11"
+                          placeholder="Ex: Rim Normal, BIRADS 2, Tireoide Homogênea..."
+                        />
+                      </div>
+                      <div>
+                        <label className="label text-[10px] uppercase tracking-widest">Área Médica (opcional)</label>
+                        <select
+                          value={snippetForm.area}
+                          onChange={(e) => setSnippetForm({ ...snippetForm, area: e.target.value })}
+                          className="input h-11"
+                        >
+                          <option value="">Todas as áreas</option>
+                          {EXAM_AREAS.map(a => (
+                            <option key={a.id} value={a.id}>{a.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label text-[10px] uppercase tracking-widest">Conteúdo da Frase *</label>
+                      <textarea
+                        value={snippetForm.content}
+                        onChange={(e) => setSnippetForm({ ...snippetForm, content: e.target.value })}
+                        rows={6}
+                        className="w-full rounded-2xl border-ink-200 text-sm p-4 focus:ring-brand-500 focus:border-brand-500 leading-relaxed bg-ink-50/30"
+                        placeholder="Digite o texto completo da frase que será inserida no laudo..."
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={saveSnippet} className="btn-primary flex items-center gap-2">
+                        <Save size={16} /> {snippetEditId ? 'Salvar Alterações' : 'Adicionar Frase'}
+                      </button>
+                      <button onClick={() => setShowSnippetForm(false)} className="btn-ghost text-ink-500">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Search */}
+                {snippets.length > 0 && (
+                  <div className="relative">
+                    <input
+                      value={snippetSearch}
+                      onChange={(e) => setSnippetSearch(e.target.value)}
+                      className="input h-11 pl-10"
+                      placeholder="Buscar frases por título, conteúdo ou área..."
+                    />
+                    <FileText size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                  </div>
+                )}
+
+                {/* Snippet list */}
+                {filteredSnippets.length === 0 && (
+                  <div className="bg-white rounded-3xl border border-ink-100 p-12 text-center space-y-3">
+                    <BookOpen size={36} className="text-ink-300 mx-auto" />
+                    <p className="font-bold text-ink-500">
+                      {snippets.length === 0 ? 'Nenhuma frase cadastrada ainda.' : 'Nenhuma frase encontrada.'}
+                    </p>
+                    {snippets.length === 0 && (
+                      <p className="text-sm text-ink-400">
+                        Crie frases prontas para agilizar sua laudagem. Elas ficam disponíveis no editor de laudos.
+                      </p>
+                    )}
+                    {snippets.length === 0 && (
+                      <button onClick={openNewSnippet} className="btn-primary mx-auto flex items-center gap-2 mt-4">
+                        <Plus size={16} /> Criar primeira frase
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredSnippets.map((snippet) => (
+                    <div key={snippet.id} className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 flex gap-4 group hover:border-brand-200 hover:shadow-md transition-all">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-black text-ink-900 text-sm">{snippet.title}</span>
+                          {snippet.area && (
+                            <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 text-[9px] font-black uppercase tracking-wider border border-brand-100">
+                              {EXAM_AREAS.find(a => a.id === snippet.area)?.label || snippet.area}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-ink-600 leading-relaxed line-clamp-3">{snippet.content}</p>
+                        <p className="text-[9px] text-ink-400 uppercase tracking-wider mt-2 font-bold">
+                          {snippet.content.length} caracteres
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openEditSnippet(snippet.id)}
+                          className="p-2 rounded-xl hover:bg-brand-50 text-brand-500 transition-all"
+                          title="Editar"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => deleteSnippet(snippet.id)}
+                          className="p-2 rounded-xl hover:bg-red-50 text-red-400 transition-all"
+                          title="Remover"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ═══ TAB: ENGINE ═══ */}
             {activeTab === 'engine' && (
               <div className="max-w-3xl space-y-6 animate-fade-in">
                 <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
@@ -548,19 +951,18 @@ export function LaudIA() {
                               onClick={testConnection}
                               disabled={testStatus === 'testing'}
                               className={classNames(
-                                "w-14 h-14 flex items-center justify-center rounded-xl transition-all border",
-                                testStatus === 'success' ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                                  testStatus === 'error' ? "bg-red-50 text-red-600 border-red-200" :
-                                    "bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100"
+                                'w-14 h-14 flex items-center justify-center rounded-xl transition-all border',
+                                testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                testStatus === 'error'   ? 'bg-red-50 text-red-600 border-red-200' :
+                                                           'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
                               )}
                             >
                               {testStatus === 'testing' ? <Loader2 size={20} className="animate-spin" /> :
-                                testStatus === 'success' ? <CheckCircle2 size={20} /> :
-                                  testStatus === 'error' ? <AlertCircle size={20} /> : <Zap size={20} />}
+                               testStatus === 'success' ? <CheckCircle2 size={20} /> :
+                               testStatus === 'error'   ? <AlertCircle size={20} /> : <Zap size={20} />}
                             </button>
                           </div>
                         </div>
-
                         <div>
                           <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Gemini Principal</label>
                           <select
@@ -590,19 +992,18 @@ export function LaudIA() {
                               onClick={testConnection}
                               disabled={testStatus === 'testing'}
                               className={classNames(
-                                "w-14 h-14 flex items-center justify-center rounded-xl transition-all border",
-                                testStatus === 'success' ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                                  testStatus === 'error' ? "bg-red-50 text-red-600 border-red-200" :
-                                    "bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100"
+                                'w-14 h-14 flex items-center justify-center rounded-xl transition-all border',
+                                testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                testStatus === 'error'   ? 'bg-red-50 text-red-600 border-red-200' :
+                                                           'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
                               )}
                             >
                               {testStatus === 'testing' ? <Loader2 size={20} className="animate-spin" /> :
-                                testStatus === 'success' ? <CheckCircle2 size={20} /> :
-                                  testStatus === 'error' ? <AlertCircle size={20} /> : <Zap size={20} />}
+                               testStatus === 'success' ? <CheckCircle2 size={20} /> :
+                               testStatus === 'error'   ? <AlertCircle size={20} /> : <Zap size={20} />}
                             </button>
                           </div>
                         </div>
-
                         <div>
                           <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Claude Principal</label>
                           <select
@@ -610,7 +1011,7 @@ export function LaudIA() {
                             onChange={(e) => setLocalSettings({ ...localSettings, anthropicModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Recomendado - Excelente Diagnóstico)</option>
+                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Recomendado)</option>
                             <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Rápido e Preciso)</option>
                             <option value="claude-3-opus-latest">Claude 3 Opus (Complexidade Máxima)</option>
                           </select>
@@ -642,7 +1043,7 @@ export function LaudIA() {
               </div>
             )}
 
-            {/* TAB: TRAINING */}
+            {/* ═══ TAB: TRAINING ═══ */}
             {activeTab === 'training' && (
               <div className="max-w-3xl space-y-6 animate-fade-in">
                 <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
@@ -659,18 +1060,18 @@ export function LaudIA() {
                     <button
                       onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
                       className={classNames(
-                        "relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                        'relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
                         localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
                       )}
                     >
                       <span className={classNames(
-                        "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
                         localSettings.aiTrainingEnabled ? 'translate-x-5' : 'translate-x-0'
                       )} />
                     </button>
                   </div>
 
-                  <div className={classNames("space-y-8 transition-opacity duration-300", !localSettings.aiTrainingEnabled && "opacity-40 pointer-events-none")}>
+                  <div className={classNames('space-y-8 transition-opacity duration-300', !localSettings.aiTrainingEnabled && 'opacity-40 pointer-events-none')}>
                     <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl text-sm text-indigo-900 leading-relaxed">
                       <strong>Como funciona:</strong> Ao habilitar esta função, o LAUD.IA enviará seus últimos exames finalizados da mesma especialidade como contexto. Isso garante que a IA utilize o seu vocabulário, estilo de pontuação e estrutura preferida.
                     </div>

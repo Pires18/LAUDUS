@@ -78,6 +78,9 @@ function buildSystemContext(settings: AppSettings, area: string): string {
   const areaExtra = settings.aiAreaPrompts?.[area as ExamArea] || '';
 
   const parts = [master, global, skeleton, rules];
+  if (settings.normalDoctrine?.trim()) {
+    parts.push(`═══════════════════════════════════════════\nDOUTRINA DE NORMALIDADE HABITUAL DO MÉDICO:\n═══════════════════════════════════════════\n${settings.normalDoctrine.trim()}`);
+  }
   if (areaRules) {
     parts.push(`═══════════════════════════════════════════\nPROTOCOLO DE ÁREA ATIVO:\n═══════════════════════════════════════════\n${areaRules}`);
   }
@@ -153,15 +156,22 @@ function buildContextMessage({
     lines.push(`\nANAMNESE DO PACIENTE (dados da consulta — usar como contexto clínico prioritário para calibrar descrição, conclusão e recomendações):\n${anamnesis.trim()}`);
   }
 
-  lines.push(`NOTAS DO MÉDICO: ${notes || 'Nenhuma nota adicional.'}`);
+  // Rótulo da nota varia por modo para clareza semântica para o modelo
+  const notesLabel = mode === 'GERAÇÃO INICIAL' ? 'NOTAS DO MÉDICO' : 'INSTRUÇÃO DE ALTERAÇÃO';
+  lines.push(`${notesLabel}: ${notes || 'Nenhuma nota adicional.'}`);
 
   const prevContext = previousExams.length > 0
     ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${previousExams.join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
     : '';
 
+  // Rótulo do bloco HTML muda por modo
+  const maskLabel = mode === 'GERAÇÃO INICIAL'
+    ? 'MÁSCARA DE REFERÊNCIA'
+    : 'LAUDO ATUAL (modificar conforme instrução acima)';
+
   return `${lines.join('\n')}${prevContext}
 
-MÁSCARA DE REFERÊNCIA:
+${maskLabel}:
 ${maskHtml}`;
 }
 
@@ -192,14 +202,18 @@ export function stripScratchpad(text: string): string {
   cleaned = cleaned.replace(/<\/?scratchpad>/gi, '');
 
   // Camada 5 (defesa final): Remove qualquer texto antes do primeiro <h1>
-  // Se o modelo vazou raciocínio antes do HTML, descarta tudo antes do <h1>
-  const h1Index = cleaned.search(/<h1[\s>]/i);
-  if (h1Index > 0) {
-    // Há conteúdo antes do <h1> — verificar se parece texto de raciocínio
-    const before = cleaned.substring(0, h1Index).trim();
-    // Se tem mais de 20 caracteres antes do h1, é provável raciocínio vazado
-    if (before.length > 20) {
-      cleaned = cleaned.substring(h1Index);
+  // EXCEÇÃO: respostas do Copiloto têm marcadores === CONVERSA === / === PROPOSTA ===
+  // antes do <h1> — não devem ser removidos (são o formato obrigatório do Copiloto).
+  const hasCopilotFormat =
+    cleaned.includes('=== CONVERSA ===') || cleaned.includes('=== PROPOSTA ===');
+
+  if (!hasCopilotFormat) {
+    const h1Index = cleaned.search(/<h1[\s>]/i);
+    if (h1Index > 0) {
+      const before = cleaned.substring(0, h1Index).trim();
+      if (before.length > 20) {
+        cleaned = cleaned.substring(h1Index);
+      }
     }
   }
 
@@ -320,7 +334,25 @@ export function buildCopilotPrompt({
   settings,
   previousExams = [],
 }: CopilotParams): BuiltPrompt {
-  const systemContext = buildSystemContext(settings, exam.area);
+  // Override crítico: os Blocos 2 e 3 instruem o modelo a começar o output com <h1>.
+  // No modo Copiloto isso é INCORRETO — o output deve iniciar com === CONVERSA ===.
+  // Este override é adicionado ao final do systemContext para ter precedência máxima.
+  const copilotModeOverride = `\n\n═══════════════════════════════════════════════════════════════
+OVERRIDE — MODO COPILOTO ATIVO (PRIORIDADE MÁXIMA)
+═══════════════════════════════════════════════════════════════
+⚠ REGRAS DOS BLOCOS 2 E 3 SUSPENSAS NESTE MODO:
+  • "Output começa diretamente com <h1>" — SUSPENSA
+  • "Zero texto antes do HTML" — SUSPENSA
+  • "ZERO caractere fora das tags HTML" — SUSPENSA
+
+NOVA REGRA ABSOLUTA DE FORMATO (substitui as acima):
+O output DEVE começar com "=== CONVERSA ===" e conter
+as duas seções exatamente como especificado na mensagem.
+O HTML do laudo modificado vai DENTRO de "=== PROPOSTA ===".
+Violar este formato invalida completamente a resposta.
+═══════════════════════════════════════════════════════════════`;
+
+  const systemContext = buildSystemContext(settings, exam.area) + copilotModeOverride;
 
   const copilotFormat = `═══════════════════════════════════════════════════════════════
 MODO COPILOTO — FORMATO DE RESPOSTA OBRIGATÓRIO
@@ -400,7 +432,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       generationConfig: {
         temperature: settings.aiTemperature ?? 0.3,
         topP: 0.9,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
       }
     });
 
@@ -423,7 +455,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: [
           {
             type: 'text',
@@ -476,7 +508,7 @@ export async function generateReportStream(
       generationConfig: {
         temperature: settings.aiTemperature ?? 0.3,
         topP: 0.9,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
       }
     });
 
@@ -506,7 +538,7 @@ export async function generateReportStream(
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: [
           {
             type: 'text',

@@ -1,14 +1,19 @@
-import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History } from 'lucide-react';
+import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 interface EditorToolbarProps {
   isGenerating: boolean;
   hasReport: boolean;
+  /** Se o conteúdo atual é apenas a máscara (contém placeholders) → modo Geração Inicial */
+  isTemplateMask: boolean;
   status: string;
   onRefine: () => void;
   onShowPrompt: () => void;
   onReset: () => void;
   onShowHistory: () => void;
+  onToggleSnippets: () => void;
+  snippetsOpen: boolean;
+  snippetCount: number;
   saveState: 'idle' | 'saving' | 'saved';
   geminiModel: string;
 }
@@ -16,14 +21,20 @@ interface EditorToolbarProps {
 export function EditorToolbar({
   isGenerating,
   hasReport,
+  isTemplateMask,
   status,
   onRefine,
   onShowPrompt,
   onReset,
   onShowHistory,
+  onToggleSnippets,
+  snippetsOpen,
+  snippetCount,
   saveState,
   geminiModel
 }: EditorToolbarProps) {
+  const refineLabel = isTemplateMask ? 'Gerar com Laud.IA' : 'Refinar com Laud.IA';
+
   return (
     <div className="px-4 py-2.5 border-b border-ink-100 bg-white flex items-center gap-3 shrink-0 flex-wrap">
       <button
@@ -31,8 +42,8 @@ export function EditorToolbar({
         disabled={isGenerating || status === 'finalizado'}
         className={classNames(
           "h-10 px-6 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-lg transition-all flex items-center justify-center relative overflow-hidden border border-brand-500/20",
-          isGenerating 
-            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" 
+          isGenerating
+            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
             : "bg-gradient-to-r from-brand-600 via-brand-700 to-indigo-700 text-white hover:shadow-xl hover:shadow-brand-500/25 active:scale-95"
         )}
       >
@@ -41,7 +52,7 @@ export function EditorToolbar({
         ) : (
           <Sparkles size={16} className="text-amber-300 fill-amber-300 animate-pulse" />
         )}
-        Refinar com Laud.IA
+        {refineLabel}
       </button>
 
       <button
@@ -75,6 +86,25 @@ export function EditorToolbar({
       >
         <History size={14} /> Histórico Clínico
       </button>
+
+      {snippetCount > 0 && (
+        <button
+          onClick={onToggleSnippets}
+          className={classNames(
+            'btn-secondary text-xs py-1.5 px-2.5 relative transition-all',
+            snippetsOpen
+              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+              : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+          )}
+          title="Frases prontas"
+        >
+          <BookOpen size={14} />
+          Frases
+          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">
+            {snippetCount > 9 ? '9+' : snippetCount}
+          </span>
+        </button>
+      )}
 
       <div className="text-[11px] text-ink-500 flex items-center gap-1.5 ml-auto">
         {saveState === 'saving' && (

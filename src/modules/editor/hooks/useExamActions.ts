@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { updateItem, getRecentFinalizedReports } from '../../../store/db';
 import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types';
-import { generateReportStream, generateMockReport, generateReport } from '../../ai/gemini';
+import { generateReportStream, generateMockReport } from '../../ai/gemini';
+import { sanitizeHtml } from '../../../utils/sanitizeHtml';
 
 interface UseExamActionsProps {
   examId: string;
@@ -68,70 +69,75 @@ export function useExamActions({
     };
   }, [examId]);
 
-  const handleInitialGenerate = useCallback(async () => {
+  /**
+   * Geração / Refinamento inteligente — modo único unificado.
+   * Auto-detecta o modo baseado no conteúdo atual:
+   *  • Conteúdo com placeholders (…) e sem customPrompt → GERAÇÃO INICIAL (buildPrompt)
+   *  • Conteúdo real já preenchido ou customPrompt específico → REFINAMENTO (buildRefinePrompt)
+   * Em ambos os casos usa streaming para UX responsiva.
+   * Aplica sanitizeHtml no output final antes de salvar (segurança + XSS).
+   */
+  const handleRefine = useCallback(async (currentReport: string, customPrompt?: string) => {
     if (!template || !patient) return;
-    setIsGenerating(true);
-    try {
-      const previousExams = settings.aiTrainingEnabled 
-        ? await getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
-        : [];
-      const html = await generateReport({
-        template,
-        patient,
-        settings,
-        clinicalIndication,
-        requestingPhysician,
-        anamnesis,
-        previousExams
-      });
-      onReportChange(html);
-      await updateItem('exams', examId, { reportContent: html });
-      showToast('Laudo inicial gerado com base no seu histórico!', 'success');
-    } catch (err) {
-      console.error('[useExamActions] Erro ao gerar laudo:', err);
-      showToast('Erro ao gerar laudo inicial', 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, onReportChange, showToast]);
 
-  const handleRefine = useCallback(async (currentReport: string) => {
-    if (!template || !patient) return;
-    
     setIsGenerating(true);
     try {
-      const previousExams = settings.aiTrainingEnabled 
+      const previousExams = settings.aiTrainingEnabled
         ? await getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
         : [];
-      let html: string;
+
       const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+      let html: string;
+
       if (hasKey) {
-        html = await generateReportStream({
-          currentReport,
-          template,
-          patient,
-          settings,
-          clinicalIndication,
-          requestingPhysician,
-          anamnesis,
-          previousExams
-        }, (chunk) => {
-          onReportChange(chunk);
-        });
+        // Detecta se é a primeira geração (máscara com placeholders ainda intactos)
+        // Nesse caso, usa buildPrompt (GERAÇÃO INICIAL) para melhor qualidade
+        const isFirstGeneration = !customPrompt && /\(…\)/.test(currentReport);
+
+        if (isFirstGeneration) {
+          // Modo: GERAÇÃO INICIAL — gera do zero a partir da máscara como referência
+          html = await generateReportStream({
+            template,
+            patient,
+            settings,
+            clinicalIndication,
+            requestingPhysician,
+            anamnesis,
+            previousExams,
+          }, (chunk) => {
+            onReportChange(chunk);
+          });
+          showToast('Laudo gerado com IA! ✓', 'success');
+        } else {
+          // Modo: REFINAMENTO — edição cirúrgica do laudo já existente (R10)
+          html = await generateReportStream({
+            currentReport,
+            template,
+            patient,
+            settings,
+            clinicalIndication,
+            requestingPhysician,
+            anamnesis,
+            previousExams,
+            customPrompt,
+          }, (chunk) => {
+            onReportChange(chunk);
+          });
+          showToast('Laudo refinado com sucesso! ✓', 'success');
+        }
+
+        // Sanitização obrigatória do HTML antes de salvar (prevenção XSS)
+        html = sanitizeHtml(html);
       } else {
-        html = generateMockReport({
-          template,
-          patient,
-          settings,
-        });
-        showToast('API Key não configurada — laudo refinado em modo demo', 'info');
+        html = generateMockReport({ template, patient, settings });
+        showToast('API Key não configurada — modo demonstração ativo', 'info');
       }
+
       onReportChange(html);
       await updateItem('exams', examId, { reportContent: html });
-      showToast('Laudo refinado seguindo seu estilo padrão!', 'success');
     } catch (e: unknown) {
-      console.error('[useExamActions] Erro no refinamento IA:', e);
-      const message = e instanceof Error ? e.message : 'Erro ao refinar laudo';
+      console.error('[useExamActions] Erro na geração/refinamento:', e);
+      const message = e instanceof Error ? e.message : 'Erro ao processar laudo com IA';
       showToast(message, 'error');
     } finally {
       setIsGenerating(false);
@@ -154,7 +160,6 @@ export function useExamActions({
     isGenerating,
     saveState,
     debouncedSave,
-    handleInitialGenerate,
     handleRefine,
     updateStatus
   };
