@@ -134,7 +134,8 @@ export function ExamEditor({ examId }: Props) {
     template,
     clinicalIndication: exam?.clinicalIndication,
     requestingPhysician: exam?.requestingPhysician,
-    anamnesis: exam?.anamnesis
+    anamnesis: exam?.anamnesis,
+    examDateMs: exam?.createdAt
   });
 
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
@@ -805,6 +806,7 @@ export function ExamEditor({ examId }: Props) {
         {showCalculators && (
           <CalculatorModal 
             area={exam.area} 
+            examDateMs={exam.createdAt}
             onClose={() => setShowCalculators(false)} 
             onSendToCopilot={(res) => {
               setCopilotPrompt(res);
@@ -822,6 +824,8 @@ export function ExamEditor({ examId }: Props) {
           exam={exam}
           patient={patient}
           template={template}
+          clinic={clinic}
+          settings={settings}
         />
       )}
 

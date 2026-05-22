@@ -277,7 +277,26 @@ export function AdminLaudIA() {
             Gestão de alto nível, sintonia fina de temperatura cognitiva e publicação dos prompts médicos oficiais do motor de inteligência artificial LAUD.IA.
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-3 shrink-0 self-start md:self-auto">
+          <button
+            onClick={() => {
+              if (window.confirm('Tem certeza que deseja restaurar TODOS os prompts (Mestre, Globais, Estrutura, Regras e Áreas) para o padrão de fábrica? Isso sobrescreverá as alterações atuais.')) {
+                setLocalSettings({
+                  ...localSettings,
+                  aiMasterPrompt: DEFAULT_MASTER_PROMPT,
+                  aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
+                  aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT,
+                  aiRigidRules: DEFAULT_RIGID_RULES,
+                  aiAreaPrompts: { ...AREA_SPECIFIC_PROMPTS }
+                });
+                showToast('Reset de Fábrica concluído. Clique em Publicar para salvar.', 'success');
+              }
+            }}
+            className="h-12 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 bg-rose-50 border border-rose-200/80 hover:border-rose-500 transition-all flex items-center gap-2"
+          >
+            <ShieldAlert size={12} />
+            Factory Reset
+          </button>
           <button 
             onClick={() => {
               setLocalSettings(settings);

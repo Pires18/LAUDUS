@@ -35,13 +35,18 @@ export async function syncGoogleDoc(
     analise_laudo: [],
     conclusao_laudo: [],
     classificacao_laudo: [],
+    observacao_laudo: [],
     recomendacao_laudo: [],
     titulo_laudo: []
   };
 
   const cleanNodeText = (html: string) => {
     const div = document.createElement('div');
-    div.innerHTML = html.replace(/<br\s*\/?>/g, '\n').replace(/<\/p>/g, '\n');
+    const processedHtml = html
+      .replace(/<br\s*\/?>/g, '\n')
+      .replace(/<\/p>/g, '\n')
+      .replace(/\(…\)/g, '( \u00A0\u00A0\u00A0\u00A0 )'); // Espaçamento adequado para o placeholder
+    div.innerHTML = processedHtml;
     return (div.textContent || '').trim();
   };
 
@@ -55,6 +60,7 @@ export async function syncGoogleDoc(
       else if (header.includes('ANÁLISE')) currentSection = 'analise_laudo';
       else if (header.includes('CONCLUSÃO')) currentSection = 'conclusao_laudo';
       else if (header.includes('CLASSIFICAÇ')) currentSection = 'classificacao_laudo';
+      else if (header.includes('OBSERVAÇ')) currentSection = 'observacao_laudo';
       else if (header.includes('RECOMENDAÇÕES')) currentSection = 'recomendacao_laudo';
       else if (!currentSection) {
         sectionBuffer.titulo_laudo.push(text);
@@ -76,7 +82,7 @@ export async function syncGoogleDoc(
 
   const sections: Record<string, string> = {};
   Object.keys(sectionBuffer).forEach(key => {
-    if (key === 'conclusao_laudo' || key === 'recomendacao_laudo') {
+    if (key === 'conclusao_laudo' || key === 'recomendacao_laudo' || key === 'observacao_laudo') {
       sections[key] = sectionBuffer[key].join('\n');
     } else {
       sections[key] = sectionBuffer[key].join('\n\n');
@@ -98,6 +104,7 @@ export async function syncGoogleDoc(
     'analise_laudo': sections.analise_laudo || '',
     'conclusao_laudo': sections.conclusao_laudo || '',
     'classificacao_laudo': sections.classificacao_laudo || '',
+    'observacao_laudo': sections.observacao_laudo || '',
     'recomendacao_laudo': sections.recomendacao_laudo || '',
     'data_exame': formatDate(exam.createdAt || Date.now()),
     'numero_laudo': (exam.friendlyId || exam.id).toUpperCase(),

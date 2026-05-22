@@ -8,6 +8,7 @@ import { useApp } from '../../store/app';
 import { updateItem } from '../../store/db';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/gemini';
+import { parseAnamnesis, serializeAnamnesis } from './components/AnamnesisConsentModal';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -396,7 +397,8 @@ export function LaudCopilot({
           area: exam.area,
           clinicalIndication: exam.clinicalIndication,
           requestingPhysician: exam.requestingPhysician,
-          anamnesis: exam.anamnesis
+          anamnesis: exam.anamnesis,
+          dateMs: exam.createdAt
         },
         settings,
         previousExams
@@ -916,13 +918,47 @@ export function LaudCopilot({
               )}
             </div>
 
-            <div className="flex-1 min-h-0 flex flex-col">
-              <textarea
-                value={formText}
-                onChange={(e) => handleFormTextChange(e.target.value)}
-                placeholder="Preencha os achados clínicos deste exame aqui..."
-                className="w-full flex-1 p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
-              />
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-3 custom-scrollbar pr-2">
+              {(() => {
+                const fields = parseAnamnesis(formText);
+                const hasStructured = fields.some(f => f.isStructured);
+                
+                if (hasStructured) {
+                  return fields.map((field, idx) => (
+                    <div key={idx}>
+                      {field.isStructured ? (
+                        <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1.5 ml-1">
+                            {field.label}
+                          </label>
+                          <input
+                            type="text"
+                            value={field.value}
+                            onChange={(e) => {
+                              const newFields = [...fields];
+                              newFields[idx].value = e.target.value;
+                              handleFormTextChange(serializeAnamnesis(newFields));
+                            }}
+                            className="w-full bg-white border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-slate-800 font-medium placeholder-slate-300"
+                            placeholder={`Preencher ${field.label.toLowerCase()}...`}
+                          />
+                        </div>
+                      ) : (
+                        field.rawLine.trim() ? <p className="text-xs text-slate-500 italic px-2 py-1">{field.rawLine}</p> : null
+                      )}
+                    </div>
+                  ));
+                } else {
+                  return (
+                    <textarea
+                      value={formText}
+                      onChange={(e) => handleFormTextChange(e.target.value)}
+                      placeholder="Preencha os achados clínicos deste exame aqui..."
+                      className="w-full h-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
+                    />
+                  );
+                }
+              })()}
             </div>
           </div>
 

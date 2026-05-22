@@ -135,6 +135,7 @@ export interface ReportTemplate {
   conclusionTemplate: string;
   classificationTemplate?: string;
   recommendationsTemplate: string;
+  observationsTemplate?: string;
 
   /** Instruções específicas para o motor de IA */
   aiInstructions?: string;

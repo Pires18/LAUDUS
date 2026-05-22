@@ -12,9 +12,10 @@ interface Props {
   area?: ExamArea;
   onClose: () => void;
   onSendToCopilot: (result: string) => void;
+  examDateMs?: number;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot }: Props) {
+export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: Props) {
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
   const [showAll, setShowAll] = useState(false);
@@ -158,6 +159,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot }: Props) {
                         <selectedCalc.component 
                           value={calcResult || {}} 
                           onChange={(val: any) => setCalcResult(val)} 
+                          examDateMs={examDateMs}
                         />
                         {selectedCalc.reference && (
                           <CalculatorReference 

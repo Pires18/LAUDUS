@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../../../components/Modal';
-import { ExamRequest, Patient, ReportTemplate } from '../../../types';
+import { ExamRequest, Patient, ReportTemplate, Clinic, AppSettings } from '../../../types';
 import { updateItem, getItem } from '../../../store/db';
 import { ClipboardList, ShieldCheck, Printer, RotateCcw, Check, FileText } from 'lucide-react';
 
@@ -49,9 +49,11 @@ interface Props {
   patient: Patient;
   template?: ReportTemplate | null;
   initialTab?: 'anamnesis' | 'consent';
+  clinic?: Clinic | null;
+  settings?: AppSettings;
 }
 
-export function AnamnesisConsentModal({ open, onClose, exam, patient, template: initialTemplate, initialTab = 'anamnesis' }: Props) {
+export function AnamnesisConsentModal({ open, onClose, exam, patient, template: initialTemplate, initialTab = 'anamnesis', clinic, settings }: Props) {
   const [activeTab, setActiveTab] = useState<'anamnesis' | 'consent'>(initialTab);
   const [template, setTemplate] = useState<ReportTemplate | null>(initialTemplate || null);
 
@@ -142,19 +144,26 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const physicianName = settings?.physicianName || 'Médico Executante';
+    const physicianCRM = settings?.physicianCRM ? `CRM ${settings.physicianCRM}` : '';
+    const clinicName = clinic?.name || settings?.clinicName || 'Clínica';
+    const logoHtml = clinic?.logoUrl ? `<img src="${clinic.logoUrl}" alt="${clinicName}" class="logo" />` : `<h2>${clinicName}</h2>`;
+    const patientDoc = patient.cpf ? `CPF: ${patient.cpf}` : (patient.rg ? `RG: ${patient.rg}` : 'Documento não informado');
+
     const signatureBlock = showSignature
       ? `
         <div class="signature-container">
           <div class="sig-box">
             <div class="line"></div>
+            <p><strong>${patient.name}</strong></p>
             <p>Assinatura do Paciente (ou Responsável)</p>
-            <p>Nome: ${patient.name}</p>
-            <p>CPF/RG: ${patient.cpf || patient.rg || 'Não informado'}</p>
+            <p>${patientDoc}</p>
           </div>
           <div class="sig-box">
             <div class="line"></div>
+            <p><strong>${physicianName}</strong></p>
             <p>Assinatura do Médico Executante</p>
-            <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
+            <p>${physicianCRM}</p>
           </div>
         </div>
       `
@@ -165,45 +174,63 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
         <head>
           <title>${title}</title>
           <style>
-            body { font-family: sans-serif; padding: 40px; color: #333; line-height: 1.6; font-size: 14px; }
-            .header { border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 25px; }
-            .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; }
-            .header p { margin: 5px 0 0 0; font-size: 12px; color: #666; }
-            .metadata { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 30px; background: #f9f9f9; padding: 15px; border-radius: 6px; border: 1px solid #eee; }
-            .metadata div p { margin: 3px 0; }
-            .metadata strong { color: #111; }
-            .content { white-space: pre-wrap; margin-bottom: 50px; text-align: justify; }
-            .signature-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 60px; page-break-inside: avoid; }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+            body { font-family: 'Inter', sans-serif; padding: 40px; color: #111827; line-height: 1.6; font-size: 13px; max-width: 800px; margin: 0 auto; }
+            .header-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
+            .header-top .logo { max-height: 50px; max-width: 200px; object-fit: contain; }
+            .header-top .clinic-info { text-align: right; font-size: 11px; color: #6b7280; }
+            .doc-title { text-align: center; margin-bottom: 30px; }
+            .doc-title h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; color: #111827; }
+            .metadata { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
+            .metadata div p { margin: 4px 0; font-size: 12px; }
+            .metadata strong { color: #374151; display: inline-block; width: 90px; }
+            .content { white-space: pre-wrap; margin-bottom: 50px; text-align: justify; font-size: 13px; color: #374151; }
+            .signature-container { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 80px; page-break-inside: avoid; }
             .sig-box { text-align: center; }
-            .sig-box .line { border-top: 1px solid #999; margin-bottom: 10px; width: 80%; margin-left: auto; margin-right: auto; }
-            .sig-box p { margin: 3px 0; font-size: 11px; color: #555; }
+            .sig-box .line { border-top: 1px solid #000; margin-bottom: 12px; width: 100%; }
+            .sig-box p { margin: 4px 0; font-size: 11px; color: #4b5563; }
+            .sig-box strong { color: #111827; font-size: 12px; }
             @media print {
-              body { padding: 0; }
-              .metadata { background: none; border: 1px solid #ddd; }
+              body { padding: 0; max-width: 100%; }
+              .metadata { background: none; border: 1px solid #d1d5db; }
+              .header-top { border-bottom-color: #d1d5db; }
             }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>${title}</h1>
-            <p>Documento digital emitido em ${new Date().toLocaleString('pt-BR')}</p>
+          <div class="header-top">
+            <div>${logoHtml}</div>
+            <div class="clinic-info">
+              <p>Documento digital emitido em ${new Date().toLocaleString('pt-BR')}</p>
+              <p>ID do Exame: ${(exam.friendlyId || exam.id).toUpperCase()}</p>
+            </div>
           </div>
+          
+          <div class="doc-title">
+            <h1>${title}</h1>
+          </div>
+
           <div class="metadata">
             <div>
               <p><strong>Paciente:</strong> ${patient.name}</p>
               <p><strong>Nascimento:</strong> ${patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('pt-BR') : 'Não informado'}</p>
               <p><strong>Gênero:</strong> ${patient.gender === 'M' ? 'Masculino' : patient.gender === 'F' ? 'Feminino' : 'Outro'}</p>
+              <p><strong>Convênio:</strong> ${patient.insurance || 'Particular'}</p>
             </div>
             <div>
-              <p><strong>Exame:</strong> ${exam.examType}</p>
-              <p><strong>Área:</strong> ${exam.area.replace(/-/g, ' ').toUpperCase()}</p>
-              <p><strong>Data do Laudo:</strong> ${new Date(exam.createdAt).toLocaleDateString('pt-BR')}</p>
+              <p><strong>Procedimento:</strong> ${exam.examType}</p>
+              <p><strong>Especialidade:</strong> ${exam.area.replace(/-/g, ' ').toUpperCase()}</p>
+              <p><strong>Médico(a):</strong> ${physicianName}</p>
+              <p><strong>CRM:</strong> ${physicianCRM || 'Não informado'}</p>
             </div>
           </div>
+
           <div class="content">${content || 'Nenhum conteúdo registrado.'}</div>
+          
           ${signatureBlock}
+          
           <script>
-            window.onload = function() { window.print(); window.close(); }
+            setTimeout(() => { window.print(); window.close(); }, 500);
           </script>
         </body>
       </html>

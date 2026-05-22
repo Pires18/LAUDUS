@@ -289,7 +289,7 @@ export function LaudIA() {
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
             messages: [{ role: 'user', content: 'Say OK' }],
             max_tokens: 1,
           }),

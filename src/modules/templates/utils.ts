@@ -33,6 +33,7 @@ export function getInitialReportContent(template: ReportTemplate): string {
   html += addSection('ANÁLISE', template.analysisTemplate);
   html += addSection('CLASSIFICAÇÕES', template.classificationTemplate || '');
   html += addSection('CONCLUSÃO', template.conclusionTemplate);
+  html += addSection('OBSERVAÇÕES', template.observationsTemplate);
   html += addSection('RECOMENDAÇÕES', template.recommendationsTemplate);
 
   return html;

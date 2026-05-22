@@ -10,13 +10,14 @@ interface GenerateReportParams {
   requestingPhysician?: string;
   anamnesis?: string;
   previousExams?: string[];
+  examDateMs?: number;
 }
 
 interface CopilotParams {
   instruction: string;
   currentReport: string;
   patient: Patient | null;
-  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string };
+  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string; dateMs?: number };
   settings: AppSettings;
   previousExams?: string[];
 }
@@ -31,6 +32,7 @@ interface RefineParams {
   anamnesis?: string;
   previousExams?: string[];
   customPrompt?: string;
+  examDateMs?: number;
 }
 
 /**
@@ -124,6 +126,7 @@ function buildContextMessage({
   maskHtml,
   requestingPhysician,
   previousExams = [],
+  examDateMs,
 }: {
   mode: 'GERAÇÃO INICIAL' | 'REFINAMENTO';
   examType: string;
@@ -134,8 +137,10 @@ function buildContextMessage({
   maskHtml: string;
   requestingPhysician?: string;
   previousExams?: string[];
+  examDateMs?: number;
 }): string {
-  const examDate = new Date().toLocaleDateString('pt-BR');
+  const dateObj = examDateMs ? new Date(examDateMs) : new Date();
+  const examDate = dateObj.toLocaleDateString('pt-BR');
   const patientAge = patient?.birthDate ? calculateAge(patient.birthDate) : 'Não informada';
   const genderMap = { M: 'Masculino', F: 'Feminino', O: 'Outro' } as const;
   const patientGender = patient?.gender ? genderMap[patient.gender as keyof typeof genderMap] || 'Não informado' : 'Não informado';
@@ -143,7 +148,7 @@ function buildContextMessage({
   const lines: string[] = [
     `MODO: ${mode}`,
     `EXAME: ${examType}`,
-    `DATA: ${examDate}`,
+    `DATA DO EXAME: ${examDate} (ATENÇÃO: Use ESTA data como o "Hoje" para qualquer cálculo de datas no laudo, como DDP ou Idade Gestacional. PROIBIDO usar a data atual real do sistema.)`,
     `PACIENTE: ${patient?.name || 'Não informado'}, ${patientAge}, ${patientGender}`,
   ];
   if (patient?.insurance) lines.push(`CONVÊNIO: ${patient.insurance}`);
@@ -160,8 +165,23 @@ function buildContextMessage({
   const notesLabel = mode === 'GERAÇÃO INICIAL' ? 'NOTAS DO MÉDICO' : 'INSTRUÇÃO DE ALTERAÇÃO';
   lines.push(`${notesLabel}: ${notes || 'Nenhuma nota adicional.'}`);
 
-  const prevContext = previousExams.length > 0
-    ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${previousExams.join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
+  let processedExams = previousExams;
+  if (previousExams.length > 0) {
+    const totalLength = previousExams.join('').length;
+    if (totalLength > 15000) {
+      processedExams = [];
+      let currentLen = 0;
+      for (const ex of previousExams) {
+        if (currentLen + ex.length < 15000) {
+          processedExams.push(ex);
+          currentLen += ex.length;
+        } else break;
+      }
+    }
+  }
+
+  const prevContext = processedExams.length > 0
+    ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${processedExams.join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
     : '';
 
   // Rótulo do bloco HTML muda por modo
@@ -209,10 +229,12 @@ export function stripScratchpad(text: string): string {
 
   if (!hasCopilotFormat) {
     const h1Index = cleaned.search(/<h1[\s>]/i);
-    if (h1Index > 0) {
-      const before = cleaned.substring(0, h1Index).trim();
-      if (before.length > 20) {
-        cleaned = cleaned.substring(h1Index);
+    if (h1Index !== -1) {
+      cleaned = cleaned.substring(h1Index);
+    } else {
+      const h2Index = cleaned.search(/<h2[\s>]/i);
+      if (h2Index !== -1) {
+        cleaned = cleaned.substring(h2Index);
       }
     }
   }
@@ -232,6 +254,7 @@ export function buildPrompt({
   anamnesis,
   settings,
   previousExams = [],
+  examDateMs,
 }: GenerateReportParams): BuiltPrompt {
   const systemContext = buildSystemContext(settings, template.area);
   const maskHtml = buildMaskHtml(template);
@@ -245,6 +268,7 @@ export function buildPrompt({
     maskHtml,
     requestingPhysician,
     previousExams,
+    examDateMs,
   });
 
   const userMessage = `═══════════════════════════════════════════════════════════════
@@ -272,12 +296,16 @@ export function buildRefinePrompt({
   anamnesis,
   previousExams = [],
   customPrompt,
+  examDateMs,
 }: RefineParams): BuiltPrompt {
   const systemContext = buildSystemContext(settings, template.area);
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"
 [REGRAS DE OURO DO REFINAMENTO — EXECUÇÃO OBRIGATÓRIA:
+• OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções.
+• PROIBIDO: Adicionar ou concatenar texto no final do laudo. As alterações DEVEM ser integradas no local correto.
+• MÁSCARA PADRÃO: NÃO altere a padronização, estilo ou os placeholders da máscara padrão. Ajuste e inclua TODAS as alterações de forma adequada ao laudo, mantendo o padrão do texto original intacto.
 • Aplicar a instrução em TODOS os locais que ela afeta no laudo.
 • Atualizar OBRIGATORIAMENTE as 3 seções impactadas:
   1. ANÁLISE: descrição morfológica correta e adequada do achado.
@@ -309,6 +337,7 @@ export function buildRefinePrompt({
     maskHtml: currentReport,
     requestingPhysician,
     previousExams,
+    examDateMs,
   });
 
   const userMessage = `═══════════════════════════════════════════════════════════════
@@ -367,7 +396,10 @@ SEM saudações. SEM explicações prolixas. Puramente clínica.]
 === PROPOSTA ===
 [HTML COMPLETO do laudo com a alteração integrada.
 REGRAS DE OURO DO COPILOTO:
-• Atualizar ANÁLISE (descrição morfológica adequada do achado).
+• OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
+• PROIBIDO: Adicionar ou concatenar o texto no final do laudo. As alterações DEVEM ser mescladas/integradas no local correto dentro da ANÁLISE.
+• MÁSCARA PADRÃO: NÃO altere a padronização, estilo ou os placeholders da máscara padrão. Ajuste e inclua TODAS as alterações de forma adequada ao laudo, mantendo o padrão do texto original intacto.
+• Atualizar ANÁLISE (descrição morfológica adequada do achado, no órgão correto).
 • Atualizar CONCLUSÃO (bullet específico e preciso para o achado).
 • Atualizar RECOMENDAÇÕES (conduta N1-N4 adequada ao achado e contexto clínico).
 • A cascata Análise→Conclusão→Recomendação deve ser íntegra.
@@ -386,6 +418,7 @@ REGRAS DE OURO DO COPILOTO:
     maskHtml: currentReport,
     requestingPhysician: exam.requestingPhysician,
     previousExams,
+    examDateMs: exam.dateMs,
   });
 
   const userMessage = `${copilotFormat}

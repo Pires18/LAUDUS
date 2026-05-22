@@ -14,6 +14,7 @@ interface UseExamActionsProps {
   clinicalIndication?: string;
   requestingPhysician?: string;
   anamnesis?: string;
+  examDateMs?: number;
 }
 
 export function useExamActions({
@@ -25,7 +26,8 @@ export function useExamActions({
   template,
   clinicalIndication,
   requestingPhysician,
-  anamnesis
+  anamnesis,
+  examDateMs
 }: UseExamActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -104,6 +106,7 @@ export function useExamActions({
             requestingPhysician,
             anamnesis,
             previousExams,
+            examDateMs,
           }, (chunk) => {
             onReportChange(chunk);
           });
@@ -120,6 +123,7 @@ export function useExamActions({
             anamnesis,
             previousExams,
             customPrompt,
+            examDateMs,
           }, (chunk) => {
             onReportChange(chunk);
           });

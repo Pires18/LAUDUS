@@ -8,6 +8,7 @@ interface GeneratedTemplate {
   analysisTemplate: string;
   conclusionTemplate: string;
   recommendationsTemplate: string;
+  observationsTemplate?: string;
   classificationTemplate?: string;
 }
 
@@ -42,14 +43,7 @@ export async function generateTemplateStructure(
     'reumatologico': 'Articulações afetadas, sinovite OMERACT modo B + Power Doppler, erosões, enteses, depósitos de cristais.',
   };
 
-  const prompt = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie uma Máscara de Laudo (Template) de MÁXIMA QUALIDADE CLÍNICA para o sistema LAUD.US.
-
-EXAME ALVO:
-- Área: ${area}
-- Nome do Exame: ${examName}
-- Contexto da área: ${areaContext[area] || 'Exame ultrassonográfico geral.'}
-
-${examples.length > 0 ? `ESTILO DE REFERÊNCIA DO MÉDICO (replique vocabulário, fraseologia e nível de detalhe):\n${examples.join('\n\n---\n\n')}\n` : ''}
+  const systemContext = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie uma Máscara de Laudo (Template) de MÁXIMA QUALIDADE CLÍNICA para o sistema LAUD.US.
 
 REGRAS PARA CADA CAMPO:
 
@@ -60,6 +54,7 @@ REGRAS PARA CADA CAMPO:
 3. analysisTemplate: Descrição de um exame COMPLETAMENTE NORMAL. Regras:
    - Use <p><strong>NOME DO ÓRGÃO:</strong> descrição normal detalhada.</p> para cada estrutura.
    - Use "(…)" APENAS para campos de medidas numéricas que variam por paciente (ex: "medindo (…) x (…) x (…) cm" ou "medindo (…) x (…) x (…) mm" para a área de medicina-fetal).
+   - Para medidas numéricas padrão com unidade, utilize vírgula decimal e espaço entre número e unidade (ex: "3,50 cm").
    - Para exames da área "medicina-fetal", TODAS as medidas anatômicas, biométricas e anexiais DEVEM ser obrigatoriamente padronizadas em milímetros (mm), sendo terminantemente proibido o uso de centímetros (cm).
    - Para estruturas qualitativas normais, escreva a descrição completa (não use placeholder).
    - Inclua TODAS as estruturas relevantes para este tipo de exame, na ordem anatômica lógica.
@@ -69,7 +64,9 @@ REGRAS PARA CADA CAMPO:
 
 5. recommendationsTemplate: Recomendação padrão ou <p>• Seguimento clínico de rotina conforme protocolo da especialidade solicitante.</p>
 
-6. classificationTemplate: SE o exame envolver mama (BI-RADS), tireoide (TI-RADS), ovário (O-RADS), fígado em cirrótico (LI-RADS) ou cisto renal (BOSNIAK): inclua tabela HTML simples com a classificação padrão. Caso contrário, retorne string vazia "".
+6. observationsTemplate: Observações adicionais ou notas clínicas. Se não houver observação padrão, use <p>(…)</p>.
+
+7. classificationTemplate: SE o exame envolver mama (BI-RADS), tireoide (TI-RADS), ovário (O-RADS), fígado em cirrótico (LI-RADS) ou cisto renal (BOSNIAK): inclua tabela HTML simples com a classificação padrão. Caso contrário, retorne string vazia "".
 
 DIRETRIZES DE QUALIDADE:
 - Terminologia CBR/SBUS/ISUOG/ACR conforme a área.
@@ -78,21 +75,32 @@ DIRETRIZES DE QUALIDADE:
 - NÃO use markdown (##, **, ---).
 - HTML limpo: apenas <p>, <strong>, <em>, <table>, <tr>, <td>, <ul>, <li>.
 
-FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
+FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \\\`\\\`\\\`):
 {
   "title": "NOME EM CAIXA ALTA",
   "technique": "HTML da técnica",
   "analysisTemplate": "HTML da análise normal",
   "conclusionTemplate": "HTML da conclusão",
   "recommendationsTemplate": "HTML das recomendações",
+  "observationsTemplate": "HTML das observações ou string vazia",
   "classificationTemplate": "HTML da classificação ou string vazia"
 }`;
+
+  const userMessage = `EXAME ALVO:
+- Área: ${area}
+- Nome do Exame: ${examName}
+- Contexto da área: ${areaContext[area] || 'Exame ultrassonográfico geral.'}
+
+${examples.length > 0 ? `ESTILO DE REFERÊNCIA DO MÉDICO (replique vocabulário, fraseologia e nível de detalhe):\n${examples.join('\n\n---\n\n')}\n` : ''}
+
+Gere o JSON da máscara do laudo agora.`;
 
   let text = '';
   if (provider === 'gemini') {
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
     const model = genAI.getGenerativeModel({
       model: settings.geminiModel || 'gemini-2.5-flash',
+      systemInstruction: systemContext,
       generationConfig: {
         temperature: 0.2,
         topP: 0.9,
@@ -100,7 +108,7 @@ FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
       }
     });
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(userMessage);
     text = result.response.text();
   } else {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -108,12 +116,20 @@ FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \`\`\`):
       headers: {
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-1-0',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
         max_tokens: 8192,
-        messages: [{ role: 'user', content: prompt }],
+        system: [
+          {
+            type: 'text',
+            text: systemContext,
+            cache_control: { type: 'ephemeral' }
+          }
+        ],
+        messages: [{ role: 'user', content: userMessage }],
         temperature: 0.2
       })
     });
@@ -165,58 +181,69 @@ export async function generateTemplateField(
     throw new Error(`API Key do ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada. Vá em Configurações para adicionar.`);
   }
 
-  let prompt = '';
+  let systemContext = '';
+  let userMessage = '';
+
   if (fieldType === 'customForm') {
-    prompt = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie um modelo de formulário em formato de texto livre para o copiloto do exame de "${examName}" (Área: ${area}).
-Este formulário deve servir de guia para o médico preencher de forma rápida os achados durante a realização do exame.
-O formato deve listar os principais órgãos, regiões ou estruturas avaliados neste tipo de exame em linhas separadas, utilizando colchetes vazios ou com valores padrão indicativos de normalidade, de forma que o médico possa editar os dados de forma rápida.
+    systemContext = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie um modelo de formulário em formato de texto livre para o copiloto do exame.
+Este formulário deve listar os principais órgãos, regiões ou estruturas avaliados neste tipo de exame em linhas separadas.
+É OBRIGATÓRIO que todas as estruturas contenham apenas colchetes completamente vazios para preenchimento. NÃO escreva texto de exemplo ou de normalidade dentro dos colchetes.
 
 Exemplo de formato esperado:
-Fígado: [Aspecto habitual]
-Vesícula biliar: [Normal, sem cálculos]
-Pâncreas: [Aspecto habitual]
-Rins: [Normais]
-Bexiga: [Cheia, com paredes finas]
+Fígado: [ ]
+Vesícula biliar: [ ]
+Pâncreas: [ ]
+Rins: [ ]
+Bexiga: [ ]
 
 Regras importantes:
 - Retorne APENAS o modelo de texto livre sugerido.
 - NÃO inclua títulos, explicações, saudações, introduções ou bloco de código markdown (como \`\`\`). Retorne apenas o texto puro das linhas do formulário.`;
+    userMessage = `Gere o formulário para o exame de "${examName}" (Área: ${area}).`;
   } else if (fieldType === 'anamnesis') {
-    prompt = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie um modelo de anamnese padrão no formato de formulário estruturado para o exame de "${examName}" (Área: ${area}).
+    systemContext = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie um modelo de anamnese padrão no formato de formulário estruturado para o exame.
 Este formulário deve listar perguntas e itens clínicos essenciais a serem respondidos/preenchidos pelo médico ou recepcionista antes ou durante o exame.
-Cada item deve seguir rigorosamente o padrão "Rótulo do Campo: [Valor Padrão]" em linhas separadas. O valor padrão entre colchetes deve indicar uma resposta comum ou ficar vazio para preenchimento.
+Foque ESTRITAMENTE em: queixas principais, tempo de evolução, antecedentes patológicos, cirurgias prévias e dados clínicos essenciais para o exame.
+NÃO inclua campos de identificação do paciente (nome, idade, sexo, convênio), pois já constam no cabeçalho automático.
+É OBRIGATÓRIO que cada item siga rigorosamente o padrão "Rótulo do Campo: [ ]" em linhas separadas.
+TODOS os colchetes devem estar VAZIOS (com apenas um espaço dentro). NÃO inclua textos de exemplo ou valores padrão.
 
 Personalize as perguntas de acordo com o tipo de exame. Exemplos:
 - Se for exame Obstétrico (Medicina Fetal):
-  DUM (Data da Última Menstruação): [Não recorda / Informar]
+  DUM (Data da Última Menstruação): [ ]
   Gestações anteriores (G/P/A): [ ]
-  Queixa ou Indicação: [Acompanhamento de rotina]
+  Queixa ou Indicação: [ ]
 - Se for Abdome (Medicina Interna):
-  Indicação / Suspeita Clínica: [Dor abdominal / Pesquisa de colelitíase]
+  Indicação / Suspeita Clínica: [ ]
   Tempo de evolução dos sintomas: [ ]
-  Sintomas associados: [Nenhum / Náuseas / Vômitos]
-  Cirurgias abdominais prévias: [Nega]
+  Sintomas associados: [ ]
+  Cirurgias abdominais prévias: [ ]
 - Se for Musculoesquelético:
-  Indicação / Queixa: [Dor articular]
-  Trauma ou queda recente: [Não]
+  Indicação / Queixa: [ ]
+  Trauma ou queda recente: [ ]
   Tempo de evolução: [ ]
 
 Regras importantes:
-- Cada linha de pergunta/campo DEVE seguir o formato: "Nome do Campo: [Valor Padrão]".
-- Crie de 3 a 6 campos essenciais e relevantes para este exame específico.
+- Cada linha de pergunta/campo DEVE seguir o formato: "Nome do Campo: [ ]".
+- Crie de 3 a 5 campos cruciais e diretos para este exame específico.
 - Retorne APENAS as linhas do formulário estruturado.
 - NÃO inclua títulos, explicações, saudações, introduções ou bloco de código markdown (como \`\`\`). Retorne apenas o texto puro do formulário.`;
+    userMessage = `Gere o formulário estruturado de anamnese para o exame de "${examName}" (Área: ${area}).`;
   } else {
-    prompt = `Você é um Médico Radiologista Sênior especialista em ultrassonografia e especialista em direito médico. Crie um Termo de Consentimento Livre e Esclarecido (TCLE) completo e formal para a realização do exame de "${examName}" (Área: ${area}).
-O termo deve incluir:
-1. Título: TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO - [Nome do Exame] (substitua [Nome do Exame] pelo nome correspondente).
-2. Explicação simples do procedimento e seus benefícios.
-3. Riscos mínimos (como desconforto leve pela pressão do transdutor, preparo prévio se houver).
-4. Declaração de consentimento voluntário em primeira pessoa: "Eu, [Nome do Paciente] (ou seu responsável legal), declaro que fui devidamente esclarecido(a) sobre o exame..."
+    systemContext = `Você é um Médico Radiologista Sênior e especialista em direito médico. Crie um Termo de Consentimento Livre e Esclarecido (TCLE) direto e formal para a realização do exame.
+O termo deve ser redigido de forma simples e genérica, na primeira pessoa.
+NÃO inclua campos, linhas ou lacunas para preencher nome do paciente, RG, CPF, médico, data, clínica ou assinaturas no corpo do texto, pois o sistema já insere essas variáveis automaticamente no cabeçalho e rodapé do documento impresso.
+
+O texto deve conter apenas a declaração do procedimento:
+1. Explicação muito breve e simples do procedimento e seus benefícios.
+2. Riscos mínimos (como desconforto leve pela pressão do transdutor, preparo prévio se houver).
+3. Declaração direta: "Eu, paciente ou responsável legal, declaro que fui devidamente esclarecido(a) sobre a natureza e os propósitos do exame..."
 
 Regras importantes:
-- Retorne APENAS o texto completo do termo de consentimento.
+- Retorne APENAS o corpo do texto do termo de consentimento.
+- NÃO inclua título do documento, pois o sistema já gera o título impresso com o nome do exame.
 - NÃO inclua explicações adicionais, comentários, notas ao programador ou bloco de código markdown (como \`\`\`). Retorne apenas o texto puro do termo.`;
+    userMessage = `Gere o Termo de Consentimento para o exame de "${examName}" (Área: ${area}).`;
   }
 
   let text = '';
@@ -224,6 +251,7 @@ Regras importantes:
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
     const model = genAI.getGenerativeModel({
       model: settings.geminiModel || 'gemini-2.5-flash',
+      systemInstruction: systemContext,
       generationConfig: {
         temperature: 0.3,
         topP: 0.9,
@@ -231,7 +259,7 @@ Regras importantes:
       }
     });
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(userMessage);
     text = result.response.text();
   } else {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -239,12 +267,20 @@ Regras importantes:
       headers: {
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-1-0',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
         max_tokens: 8192,
-        messages: [{ role: 'user', content: prompt }],
+        system: [
+          {
+            type: 'text',
+            text: systemContext,
+            cache_control: { type: 'ephemeral' }
+          }
+        ],
+        messages: [{ role: 'user', content: userMessage }],
         temperature: 0.3
       })
     });

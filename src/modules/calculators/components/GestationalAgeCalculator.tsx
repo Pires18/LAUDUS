@@ -4,7 +4,7 @@ import { Calendar, Clock } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 
-export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
+export function GestationalAgeCalculator({ value, onChange, examDateMs }: CalculatorProps) {
   const [method, setMethod] = useState<'dum' | 'usg'>(value?.method || 'dum');
   const [dumDate, setDumDate] = useState(value?.dumDate || '');
   const [prevUsgDate, setPrevUsgDate] = useState(value?.prevUsgDate || '');
@@ -21,14 +21,14 @@ export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
   useEffect(() => {
     let currentGa = null;
     let eddStr = null; 
-    const today = new Date();
+    const today = examDateMs ? new Date(examDateMs) : new Date();
     today.setHours(0, 0, 0, 0);
 
     if (method === 'dum' && dumDate) {
-      const d = new Date(dumDate + 'T12:00:00');
+      const d = new Date(dumDate + 'T00:00:00');
       if (!isNaN(d.getTime())) {
         const diffMs = today.getTime() - d.getTime();
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
         
         if (diffDays >= 0) {
           const weeks = Math.floor(diffDays / 7);
@@ -40,11 +40,11 @@ export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
         }
       }
     } else if (method === 'usg' && prevUsgDate && prevUsgWeeks !== '') {
-      const d = new Date(prevUsgDate + 'T12:00:00');
+      const d = new Date(prevUsgDate + 'T00:00:00');
       if (!isNaN(d.getTime())) {
         const initialDays = (Number(prevUsgWeeks) * 7) + Number(prevUsgDays || 0);
         const diffMs = today.getTime() - d.getTime();
-        const daysSinceUsg = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const daysSinceUsg = Math.round(diffMs / (1000 * 60 * 60 * 24));
         const totalDays = initialDays + daysSinceUsg;
         
         if (totalDays >= 0) {
@@ -69,7 +69,7 @@ export function GestationalAgeCalculator({ value, onChange }: CalculatorProps) {
       edd: eddStr,
       _summary: summary
     });
-  }, [method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays]);
+  }, [method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays, examDateMs]);
 
   return (
     <div className="space-y-8">

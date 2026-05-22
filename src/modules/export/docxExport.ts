@@ -179,7 +179,8 @@ export async function exportToDocx({ exam, patient, settings, reportHtml }: Expo
   }));
 
   // Conteúdo do laudo
-  const reportParagraphs = htmlToDocxParagraphs(reportHtml);
+  const processedHtml = reportHtml.replace(/\(…\)/g, '( \u00A0\u00A0\u00A0\u00A0 )');
+  const reportParagraphs = htmlToDocxParagraphs(processedHtml);
 
   // Assinatura
   const signature: Paragraph[] = [];
@@ -247,7 +248,8 @@ export async function copyReportToClipboard(reportHtml: string, patient: Patient
     <small>CRM ${settings.physicianCRM || ''}${settings.physicianRQE ? ` · RQE ${settings.physicianRQE}` : ''}</small></p>
   ` : '';
 
-  const fullHtml = `<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;">${header}${reportHtml}${signature}</div>`;
+  const processedReportHtml = reportHtml.replace(/\(…\)/g, '( &nbsp;&nbsp;&nbsp;&nbsp; )');
+  const fullHtml = `<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;">${header}${processedReportHtml}${signature}</div>`;
   const plainText = (new DOMParser()).parseFromString(fullHtml, 'text/html').body.textContent || '';
 
   await navigator.clipboard.write([

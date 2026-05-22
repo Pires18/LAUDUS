@@ -207,6 +207,9 @@ export function TemplateEditor({ templateId }: Props) {
                       u('analysisTemplate', result.analysisTemplate);
                       u('conclusionTemplate', result.conclusionTemplate);
                       u('recommendationsTemplate', result.recommendationsTemplate);
+                      if (result.observationsTemplate) {
+                        u('observationsTemplate', result.observationsTemplate);
+                      }
                       if (result.classificationTemplate) {
                         u('classificationTemplate', result.classificationTemplate);
                       }
@@ -264,6 +267,13 @@ export function TemplateEditor({ templateId }: Props) {
               value={draft.classificationTemplate || ''}
               onChange={(val) => u('classificationTemplate', val)}
               placeholder="Ex: BI-RADS: (...) — Categoria (...)"
+            />
+
+            <TemplateTextBlock
+              label="Texto Padrão: Observações (Opcional)"
+              value={draft.observationsTemplate || ''}
+              onChange={(val) => u('observationsTemplate', val)}
+              placeholder="Ex: Observações e notas adicionais clínicas..."
             />
 
             <TemplateTextBlock
