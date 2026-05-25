@@ -88,7 +88,7 @@ export function PatientDetail({ patientId }: Props) {
 
       <PageHeader
         title={patient.name}
-        subtitle={`${calculateAge(patient.birthDate)} — CPF: ${patient.cpf ? formatCPF(patient.cpf) : 'Não informado'}`}
+        subtitle={`Prontuário: ${patient.id} — ${calculateAge(patient.birthDate)} — CPF: ${patient.cpf ? formatCPF(patient.cpf) : 'Não informado'}`}
         actions={
           <div className="flex gap-3">
             <button className="btn-secondary h-11 px-5 rounded-2xl" onClick={() => setEditing(true)}>
@@ -110,6 +110,10 @@ export function PatientDetail({ patientId }: Props) {
             <UserCircle size={16} className="text-brand-500" /> Informações Pessoais
           </h3>
           <div className="space-y-4 text-sm">
+            <div className="flex justify-between items-center border-b border-ink-50 pb-3">
+              <span className="text-ink-500 font-medium">Nº Prontuário</span>
+              <span className="font-mono font-black text-brand-700 bg-brand-50 px-3 py-1 rounded-full border border-brand-100 text-xs">{patient.id}</span>
+            </div>
             {patient.birthDate && (
               <div className="flex justify-between items-center border-b border-ink-50 pb-3">
                 <span className="text-ink-500 font-medium">Nascimento</span>

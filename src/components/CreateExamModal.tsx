@@ -18,7 +18,7 @@ interface CreateExamModalProps {
 }
 
 export function CreateExamModal({ onClose }: CreateExamModalProps) {
-  const { setView, selectedClinicId, showToast, createExamDefaultPatient, setCreateExamDefaultPatient } = useApp();
+  const { setView, selectedClinicId, showToast, createExamDefaultPatient, setCreateExamDefaultPatient, settings } = useApp();
   const { data: patients } = useCollection<Patient>('patients');
   const { data: templates } = useCollection<ReportTemplate>('templates');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -132,6 +132,55 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       };
       const id = genId('exams');
       await addItemWithId('exams', id, examData);
+
+      // Sincronização local com a Worklist do Orthanc (Mac Mini M2)
+      try {
+        // Formata o nome para DICOM (SOBRENOME^NOME^NOMEMEIO)
+        const cleanName = selectedPatient.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+        const nameParts = cleanName.split(/\s+/);
+        let dicomName = cleanName;
+        if (nameParts.length > 1) {
+          const lastName = nameParts.pop();
+          dicomName = `${lastName}^${nameParts.join('^')}`;
+        }
+
+        // Formata data de nascimento para AAAAMMDD
+        const dicomBirthDate = selectedPatient.birthDate ? selectedPatient.birthDate.replace(/[^0-9]/g, '') : '';
+
+        // Formata data e hora atual do exame
+        const now = new Date();
+        const stepDate = now.getFullYear() + 
+          String(now.getMonth() + 1).padStart(2, '0') + 
+          String(now.getDate()).padStart(2, '0');
+        const stepTime = String(now.getHours()).padStart(2, '0') + 
+          String(now.getMinutes()).padStart(2, '0') + 
+          String(now.getSeconds()).padStart(2, '0');
+
+        const stepDescription = template.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+        if (settings.dicomSyncEnabled !== false) {
+          await fetch('/api/worklist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              examId: id,
+              patientName: dicomName,
+              patientId: selectedPatient.id,
+              patientBirthDate: dicomBirthDate,
+              patientSex: selectedPatient.gender || 'F',
+              modality: settings.dicomModalityType || 'US',
+              aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+              stepDate,
+              stepTime,
+              stepDescription,
+              outputDir: settings.dicomWorklistFolder
+            })
+          });
+        }
+      } catch (syncError) {
+        console.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', syncError);
+      }
+
       showToast('Exame iniciado!');
       setCreateExamDefaultPatient(null);
       setView({ name: 'exam-editor', examId: id });

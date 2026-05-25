@@ -7,12 +7,12 @@ import { PageHeader } from '../../components/PageHeader';
 import { 
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
-  RotateCcw, Clock
+  RotateCcw, Clock, Database
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
 
-type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'audit';
+type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit';
 
 export function Settings() {
   const { settings, updateSettings, showToast } = useApp();
@@ -47,6 +47,7 @@ export function Settings() {
     { id: 'perfil', label: 'Meu Perfil', icon: User },
     { id: 'assinatura', label: 'Assinatura Médica', icon: Signature },
     { id: 'sistema', label: 'Preferências', icon: Sliders },
+    { id: 'dicom', label: 'Integração PACS', icon: Database },
     { id: 'audit', label: 'Auditoria & Saúde', icon: ShieldCheck },
   ] as const;
 
@@ -270,6 +271,169 @@ export function Settings() {
                     </div>
                     <div className="w-10 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
                       <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DICOM/PACS */}
+          {activeTab === 'dicom' && (
+            <div className="max-w-3xl space-y-6 animate-fade-in">
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Database size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-ink-900">Integração PACS / DICOM Worklist</h3>
+                    <p className="text-sm text-ink-500">Configure como o Laud.us exporta os exames para a sua worklist local do Orthanc.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Habilitar Sincronização */}
+                  <div className="flex items-center justify-between p-5 rounded-2xl bg-ink-50 border border-ink-100">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-bold text-ink-900">Sincronização com Worklist do Orthanc</p>
+                      <p className="text-xs text-ink-500">Salvar arquivos .wl na pasta de destino na criação/exclusão de exames.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('dicomSyncEnabled', !draft.dicomSyncEnabled)}
+                      className={classNames(
+                        "w-12 h-7 rounded-full transition-all relative",
+                        draft.dicomSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.dicomSyncEnabled ? "left-6" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  {/* Caminho da Pasta */}
+                  <div>
+                    <label className="label">Diretório da Worklist no Servidor (Caminho Absoluto)</label>
+                    <input
+                      className="input h-14"
+                      value={draft.dicomWorklistFolder || ''}
+                      onChange={(e) => u('dicomWorklistFolder', e.target.value)}
+                      placeholder="Ex: /Users/usuario/Documents/OrthancServer/db/WorklistsDatabase/"
+                    />
+                    <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc lê os arquivos .wl. A aplicação deve ter permissão de escrita.</p>
+                  </div>
+
+                  {/* URL do Visualizador Orthanc */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="label">URL Base do Servidor Orthanc</label>
+                      <input
+                        className="input h-14"
+                        value={draft.dicomViewerUrl || ''}
+                        onChange={(e) => u('dicomViewerUrl', e.target.value)}
+                        placeholder="Ex: http://localhost:8042"
+                      />
+                      <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP do servidor Orthanc (ex: IP local ou Tailscale).</p>
+                    </div>
+
+                    <div>
+                      <label className="label">Tipo de Visualizador DICOM</label>
+                      <select
+                        className="input h-14"
+                        value={draft.dicomViewerType || 'stone'}
+                        onChange={(e) => {
+                          const type = e.target.value as any;
+                          u('dicomViewerType', type);
+                          if (type === 'stone') {
+                            u('dicomViewerUrlPattern', '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}');
+                          } else if (type === 'oe2') {
+                            u('dicomViewerUrlPattern', '{{baseUrl}}/ui/app/retrieve-and-view.html?StudyInstanceUID=1.2.276.0.7230010.3.1.2.{{examId}}');
+                          } else if (type === 'ohif') {
+                            u('dicomViewerUrlPattern', '{{baseUrl}}/viewer?StudyInstanceUIDs=1.2.276.0.7230010.3.1.2.{{examId}}');
+                          }
+                        }}
+                      >
+                        <option value="stone">Stone Web Viewer (Orthanc)</option>
+                        <option value="oe2">Orthanc Explorer 2</option>
+                        <option value="ohif">OHIF Viewer</option>
+                        <option value="custom">Personalizado (Padrão de URL)</option>
+                      </select>
+                      <p className="text-[11px] text-ink-400 mt-1">Formato do link gerado para abrir exames diretamente.</p>
+                    </div>
+                  </div>
+
+                  {draft.dicomViewerType === 'custom' && (
+                    <div className="animate-fade-in">
+                      <label className="label">Padrão da URL do Visualizador</label>
+                      <input
+                        className="input h-14"
+                        value={draft.dicomViewerUrlPattern || ''}
+                        onChange={(e) => u('dicomViewerUrlPattern', e.target.value)}
+                        placeholder="Ex: {{baseUrl}}/viewer/{{StudyInstanceUID}}"
+                      />
+                      <p className="text-[11px] text-ink-400 mt-1">
+                        Use variáveis para montagem do link: <code className="bg-ink-50 px-1 py-0.5 rounded text-brand-600 font-mono font-bold text-[10px]">{"{{baseUrl}}"}</code>, <code className="bg-ink-50 px-1 py-0.5 rounded text-brand-600 font-mono font-bold text-[10px]">{"{{StudyInstanceUID}}"}</code>, <code className="bg-ink-50 px-1 py-0.5 rounded text-brand-600 font-mono font-bold text-[10px]">{"{{examId}}"}</code>.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Preview da URL Gerada */}
+                  <div className="p-4 rounded-2xl bg-brand-50/50 border border-brand-100/50 text-brand-900">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-brand-700 mb-1">Visualização do Link do Exame</p>
+                    <p className="text-xs font-mono font-bold break-all text-brand-600">
+                      {(() => {
+                        const baseUrl = (draft.dicomViewerUrl || 'http://localhost:8042').replace(/\/$/, '');
+                        const sampleExamId = 'EXEMPLO123';
+                        const sampleStudyUid = `1.2.276.0.7230010.3.1.2.${sampleExamId}`;
+                        const pattern = draft.dicomViewerUrlPattern || '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}';
+                        return pattern
+                          .replace('{{baseUrl}}', baseUrl)
+                          .replace('{{StudyInstanceUID}}', sampleStudyUid)
+                          .replace('{{examId}}', sampleExamId);
+                      })()}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Modalidade */}
+                    <div>
+                      <label className="label">Modalidade</label>
+                      <select
+                        className="input h-14"
+                        value={draft.dicomModalityType || 'US'}
+                        onChange={(e) => u('dicomModalityType', e.target.value)}
+                      >
+                        <option value="US">US (Ultrassonografia)</option>
+                        <option value="CR">CR (Radiologia Computadorizada)</option>
+                        <option value="CT">CT (Tomografia Computadorizada)</option>
+                        <option value="MR">MR (Ressonância Magnética)</option>
+                        <option value="DX">DX (Radiografia Digital)</option>
+                      </select>
+                    </div>
+
+                    {/* Modality AE Title */}
+                    <div>
+                      <label className="label">AE Title do Equipamento</label>
+                      <input
+                        className="input h-14"
+                        value={draft.dicomModalityAETitle || ''}
+                        onChange={(e) => u('dicomModalityAETitle', e.target.value)}
+                        placeholder="Ex: MINDRAYMX7"
+                      />
+                    </div>
+
+                    {/* Orthanc AE Title */}
+                    <div>
+                      <label className="label">AE Title do Orthanc (Remote)</label>
+                      <input
+                        className="input h-14"
+                        value={draft.dicomOrthancAETitle || ''}
+                        onChange={(e) => u('dicomOrthancAETitle', e.target.value)}
+                        placeholder="Ex: ORTHANC"
+                      />
                     </div>
                   </div>
                 </div>

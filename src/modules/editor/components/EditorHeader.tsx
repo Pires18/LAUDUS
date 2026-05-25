@@ -1,5 +1,5 @@
 import { 
-  ChevronLeft, CheckCircle2, Settings, User, Activity, Info, ClipboardList
+  ChevronLeft, CheckCircle2, Settings, User, Activity, Info, ClipboardList, Play
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDateTime, classNames } from '../../../utils/format';
@@ -27,8 +27,28 @@ export function EditorHeader({
   onEditMetadata,
   onOpenAnamnesisConsent
 }: EditorHeaderProps) {
+  const { settings } = useApp();
   const area = EXAM_AREAS.find(a => a.id === exam.area);
   const age = calculateAge(patient.birthDate || '');
+  const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+  let viewerUrl = baseUrl;
+
+  const viewerType = settings.dicomViewerType || 'stone';
+  if (viewerType === 'stone') {
+    viewerUrl = `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
+  } else if (viewerType === 'oe2') {
+    viewerUrl = `${baseUrl.replace(/\/$/, '')}/ui/app/retrieve-and-view.html?StudyInstanceUID=${studyUid}`;
+  } else if (viewerType === 'ohif') {
+    viewerUrl = `${baseUrl.replace(/\/$/, '')}/viewer?StudyInstanceUIDs=${studyUid}`;
+  } else if (viewerType === 'custom' && settings.dicomViewerUrlPattern) {
+    viewerUrl = settings.dicomViewerUrlPattern
+      .replace('{{baseUrl}}', baseUrl.replace(/\/$/, ''))
+      .replace('{{StudyInstanceUID}}', studyUid)
+      .replace('{{examId}}', exam.id);
+  } else {
+    viewerUrl = `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
+  }
 
   return (
     <header className="h-[72px] bg-ink-900 border-b border-white/5 flex items-center justify-between px-6 shrink-0 sticky top-0 z-[100] backdrop-blur-md">
@@ -92,6 +112,19 @@ export function EditorHeader({
               <span className="text-[10px] font-bold text-ink-200">Database Realtime</span>
            </div>
         </div>
+
+        {settings.dicomSyncEnabled !== false && (
+          <a
+            href={viewerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+            title="Abrir Visualizador DICOM (Orthanc)"
+          >
+            <Play size={16} />
+            <span className="hidden md:inline">Ver Imagens</span>
+          </a>
+        )}
 
         <button
           onClick={onOpenAnamnesisConsent}

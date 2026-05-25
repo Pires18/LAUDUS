@@ -8,7 +8,7 @@ import { useState, useMemo } from 'react';
 import {
   CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2, FileText,
   LayoutList, Building2, SlidersHorizontal, UserCog, Loader2, X,
-  ChevronRight
+  ChevronRight, RefreshCw
 } from 'lucide-react';
 import { Skeleton } from '../../components/SkeletonLoader';
 import { AreaIcon } from '../../components/AreaIcon';
@@ -103,6 +103,23 @@ export function Worklist() {
     try {
       const examToDelete = exams.find(e => e.id === deleteId);
       await deleteItem('exams', deleteId);
+
+      // Exclui o arquivo correspondente da Worklist do Orthanc
+      if (settings.dicomSyncEnabled !== false) {
+        try {
+          await fetch('/api/worklist', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              examId: deleteId,
+              outputDir: settings.dicomWorklistFolder
+            })
+          });
+        } catch (err) {
+          console.warn('[Orthanc Sync] Falha ao remover arquivo da worklist local:', err);
+        }
+      }
+
       await addAuditLog({
         action: 'EXCLUIR_EXAME',
         details: `Exame ${examToDelete?.examType} do paciente ID ${examToDelete?.patientId} foi excluído.`,
@@ -113,6 +130,53 @@ export function Worklist() {
       showToast('Erro ao excluir exame', 'error');
     } finally {
       setDeleteId(null);
+    }
+  }
+
+  async function handleSyncOrthanc(exam: ExamRequest, patientName: string, patientBirthDate?: string, patientSex?: 'M' | 'F' | 'O') {
+    try {
+      const cleanName = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      const nameParts = cleanName.split(/\s+/);
+      let dicomName = cleanName;
+      if (nameParts.length > 1) {
+        const lastName = nameParts.pop();
+        dicomName = `${lastName}^${nameParts.join('^')}`;
+      }
+      const dicomBirthDate = patientBirthDate ? patientBirthDate.replace(/[^0-9]/g, '') : '';
+      
+      const now = new Date();
+      const stepDate = now.getFullYear() + 
+        String(now.getMonth() + 1).padStart(2, '0') + 
+        String(now.getDate()).padStart(2, '0');
+      const stepTime = String(now.getHours()).padStart(2, '0') + 
+        String(now.getMinutes()).padStart(2, '0') + 
+        String(now.getSeconds()).padStart(2, '0');
+
+      const res = await fetch('/api/worklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId: exam.id,
+          patientName: dicomName,
+          patientId: exam.patientId,
+          patientBirthDate: dicomBirthDate,
+          patientSex: patientSex || 'F',
+          modality: settings.dicomModalityType || 'US',
+          aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+          stepDate,
+          stepTime,
+          stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
+          outputDir: settings.dicomWorklistFolder
+        })
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast('Enviado para a Worklist do Orthanc!', 'success');
+      } else {
+        showToast('Erro ao sincronizar: ' + result.error, 'error');
+      }
+    } catch (err: any) {
+      showToast('Erro de conexão com API local do Orthanc', 'error');
     }
   }
 
@@ -387,6 +451,16 @@ export function Worklist() {
                               <UserCog className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
                             </button>
                             <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender);
+                              }}
+                              className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 transition-all shadow-sm shrink-0"
+                              title="Enviar para Worklist Orthanc"
+                            >
+                              <RefreshCw className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
+                            </button>
+                            <button
                               onClick={() => setDeleteId(exam.id)}
                               className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-ink-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all shadow-sm shrink-0"
                               title="Excluir Registro"
@@ -497,6 +571,16 @@ export function Worklist() {
                           title="Ajustar Metadados"
                         >
                           <UserCog size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender);
+                          }}
+                          className="p-2.5 rounded-xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          title="Enviar para Worklist Orthanc"
+                        >
+                          <RefreshCw size={16} />
                         </button>
                         <button
                           onClick={() => setDeleteId(exam.id)}

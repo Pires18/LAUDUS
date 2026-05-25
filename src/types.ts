@@ -193,6 +193,16 @@ export interface AppSettings {
   aiTrainingContextSize?: number;
   /** Banco de frases prontas do usuário */
   snippets?: { id: string; title: string; content: string; area?: string }[];
+  
+  // Configurações de Integração DICOM / PACS Worklist
+  dicomSyncEnabled?: boolean;
+  dicomWorklistFolder?: string;
+  dicomModalityAETitle?: string;
+  dicomModalityType?: string;
+  dicomOrthancAETitle?: string;
+  dicomViewerUrl?: string;
+  dicomViewerType?: 'stone' | 'oe2' | 'ohif' | 'custom';
+  dicomViewerUrlPattern?: string;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */

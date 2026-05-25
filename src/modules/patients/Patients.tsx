@@ -114,7 +114,8 @@ export function Patients() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-ink-100 text-xs uppercase tracking-wide text-ink-500">
-                    <th className="text-left px-4 py-3 font-medium w-[30%]">Nome</th>
+                    <th className="text-left px-4 py-3 font-medium w-[25%]">Nome</th>
+                    <th className="text-left px-4 py-3 font-medium w-[15%]">Prontuário</th>
                     <th className="text-left px-4 py-3 font-medium">Contato</th>
                     <th className="text-left px-4 py-3 font-medium">Idade</th>
                     <th className="text-left px-4 py-3 font-medium">CPF</th>
@@ -138,6 +139,7 @@ export function Patients() {
                           <span className="font-medium text-ink-900">{p.name}</span>
                         </div>
                       </td>
+                      <td className="px-4 py-3 text-ink-700 font-mono text-xs font-bold">{p.id}</td>
                       <td className="px-4 py-3">
                         {p.phone ? (
                           <span className="text-ink-700">{formatPhone(p.phone)}</span>
@@ -164,7 +166,7 @@ export function Patients() {
                 </tbody>
               </table>
             </div>
-
+ 
             {/* Mobile View */}
             <div className="md:hidden divide-y divide-ink-50">
               {sorted.map((p) => (
@@ -178,7 +180,8 @@ export function Patients() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-ink-900 truncate">{p.name}</div>
-                    <div className="flex items-center gap-2 text-xs text-ink-500">
+                    <div className="text-[10px] font-mono text-brand-600 font-bold mt-0.5">Prontuário: {p.id}</div>
+                    <div className="flex items-center gap-2 text-xs text-ink-500 mt-1">
                       <span>{calculateAge(p.birthDate)}</span>
                       {p.cpf && <><span>·</span><span className="font-mono">{formatCPF(p.cpf)}</span></>}
                       {p.phone && <><span>·</span><span>{formatPhone(p.phone)}</span></>}

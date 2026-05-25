@@ -108,7 +108,15 @@ export async function getSettings(): Promise<AppSettings> {
     let defaultSettings: AppSettings = { 
       geminiModel: 'gemini-2.5-flash', 
       aiProvider: 'gemini', 
-      anthropicModel: 'claude-3-5-sonnet-latest' 
+      anthropicModel: 'claude-3-5-sonnet-latest',
+      dicomSyncEnabled: true,
+      dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+      dicomModalityAETitle: 'MINDRAYMX7',
+      dicomModalityType: 'US',
+      dicomOrthancAETitle: 'ORTHANC',
+      dicomViewerUrl: 'http://localhost:8042',
+      dicomViewerType: 'stone',
+      dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
     
@@ -136,7 +144,15 @@ export async function getSettings(): Promise<AppSettings> {
   return { 
     geminiModel: 'gemini-2.5-flash', 
     aiProvider: 'gemini', 
-    anthropicModel: 'claude-3-5-sonnet-latest' 
+    anthropicModel: 'claude-3-5-sonnet-latest',
+    dicomSyncEnabled: true,
+    dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+    dicomModalityAETitle: 'MINDRAYMX7',
+    dicomModalityType: 'US',
+    dicomOrthancAETitle: 'ORTHANC',
+    dicomViewerUrl: 'http://localhost:8042',
+    dicomViewerType: 'stone',
+    dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
   };
 }
 
