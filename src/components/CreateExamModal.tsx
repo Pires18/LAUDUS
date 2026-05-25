@@ -135,14 +135,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
       // Sincronização local com a Worklist do Orthanc (Mac Mini M2)
       try {
-        // Formata o nome para DICOM (SOBRENOME^NOME^NOMEMEIO)
-        const cleanName = selectedPatient.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-        const nameParts = cleanName.split(/\s+/);
-        let dicomName = cleanName;
-        if (nameParts.length > 1) {
-          const lastName = nameParts.pop();
-          dicomName = `${lastName}^${nameParts.join('^')}`;
-        }
+        // Formata o nome para DICOM (Mantendo ordem natural em maiúsculas sem acentos)
+        const dicomName = selectedPatient.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 
         // Formata data de nascimento para AAAAMMDD
         const dicomBirthDate = selectedPatient.birthDate ? selectedPatient.birthDate.replace(/[^0-9]/g, '') : '';

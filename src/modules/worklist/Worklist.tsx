@@ -135,13 +135,8 @@ export function Worklist() {
 
   async function handleSyncOrthanc(exam: ExamRequest, patientName: string, patientBirthDate?: string, patientSex?: 'M' | 'F' | 'O') {
     try {
-      const cleanName = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-      const nameParts = cleanName.split(/\s+/);
-      let dicomName = cleanName;
-      if (nameParts.length > 1) {
-        const lastName = nameParts.pop();
-        dicomName = `${lastName}^${nameParts.join('^')}`;
-      }
+      // Formata o nome para DICOM (Mantendo ordem natural em maiúsculas sem acentos)
+      const dicomName = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
       const dicomBirthDate = patientBirthDate ? patientBirthDate.replace(/[^0-9]/g, '') : '';
       
       const now = new Date();
