@@ -314,13 +314,99 @@ export function Settings() {
                     </button>
                   </div>
 
+                  {/* Predefinições Rápidas (Presets) */}
+                  <div className="p-5 rounded-2xl bg-brand-50/40 border border-brand-100">
+                    <p className="text-sm font-bold text-ink-900 mb-1">Predefinição de Servidor (Preset)</p>
+                    <p className="text-xs text-ink-500 mb-4">Escolha rapidamente entre as configurações do Servidor Principal ou do Backup do Notebook.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft((d) => ({
+                            ...d,
+                            dicomPreset: 'macmini',
+                            dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+                            dicomViewerUrl: 'http://100.93.111.95:8042',
+                            dicomOrthancAETitle: 'ORTHANCPACS',
+                            dicomViewerType: 'stone',
+                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
+                          }));
+                        }}
+                        className={classNames(
+                          "p-3.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between h-24",
+                          draft.dicomPreset === 'macmini'
+                            ? "bg-white border-brand-500 shadow-sm"
+                            : "bg-white/50 border-ink-150 hover:bg-white"
+                        )}
+                      >
+                        <span className="text-[10px] font-black uppercase tracking-wider text-brand-600">Servidor Principal</span>
+                        <div>
+                          <p className="text-xs font-black text-ink-900 leading-tight">Mac Mini</p>
+                          <p className="text-[9px] text-ink-400 mt-0.5">IP 100.93.111.95</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft((d) => ({
+                            ...d,
+                            dicomPreset: 'notebook',
+                            dicomWorklistFolder: 'C:\\OrthancServer\\db\\WorklistsDatabase\\',
+                            dicomViewerUrl: 'http://localhost:8043',
+                            dicomOrthancAETitle: 'ORTHANCBACKUP',
+                            dicomViewerType: 'stone',
+                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
+                          }));
+                        }}
+                        className={classNames(
+                          "p-3.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between h-24",
+                          draft.dicomPreset === 'notebook'
+                            ? "bg-white border-brand-500 shadow-sm"
+                            : "bg-white/50 border-ink-150 hover:bg-white"
+                        )}
+                      >
+                        <span className="text-[10px] font-black uppercase tracking-wider text-brand-600">Servidor Backup</span>
+                        <div>
+                          <p className="text-xs font-black text-ink-900 leading-tight">Notebook Local</p>
+                          <p className="text-[9px] text-ink-400 mt-0.5">Porta 8043 (Docker)</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraft((d) => ({
+                            ...d,
+                            dicomPreset: 'custom'
+                          }));
+                        }}
+                        className={classNames(
+                          "p-3.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between h-24",
+                          draft.dicomPreset === 'custom' || (!draft.dicomPreset)
+                            ? "bg-white border-brand-500 shadow-sm"
+                            : "bg-white/50 border-ink-150 hover:bg-white"
+                        )}
+                      >
+                        <span className="text-[10px] font-black uppercase tracking-wider text-ink-400">Personalizado</span>
+                        <div>
+                          <p className="text-xs font-black text-ink-900 leading-tight">Outro Servidor</p>
+                          <p className="text-[9px] text-ink-400 mt-0.5">Definir campos abaixo</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Caminho da Pasta */}
                   <div>
                     <label className="label">Diretório da Worklist no Servidor (Caminho Absoluto)</label>
                     <input
                       className="input h-14"
                       value={draft.dicomWorklistFolder || ''}
-                      onChange={(e) => u('dicomWorklistFolder', e.target.value)}
+                      onChange={(e) => {
+                        u('dicomWorklistFolder', e.target.value);
+                        u('dicomPreset', 'custom');
+                      }}
                       placeholder="Ex: /Users/usuario/Documents/OrthancServer/db/WorklistsDatabase/"
                     />
                     <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc lê os arquivos .wl. A aplicação deve ter permissão de escrita.</p>
@@ -333,7 +419,10 @@ export function Settings() {
                       <input
                         className="input h-14"
                         value={draft.dicomViewerUrl || ''}
-                        onChange={(e) => u('dicomViewerUrl', e.target.value)}
+                        onChange={(e) => {
+                          u('dicomViewerUrl', e.target.value);
+                          u('dicomPreset', 'custom');
+                        }}
                         placeholder="Ex: http://localhost:8042"
                       />
                       <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP do servidor Orthanc (ex: IP local ou Tailscale).</p>
@@ -431,7 +520,10 @@ export function Settings() {
                       <input
                         className="input h-14"
                         value={draft.dicomOrthancAETitle || ''}
-                        onChange={(e) => u('dicomOrthancAETitle', e.target.value)}
+                        onChange={(e) => {
+                          u('dicomOrthancAETitle', e.target.value);
+                          u('dicomPreset', 'custom');
+                        }}
                         placeholder="Ex: ORTHANC"
                       />
                     </div>

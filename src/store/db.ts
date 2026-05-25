@@ -116,7 +116,8 @@ export async function getSettings(): Promise<AppSettings> {
       dicomOrthancAETitle: 'ORTHANC',
       dicomViewerUrl: 'http://localhost:8042',
       dicomViewerType: 'stone',
-      dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
+      dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
+      dicomPreset: 'macmini'
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
     
@@ -152,7 +153,8 @@ export async function getSettings(): Promise<AppSettings> {
     dicomOrthancAETitle: 'ORTHANC',
     dicomViewerUrl: 'http://localhost:8042',
     dicomViewerType: 'stone',
-    dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
+    dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
+    dicomPreset: 'macmini'
   };
 }
 
