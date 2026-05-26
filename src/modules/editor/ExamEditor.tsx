@@ -294,6 +294,36 @@ export function ExamEditor({ examId }: Props) {
     }, 200);
   };
 
+  const originalTitleRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      if (exam && patient) {
+        originalTitleRef.current = document.title;
+        const dateStr = new Date(exam.createdAt).toLocaleDateString('pt-BR').replace(/\//g, '-');
+        const patientName = patient.name.trim();
+        const examName = exam.examType.trim();
+        const clinicName = (clinic?.name || settings.clinicName || 'LAUDUS').trim();
+        document.title = `${dateStr} - ${patientName} - ${examName} - ${clinicName}`;
+      }
+    };
+
+    const handleAfterPrint = () => {
+      if (originalTitleRef.current !== null) {
+        document.title = originalTitleRef.current;
+        originalTitleRef.current = null;
+      }
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, [exam, patient, clinic, settings]);
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyboard(e: KeyboardEvent) {
