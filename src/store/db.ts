@@ -121,7 +121,9 @@ export async function getSettings(): Promise<AppSettings> {
       dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-      dicomPreset: isWindows ? 'notebook' : 'macmini'
+      dicomPreset: isWindows ? 'notebook' : 'macmini',
+      dicomUsername: 'admin',
+      dicomPassword: '123456789'
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
@@ -171,7 +173,9 @@ export async function getSettings(): Promise<AppSettings> {
     dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-    dicomPreset: isWindows ? 'notebook' : 'macmini'
+    dicomPreset: isWindows ? 'notebook' : 'macmini',
+    dicomUsername: 'admin',
+    dicomPassword: '123456789'
   };
 }
 

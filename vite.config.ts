@@ -36,9 +36,9 @@ function localOrthancWorklistPlugin() {
               headers['Authorization'] = `Basic ${authString}`;
               authSource = `URL credentials (user: ${targetUrlObj.username})`;
             } else {
-              const authString = Buffer.from('orthanc:orthanc').toString('base64');
+              const authString = Buffer.from('admin:123456789').toString('base64');
               headers['Authorization'] = `Basic ${authString}`;
-              authSource = 'default fallback (orthanc:orthanc)';
+              authSource = 'default fallback (admin:123456789)';
             }
 
             console.log(`[Orthanc Proxy] Requesting: ${req.method} ${targetUrl} (Auth source: ${authSource})`);
