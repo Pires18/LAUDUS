@@ -59,7 +59,7 @@ export function ExamEditor({ examId }: Props) {
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [unlockReason, setUnlockReason] = useState('');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
-  const [showEditMetadata, setShowEditMetadata] = useState(false);
+
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
@@ -77,15 +77,7 @@ export function ExamEditor({ examId }: Props) {
   const chatHistoryInitialized = useRef(false);
   const chatSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  // Metadata Edit State
-  const [editData, setEditData] = useState({
-    patientName: '',
-    birthDate: '',
-    requestingPhysician: '',
-    clinicalIndication: '',
-    clinicId: ''
-  });
-  const [loadingMetadata, setLoadingMetadata] = useState(false);
+
 
   const editorRef = useRef<RichEditorRef>(null);
   const reportContentRef = useRef(reportContent);
@@ -211,27 +203,7 @@ export function ExamEditor({ examId }: Props) {
     }
   }, [template, examId, showToast]);
 
-  const handleSaveMetadata = async () => {
-    if (!exam || !patient) return;
-    try {
-      setLoadingMetadata(true);
-      await updateItem('patients', exam.patientId, {
-        name: editData.patientName,
-        birthDate: editData.birthDate
-      });
-      await updateItem('exams', examId, {
-        requestingPhysician: editData.requestingPhysician,
-        clinicalIndication: editData.clinicalIndication,
-        clinicId: editData.clinicId
-      });
-      setShowEditMetadata(false);
-      showToast('Dados atualizados com sucesso!');
-    } catch (err) {
-      showToast('Erro ao atualizar dados', 'error');
-    } finally {
-      setLoadingMetadata(false);
-    }
-  };
+
 
   const handlePrintImages = (instances: any[]) => {
     setSelectedInstancesForPrint(instances);
@@ -319,20 +291,6 @@ export function ExamEditor({ examId }: Props) {
                 return;
               }
               setShowUnlockModal(true);
-            }}
-            onEditMetadata={() => {
-              if (currentRole === 'recepcao') {
-                showToast('Acesso restrito: Secretárias não alteram dados de exame.', 'error');
-                return;
-              }
-              setEditData({
-                patientName: patient.name,
-                birthDate: patient.birthDate || '',
-                requestingPhysician: exam.requestingPhysician || '',
-                clinicalIndication: exam.clinicalIndication || '',
-                clinicId: exam.clinicId || ''
-              });
-              setShowEditMetadata(true);
             }}
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
             onOpenDicomImages={() => setShowDicomImages(true)}
@@ -721,84 +679,7 @@ export function ExamEditor({ examId }: Props) {
         </div>
       )}
 
-      {/* Modal de Edição de Metadados */}
-      {showEditMetadata && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between">
-              <h3 className="font-semibold text-ink-900 flex items-center gap-2">
-                <UserCog size={18} className="text-brand-500" />
-                Editar Dados do Exame
-              </h3>
-              <button onClick={() => setShowEditMetadata(false)} className="p-1 hover:bg-ink-100 rounded-lg text-ink-400"><X size={20} /></button>
-            </div>
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div>
-                <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Nome do Paciente</label>
-                <input 
-                  className="input" 
-                  value={editData.patientName} 
-                  onChange={e => setEditData({...editData, patientName: e.target.value})} 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Data de Nascimento</label>
-                  <input 
-                    type="date"
-                    className="input" 
-                    value={editData.birthDate} 
-                    onChange={e => setEditData({...editData, birthDate: e.target.value})} 
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Médico Solicitante</label>
-                  <input 
-                    className="input" 
-                    value={editData.requestingPhysician} 
-                    onChange={e => setEditData({...editData, requestingPhysician: e.target.value})} 
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Indicação Clínica</label>
-                <textarea 
-                  className="input min-h-[80px] py-3 resize-none" 
-                  value={editData.clinicalIndication} 
-                  onChange={e => setEditData({...editData, clinicalIndication: e.target.value})} 
-                />
-              </div>
 
-              <div>
-                <label className="text-[10px] font-black uppercase text-ink-400 mb-1.5 block ml-1">Clínica</label>
-                <select 
-                  className="input" 
-                  value={editData.clinicId} 
-                  onChange={e => setEditData({...editData, clinicId: e.target.value})}
-                >
-                  <option value="">Selecione uma clínica</option>
-                  {clinics.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-ink-400 mt-1 ml-1 italic">
-                  * Alterar a clínica afeta o template e a pasta de exportação do Google Docs.
-                </p>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-ink-100 flex justify-end gap-3 bg-ink-50">
-              <button className="btn-ghost" onClick={() => setShowEditMetadata(false)}>Cancelar</button>
-              <button 
-                className="btn-primary px-8"
-                disabled={loadingMetadata}
-                onClick={handleSaveMetadata}
-              >
-                {loadingMetadata ? <Loader2 size={18} className="animate-spin" /> : 'Salvar Alterações'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showHistoryModal && exam && patient && (
         <ExamHistoryModal

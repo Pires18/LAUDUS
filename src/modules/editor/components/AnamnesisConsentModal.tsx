@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../../../components/Modal';
 import { ExamRequest, Patient, ReportTemplate, Clinic, AppSettings } from '../../../types';
 import { updateItem, getItem } from '../../../store/db';
-import { ClipboardList, ShieldCheck, Printer, RotateCcw, Check, FileText } from 'lucide-react';
+import { ClipboardList, ShieldCheck, Printer, RotateCcw, Check, FileText, UserCog, Loader2 } from 'lucide-react';
+import { useCollection } from '../../../hooks/useFirestore';
+import { useApp } from '../../../store/app';
 
 export interface AnamnesisField {
   label: string;
@@ -48,20 +50,39 @@ interface Props {
   exam: ExamRequest;
   patient: Patient;
   template?: ReportTemplate | null;
-  initialTab?: 'anamnesis' | 'consent';
+  initialTab?: 'metadata' | 'anamnesis' | 'consent';
   clinic?: Clinic | null;
   settings?: AppSettings;
 }
 
-export function AnamnesisConsentModal({ open, onClose, exam, patient, template: initialTemplate, initialTab = 'anamnesis', clinic, settings }: Props) {
-  const [activeTab, setActiveTab] = useState<'anamnesis' | 'consent'>(initialTab);
+export function AnamnesisConsentModal({ open, onClose, exam, patient, template: initialTemplate, initialTab = 'metadata', clinic, settings }: Props) {
+  const [activeTab, setActiveTab] = useState<'metadata' | 'anamnesis' | 'consent'>(initialTab);
   const [template, setTemplate] = useState<ReportTemplate | null>(initialTemplate || null);
+
+  const { showToast } = useApp();
+  const { data: clinics } = useCollection<Clinic>('clinics');
+  const currentRole = settings?.currentRole || 'medico';
+  const isEditable = exam.status !== 'finalizado' && currentRole !== 'recepcao';
 
   // Local state for fields
   const [anamnesis, setAnamnesis] = useState(exam.anamnesis ?? '');
   const [consentTerm, setConsentTerm] = useState(exam.consentTerm ?? '');
   const [consentAccepted, setConsentAccepted] = useState(exam.consentAccepted ?? false);
   const [viewMode, setViewMode] = useState<'form' | 'text'>('form');
+
+  // Metadata tab states
+  const [patientName, setPatientName] = useState(patient.name);
+  const [birthDate, setBirthDate] = useState(patient.birthDate || '');
+  const [requestingPhysician, setRequestingPhysician] = useState(exam.requestingPhysician || '');
+  const [clinicId, setClinicId] = useState(exam.clinicId || '');
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+
+  useEffect(() => {
+    setPatientName(patient.name);
+    setBirthDate(patient.birthDate || '');
+    setRequestingPhysician(exam.requestingPhysician || '');
+    setClinicId(exam.clinicId || '');
+  }, [patient, exam]);
 
   // Set default view mode based on structured fields
   useEffect(() => {
@@ -137,6 +158,25 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     if (window.confirm('Deseja restaurar o termo de consentimento para o padrão da máscara?')) {
       setConsentTerm(template.consentTemplate);
       await updateItem('exams', exam.id, { consentTerm: template.consentTemplate });
+    }
+  };
+
+  const handleSaveMetadata = async () => {
+    try {
+      setLoadingMetadata(true);
+      await updateItem('patients', exam.patientId, {
+        name: patientName,
+        birthDate: birthDate || null
+      });
+      await updateItem('exams', exam.id, {
+        requestingPhysician: requestingPhysician,
+        clinicId: clinicId
+      });
+      showToast('Dados do exame atualizados com sucesso!', 'success');
+    } catch (err) {
+      showToast('Erro ao atualizar dados do exame.', 'error');
+    } finally {
+      setLoadingMetadata(false);
     }
   };
 
@@ -242,12 +282,23 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     <Modal
       open={open}
       onClose={onClose}
-      title="Ficha do Exame (Anamnese & Consentimento)"
+      title="Ficha & Configurações do Exame"
       size="lg"
     >
       <div className="flex flex-col h-full space-y-4">
         {/* Navigation Tabs inside Modal */}
         <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+          <button
+            onClick={() => setActiveTab('metadata')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
+              activeTab === 'metadata'
+                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <UserCog size={14} />
+            Dados do Exame
+          </button>
           <button
             onClick={() => setActiveTab('anamnesis')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
@@ -271,6 +322,83 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             Termo de Consentimento
           </button>
         </div>
+
+        {/* Tab 0: Metadata (Dados do Exame) */}
+        {activeTab === 'metadata' && (
+          <div className="flex-1 flex flex-col space-y-4 min-h-[350px]">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <UserCog size={16} className="text-brand-500" />
+              <span className="text-xs font-bold text-slate-700">Configuração de Identificação & Unidade</span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Nome do Paciente</label>
+                <input 
+                  type="text"
+                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  value={patientName} 
+                  onChange={e => setPatientName(e.target.value)}
+                  disabled={!isEditable}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Data de Nascimento</label>
+                  <input 
+                    type="date"
+                    className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                    value={birthDate} 
+                    onChange={e => setBirthDate(e.target.value)}
+                    disabled={!isEditable}
+                  />
+                </div>
+                <div className="flex flex-col space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Médico Solicitante</label>
+                  <input 
+                    type="text"
+                    className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                    value={requestingPhysician} 
+                    onChange={e => setRequestingPhysician(e.target.value)}
+                    disabled={!isEditable}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Clínica</label>
+                <select 
+                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  value={clinicId} 
+                  onChange={e => setClinicId(e.target.value)}
+                  disabled={!isEditable}
+                >
+                  <option value="">Selecione uma clínica</option>
+                  {clinics.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <p className="text-[9px] text-slate-400 mt-1 ml-1 italic">
+                  * Alterar a clínica afeta o template e a pasta de exportação do Google Docs.
+                </p>
+              </div>
+            </div>
+
+            {isEditable && (
+              <div className="flex justify-end pt-4 border-t border-slate-100">
+                <button 
+                  type="button"
+                  onClick={handleSaveMetadata}
+                  disabled={loadingMetadata || !patientName.trim()}
+                  className="px-6 h-10 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 transition-all active:scale-95"
+                >
+                  {loadingMetadata ? <Loader2 size={14} className="animate-spin" /> : 'Salvar Alterações'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tab 1: Anamnesis */}
         {activeTab === 'anamnesis' && (() => {
@@ -333,7 +461,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {template?.anamnesisTemplate && (
+                  {template?.anamnesisTemplate && isEditable && (
                     <button
                       onClick={handleRestoreAnamnesis}
                       title="Restaurar anamnese padrão da máscara"
@@ -367,8 +495,9 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                           <input
                             type="text"
                             value={field.value}
+                            disabled={!isEditable}
                             onChange={(e) => handleFieldChange(idx, e.target.value)}
-                            className="h-10 px-3 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm"
+                            className="h-10 px-3 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60"
                             placeholder={`Preencher ${field.label.toLowerCase()}...`}
                           />
                         </div>
@@ -383,18 +512,20 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     </label>
                     <textarea
                       value={unstructuredLines}
+                      disabled={!isEditable}
                       onChange={(e) => handleUnstructuredChange(e.target.value)}
                       placeholder="Outros achados, cirurgias, observações ou queixas clínicas livres..."
-                      className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 min-h-[100px]"
+                      className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 min-h-[100px] disabled:opacity-60"
                     />
                   </div>
                 </div>
               ) : (
                 <textarea
                   value={anamnesis}
+                  disabled={!isEditable}
                   onChange={(e) => handleSaveAnamnesis(e.target.value)}
                   placeholder="Descreva o histórico clínico do paciente, sintomas e indicações para este exame..."
-                  className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850"
+                  className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
                 />
               )}
             </div>
@@ -410,7 +541,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 <span className="text-xs font-bold text-slate-700">Termo de Consentimento Informado</span>
               </div>
               <div className="flex items-center gap-2">
-                {template?.consentTemplate && (
+                {template?.consentTemplate && isEditable && (
                   <button
                     onClick={handleRestoreConsent}
                     title="Restaurar termo padrão da máscara"
@@ -432,19 +563,21 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
             <textarea
               value={consentTerm}
+              disabled={!isEditable}
               onChange={(e) => handleSaveConsentTerm(e.target.value)}
               placeholder="Insira o texto explicativo do termo de consentimento livre e esclarecido..."
-              className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850"
+              className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
             />
 
             {/* Checkbox for Acceptance */}
-            <label className="flex items-start gap-3 p-3 bg-indigo-50/50 hover:bg-indigo-50/80 border border-indigo-150 rounded-xl cursor-pointer transition-all select-none">
+            <label className={`flex items-start gap-3 p-3 bg-indigo-50/50 border border-indigo-150 rounded-xl transition-all select-none ${isEditable ? 'hover:bg-indigo-50/80 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`}>
               <div className="relative flex items-center justify-center mt-0.5">
                 <input
                   type="checkbox"
                   checked={consentAccepted}
+                  disabled={!isEditable}
                   onChange={(e) => handleToggleConsent(e.target.checked)}
-                  className="peer h-4 w-4 shrink-0 rounded border border-indigo-300 bg-white text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 transition-all checked:bg-indigo-600 checked:border-indigo-600 outline-none appearance-none"
+                  className="peer h-4 w-4 shrink-0 rounded border border-indigo-300 bg-white text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0 transition-all checked:bg-indigo-600 checked:border-indigo-600 outline-none appearance-none disabled:opacity-60"
                 />
                 {consentAccepted && (
                   <Check size={11} className="absolute text-white pointer-events-none" />

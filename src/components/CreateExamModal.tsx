@@ -5,7 +5,7 @@ import { addItemWithId, genId } from '../store/db';
 import { Patient, ReportTemplate, Clinic, ExamRequest, EXAM_AREAS, ExamArea } from '../types';
 import { 
   X, Search, UserPlus, ArrowRight, Loader2, Sparkles, 
-  LayoutGrid, Brain, ChevronRight, Wand2
+  ChevronRight
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { generateNumericId } from '../store/db';
@@ -30,19 +30,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [newPatientName, setNewPatientName] = useState('');
   const [newPatientBirthDate, setNewPatientBirthDate] = useState('');
   const [newPatientGender, setNewPatientGender] = useState<'M' | 'F' | 'O'>('F');
-  const [clinicalIndication, setClinicalIndication] = useState('');
 
   const [selectedArea, setSelectedArea] = useState<ExamArea | 'todas'>('todas');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
-
-  const clinicalHints = [
-    'Dor abdominal a esclarecer',
-    'Pesquisa de colelitíase',
-    'Seguimento de nódulo',
-    'Rotina pré-natal',
-    'Avaliação de fluxo Doppler'
-  ];
 
   // Configura clínica inicial
   useEffect(() => {
@@ -128,7 +119,6 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         examType: template.name,
         templateId: template.id,
         status: 'pendente',
-        clinicalIndication: clinicalIndication.trim() || undefined,
         reportContent: getInitialReportContent(template),
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -308,40 +298,6 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                           </select>
                         </div>
                       )}
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                          <div className="flex items-center gap-1.5">
-                            <Brain size={13} className="text-brand-500" />
-                            <label className="text-[9px] font-black text-ink-900 uppercase tracking-widest">Indicação Clínica</label>
-                          </div>
-                          <div className="flex items-center gap-1">
-                             <Wand2 size={10} className="text-brand-400" />
-                             <span className="text-[8px] font-black text-brand-500 uppercase tracking-tighter">IA Context</span>
-                          </div>
-                        </div>
-                        
-                        <div className="relative group">
-                          <textarea
-                            placeholder="Descreva sintomas, achados de exames anteriores ou hipótese diagnóstica..."
-                            className="w-full p-4 bg-ink-50 border-2 border-ink-100 rounded-2xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white outline-none transition-all font-semibold text-xs min-h-[90px] resize-none leading-relaxed"
-                            value={clinicalIndication}
-                            onChange={(e) => setClinicalIndication(e.target.value)}
-                            autoFocus
-                          />
-                          <div className="absolute right-2.5 bottom-2.5 flex flex-wrap gap-1.5">
-                             {clinicalHints.slice(0, 3).map((hint, idx) => (
-                               <button
-                                 key={idx}
-                                 onClick={() => setClinicalIndication(hint)}
-                                 className="px-2.5 py-1 bg-white border border-ink-100 rounded-lg text-[8px] font-black text-ink-400 hover:text-brand-600 hover:border-brand-200 transition-all shadow-sm"
-                               >
-                                 {hint}
-                               </button>
-                             ))}
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 ) : (

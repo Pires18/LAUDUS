@@ -13,7 +13,6 @@ interface EditorHeaderProps {
   onBack: () => void;
   onStatusChange: (status: ExamStatus) => void;
   onUnlock: () => void;
-  onEditMetadata: () => void;
   onOpenAnamnesisConsent: () => void;
   onOpenDicomImages: () => void;
 }
@@ -25,7 +24,6 @@ export function EditorHeader({
   onBack,
   onStatusChange,
   onUnlock,
-  onEditMetadata,
   onOpenAnamnesisConsent,
   onOpenDicomImages
 }: EditorHeaderProps) {
@@ -141,19 +139,10 @@ export function EditorHeader({
         <button
           onClick={onOpenAnamnesisConsent}
           className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-white/5 text-ink-200 hover:text-white hover:bg-white/10 border border-white/5 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
-          title="Anamnese & Termo de Consentimento"
-        >
-          <ClipboardList size={16} />
-          <span className="hidden md:inline">Anamnese & Termo</span>
-        </button>
-
-        <button
-          onClick={onEditMetadata}
-          className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-white/5 text-ink-200 hover:text-white hover:bg-white/10 border border-white/5 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
-          title="Configurar Metadados"
+          title="Ficha, Anamnese & Configurações"
         >
           <Settings size={16} />
-          <span className="hidden md:inline">Config</span>
+          <span className="hidden md:inline">Ficha & Config</span>
         </button>
 
         {exam.status === 'finalizado' ? (
