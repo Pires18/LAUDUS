@@ -7,7 +7,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { 
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
-  RotateCcw, Clock, Database
+  RotateCcw, Clock, Database, Info
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -556,6 +556,78 @@ export function Settings() {
                         placeholder="Ex: ORTHANC"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Passo a Passo Configuração no Aparelho */}
+                <div className="mt-6 bg-slate-900 text-slate-100 rounded-3xl p-6 border border-slate-800 shadow-lg space-y-6">
+                  <div className="flex items-center gap-3 border-b border-slate-800/80 pb-4">
+                    <div className="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center border border-brand-500/20 shrink-0">
+                      <Info size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-wider text-white">Manual de Configuração do Aparelho</h4>
+                      <p className="text-xs text-slate-400">Como vincular seu equipamento de ultrassonografia (Mindray, GE, Samsung, etc.) ao sistema.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs leading-relaxed">
+                    {/* Passo 1 */}
+                    <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] font-black flex items-center justify-center select-none shrink-0">1</span>
+                        <h5 className="font-black text-slate-200 uppercase tracking-wide">Dados de Rede</h5>
+                      </div>
+                      <p className="text-slate-400 text-[11px]">Identifique os dados de rede do seu servidor Orthanc local:</p>
+                      <ul className="space-y-1 text-[11px] font-mono bg-slate-900/60 p-2.5 rounded-xl border border-slate-850 mt-2 text-brand-400">
+                        <li>
+                          <strong>IP:</strong> {(() => {
+                            try {
+                              return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR';
+                            } catch {
+                              return 'IP_DO_SERVIDOR';
+                            }
+                          })()}
+                        </li>
+                        <li><strong>Porta DICOM:</strong> 4242</li>
+                        <li><strong>AE Title:</strong> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
+                      </ul>
+                    </div>
+
+                    {/* Passo 2 */}
+                    <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center select-none shrink-0">2</span>
+                        <h5 className="font-black text-slate-200 uppercase tracking-wide">DICOM Store (Envio)</h5>
+                      </div>
+                      <p className="text-slate-400 text-[11px]">No aparelho de ultrassom (Configurações de Rede / DICOM Storage):</p>
+                      <ol className="list-decimal pl-4 text-slate-400 text-[11px] space-y-1 mt-2">
+                        <li>Adicione um novo servidor de armazenamento (Storage/Store).</li>
+                        <li>Insira o <strong>IP</strong>, a <strong>Porta 4242</strong> e o <strong>AE Title</strong> indicados no Passo 1.</li>
+                        <li>Clique em <strong>Ping/Echo/Verify</strong> para testar a comunicação.</li>
+                      </ol>
+                    </div>
+
+                    {/* Passo 3 */}
+                    <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-black flex items-center justify-center select-none shrink-0">3</span>
+                        <h5 className="font-black text-slate-200 uppercase tracking-wide">DICOM Worklist</h5>
+                      </div>
+                      <p className="text-slate-400 text-[11px]">No aparelho de ultrassom (Configurações de DICOM Worklist):</p>
+                      <ol className="list-decimal pl-4 text-slate-400 text-[11px] space-y-1 mt-2">
+                        <li>Adicione um novo serviço de consulta de Worklist.</li>
+                        <li>Insira o mesmo <strong>IP</strong>, a <strong>Porta 4242</strong> e o <strong>AE Title</strong> do servidor.</li>
+                        <li>Faça uma busca (Query/Search) para puxar os pacientes da fila.</li>
+                      </ol>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-955 border border-slate-800/80 p-4 rounded-2xl text-[11px] text-slate-400 flex items-start gap-2.5">
+                    <span className="text-brand-500 text-sm leading-none shrink-0 mt-0.5">ℹ</span>
+                    <p>
+                      <strong>Dica de Integração:</strong> Certifique-se de que a rede do aparelho e a do servidor Orthanc consigam se comunicar (mesmo Wi-Fi ou roteador). Caso o aparelho não possua suporte a Worklist direta, o preenchimento de ID do Paciente no aparelho deve ser exatamente o mesmo ID numérico do Laudus para que as imagens se vinculem automaticamente.
+                    </p>
                   </div>
                 </div>
               </div>
