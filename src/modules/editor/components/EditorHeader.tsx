@@ -16,6 +16,8 @@ interface EditorHeaderProps {
   onOpenAnamnesisConsent: () => void;
   onOpenDicomImages: () => void;
   hasDicomImages?: boolean;
+  onToggleViewer?: () => void;
+  viewerOpen?: boolean;
 }
 
 export function EditorHeader({
@@ -27,7 +29,9 @@ export function EditorHeader({
   onUnlock,
   onOpenAnamnesisConsent,
   onOpenDicomImages,
-  hasDicomImages = false
+  hasDicomImages = false,
+  onToggleViewer,
+  viewerOpen = false
 }: EditorHeaderProps) {
   const { settings } = useApp();
   const area = EXAM_AREAS.find(a => a.id === exam.area);
@@ -90,17 +94,18 @@ export function EditorHeader({
               </span>
             </div>
             
-            <div className="flex items-center gap-2 sm:gap-4 text-[9px] font-bold text-ink-400 uppercase tracking-[0.15em] min-w-0">
-              <div className="flex items-center gap-1.5 min-w-0 truncate">
-                <Activity size={11} className="text-brand-500 shrink-0" />
-                <span className="text-ink-200 truncate">{exam.examType}</span>
-              </div>
-              <div className="hidden sm:flex items-center gap-1.5 max-w-[300px] truncate">
-                <Info size={11} className="text-amber-500" />
-                <span className="text-ink-500 italic lowercase tracking-normal">
-                  {exam.clinicalIndication || 'Indicação não informada'}
-                </span>
-              </div>
+            <div className="flex items-center gap-2 text-[10px] font-semibold text-ink-300">
+              <span className="text-ink-400 uppercase font-black text-[9px] tracking-wider">{exam.examType}</span>
+              <span className="text-ink-500">•</span>
+              <span>{formatDateTime(exam.createdAt)}</span>
+              {exam.clinicalIndication && (
+                <>
+                  <span className="text-ink-500">•</span>
+                  <span className="text-ink-500 italic lowercase tracking-normal">
+                    {exam.clinicalIndication}
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -118,16 +123,19 @@ export function EditorHeader({
         {settings.dicomSyncEnabled !== false && (
           <>
             {hasDicomImages ? (
-              <a
-                href={viewerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
-                title="Abrir Visualizador DICOM (Orthanc)"
+              <button
+                onClick={onToggleViewer}
+                className={classNames(
+                  "h-10 w-10 md:w-auto md:px-4 rounded-xl transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0 border",
+                  viewerOpen 
+                    ? "bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20" 
+                    : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20"
+                )}
+                title="Visualizador de Imagens Integrado"
               >
                 <Play size={16} />
                 <span className="hidden md:inline">Ver Imagens</span>
-              </a>
+              </button>
             ) : (
               <button
                 disabled

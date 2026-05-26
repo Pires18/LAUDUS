@@ -8,7 +8,7 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
@@ -78,17 +78,38 @@ export function ExamEditor({ examId }: Props) {
   const chatSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [hasDicomImages, setHasDicomImages] = useState(false);
+  const [dicomInstances, setDicomInstances] = useState<any[]>([]);
+  const [showIntegratedViewer, setShowIntegratedViewer] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [dicomInstances]);
+
+  const handlePrevImage = useCallback(() => {
+    if (dicomInstances.length === 0) return;
+    setActiveImageIndex((prev) => (prev === 0 ? dicomInstances.length - 1 : prev - 1));
+  }, [dicomInstances.length]);
+
+  const handleNextImage = useCallback(() => {
+    if (dicomInstances.length === 0) return;
+    setActiveImageIndex((prev) => (prev === dicomInstances.length - 1 ? 0 : prev + 1));
+  }, [dicomInstances.length]);
 
   useEffect(() => {
     let active = true;
 
     if (!exam || !exam.id) {
       setHasDicomImages(false);
+      setDicomInstances([]);
+      setShowIntegratedViewer(false);
       return;
     }
 
     if (settings.dicomSyncEnabled === false) {
       setHasDicomImages(false);
+      setDicomInstances([]);
+      setShowIntegratedViewer(false);
       return;
     }
 
@@ -117,7 +138,10 @@ export function ExamEditor({ examId }: Props) {
 
         if (!res.ok) {
           console.warn('[PACS Check] Erro na resposta do proxy:', res.status);
-          if (active) setHasDicomImages(false);
+          if (active) {
+            setHasDicomImages(false);
+            setDicomInstances([]);
+          }
           return;
         }
 
@@ -129,18 +153,33 @@ export function ExamEditor({ examId }: Props) {
           
           if (instancesRes.ok) {
             const instances = await instancesRes.json();
+            const sorted = (instances || []).sort((a: any, b: any) => {
+              const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
+              const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
+              return numA - numB;
+            });
             if (active) {
-              setHasDicomImages(instances && instances.length > 0);
+              setDicomInstances(sorted);
+              setHasDicomImages(sorted.length > 0);
             }
           } else {
-            if (active) setHasDicomImages(false);
+            if (active) {
+              setHasDicomImages(false);
+              setDicomInstances([]);
+            }
           }
         } else {
-          if (active) setHasDicomImages(false);
+          if (active) {
+            setHasDicomImages(false);
+            setDicomInstances([]);
+          }
         }
       } catch (e) {
         console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
-        if (active) setHasDicomImages(false);
+        if (active) {
+          setHasDicomImages(false);
+          setDicomInstances([]);
+        }
       }
     };
 
@@ -408,6 +447,8 @@ export function ExamEditor({ examId }: Props) {
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
             onOpenDicomImages={() => setShowDicomImages(true)}
             hasDicomImages={hasDicomImages}
+            onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
+            viewerOpen={showIntegratedViewer}
           />
 
           {/* AVISO API KEY */}
@@ -421,6 +462,95 @@ export function ExamEditor({ examId }: Props) {
           )}
 
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
+            {/* Integrated Dicom Image Viewer Sidebar */}
+            {showIntegratedViewer && hasDicomImages && dicomInstances.length > 0 && (
+              <div className="w-[320px] md:w-[380px] xl:w-[440px] border-r border-slate-800 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in relative z-20">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-black text-xs uppercase tracking-widest text-slate-200">PACS Integrado</span>
+                  </div>
+                  <button 
+                    onClick={() => setShowIntegratedViewer(false)}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
+                    title="Fechar Visualizador"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Main Preview Area */}
+                <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-slate-800 bg-slate-900/50">
+                  {(() => {
+                    const activeInstance = dicomInstances[activeImageIndex];
+                    if (!activeInstance) return null;
+                    const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+                    const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+                    const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
+
+                    return (
+                      <div className="w-full flex flex-col gap-3">
+                        <div className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner">
+                          <img 
+                            src={previewUrl} 
+                            alt={`Instance ${instanceNum}`}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg"
+                            title="Anterior"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg"
+                            title="Próxima"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md">
+                            FOTO {activeImageIndex + 1} / {dicomInstances.length}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 px-1">
+                          <span>Instância: {instanceNum}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Thumbnails Grid List */}
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                  <div className="grid grid-cols-3 gap-2">
+                    {dicomInstances.map((instance, idx) => {
+                      const isActive = idx === activeImageIndex;
+                      const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+                      const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+                      
+                      return (
+                        <button
+                          key={instance.ID}
+                          onClick={() => setActiveImageIndex(idx)}
+                          className={classNames(
+                            "relative aspect-square bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md",
+                            isActive 
+                              ? "border-emerald-500 ring-2 ring-emerald-500/25 scale-[0.98]" 
+                              : "border-slate-800 hover:border-slate-600 hover:scale-[1.02]"
+                          )}
+                        >
+                          <img src={previewUrl} className="max-w-full max-h-full object-contain" loading="lazy" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Main Workspace */}
             <div className="flex-1 flex flex-col min-w-0 mr-0">
               {/* Section Progress Bar */}
