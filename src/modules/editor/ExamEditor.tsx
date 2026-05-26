@@ -97,6 +97,24 @@ export function ExamEditor({ examId }: Props) {
     setActiveImageIndex((prev) => (prev === dicomInstances.length - 1 ? 0 : prev + 1));
   }, [dicomInstances.length]);
 
+  // Keyboard navigation for Full Screen Lightbox
+  useEffect(() => {
+    if (!showFullScreenImage) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        handlePrevImage();
+      } else if (e.key === 'ArrowRight') {
+        handleNextImage();
+      } else if (e.key === 'Escape') {
+        setShowFullScreenImage(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showFullScreenImage, handlePrevImage, handleNextImage]);
+
   useEffect(() => {
     let active = true;
 
@@ -1020,12 +1038,29 @@ export function ExamEditor({ examId }: Props) {
           className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-4 animate-fade-in cursor-zoom-out"
           onClick={() => setShowFullScreenImage(false)}
         >
+          {/* Close Button */}
           <button 
             onClick={() => setShowFullScreenImage(false)}
-            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 border border-white/10"
+            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 border border-white/10 z-[210]"
             title="Fechar Tela Cheia"
           >
             <X size={24} />
+          </button>
+
+          {/* Navigation Buttons */}
+          <button
+            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
+            className="absolute left-6 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/10 hover:bg-white/20 hover:scale-105 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all active:scale-95 shadow-2xl z-[210] cursor-pointer"
+            title="Anterior (Seta Esquerda)"
+          >
+            <ChevronLeft size={32} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
+            className="absolute right-6 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/10 hover:bg-white/20 hover:scale-105 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all active:scale-95 shadow-2xl z-[210] cursor-pointer"
+            title="Próxima (Seta Direita)"
+          >
+            <ChevronRight size={32} />
           </button>
 
           {(() => {
