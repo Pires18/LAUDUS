@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void;
   exam: ExamRequest;
   settings: AppSettings;
-  onPrint: (instances: any[]) => void;
+  onPrint: (instances: any[], gridType: string) => void;
 }
 
 export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Props) {
@@ -17,6 +17,7 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
   const [error, setError] = useState<string | null>(null);
   const [instances, setInstances] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [gridType, setGridType] = useState<string>('2x3');
 
   const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
   const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
@@ -115,7 +116,7 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
   const handleGeneratePdf = () => {
     if (selectedIds.size === 0) return;
     const selectedInstances = instances.filter(inst => selectedIds.has(inst.ID));
-    onPrint(selectedInstances);
+    onPrint(selectedInstances, gridType);
   };
 
   return (
@@ -126,7 +127,7 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
           <Camera className="text-slate-500 shrink-0 mt-0.5" size={18} />
           <div className="text-xs leading-normal font-semibold text-slate-600">
             Busca direta de imagens no servidor Orthanc local em <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[10px]">{baseUrl}</code>.
-            O laudo imprimirá em formato de grade com **2 colunas** e **3 linhas (6 fotos por página)**.
+            Selecione as fotos do PACS que deseja incluir na documentação fotográfica impressa.
           </div>
         </div>
 
@@ -236,21 +237,38 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
         )}
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-          <button type="button" onClick={onClose} className="btn-secondary h-11 px-5 rounded-2xl">
-            Cancelar
-          </button>
-          <button
-            type="button"
-            disabled={selectedIds.size === 0 || loading || !!error}
-            onClick={handleGeneratePdf}
-            className="btn-primary h-11 px-6 rounded-2xl shadow-brand flex items-center gap-2"
-          >
-            <Printer size={16} />
-            <span className="font-bold text-xs uppercase tracking-widest">
-              {selectedIds.size > 0 ? `Imprimir PDF (${selectedIds.size})` : 'Imprimir PDF'}
-            </span>
-          </button>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-slate-100">
+          {/* Grid Selector */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Layout de Impressão:</span>
+            <select
+              value={gridType}
+              onChange={(e) => setGridType(e.target.value)}
+              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
+            >
+              <option value="1x2">1 Coluna x 2 Linhas (2 fotos/pág)</option>
+              <option value="2x2">2 Colunas x 2 Linhas (4 fotos/pág)</option>
+              <option value="2x3">2 Colunas x 3 Linhas (6 fotos/pág)</option>
+              <option value="2x4">2 Colunas x 4 Linhas (8 fotos/pág)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <button type="button" onClick={onClose} className="btn-secondary h-11 px-5 rounded-2xl">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={selectedIds.size === 0 || loading || !!error}
+              onClick={handleGeneratePdf}
+              className="btn-primary h-11 px-6 rounded-2xl shadow-brand flex items-center gap-2"
+            >
+              <Printer size={16} />
+              <span className="font-bold text-xs uppercase tracking-widest">
+                {selectedIds.size > 0 ? `Imprimir PDF (${selectedIds.size})` : 'Imprimir PDF'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </Modal>

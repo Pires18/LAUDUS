@@ -285,8 +285,11 @@ export function ExamEditor({ examId }: Props) {
 
 
 
-  const handlePrintImages = (instances: any[]) => {
+  const [selectedGridType, setSelectedGridType] = useState<string>('2x3');
+
+  const handlePrintImages = (instances: any[], gridType: string = '2x3') => {
     setSelectedInstancesForPrint(instances);
+    setSelectedGridType(gridType);
     document.body.classList.add('print-mode-images');
     setTimeout(() => {
       window.print();
@@ -851,8 +854,8 @@ export function ExamEditor({ examId }: Props) {
           onClose={() => setShowDicomImages(false)}
           exam={exam}
           settings={settings}
-          onPrint={(instances) => {
-            handlePrintImages(instances);
+          onPrint={(instances, gridType) => {
+            handlePrintImages(instances, gridType);
           }}
         />
       )}
@@ -865,6 +868,7 @@ export function ExamEditor({ examId }: Props) {
           examType={exam.examType}
           examDate={exam.createdAt}
           selectedInstances={selectedInstancesForPrint}
+          gridType={selectedGridType}
         />
       )}
         </div>

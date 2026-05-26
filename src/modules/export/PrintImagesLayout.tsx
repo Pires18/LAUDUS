@@ -9,11 +9,34 @@ interface Props {
   examType: string;
   examDate: number;
   selectedInstances: Array<{ ID: string; MainDicomTags?: { InstanceNumber?: string } }>;
+  gridType?: string;
 }
 
-export function PrintImagesLayout({ patient, clinic, settings, examType, examDate, selectedInstances }: Props) {
-  // Chunk instances into arrays of maximum 6 items
-  const chunkSize = 6;
+export function PrintImagesLayout({ patient, clinic, settings, examType, examDate, selectedInstances, gridType = '2x3' }: Props) {
+  // Determine grid dimensions based on gridType
+  let cols = 2;
+  let rows = 3;
+  let chunkSize = 6;
+
+  if (gridType === '1x2') {
+    cols = 1;
+    rows = 2;
+    chunkSize = 2;
+  } else if (gridType === '2x2') {
+    cols = 2;
+    rows = 2;
+    chunkSize = 4;
+  } else if (gridType === '2x3') {
+    cols = 2;
+    rows = 3;
+    chunkSize = 6;
+  } else if (gridType === '2x4') {
+    cols = 2;
+    rows = 4;
+    chunkSize = 8;
+  }
+
+  // Chunk instances into arrays of maximum chunkSize items
   const pages: typeof selectedInstances[] = [];
   for (let i = 0; i < selectedInstances.length; i += chunkSize) {
     pages.push(selectedInstances.slice(i, i + chunkSize));
@@ -41,8 +64,8 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
                 )}
                 <p className="text-[10px] text-gray-500 mt-1 max-w-sm whitespace-pre-wrap leading-tight">
                   {clinic?.address 
-                    ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) 
-                    : settings.clinicAddress}
+                  ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) 
+                  : settings.clinicAddress}
                   {clinic?.phone && <><br />Tel: {clinic.phone}</>}
                 </p>
               </div>
@@ -56,8 +79,14 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
             </div>
           </div>
 
-          {/* Grid Layout (2 cols, 3 rows) */}
-          <div className="print-images-grid flex-grow">
+          {/* Grid Layout */}
+          <div 
+            className="print-images-grid flex-grow"
+            style={{
+              gridTemplateColumns: `repeat(${cols}, 1fr)`,
+              gridTemplateRows: `repeat(${rows}, 1fr)`
+            }}
+          >
             {pageInstances.map((instance, instIdx) => {
               const globalIndex = pageIdx * chunkSize + instIdx + 1;
               const instanceNum = instance.MainDicomTags?.InstanceNumber || globalIndex;
