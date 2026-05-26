@@ -29,18 +29,23 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
         <div key={pageIdx} className="print-images-page">
           {/* Header */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3 mb-4">
-            <div>
-              {clinic?.logoUrl ? (
-                <img src={clinic.logoUrl} alt="Logo" className="h-12 object-contain" />
-              ) : (
-                <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
+            <div className="flex items-center gap-3">
+              {clinic?.logoUrl && (
+                <img src={clinic.logoUrl} alt="Logo" className="h-16 object-contain shrink-0" />
               )}
-              <p className="text-[10px] text-gray-500 mt-1 max-w-sm whitespace-pre-wrap leading-tight">
-                {clinic?.address 
-                  ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) 
-                  : settings.clinicAddress}
-                {clinic?.phone && <><br />Tel: {clinic.phone}</>}
-              </p>
+              <div>
+                {!clinic?.logoUrl ? (
+                  <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
+                ) : (
+                  <h2 className="text-sm font-bold uppercase text-slate-800 leading-tight">{clinic?.name || settings.clinicName}</h2>
+                )}
+                <p className="text-[10px] text-gray-500 mt-1 max-w-sm whitespace-pre-wrap leading-tight">
+                  {clinic?.address 
+                    ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) 
+                    : settings.clinicAddress}
+                  {clinic?.phone && <><br />Tel: {clinic.phone}</>}
+                </p>
+              </div>
             </div>
             <div className="text-right text-[11px] space-y-0.5 leading-tight">
               <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest block mb-1">Documentação Fotográfica</span>

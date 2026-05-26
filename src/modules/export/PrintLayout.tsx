@@ -22,16 +22,21 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
     <div id="print-area" className="hidden print:block w-full text-black bg-white min-h-screen text-[14px] leading-relaxed font-sans relative pb-32">
       {/* Header */}
       <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
-        <div>
-          {clinic?.logoUrl ? (
-            <img src={clinic.logoUrl} alt="Logo" className="h-16 object-contain" />
-          ) : (
-            <h1 className="text-2xl font-bold uppercase">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
+        <div className="flex items-center gap-4">
+          {clinic?.logoUrl && (
+            <img src={clinic.logoUrl} alt="Logo" className="h-20 object-contain shrink-0" />
           )}
-          <p className="text-xs text-gray-600 mt-2 max-w-sm whitespace-pre-wrap">
-            {clinic?.address ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) : settings.clinicAddress}
-            {clinic?.phone && <><br />Tel: {clinic.phone}</>}
-          </p>
+          <div>
+            {!clinic?.logoUrl ? (
+              <h1 className="text-2xl font-bold uppercase">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
+            ) : (
+              <h2 className="text-lg font-bold uppercase text-slate-800 leading-tight">{clinic?.name || settings.clinicName}</h2>
+            )}
+            <p className="text-xs text-gray-600 mt-1.5 max-w-sm whitespace-pre-wrap">
+              {clinic?.address ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) : settings.clinicAddress}
+              {clinic?.phone && <><br />Tel: {clinic.phone}</>}
+            </p>
+          </div>
         </div>
         <div className="text-right text-sm">
           <p><strong>Data:</strong> {formatDate(examDate)}</p>
