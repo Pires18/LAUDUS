@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { Patient, Clinic, AppSettings } from '../../types';
 import { calculateAge, formatDate } from '../../utils/format';
 
@@ -20,30 +21,33 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
 
   const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
 
-  return (
-    <div id="print-images-area" className="hidden print:block w-full text-black bg-white min-h-screen text-[12px] leading-relaxed font-sans relative">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div id="print-images-area" className="hidden print:block w-full text-black bg-white text-[12px] leading-relaxed font-sans">
       {pages.map((pageInstances, pageIdx) => (
         <div key={pageIdx} className="print-images-page">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-300 pb-2 mb-3">
+          <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3 mb-4">
             <div>
               {clinic?.logoUrl ? (
-                <img src={clinic.logoUrl} alt="Logo" className="h-10 object-contain" />
+                <img src={clinic.logoUrl} alt="Logo" className="h-12 object-contain" />
               ) : (
-                <h1 className="text-lg font-bold uppercase tracking-tight text-slate-800">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
+                <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
               )}
-              <p className="text-[9px] text-gray-500 mt-0.5">
+              <p className="text-[10px] text-gray-500 mt-1 max-w-sm whitespace-pre-wrap leading-tight">
                 {clinic?.address 
                   ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) 
                   : settings.clinicAddress}
+                {clinic?.phone && <><br />Tel: {clinic.phone}</>}
               </p>
             </div>
-            <div className="text-right text-[10px] space-y-0.5 leading-tight">
-              <span className="text-[9px] font-black text-brand-650 uppercase tracking-widest block mb-0.5">Documentação Fotográfica</span>
-              <p><strong>Paciente:</strong> {patient.name} ({calculateAge(patient.birthDate)})</p>
+            <div className="text-right text-[11px] space-y-0.5 leading-tight">
+              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest block mb-1">Documentação Fotográfica</span>
+              <p><strong>Paciente:</strong> {patient.name} ({calculateAge(patient.birthDate)} anos)</p>
               <p><strong>Exame:</strong> <span className="uppercase font-bold">{examType}</span></p>
               <p><strong>Data:</strong> {formatDate(examDate)}</p>
-              <p className="text-gray-400 text-[9px] font-medium">Página {pageIdx + 1} de {pages.length}</p>
+              <p className="text-slate-400 text-[10px] font-medium pt-0.5">Página {pageIdx + 1} de {pages.length}</p>
             </div>
           </div>
 
@@ -56,15 +60,12 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
               
               return (
                 <div key={instance.ID} className="print-image-card">
-                  <div className="flex-grow flex items-center justify-center overflow-hidden w-full h-[180px] bg-black rounded">
+                  <div className="w-full h-full flex items-center justify-center overflow-hidden bg-black rounded">
                     <img 
                       src={previewUrl} 
                       alt={`Imagem ${instanceNum}`}
                       className="max-w-full max-h-full object-contain"
                     />
-                  </div>
-                  <div className="print-image-caption">
-                    Imagem {globalIndex} {instance.MainDicomTags?.InstanceNumber ? `(Instância ${instance.MainDicomTags.InstanceNumber})` : ''}
                   </div>
                 </div>
               );
@@ -72,12 +73,13 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-250 pt-1.5 mt-3 text-center text-[8px] text-gray-400 flex justify-between leading-none">
-            <span>Sincronização PACS Orthanc — Laud.us</span>
+          <div className="border-t border-slate-200 pt-2 mt-4 text-left text-[9px] text-gray-400 flex justify-between leading-none">
+            <span>Sincronização PACS Orthanc — LAUD.US</span>
             <span>Gerado automaticamente em {formatDate(Date.now())}</span>
           </div>
         </div>
       ))}
-    </div>
+    </div>,
+    document.body
   );
 }

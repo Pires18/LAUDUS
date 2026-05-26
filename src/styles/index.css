@@ -134,50 +134,50 @@ html, body, #root {
     size: A4;
   }
   
-  body * {
-    visibility: hidden;
+  /* Hides the main react app root completely to prevent parent viewport constraints */
+  #root {
+    display: none !important;
   }
-  
-  /* Se não estiver no modo de impressão de imagens, imprime o laudo de texto */
-  body:not(.print-mode-images) #print-area,
-  body:not(.print-mode-images) #print-area * {
-    visibility: visible;
+
+  /* Reset body styles for print */
+  body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  
+
+  /* Show the active print area */
   body:not(.print-mode-images) #print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background: white;
+    display: block !important;
+    position: relative !important;
+    visibility: visible !important;
   }
-
-  /* Se estiver no modo de impressão de imagens, imprime apenas a área de imagens */
-  body.print-mode-images #print-images-area,
-  body.print-mode-images #print-images-area * {
-    visibility: visible;
-  }
-
+  
   body.print-mode-images #print-images-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background: white;
+    display: block !important;
+    position: relative !important;
+    visibility: visible !important;
+  }
+
+  body:not(.print-mode-images) #print-images-area {
+    display: none !important;
+  }
+  
+  body.print-mode-images #print-area {
+    display: none !important;
   }
 
   .print-images-page {
     page-break-after: always;
+    page-break-inside: avoid;
     box-sizing: border-box;
-    height: 100vh;
+    height: 267mm; /* Exact printable A4 height (297mm - 30mm margin) */
+    max-height: 267mm;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    page-break-inside: avoid;
+    overflow: hidden;
   }
 
   .print-images-page:last-child {
@@ -188,30 +188,23 @@ html, body, #root {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    gap: 12px;
-    margin-top: 10px;
-    margin-bottom: 10px;
+    gap: 8mm;
+    margin-top: 4mm;
+    margin-bottom: 4mm;
     flex-grow: 1;
   }
 
   .print-image-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 4px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #fafafa;
+    background: #000;
     overflow: hidden;
-  }
-
-  .print-image-caption {
-    font-size: 9px;
-    font-weight: bold;
-    color: #475569;
-    margin-top: 5px;
-    text-align: center;
+    height: 100%;
   }
 
   .no-print {

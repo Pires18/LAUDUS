@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { Patient, Clinic, AppSettings } from '../../types';
 import { calculateAge, formatDate } from '../../utils/format';
 
@@ -15,7 +16,9 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
   const defaultSignature = settings.defaultSignature || (settings.physicianName ? `${settings.physicianName}\nCRM: ${settings.physicianCRM || ''}` : '');
   const signature = (clinic?.footerHtml?.replace(/<[^>]*>?/gm, '') || '') || defaultSignature;
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div id="print-area" className="hidden print:block w-full text-black bg-white min-h-screen text-[14px] leading-relaxed font-sans relative pb-32">
       {/* Header */}
       <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
@@ -62,6 +65,7 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
         .print-prose p { margin-bottom: 8px; text-align: justify; }
         .print-prose ul { margin-left: 20px; margin-bottom: 12px; }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
