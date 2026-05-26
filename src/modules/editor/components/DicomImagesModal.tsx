@@ -120,7 +120,7 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Imagens do Exame (Orthanc PACS)">
+    <Modal open={open} onClose={onClose} title="Imagens do Exame (Orthanc PACS)" size="lg">
       <div className="space-y-5">
         {/* Info Header */}
         <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
@@ -185,7 +185,7 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
             </div>
 
             {/* Images Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[360px] overflow-y-auto pr-1.5 custom-scrollbar">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[260px] overflow-y-auto pr-1.5 custom-scrollbar">
               {instances.map((instance, idx) => {
                 const isSelected = selectedIds.has(instance.ID);
                 const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
@@ -237,14 +237,14 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
         )}
 
         {/* Footer Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-slate-100">
+        <div className="flex flex-col gap-4 pt-3 border-t border-slate-100">
           {/* Grid Selector */}
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Layout de Impressão:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider shrink-0">Layout de Impressão:</span>
             <select
               value={gridType}
               onChange={(e) => setGridType(e.target.value)}
-              className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
+              className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
             >
               <option value="1x2">1 Coluna x 2 Linhas (2 fotos/pág)</option>
               <option value="2x2">2 Colunas x 2 Linhas (4 fotos/pág)</option>
@@ -253,7 +253,7 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
             </select>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-3 justify-end">
             <button type="button" onClick={onClose} className="btn-secondary h-11 px-5 rounded-2xl">
               Cancelar
             </button>
