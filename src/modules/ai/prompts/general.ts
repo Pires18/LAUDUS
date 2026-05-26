@@ -1857,7 +1857,7 @@ PROIBIDO:
 A seção ANÁLISE é a descrição técnica detalhada.
 
   REGRAS:
-1. Usar parágrafos <p>.
+1. OBRIGATÓRIO: Cada estrutura anatômica, órgão ou região descrita na ANÁLISE deve estar obrigatoriamente em seu próprio parágrafo individual usando a tag <p> (ex: <p>FÍGADO: ...</p>). É terminantemente proibido agrupar múltiplos órgãos/estruturas no mesmo parágrafo ou separá-los por tags <br>. Isso garante o espaçamento vertical adequado entre todas as estruturas do laudo.
 2. Não usar bullets.
 3. Não usar listas com<ul> / <li>, salvo em exames em que o módulo permita expressamente.
 4. Cada estrutura anatômica deve iniciar com nome em caixa alta seguido de dois - pontos.

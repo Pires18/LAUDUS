@@ -331,12 +331,12 @@ export function Worklist() {
           <table className="hidden md:table w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-ink-50/20 border-b border-ink-100">
-                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[24%]">Paciente</th>
-                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[24%]">Exame & Especialidade</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[20%]">Paciente</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[20%]">Exame & Especialidade</th>
                 <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-center w-[12%]">Status</th>
-                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[15%]">Unidade</th>
-                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[12%]">Data / Hora</th>
-                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-right w-[13%]">Ações</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[14%]">Unidade</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] w-[14%]">Data / Hora</th>
+                <th className="px-2 md:px-3 lg:px-4 xl:px-6 py-5 text-[9px] lg:text-[10px] font-black text-ink-400 uppercase tracking-[0.2em] text-right w-[20%]">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">

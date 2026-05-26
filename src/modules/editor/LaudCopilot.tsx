@@ -211,24 +211,26 @@ export function LaudCopilot({
 
     const items: Array<{ structure: string; status: 'Normal' | 'Alterado'; details: string }> = [];
 
-    // Tenta parsear linhas no formato "- Estrutura: valor"
+    // Tenta parsear linhas no formato "Estrutura: valor" ou "- Estrutura: valor"
     const lines = body.split('\n');
     lines.forEach(line => {
       const trimmed = line.trim();
       if (!trimmed) return;
 
-      // Formato estruturado: "- Structure: rest"
-      if (trimmed.startsWith('- ')) {
-        const text = trimmed.substring(2);
-        const parts = text.split(': ');
-        if (parts.length >= 2) {
-          const structure = parts[0].trim();
-          const rest = parts.slice(1).join(': ').trim();
-          const isAlterado = rest.toLowerCase().includes('alterado') || rest.toLowerCase().includes('patolog') || rest.toLowerCase().includes('alteraç');
-          const details = rest.replace(/alterado/i, '').replace(/normal/i, '').replace(/^(\s*-\s*|\s*\(\s*\)\s*)/, '').trim();
-          items.push({ structure, status: isAlterado ? 'Alterado' : 'Normal', details });
-          return;
+      const cleanLine = trimmed.startsWith('- ') ? trimmed.substring(2).trim() : trimmed;
+      const colonIndex = cleanLine.indexOf(':');
+      if (colonIndex !== -1) {
+        const structure = cleanLine.substring(0, colonIndex).trim();
+        let rest = cleanLine.substring(colonIndex + 1).trim();
+        // Remove colchetes se houver (ex: [Normal] -> Normal)
+        if (rest.startsWith('[') && rest.endsWith(']')) {
+          rest = rest.substring(1, rest.length - 1).trim();
         }
+        const isAlterado = rest.toLowerCase().includes('alterado') || rest.toLowerCase().includes('patolog') || rest.toLowerCase().includes('alteraç');
+        const cleanRest = rest.replace(/alterado/i, '').replace(/normal/i, '').trim();
+        const details = cleanRest.replace(/^[,\s\-()]+/, '').trim();
+        items.push({ structure, status: isAlterado ? 'Alterado' : 'Normal', details });
+        return;
       }
 
       // Formato livre: linha de texto simples → usa como item único
@@ -307,7 +309,7 @@ export function LaudCopilot({
 
   const renderRichClinicalContent = (text: string, isUser: boolean) => {
     if (isUser) {
-      return <p className="text-xs font-bold leading-relaxed">{text}</p>;
+      return <p className="text-xs font-bold leading-relaxed whitespace-pre-wrap">{text}</p>;
     }
 
     // Split text into paragraphs

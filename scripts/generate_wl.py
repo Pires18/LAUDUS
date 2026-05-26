@@ -24,10 +24,14 @@ def main():
         if not exam_id:
             raise ValueError("O campo 'examId' e obrigatorio.")
 
-        # Garantir a pasta de destino configurada (com fallback para o Mac Mini M2)
+        # Garantir a pasta de destino configurada (com fallback dependendo do SO)
         output_dir = data.get('outputDir', '')
         if not output_dir:
-            output_dir = '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/'
+            import platform
+            if platform.system() == 'Windows':
+                output_dir = 'C:/OrthancServer/db/WorklistsDatabase/'
+            else:
+                output_dir = '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/'
             
         os.makedirs(output_dir, exist_ok=True)
         

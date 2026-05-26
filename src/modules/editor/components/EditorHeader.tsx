@@ -1,5 +1,5 @@
 import { 
-  ChevronLeft, CheckCircle2, Settings, User, Activity, Info, ClipboardList, Play
+  ChevronLeft, CheckCircle2, Settings, User, Activity, Info, ClipboardList, Play, Image
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDateTime, classNames } from '../../../utils/format';
@@ -15,6 +15,7 @@ interface EditorHeaderProps {
   onUnlock: () => void;
   onEditMetadata: () => void;
   onOpenAnamnesisConsent: () => void;
+  onOpenDicomImages: () => void;
 }
 
 export function EditorHeader({
@@ -25,7 +26,8 @@ export function EditorHeader({
   onStatusChange,
   onUnlock,
   onEditMetadata,
-  onOpenAnamnesisConsent
+  onOpenAnamnesisConsent,
+  onOpenDicomImages
 }: EditorHeaderProps) {
   const { settings } = useApp();
   const area = EXAM_AREAS.find(a => a.id === exam.area);
@@ -114,16 +116,26 @@ export function EditorHeader({
         </div>
 
         {settings.dicomSyncEnabled !== false && (
-          <a
-            href={viewerUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
-            title="Abrir Visualizador DICOM (Orthanc)"
-          >
-            <Play size={16} />
-            <span className="hidden md:inline">Ver Imagens</span>
-          </a>
+          <>
+            <a
+              href={viewerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+              title="Abrir Visualizador DICOM (Orthanc)"
+            >
+              <Play size={16} />
+              <span className="hidden md:inline">Ver Imagens</span>
+            </a>
+            <button
+              onClick={onOpenDicomImages}
+              className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 border border-brand-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+              title="Salvar ou Imprimir Imagens do Exame (PACS)"
+            >
+              <Image size={16} />
+              <span className="hidden md:inline">PDF de Imagens</span>
+            </button>
+          </>
         )}
 
         <button

@@ -13,6 +13,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
 import { CalculatorModal } from '../calculators/CalculatorModal';
+import { DicomImagesModal } from './components/DicomImagesModal';
+import { PrintImagesLayout } from '../export/PrintImagesLayout';
 
 // Refactored Hooks
 import { useExamActions } from './hooks/useExamActions';
@@ -62,6 +64,8 @@ export function ExamEditor({ examId }: Props) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
+  const [showDicomImages, setShowDicomImages] = useState(false);
+  const [selectedInstancesForPrint, setSelectedInstancesForPrint] = useState<any[]>([]);
   const [copilotPrompt, setCopilotPrompt] = useState('');
   const [showSnippets, setShowSnippets] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
@@ -229,6 +233,15 @@ export function ExamEditor({ examId }: Props) {
     }
   };
 
+  const handlePrintImages = (instances: any[]) => {
+    setSelectedInstancesForPrint(instances);
+    document.body.classList.add('print-mode-images');
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('print-mode-images');
+    }, 200);
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyboard(e: KeyboardEvent) {
@@ -322,6 +335,7 @@ export function ExamEditor({ examId }: Props) {
               setShowEditMetadata(true);
             }}
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
+            onOpenDicomImages={() => setShowDicomImages(true)}
           />
 
           {/* AVISO API KEY */}
@@ -838,6 +852,29 @@ export function ExamEditor({ examId }: Props) {
         physicianName={exam.requestingPhysician}
         examDate={exam.createdAt}
       />
+
+      {showDicomImages && exam && (
+        <DicomImagesModal
+          open={showDicomImages}
+          onClose={() => setShowDicomImages(false)}
+          exam={exam}
+          settings={settings}
+          onPrint={(instances) => {
+            handlePrintImages(instances);
+          }}
+        />
+      )}
+
+      {selectedInstancesForPrint.length > 0 && exam && patient && (
+        <PrintImagesLayout
+          patient={patient}
+          clinic={clinic}
+          settings={settings}
+          examType={exam.examType}
+          examDate={exam.createdAt}
+          selectedInstances={selectedInstancesForPrint}
+        />
+      )}
         </div>
       )}
     </>

@@ -29,6 +29,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [newPatientName, setNewPatientName] = useState('');
   const [newPatientBirthDate, setNewPatientBirthDate] = useState('');
+  const [newPatientGender, setNewPatientGender] = useState<'M' | 'F' | 'O'>('F');
   const [clinicalIndication, setClinicalIndication] = useState('');
 
   const [selectedArea, setSelectedArea] = useState<ExamArea | 'todas'>('todas');
@@ -97,6 +98,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         id: patientId,
         name: newPatientName.trim(),
         birthDate: newPatientBirthDate || undefined,
+        gender: newPatientGender,
         createdAt: Date.now(),
         updatedAt: Date.now()
       };
@@ -105,6 +107,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       setShowQuickPatient(false);
       setNewPatientName('');
       setNewPatientBirthDate('');
+      setNewPatientGender('F');
       showToast('Paciente registrado com sucesso!');
     } catch (err) {
       showToast('Erro ao criar paciente', 'error');
@@ -361,8 +364,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                     {showQuickPatient ? (
                       <div className="space-y-4 p-5 rounded-2xl bg-brand-50/40 border border-brand-100/60 border-dashed animate-in zoom-in-95 duration-200">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-[8px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Nome do Paciente</label>
+                          <div className="sm:col-span-2">
+                            <label className="text-[8px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Nome do Paciente *</label>
                             <input
                               type="text"
                               placeholder="Maria Oliveira Santos"
@@ -380,6 +383,18 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                               value={newPatientBirthDate}
                               onChange={(e) => setNewPatientBirthDate(e.target.value)}
                             />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Sexo</label>
+                            <select
+                              className="w-full h-11 px-3.5 bg-white border border-brand-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900"
+                              value={newPatientGender}
+                              onChange={(e) => setNewPatientGender(e.target.value as 'M' | 'F' | 'O')}
+                            >
+                              <option value="F">Feminino</option>
+                              <option value="M">Masculino</option>
+                              <option value="O">Outro</option>
+                            </select>
                           </div>
                         </div>
                         <button

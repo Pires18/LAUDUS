@@ -19,7 +19,7 @@ export function parseAnamnesis(text: string): AnamnesisField[] {
     if (match) {
       return {
         label: match[1].trim(),
-        value: match[2].trim(),
+        value: match[2],
         isStructured: true,
         rawLine: line
       };

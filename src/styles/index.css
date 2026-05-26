@@ -130,7 +130,7 @@ html, body, #root {
 
 @media print {
   @page {
-    margin: 20mm;
+    margin: 15mm;
     size: A4;
   }
   
@@ -138,11 +138,13 @@ html, body, #root {
     visibility: hidden;
   }
   
-  #print-area, #print-area * {
+  /* Se não estiver no modo de impressão de imagens, imprime o laudo de texto */
+  body:not(.print-mode-images) #print-area,
+  body:not(.print-mode-images) #print-area * {
     visibility: visible;
   }
   
-  #print-area {
+  body:not(.print-mode-images) #print-area {
     position: absolute;
     left: 0;
     top: 0;
@@ -150,6 +152,66 @@ html, body, #root {
     margin: 0;
     padding: 0;
     background: white;
+  }
+
+  /* Se estiver no modo de impressão de imagens, imprime apenas a área de imagens */
+  body.print-mode-images #print-images-area,
+  body.print-mode-images #print-images-area * {
+    visibility: visible;
+  }
+
+  body.print-mode-images #print-images-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .print-images-page {
+    page-break-after: always;
+    box-sizing: border-box;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-inside: avoid;
+  }
+
+  .print-images-page:last-child {
+    page-break-after: avoid;
+  }
+
+  .print-images-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    flex-grow: 1;
+  }
+
+  .print-image-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fafafa;
+    overflow: hidden;
+  }
+
+  .print-image-caption {
+    font-size: 9px;
+    font-weight: bold;
+    color: #475569;
+    margin-top: 5px;
+    text-align: center;
   }
 
   .no-print {
@@ -312,7 +374,7 @@ html, body {
 
 .prose h2 { @apply text-base font-black mt-10 mb-4 text-ink-900 font-sans uppercase tracking-[0.2em] border-b-2 border-ink-100 pb-2; }
 .ProseMirror h3 { @apply text-sm font-black mt-6 mb-2 text-ink-800 font-sans uppercase tracking-widest; }
-.ProseMirror p { @apply mb-1.5 leading-relaxed text-[16px]; }
+.ProseMirror p { @apply mb-4 leading-relaxed text-[16px]; }
 .ProseMirror ul { @apply list-disc pl-6 mb-4 space-y-1; }
 .ProseMirror ol { @apply list-decimal pl-6 mb-4 space-y-1; }
 .ProseMirror strong { @apply font-black text-ink-900; }

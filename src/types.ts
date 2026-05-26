@@ -204,6 +204,8 @@ export interface AppSettings {
   dicomViewerType?: 'stone' | 'oe2' | 'ohif' | 'custom';
   dicomViewerUrlPattern?: string;
   dicomPreset?: 'macmini' | 'notebook' | 'custom';
+  dicomUsername?: string;
+  dicomPassword?: string;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */

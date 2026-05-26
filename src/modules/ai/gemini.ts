@@ -399,6 +399,7 @@ REGRAS DE OURO DO COPILOTO:
 • OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
 • PROIBIDO: Adicionar ou concatenar o texto no final do laudo. As alterações DEVEM ser mescladas/integradas no local correto dentro da ANÁLISE.
 • MÁSCARA PADRÃO: NÃO altere a padronização, estilo ou os placeholders da máscara padrão. Ajuste e inclua TODAS as alterações de forma adequada ao laudo, mantendo o padrão do texto original intacto.
+• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
 • Atualizar ANÁLISE (descrição morfológica adequada do achado, no órgão correto).
 • Atualizar CONCLUSÃO (bullet específico e preciso para o achado).
 • Atualizar RECOMENDAÇÕES (conduta N1-N4 adequada ao achado e contexto clínico).

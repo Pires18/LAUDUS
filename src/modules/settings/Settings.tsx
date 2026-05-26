@@ -452,6 +452,35 @@ export function Settings() {
                       </select>
                       <p className="text-[11px] text-ink-400 mt-1">Formato do link gerado para abrir exames diretamente.</p>
                     </div>
+
+                    <div>
+                      <label className="label">Usuário do Orthanc (PACS)</label>
+                      <input
+                        className="input h-14"
+                        value={draft.dicomUsername || ''}
+                        onChange={(e) => {
+                          u('dicomUsername', e.target.value);
+                          u('dicomPreset', 'custom');
+                        }}
+                        placeholder="Ex: orthanc"
+                      />
+                      <p className="text-[11px] text-ink-400 mt-1">Usuário para autenticação básica no servidor Orthanc local.</p>
+                    </div>
+
+                    <div>
+                      <label className="label">Senha do Orthanc (PACS)</label>
+                      <input
+                        type="password"
+                        className="input h-14"
+                        value={draft.dicomPassword || ''}
+                        onChange={(e) => {
+                          u('dicomPassword', e.target.value);
+                          u('dicomPreset', 'custom');
+                        }}
+                        placeholder="Ex: orthanc"
+                      />
+                      <p className="text-[11px] text-ink-400 mt-1">Senha para autenticação básica no servidor Orthanc local.</p>
+                    </div>
                   </div>
 
                   {draft.dicomViewerType === 'custom' && (

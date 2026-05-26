@@ -105,21 +105,35 @@ export async function getSettings(): Promise<AppSettings> {
   try {
     const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
     const snap = await getDoc(docRef);
+    const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
+    
     let defaultSettings: AppSettings = { 
       geminiModel: 'gemini-2.5-flash', 
       aiProvider: 'gemini', 
       anthropicModel: 'claude-3-5-sonnet-latest',
       dicomSyncEnabled: true,
-      dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+      dicomWorklistFolder: isWindows 
+        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
+        : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
-      dicomOrthancAETitle: 'ORTHANC',
-      dicomViewerUrl: 'http://localhost:8042',
+      dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
+      dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-      dicomPreset: 'macmini'
+      dicomPreset: isWindows ? 'notebook' : 'macmini'
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
+
+    // Se o preset não for customizado (notebook, macmini ou não definido), resolve dinamicamente com base no OS
+    if (data.dicomPreset !== 'custom') {
+      data.dicomPreset = isWindows ? 'notebook' : 'macmini';
+      data.dicomWorklistFolder = isWindows 
+        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
+        : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/';
+      data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042';
+      data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
+    }
     
     // Fallback de segurança para buscar prompts oficiais do administrador
     if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
@@ -142,19 +156,22 @@ export async function getSettings(): Promise<AppSettings> {
   } catch (err) {
     console.warn('[DB] Erro ao carregar settings:', err);
   }
+  const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
   return { 
     geminiModel: 'gemini-2.5-flash', 
     aiProvider: 'gemini', 
     anthropicModel: 'claude-3-5-sonnet-latest',
     dicomSyncEnabled: true,
-    dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+    dicomWorklistFolder: isWindows 
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
+      : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
-    dicomOrthancAETitle: 'ORTHANC',
-    dicomViewerUrl: 'http://localhost:8042',
+    dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
+    dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-    dicomPreset: 'macmini'
+    dicomPreset: isWindows ? 'notebook' : 'macmini'
   };
 }
 
