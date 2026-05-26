@@ -32,10 +32,24 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
     setError(null);
     try {
       const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+      const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
       
-      // 1. Localiza o estudo no Orthanc usando o StudyInstanceUID
-      const lookupUrl = `${baseUrl.replace(/\/$/, '')}/studies?lookup=${studyUid}`;
-      const lookupRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(lookupUrl)}${authParams}`);
+      // 1. Localiza o estudo no Orthanc usando o StudyInstanceUID via POST /tools/find
+      const lookupRes = await fetch(
+        `/api/orthanc-proxy?url=${encodeURIComponent(findUrl)}${authParams}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            Level: 'Study',
+            Query: {
+              StudyInstanceUID: studyUid
+            }
+          })
+        }
+      );
       
       if (!lookupRes.ok) {
         throw new Error(`Não foi possível conectar ao Orthanc (${lookupRes.status}).`);

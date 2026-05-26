@@ -81,41 +81,81 @@ export function ExamEditor({ examId }: Props) {
 
   useEffect(() => {
     let active = true;
-    if (exam && settings.dicomSyncEnabled !== false) {
-      const checkImages = async () => {
-        try {
-          const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-          const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
-          const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-          const lookupUrl = `${baseUrl.replace(/\/$/, '')}/studies?lookup=${studyUid}`;
-          
-          const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(lookupUrl)}${authParams}`);
-          if (!res.ok) return;
-          const studies = await res.json();
-          if (studies && studies.length > 0) {
-            const studyId = studies[0];
-            const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-            const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
-            if (instancesRes.ok) {
-              const instances = await instancesRes.json();
-              if (active) {
-                setHasDicomImages(instances && instances.length > 0);
+
+    if (!exam || !exam.id) {
+      setHasDicomImages(false);
+      return;
+    }
+
+    if (settings.dicomSyncEnabled === false) {
+      setHasDicomImages(false);
+      return;
+    }
+
+    const checkImages = async () => {
+      try {
+        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+        const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+        const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+        const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
+        
+        const res = await fetch(
+          `/api/orthanc-proxy?url=${encodeURIComponent(findUrl)}${authParams}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              Level: 'Study',
+              Query: {
+                StudyInstanceUID: studyUid
               }
+            })
+          }
+        );
+
+        if (!res.ok) {
+          console.warn('[PACS Check] Erro na resposta do proxy:', res.status);
+          if (active) setHasDicomImages(false);
+          return;
+        }
+
+        const studies = await res.json();
+        if (studies && studies.length > 0) {
+          const studyId = studies[0];
+          const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+          const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
+          
+          if (instancesRes.ok) {
+            const instances = await instancesRes.json();
+            if (active) {
+              setHasDicomImages(instances && instances.length > 0);
             }
           } else {
             if (active) setHasDicomImages(false);
           }
-        } catch (e) {
-          console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
+        } else {
           if (active) setHasDicomImages(false);
         }
-      };
-      checkImages();
-    }
+      } catch (e) {
+        console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
+        if (active) setHasDicomImages(false);
+      }
+    };
+
+    checkImages();
+
     return () => {
       active = false;
     };
-  }, [exam, settings]);
+  }, [
+    exam?.id,
+    settings.dicomSyncEnabled,
+    settings.dicomViewerUrl,
+    settings.dicomUsername,
+    settings.dicomPassword
+  ]);
   
 
 
