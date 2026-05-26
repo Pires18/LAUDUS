@@ -76,6 +76,46 @@ export function ExamEditor({ examId }: Props) {
   const [localChatHistory, setLocalChatHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const chatHistoryInitialized = useRef(false);
   const chatSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [hasDicomImages, setHasDicomImages] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (exam && settings.dicomSyncEnabled !== false) {
+      const checkImages = async () => {
+        try {
+          const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+          const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+          const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+          const lookupUrl = `${baseUrl.replace(/\/$/, '')}/studies?lookup=${studyUid}`;
+          
+          const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(lookupUrl)}${authParams}`);
+          if (!res.ok) return;
+          const studies = await res.json();
+          if (studies && studies.length > 0) {
+            const studyId = studies[0];
+            const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+            const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
+            if (instancesRes.ok) {
+              const instances = await instancesRes.json();
+              if (active) {
+                setHasDicomImages(instances && instances.length > 0);
+              }
+            }
+          } else {
+            if (active) setHasDicomImages(false);
+          }
+        } catch (e) {
+          console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
+          if (active) setHasDicomImages(false);
+        }
+      };
+      checkImages();
+    }
+    return () => {
+      active = false;
+    };
+  }, [exam, settings]);
   
 
 
@@ -294,6 +334,7 @@ export function ExamEditor({ examId }: Props) {
             }}
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
             onOpenDicomImages={() => setShowDicomImages(true)}
+            hasDicomImages={hasDicomImages}
           />
 
           {/* AVISO API KEY */}

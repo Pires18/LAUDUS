@@ -15,6 +15,7 @@ interface EditorHeaderProps {
   onUnlock: () => void;
   onOpenAnamnesisConsent: () => void;
   onOpenDicomImages: () => void;
+  hasDicomImages?: boolean;
 }
 
 export function EditorHeader({
@@ -25,7 +26,8 @@ export function EditorHeader({
   onStatusChange,
   onUnlock,
   onOpenAnamnesisConsent,
-  onOpenDicomImages
+  onOpenDicomImages,
+  hasDicomImages = false
 }: EditorHeaderProps) {
   const { settings } = useApp();
   const area = EXAM_AREAS.find(a => a.id === exam.area);
@@ -115,20 +117,37 @@ export function EditorHeader({
 
         {settings.dicomSyncEnabled !== false && (
           <>
-            <a
-              href={viewerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
-              title="Abrir Visualizador DICOM (Orthanc)"
-            >
-              <Play size={16} />
-              <span className="hidden md:inline">Ver Imagens</span>
-            </a>
+            {hasDicomImages ? (
+              <a
+                href={viewerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+                title="Abrir Visualizador DICOM (Orthanc)"
+              >
+                <Play size={16} />
+                <span className="hidden md:inline">Ver Imagens</span>
+              </a>
+            ) : (
+              <button
+                disabled
+                className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-white/5 text-ink-500 border border-white/5 opacity-40 cursor-not-allowed flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+                title="Nenhuma imagem disponível no PACS para este exame"
+              >
+                <Play size={16} />
+                <span className="hidden md:inline">Ver Imagens</span>
+              </button>
+            )}
             <button
               onClick={onOpenDicomImages}
-              className="h-10 w-10 md:w-auto md:px-4 rounded-xl bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 border border-brand-500/20 transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
-              title="Salvar ou Imprimir Imagens do Exame (PACS)"
+              disabled={!hasDicomImages}
+              className={classNames(
+                "h-10 w-10 md:w-auto md:px-4 rounded-xl border transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0",
+                hasDicomImages 
+                  ? "bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 border-brand-500/20"
+                  : "bg-white/5 text-ink-500 border-white/5 opacity-40 cursor-not-allowed"
+              )}
+              title={hasDicomImages ? "Salvar ou Imprimir Imagens do Exame (PACS)" : "Nenhuma imagem disponível no PACS para este exame"}
             >
               <Image size={16} />
               <span className="hidden md:inline">PDF de Imagens</span>
