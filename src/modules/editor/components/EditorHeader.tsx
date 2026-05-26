@@ -14,7 +14,6 @@ interface EditorHeaderProps {
   onStatusChange: (status: ExamStatus) => void;
   onUnlock: () => void;
   onOpenAnamnesisConsent: () => void;
-  onOpenDicomImages: () => void;
   hasDicomImages?: boolean;
   onToggleViewer?: () => void;
   viewerOpen?: boolean;
@@ -28,7 +27,6 @@ export function EditorHeader({
   onStatusChange,
   onUnlock,
   onOpenAnamnesisConsent,
-  onOpenDicomImages,
   hasDicomImages = false,
   onToggleViewer,
   viewerOpen = false
@@ -146,20 +144,6 @@ export function EditorHeader({
                 <span className="hidden md:inline">Ver Imagens</span>
               </button>
             )}
-            <button
-              onClick={onOpenDicomImages}
-              disabled={!hasDicomImages}
-              className={classNames(
-                "h-10 w-10 md:w-auto md:px-4 rounded-xl border transition-all flex items-center justify-center md:justify-start gap-2 font-black text-[10px] uppercase tracking-widest shrink-0",
-                hasDicomImages 
-                  ? "bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 border-brand-500/20"
-                  : "bg-white/5 text-ink-500 border-white/5 opacity-40 cursor-not-allowed"
-              )}
-              title={hasDicomImages ? "Salvar ou Imprimir Imagens do Exame (PACS)" : "Nenhuma imagem disponível no PACS para este exame"}
-            >
-              <Image size={16} />
-              <span className="hidden md:inline">PDF de Imagens</span>
-            </button>
           </>
         )}
 

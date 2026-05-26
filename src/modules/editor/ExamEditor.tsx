@@ -8,7 +8,7 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
@@ -81,6 +81,7 @@ export function ExamEditor({ examId }: Props) {
   const [dicomInstances, setDicomInstances] = useState<any[]>([]);
   const [showIntegratedViewer, setShowIntegratedViewer] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const [showFullScreenImage, setShowFullScreenImage] = useState(false);
 
   useEffect(() => {
     setActiveImageIndex(0);
@@ -445,7 +446,6 @@ export function ExamEditor({ examId }: Props) {
               setShowUnlockModal(true);
             }}
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
-            onOpenDicomImages={() => setShowDicomImages(true)}
             hasDicomImages={hasDicomImages}
             onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
             viewerOpen={showIntegratedViewer}
@@ -464,20 +464,30 @@ export function ExamEditor({ examId }: Props) {
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Integrated Dicom Image Viewer Sidebar */}
             {showIntegratedViewer && hasDicomImages && dicomInstances.length > 0 && (
-              <div className="w-[320px] md:w-[380px] xl:w-[440px] border-r border-slate-800 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in relative z-20">
+              <div className="w-[380px] md:w-[460px] xl:w-[540px] border-r border-slate-800 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in relative z-20">
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="font-black text-xs uppercase tracking-widest text-slate-200">PACS Integrado</span>
                   </div>
-                  <button 
-                    onClick={() => setShowIntegratedViewer(false)}
-                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
-                    title="Fechar Visualizador"
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowDicomImages(true)}
+                      className="h-8 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-95 text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all shadow-md border border-brand-500/20"
+                      title="Gerar/Imprimir PDF das Imagens"
+                    >
+                      <Printer size={12} />
+                      <span>PDF</span>
+                    </button>
+                    <button 
+                      onClick={() => setShowIntegratedViewer(false)}
+                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
+                      title="Fechar Visualizador"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Main Preview Area */}
@@ -491,11 +501,14 @@ export function ExamEditor({ examId }: Props) {
 
                     return (
                       <div className="w-full flex flex-col gap-3">
-                        <div className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner">
+                        <div 
+                          onClick={() => setShowFullScreenImage(true)}
+                          className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
+                        >
                           <img 
                             src={previewUrl} 
                             alt={`Instance ${instanceNum}`}
-                            className="max-w-full max-h-full object-contain"
+                            className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-300"
                           />
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
@@ -511,7 +524,7 @@ export function ExamEditor({ examId }: Props) {
                           >
                             <ChevronRight size={16} />
                           </button>
-                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md">
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md animate-fade-in">
                             FOTO {activeImageIndex + 1} / {dicomInstances.length}
                           </div>
                         </div>
@@ -1000,6 +1013,41 @@ export function ExamEditor({ examId }: Props) {
           selectedInstances={selectedInstancesForPrint}
           gridType={selectedGridType}
         />
+      )}
+
+      {showFullScreenImage && dicomInstances[activeImageIndex] && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-4 animate-fade-in cursor-zoom-out"
+          onClick={() => setShowFullScreenImage(false)}
+        >
+          <button 
+            onClick={() => setShowFullScreenImage(false)}
+            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 border border-white/10"
+            title="Fechar Tela Cheia"
+          >
+            <X size={24} />
+          </button>
+
+          {(() => {
+            const activeInstance = dicomInstances[activeImageIndex];
+            const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+            const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+            const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
+
+            return (
+              <div className="relative max-w-full max-h-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                <img 
+                  src={previewUrl} 
+                  alt={`Instance ${instanceNum}`}
+                  className="max-w-[95vw] max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/5"
+                />
+                <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-black tracking-widest text-white uppercase select-none">
+                  FOTO {activeImageIndex + 1} DE {dicomInstances.length} (INSTÂNCIA {instanceNum})
+                </div>
+              </div>
+            );
+          })()}
+        </div>
       )}
         </div>
       )}
