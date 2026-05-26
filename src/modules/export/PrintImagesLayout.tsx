@@ -60,13 +60,11 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
               
               return (
                 <div key={instance.ID} className="print-image-card">
-                  <div className="w-full h-full flex items-center justify-center overflow-hidden bg-black rounded">
-                    <img 
-                      src={previewUrl} 
-                      alt={`Imagem ${instanceNum}`}
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  </div>
+                  <img 
+                    src={previewUrl} 
+                    alt={`Imagem ${instanceNum}`}
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               );
             })}
