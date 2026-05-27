@@ -690,8 +690,11 @@ CONCLUSÃO:
 3.
 Categoria final: BI-RADS® [X].
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 (incluir recomendações clinicamente úteis, proporcionais à categoria BI-RADS final, evitando redundâncias)
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão (léxico BI-RADS, limites e complementação do método).
 
 ═══════════════════════════════════════════════════════════════
 15. INTEGRAÇÃO DE INFORMAÇÕES E REGRAS FINAIS

@@ -216,9 +216,7 @@ function buildMaskHtml(template: ReportTemplate): string {
     parts.push(`CLASSIFICAÇÃO:\n${template.classificationTemplate}`);
   }
   parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
-  if (template.observationsTemplate) {
-    parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate}`);
-  }
+  parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate || '<p>(…)</p>'}`);
   if (template.aiInstructions) {
     parts.push(`INSTRUÇÕES ESPECÍFICAS DA MÁSCARA:\n${template.aiInstructions}`);
   }
@@ -857,7 +855,7 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     score -= 15;
   }
 
-  const requiredSections = ['TÉCNICA', 'ANÁLISE', 'CONCLUSÃO', 'RECOMENDAÇÕES', 'OBSERVAÇÕES'];
+  const requiredSections = ['TÉCNICA', 'ANÁLISE', 'CONCLUSÃO', 'RECOMENDAÇÕES', 'OBSERVAÇÕES METODOLÓGICAS'];
   for (const section of requiredSections) {
     if (!html.toUpperCase().includes(section)) {
       issues.push({ type: 'missing_section', severity: 'error', message: `Seção "${section}" ausente no laudo.` });

@@ -1463,13 +1463,16 @@ Usar:
 
 Formato preferencial:
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Achado principal.
 - Risco/prioridade.
 - Especialidade sugerida.
 - Exame complementar preferencial.
 - Seguimento longitudinal, quando aplicável.
 - Evitar redundâncias.
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão de limitações técnicas específicas para a idade (ex: agitação, choro, meteorismo).
 
 Exemplo neurossonografia:
 “Recomenda-se controle ultrassonográfico transfontanelar seriado e seguimento com neuropediatria/neonatologia, conforme prematuridade e evolução ventricular.”
@@ -1641,8 +1644,11 @@ CONCLUSÃO:
 2.
 3.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 Incluir recomendações clinicamente úteis, proporcionais à idade e ao achado, evitando redundâncias.
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão de limitações técnicas específicas para a idade (ex: agitação, choro, meteorismo).
 
 ═══════════════════════════════════════════════════════════════
 23. REGRA FINAL DE SEGURANÇA

@@ -841,11 +841,14 @@ CONCLUSÃO:
 2.
 3.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Achado principal: recomendação específica
 - Exame complementar quando indicado
 - Especialidade sugerida
 - Prioridade
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão de limitação de janela acústica.
 
 EXEMPLOS DE RECOMENDAÇÃO:
 

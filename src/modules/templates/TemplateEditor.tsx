@@ -270,10 +270,10 @@ export function TemplateEditor({ templateId }: Props) {
             />
 
             <TemplateTextBlock
-              label="Texto Padrão: Observações (Opcional)"
+              label="Texto Padrão: Observações Metodológicas (Opcional — Gerado automaticamente pela IA se em branco)"
               value={draft.observationsTemplate || ''}
               onChange={(val) => u('observationsTemplate', val)}
-              placeholder="Ex: Observações e notas adicionais clínicas..."
+              placeholder="Ex: Observações metodológicas e notas adicionais de limitação clínica..."
             />
 
             <TemplateTextBlock

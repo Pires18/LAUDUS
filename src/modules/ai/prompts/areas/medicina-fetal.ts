@@ -1015,7 +1015,7 @@ CONCLUSÃO:
 3.
 4.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Conduta principal
 - Próximo exame recomendado
 - Janela ideal
@@ -1023,6 +1023,9 @@ OBSERVAÇÕES / RECOMENDAÇÕES:
 - Exame especializado (se gatilho)
 - Avaliação em alto risco/medicina fetal (se indicada)
 - Evitar redundâncias
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica (léxico obstétrico, limites e complementação do método).
 
 ═══════════════════════════════════════════════════════════════
 20. INTEGRAÇÃO DE INFORMAÇÕES, OBSERVAÇÕES METODOLÓGICAS E REGRA FINAL

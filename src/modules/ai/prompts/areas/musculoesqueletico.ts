@@ -777,12 +777,15 @@ CONCLUSÃO:
 2.
 3.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Achado principal: recomendação específica
 - Exame complementar quando indicado
 - Especialidade sugerida
 - Prioridade
 - Ajuste de carga/reabilitação quando aplicável
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão de limitação de janela acústica.
 
 EXEMPLOS DE RECOMENDAÇÃO:
 N2: "Recomenda-se fisioterapia, adequação de carga e seguimento com medicina esportiva/ortopedia conforme dor e limitação funcional."

@@ -20,7 +20,7 @@ export function getInitialReportContent(template: ReportTemplate): string {
     const cleanContent = sanitize(content);
     
     // Seções principais sempre aparecem como cabeçalho mesmo se vazias
-    const isMainSection = /CLASSIFICA|ANÁLISE|CONCLUS/i.test(title);
+    const isMainSection = /CLASSIFICA|ANÁLISE|CONCLUS|OBSERVAÇ|RECOMENDA/i.test(title);
     if (!isMainSection && cleanContent === '') return '';
     
     const finalContent = cleanContent !== '' ? cleanContent : '<p>(...)</p>';
@@ -33,8 +33,8 @@ export function getInitialReportContent(template: ReportTemplate): string {
   html += addSection('ANÁLISE', template.analysisTemplate);
   html += addSection('CLASSIFICAÇÕES', template.classificationTemplate || '');
   html += addSection('CONCLUSÃO', template.conclusionTemplate);
-  html += addSection('OBSERVAÇÕES', template.observationsTemplate);
   html += addSection('RECOMENDAÇÕES', template.recommendationsTemplate);
+  html += addSection('OBSERVAÇÕES METODOLÓGICAS', template.observationsTemplate);
 
   return html;
 }

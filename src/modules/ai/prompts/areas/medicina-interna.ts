@@ -49,7 +49,8 @@ TÍTULO DO EXAME
 TÉCNICA: Exame realizado por via transabdominal, com transdutor convexo multifrequencial, complementado por transdutor linear quando necessário.
 ANÁLISE: descrição por órgão, em linhas separadas.
 CONCLUSÃO: achados principais em ordem de relevância clínica.
-OBSERVAÇÕES / RECOMENDAÇÕES: objetivas, com seguimento, exames complementares e especialidades quando aplicável.
+RECOMENDAÇÕES: objetivas, com seguimento, exames complementares e especialidades quando aplicável.
+OBSERVAÇÕES METODOLÓGICAS: Nota metodológica de limitações do exame (ex: interposição gasosa, biotipo, repleção vesical, janela acústica).
 
 PROIBIÇÕES:
 - Não incluir útero, ovários, anexos ou vesículas seminais em exame de abdome total comum.
@@ -921,11 +922,14 @@ CONCLUSÃO:
 2.
 3.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Achado principal: recomendação específica.
 - Exame complementar, quando indicado.
 - Especialidade sugerida.
 - Prioridade.
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão de limitação de janela acústica.
 
 FORMATO ENXUTO RECOMENDADO (exemplos):
 N2: “Recomenda-se correlação com perfil metabólico e enzimas hepáticas, com seguimento clínico para investigação de MASLD/síndrome metabólica.”

@@ -988,11 +988,14 @@ CONCLUSÃO:
 2.
 3.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Achado principal: recomendação específica.
 - Exame complementar, quando indicado.
 - Especialidade sugerida.
 - Prioridade.
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão de limitação de janela acústica.
 
 FORMATO ENXUTO RECOMENDADO (exemplos):
 N2: "Recomenda-se seguimento ginecológico eletivo e controle ultrassonográfico em 8–12 semanas para documentação de resolução, considerando provável cisto funcional."

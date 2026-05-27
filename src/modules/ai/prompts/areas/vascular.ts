@@ -1127,13 +1127,16 @@ Usar:
 20. MODELO FINAL DE RECOMENDAÇÕES
 ═══════════════════════════════════════════════════════════════
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 - Achado principal.
 - Grau de atividade.
 - Padrão ultrassonográfico.
 - Correlação laboratorial.
 - Especialidade.
 - Urgência, se houver.
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão (limitações de Doppler, profundidade, temperatura, uso de corticoide e correlação clínico-laboratorial).
 
 Exemplo sinovite ativa:
 “Achados de sinovite ativa ao Power Doppler OMERACT grau 2. Recomenda-se avaliação reumatológica prioritária e correlação com marcadores inflamatórios e autoanticorpos conforme hipótese clínica.”
@@ -1243,8 +1246,11 @@ CONCLUSÃO:
 2.
 3.
 
-OBSERVAÇÕES / RECOMENDAÇÕES:
+RECOMENDAÇÕES:
 Incluir recomendações clinicamente úteis, proporcionais ao achado, sem prescrição medicamentosa.
+
+OBSERVAÇÕES METODOLÓGICAS:
+- Nota metodológica padrão (limitações de Doppler, profundidade, temperatura, uso de corticoide e correlação clínico-laboratorial).
 
 ═══════════════════════════════════════════════════════════════
 24. REGRA FINAL DE SEGURANÇA
