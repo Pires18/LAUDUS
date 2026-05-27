@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
-import { updateItem } from '../../store/db';
+import { updateItem, saveVersionSnapshot } from '../../store/db';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/gemini';
 import { parseAnamnesis, serializeAnamnesis } from './components/AnamnesisConsentModal';
@@ -402,6 +402,7 @@ export function LaudCopilot({
           anamnesis: exam.anamnesis,
           dateMs: exam.createdAt
         },
+        template,
         settings,
         previousExams
       }, (chunk) => {
@@ -418,10 +419,51 @@ export function LaudCopilot({
       // AUTO-APPLY: Se o copiloto gerou uma proposta, aplica ela automaticamente no editor
       const { proposal } = parseMessageContent(finalHtml);
       if (proposal) {
-        onUpdate(sanitizeHtml(proposal));
+        const cleanProposal = sanitizeHtml(proposal);
+        // Salva versão anterior antes de aplicar!
+        await saveVersionSnapshot(exam.id, reportContent, 'copilot');
+        onUpdate(cleanProposal);
+        
         const assistantMsgIndex = newHistory.length;
         setAppliedIndices(prev => [...prev, assistantMsgIndex]);
-        showToast('Alterações integradas automaticamente ao laudo!', 'success');
+
+        if (template) {
+          showToast('Alterações integradas! Refinando...', 'info');
+          // Adiciona balão de status no chat
+          const chatWithRefining = [
+            ...newHistory,
+            { role: 'assistant' as const, content: finalHtml },
+            { role: 'assistant' as const, content: 'Refinando e higienizando laudo para garantir padrões de máscara...' }
+          ];
+          onChatUpdate(chatWithRefining);
+
+          let refinedHtml = '';
+          const finalRefined = await generateReportStream({
+            currentReport: cleanProposal,
+            template,
+            patient,
+            settings,
+            clinicalIndication: exam.clinicalIndication,
+            requestingPhysician: exam.requestingPhysician,
+            anamnesis: exam.anamnesis,
+            previousExams,
+            examDateMs: exam.createdAt
+          }, (chunk) => {
+            refinedHtml = chunk;
+            onUpdate(sanitizeHtml(refinedHtml));
+          });
+
+          onUpdate(sanitizeHtml(finalRefined));
+          showToast('Laudo integrado e refinado com sucesso! ✓', 'success');
+
+          // Restaura o histórico de chat normal sem o balão temporário de refinamento
+          onChatUpdate([
+            ...newHistory,
+            { role: 'assistant' as const, content: finalHtml }
+          ]);
+        } else {
+          showToast('Alterações integradas com sucesso! ✓', 'success');
+        }
       }
     } catch (error) {
       console.error('[LaudCopilot] handleSend error:', error);
@@ -726,8 +768,10 @@ export function LaudCopilot({
 
                             <button
                               disabled={isGenerating}
-                              onClick={() => {
+                              onClick={async () => {
                                 if (isGenerating) return;
+                                // Salva versão anterior antes de aplicar!
+                                await saveVersionSnapshot(exam.id, reportContent, 'copilot');
                                 onUpdate(sanitizeHtml(proposal));
                                 if (!appliedIndices.includes(idx)) {
                                   setAppliedIndices(prev => [...prev, idx]);

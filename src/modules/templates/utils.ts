@@ -6,7 +6,7 @@ import { ReportTemplate } from '../../types';
  */
 export function getInitialReportContent(template: ReportTemplate): string {
   // Título centralizado
-  let html = `<h2 style="text-align: center">${template.title}</h2>\n`;
+  let html = `<h1 style="text-align: center">${template.title}</h1>\n`;
   
   const sanitize = (content: string | undefined): string => {
     if (!content) return '';

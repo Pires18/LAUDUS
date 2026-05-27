@@ -115,6 +115,12 @@ export interface ExamRequest {
   consentAccepted?: boolean;
   /** Quando o termo foi assinado */
   consentAcceptedAt?: number;
+  /** Histórico de versões do laudo para diff/rollback */
+  reportVersions?: Array<{
+    timestamp: number;
+    content: string;
+    trigger: 'generation' | 'refine' | 'copilot' | 'manual';
+  }>;
 }
 
 /** Estrutura de uma máscara (template) de laudo */
@@ -159,6 +165,13 @@ export interface AppSettings {
   currentRole?: UserRole;
   geminiApiKey?: string;
   geminiModel: string;
+  geminiModelPro?: string;
+  geminiModelByMode?: {
+    generation?: string;
+    refine?: string;
+    copilot?: string;
+    template?: string;
+  };
   aiProvider?: 'gemini' | 'anthropic';
   anthropicApiKey?: string;
   anthropicModel?: string;

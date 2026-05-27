@@ -639,10 +639,108 @@ export function AdminLaudIA() {
                           onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
                           className="w-full rounded-2xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-14 px-6 font-black text-xs uppercase tracking-wider cursor-pointer bg-white"
                         >
-                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Optimized Diagnostic Core)</option>
-                          <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fastest / Advanced)</option>
-                          <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Deep Medical Reasoning / Heavy)</option>
+                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado / Equilíbrio Excelente)</option>
+                          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Raciocínio Clínico Premium)</option>
+                          <option value="gemini-2.0-flash">Gemini 2.0 Flash (Velocidade Máxima)</option>
+                          <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Experimental)</option>
+                          <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking (Experimental)</option>
                         </select>
+                      </div>
+
+                      {/* Gemini Model Selection por Modo */}
+                      <div className="md:col-span-2 border border-slate-100 rounded-[2rem] p-6 bg-slate-50/50 space-y-4 mt-2">
+                        <div>
+                          <h5 className="text-[11px] font-black text-ink-900 uppercase tracking-wider flex items-center gap-2">
+                            <Sliders size={13} className="text-indigo-500" /> Modelos Específicos por Modo (Opcional)
+                          </h5>
+                          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-wider mt-0.5">Calibre um modelo diferente do principal para cada funcionalidade.</p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Geração Inicial */}
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest block">Geração Inicial</label>
+                            <select
+                              value={localSettings.geminiModelByMode?.generation || ""}
+                              onChange={(e) => {
+                                const byMode = { ...localSettings.geminiModelByMode };
+                                if (e.target.value === "") delete byMode.generation;
+                                else byMode.generation = e.target.value;
+                                setLocalSettings({ ...localSettings, geminiModelByMode: byMode });
+                              }}
+                              className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
+                            >
+                              <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
+                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                            </select>
+                          </div>
+                          {/* Refinamento */}
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest block">Refinamento Cirúrgico</label>
+                            <select
+                              value={localSettings.geminiModelByMode?.refine || ""}
+                              onChange={(e) => {
+                                const byMode = { ...localSettings.geminiModelByMode };
+                                if (e.target.value === "") delete byMode.refine;
+                                else byMode.refine = e.target.value;
+                                setLocalSettings({ ...localSettings, geminiModelByMode: byMode });
+                              }}
+                              className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
+                            >
+                              <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
+                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                            </select>
+                          </div>
+                          {/* Copiloto */}
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest block">Laud.IA Copiloto</label>
+                            <select
+                              value={localSettings.geminiModelByMode?.copilot || ""}
+                              onChange={(e) => {
+                                const byMode = { ...localSettings.geminiModelByMode };
+                                if (e.target.value === "") delete byMode.copilot;
+                                else byMode.copilot = e.target.value;
+                                setLocalSettings({ ...localSettings, geminiModelByMode: byMode });
+                              }}
+                              className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
+                            >
+                              <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
+                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                            </select>
+                          </div>
+                          {/* Templates */}
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest block">Geração de Templates</label>
+                            <select
+                              value={localSettings.geminiModelByMode?.template || ""}
+                              onChange={(e) => {
+                                const byMode = { ...localSettings.geminiModelByMode };
+                                if (e.target.value === "") delete byMode.template;
+                                else byMode.template = e.target.value;
+                                setLocalSettings({ ...localSettings, geminiModelByMode: byMode });
+                              }}
+                              className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
+                            >
+                              <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
+                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     </>
                   ) : (

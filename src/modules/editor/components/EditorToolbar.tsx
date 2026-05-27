@@ -1,4 +1,4 @@
-import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen } from 'lucide-react';
+import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 interface EditorToolbarProps {
@@ -11,6 +11,7 @@ interface EditorToolbarProps {
   onShowPrompt: () => void;
   onReset: () => void;
   onShowHistory: () => void;
+  onShowVersions: () => void;
   onToggleSnippets: () => void;
   snippetsOpen: boolean;
   snippetCount: number;
@@ -27,6 +28,7 @@ export function EditorToolbar({
   onShowPrompt,
   onReset,
   onShowHistory,
+  onShowVersions,
   onToggleSnippets,
   snippetsOpen,
   snippetCount,
@@ -86,6 +88,15 @@ export function EditorToolbar({
       >
         <History size={14} /> Histórico Clínico
       </button>
+
+      <button
+        onClick={onShowVersions}
+        className="btn-secondary text-xs py-1.5 px-2.5 border-teal-200 text-teal-700 hover:bg-teal-50"
+        title="Ver histórico de versões/alterações do laudo"
+      >
+        <Clock size={14} /> Versões do Laudo
+      </button>
+
 
       {snippetCount > 0 && (
         <button

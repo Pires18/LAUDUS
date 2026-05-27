@@ -413,6 +413,40 @@ export async function getRecentFinalizedReports(templateIdOrArea: string, limitC
 }
 
 /**
+ * Salva um snapshot do conteúdo do laudo no histórico de versões (reportVersions) do exame.
+ */
+export async function saveVersionSnapshot(
+  examId: string,
+  content: string,
+  trigger: 'generation' | 'refine' | 'copilot' | 'manual'
+): Promise<void> {
+  if (!content || !content.trim()) return;
+  try {
+    const docRef = getDocRef('exams', examId);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const versions = data.reportVersions || [];
+    
+    // Evita duplicar se for idêntico ao último snapshot
+    if (versions.length > 0 && versions[versions.length - 1].content === content) return;
+
+    const newVersion = {
+      timestamp: Date.now(),
+      content,
+      trigger
+    };
+    
+    await updateDoc(docRef, {
+      reportVersions: [...versions, newVersion],
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    console.error('[DB] Erro ao salvar snapshot de versão do laudo:', err);
+  }
+}
+
+/**
  * Adiciona um registro de auditoria no sistema (Coleção Global).
  */
 export async function addAuditLog(log: {

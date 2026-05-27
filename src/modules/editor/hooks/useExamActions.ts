@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { updateItem, getRecentFinalizedReports } from '../../../store/db';
+import { updateItem, getRecentFinalizedReports, saveVersionSnapshot } from '../../../store/db';
 import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types';
 import { generateReportStream, generateMockReport } from '../../ai/gemini';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
+import { getInitialReportContent } from '../../templates/utils';
 
 interface UseExamActionsProps {
   examId: string;
@@ -92,11 +93,16 @@ export function useExamActions({
       let html: string;
 
       if (hasKey) {
-        // Detecta se é a primeira geração (máscara com placeholders ainda intactos)
+        // Detecta se é a primeira geração (máscara ainda limpa/não editada)
         // Nesse caso, usa buildPrompt (GERAÇÃO INICIAL) para melhor qualidade
-        const isFirstGeneration = !customPrompt && /\(…\)/.test(currentReport);
+        const initialContent = getInitialReportContent(template);
+        const cleanCurrent = currentReport.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
+        const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
+        const isFirstGeneration = !customPrompt && (cleanCurrent === '' || cleanCurrent === cleanInitial);
 
         if (isFirstGeneration) {
+          // Salva a máscara limpa como versão inicial
+          await saveVersionSnapshot(examId, currentReport, 'generation');
           // Modo: GERAÇÃO INICIAL — gera do zero a partir da máscara como referência
           html = await generateReportStream({
             template,
@@ -112,6 +118,8 @@ export function useExamActions({
           });
           showToast('Laudo gerado com IA! ✓', 'success');
         } else {
+          // Salva o laudo atual antes de refinar
+          await saveVersionSnapshot(examId, currentReport, 'refine');
           // Modo: REFINAMENTO — edição cirúrgica do laudo já existente (R10)
           html = await generateReportStream({
             currentReport,

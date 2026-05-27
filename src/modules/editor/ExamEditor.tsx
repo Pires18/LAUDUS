@@ -26,6 +26,8 @@ import { EditorToolbar } from './components/EditorToolbar';
 import { getInitialReportContent } from '../templates/utils';
 import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
+import { ReportVersionsModal } from './components/ReportVersionsModal';
+
 
 interface Props {
   examId: string;
@@ -62,6 +64,7 @@ export function ExamEditor({ examId }: Props) {
 
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
   const [showDicomImages, setShowDicomImages] = useState(false);
@@ -596,7 +599,16 @@ export function ExamEditor({ examId }: Props) {
               <EditorToolbar
                 isGenerating={isGenerating}
                 hasReport={!!reportContent}
-                isTemplateMask={/\(…\)/.test(reportContent)}
+                isTemplateMask={
+                  template
+                    ? (() => {
+                        const initialContent = getInitialReportContent(template);
+                        const cleanCurrent = reportContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
+                        const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
+                        return cleanCurrent === '' || cleanCurrent === cleanInitial;
+                      })()
+                    : true
+                }
                 status={exam.status}
                 onRefine={() => {
                   if (currentRole === 'recepcao') {
@@ -614,6 +626,7 @@ export function ExamEditor({ examId }: Props) {
                   handleReset();
                 }}
                 onShowHistory={() => setShowHistoryModal(true)}
+                onShowVersions={() => setShowVersionsModal(true)}
                 onToggleSnippets={() => { setShowSnippets(s => !s); setSnippetSearch(''); }}
                 snippetsOpen={showSnippets}
                 snippetCount={settings.snippets?.length ?? 0}
@@ -912,7 +925,7 @@ export function ExamEditor({ examId }: Props) {
             <div className="flex-1 overflow-y-auto p-5">
               <pre className="text-xs font-mono text-ink-700 whitespace-pre-wrap leading-relaxed bg-ink-50 p-4 rounded-xl border border-ink-200">
                 {(() => {
-                  const { systemContext, userMessage } = buildPrompt({
+                  const { universalContext, areaContext, userMessage } = buildPrompt({
                     template,
                     patient,
                     settings,
@@ -920,6 +933,7 @@ export function ExamEditor({ examId }: Props) {
                     requestingPhysician: exam?.requestingPhysician,
                     anamnesis: exam?.anamnesis,
                   });
+                  const systemContext = universalContext + (areaContext ? '\n\n' + areaContext : '');
                   return `══ SYSTEM CONTEXT ══\n${systemContext}\n\n══ USER MESSAGE ══\n${userMessage}`;
                 })()}
               </pre>
@@ -934,7 +948,7 @@ export function ExamEditor({ examId }: Props) {
               </span>
               <button
                 onClick={() => {
-                  const { systemContext, userMessage } = buildPrompt({
+                  const { universalContext, areaContext, userMessage } = buildPrompt({
                     template,
                     patient,
                     settings,
@@ -942,6 +956,7 @@ export function ExamEditor({ examId }: Props) {
                     requestingPhysician: exam?.requestingPhysician,
                     anamnesis: exam?.anamnesis,
                   });
+                  const systemContext = universalContext + (areaContext ? '\n\n' + areaContext : '');
                   navigator.clipboard.writeText(`══ SYSTEM CONTEXT ══\n${systemContext}\n\n══ USER MESSAGE ══\n${userMessage}`);
                   showToast('Prompt copiado!', 'success');
                 }}
@@ -962,6 +977,19 @@ export function ExamEditor({ examId }: Props) {
           currentExamId={exam.id}
           currentContent={reportContent}
           onClose={() => setShowHistoryModal(false)}
+        />
+      )}
+
+      {showVersionsModal && exam && (
+        <ReportVersionsModal
+          exam={exam}
+          currentContent={reportContent}
+          onRestore={(content) => {
+            setReportContent(content);
+            updateItem('exams', exam.id, { reportContent: content });
+          }}
+          onClose={() => setShowVersionsModal(false)}
+          showToast={showToast}
         />
       )}
 

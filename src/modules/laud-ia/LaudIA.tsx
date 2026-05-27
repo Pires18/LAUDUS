@@ -9,7 +9,7 @@ import {
   Code, Copy, Check, Plus, Trash2, Pencil, X,
   BookOpen, Sparkles, ChevronDown, ChevronUp,
   Activity, Cpu, Database, Wifi, WifiOff,
-  TrendingUp, FlaskConical,
+  TrendingUp, FlaskConical, BarChart3, Clock, Coins,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { EXAM_AREAS, ExamArea, AppSettings } from '../../types';
@@ -20,6 +20,7 @@ import {
   DEFAULT_GLOBAL_INSTRUCTIONS,
   DEFAULT_RIGID_RULES,
 } from '../ai/prompts';
+import { callMetricsHistory, type CallMetrics } from '../ai/gemini';
 import { genId } from '../../store/db';
 
 type TabId = 'prompts' | 'areas' | 'snippets' | 'engine' | 'training' | 'status';
@@ -308,11 +309,12 @@ export function LaudIA() {
     }
   }
 
-  // ── AI Improve Area Prompt ──────────────────────────────────────
+  // ── AI Improve Area Prompt (suporta Gemini e Anthropic) ─────────
   async function handleImproveAreaPrompt() {
-    const apiKey = localSettings.geminiApiKey;
-    if (!apiKey) {
-      showToast('Configure sua API Key Gemini no Motor & API antes de usar este recurso.', 'error');
+    const provider = localSettings.aiProvider || 'gemini';
+    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
+    if (!hasKey) {
+      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
       return;
     }
     const currentPrompt = localSettings.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] || '';
@@ -321,26 +323,49 @@ export function LaudIA() {
       return;
     }
     setIsImprovingArea(true);
-    try {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
 
-      const areaLabel = EXAM_AREAS.find(a => a.id === selectedArea)?.label || selectedArea;
-      const userRequest = areaImprovePrompt.trim()
-        ? `\n\nInstrução adicional do médico: "${areaImprovePrompt.trim()}"`
-        : '';
-
-      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+    const areaLabel = EXAM_AREAS.find(a => a.id === selectedArea)?.label || selectedArea;
+    const userRequest = areaImprovePrompt.trim()
+      ? `\n\nInstrução adicional do médico: "${areaImprovePrompt.trim()}"`
+      : '';
+    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
 Sua tarefa é melhorar o prompt de área de ${areaLabel} a seguir, tornando-o mais completo,
 claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
 Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+    const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${currentPrompt}`;
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: `${systemMsg}\n\nPROMPT ATUAL:\n${currentPrompt}` }] }],
-      });
+    try {
+      let improved = '';
 
-      const improved = result.response.text().trim();
+      if (provider === 'gemini') {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
+        });
+        improved = result.response.text().trim();
+      } else {
+        // Anthropic
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': localSettings.anthropicApiKey!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+            max_tokens: 8192,
+            messages: [{ role: 'user', content: fullMessage }],
+            temperature: 0.2,
+          }),
+        });
+        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+        const result = await response.json();
+        improved = (result.content?.[0]?.text || '').trim();
+      }
+
       if (improved) {
         const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: improved };
         patchLocal({ aiAreaPrompts: updated });
@@ -349,7 +374,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
         setAreaImprovePrompt('');
       }
     } catch {
-      showToast('Erro ao melhorar prompt com IA. Verifique sua API Key.', 'error');
+      showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
     } finally {
       setIsImprovingArea(false);
     }
@@ -500,6 +525,103 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
               showToast(`${title} restaurado para o padrão oficial.`, 'info');
             }}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Telemetry Dashboard ─────────────────────────────────────────
+  function TelemetryDashboard() {
+    const [metrics, setMetrics] = useState<CallMetrics[]>([]);
+
+    useEffect(() => {
+      setMetrics([...callMetricsHistory]);
+      const interval = setInterval(() => {
+        setMetrics([...callMetricsHistory]);
+      }, 3000);
+      return () => clearInterval(interval);
+    }, []);
+
+    if (metrics.length === 0) {
+      return (
+        <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 text-center">
+          <BarChart3 size={32} className="text-ink-300 mx-auto mb-3" />
+          <p className="font-black text-ink-500 text-sm">Nenhuma chamada de IA registrada ainda.</p>
+          <p className="text-xs text-ink-400 mt-1">As métricas aparecerão aqui após gerar o primeiro laudo.</p>
+        </div>
+      );
+    }
+
+    const totalTokensIn = metrics.reduce((s, m) => s + m.estimatedInputTokens, 0);
+    const totalTokensOut = metrics.reduce((s, m) => s + m.estimatedOutputTokens, 0);
+    const avgLatency = Math.round(metrics.reduce((s, m) => s + m.latencyMs, 0) / metrics.length);
+    const successRate = Math.round((metrics.filter(m => m.success).length / metrics.length) * 100);
+
+    const modeColors: Record<string, string> = {
+      generation: 'bg-brand-100 text-brand-700',
+      refine: 'bg-amber-100 text-amber-700',
+      copilot: 'bg-violet-100 text-violet-700',
+      template: 'bg-teal-100 text-teal-700',
+    };
+    const modeLabels: Record<string, string> = {
+      generation: 'Geração',
+      refine: 'Refinamento',
+      copilot: 'Copiloto',
+      template: 'Template',
+    };
+
+    return (
+      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-ink-100 bg-ink-50/30 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+            <BarChart3 size={20} />
+          </div>
+          <div>
+            <h5 className="font-black text-ink-900">Telemetria de Chamadas</h5>
+            <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Últimas {metrics.length} chamadas de IA nesta sessão</p>
+          </div>
+        </div>
+
+        {/* Resumo */}
+        <div className="grid grid-cols-4 gap-px bg-ink-100">
+          {[
+            { label: 'Tokens Entrada', value: totalTokensIn.toLocaleString('pt-BR'), icon: Database, color: 'brand' },
+            { label: 'Tokens Saída', value: totalTokensOut.toLocaleString('pt-BR'), icon: Coins, color: 'emerald' },
+            { label: 'Latência Média', value: `${(avgLatency / 1000).toFixed(1)}s`, icon: Clock, color: 'amber' },
+            { label: 'Taxa de Sucesso', value: `${successRate}%`, icon: CheckCircle2, color: successRate >= 90 ? 'emerald' : 'rose' },
+          ].map(stat => (
+            <div key={stat.label} className="bg-white p-5 text-center">
+              <stat.icon size={18} className={`text-${stat.color}-500 mx-auto mb-2`} />
+              <span className={`text-xl font-black text-${stat.color}-700 block`}>{stat.value}</span>
+              <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mt-0.5">{stat.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Log das últimas chamadas */}
+        <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
+          {metrics.slice(0, 10).map((m, i) => (
+            <div key={i} className={classNames(
+              'flex items-center gap-3 p-3 rounded-2xl border text-xs',
+              m.success ? 'bg-ink-50/60 border-ink-100' : 'bg-rose-50 border-rose-100'
+            )}>
+              <div className={classNames('px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0', modeColors[m.mode] || 'bg-ink-100 text-ink-600')}>
+                {modeLabels[m.mode] || m.mode}
+              </div>
+              <span className="text-[10px] font-mono text-ink-600 shrink-0">{m.area || '—'}</span>
+              <div className="flex-1 flex items-center gap-3 min-w-0">
+                <span className="text-ink-500 shrink-0">↑ {m.estimatedInputTokens.toLocaleString('pt-BR')} tok</span>
+                <span className="text-ink-500 shrink-0">↓ {m.estimatedOutputTokens.toLocaleString('pt-BR')} tok</span>
+                <span className="text-ink-500 shrink-0">{(m.latencyMs / 1000).toFixed(1)}s</span>
+              </div>
+              <span className={classNames('text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-lg',
+                m.provider === 'gemini' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
+              )}>{m.provider}</span>
+              {m.success
+                ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                : <AlertCircle size={14} className="text-rose-500 shrink-0" />}
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -1030,6 +1152,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                             <option value="gemini-2.5-flash">Gemini 2.5 Flash — Última Geração (Recomendado)</option>
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro — Raciocínio Clínico Premium</option>
                             <option value="gemini-2.0-flash">Gemini 2.0 Flash — Velocidade Máxima</option>
+                            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro — Experimental</option>
                             <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking — Experimental</option>
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1272,6 +1395,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
             {/* ═══ TAB: STATUS ═══ */}
             {activeTab === 'status' && (
               <div className="max-w-3xl space-y-6 animate-fade-in">
+
+                {/* Telemetria */}
+                <TelemetryDashboard />
+
                 {/* Connection Status */}
                 <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
                   <div className="flex items-center gap-3 mb-8">
@@ -1415,11 +1542,11 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                   <div className="space-y-1">
                     <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest block">Laud.IA Core</span>
                     <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
-                      Motor cognitivo radiológico v10.1 — Cascata Tripartite + Regras Rígidas + Aprendizado por Estilo.
+                      Motor cognitivo radiológico v13.0 — Cascata Tripartite + Regras Rígidas + Temperatura Adaptativa + Retry Automático + Telemetria.
                     </p>
                   </div>
                   <div className="px-4 py-2 bg-white border border-brand-200 rounded-xl text-[10px] font-black text-brand-700 shadow-sm">
-                    v10.1 PROD
+                    v13.0 PROD
                   </div>
                 </div>
               </div>

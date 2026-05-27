@@ -1149,4 +1149,4 @@ Quando houver amostra escassa:
 Quando houver discordância futura:
 - Reavaliar imagem, patologia e possibilidade de nova amostragem.
 
-FIM DO MÓDULO PROCEDIMENTOS GUIADOS E INTERVENÇÃO — VERSÃO FINAL v12.0`;
+FIM DO MÓDULO PROCEDIMENTOS GUIADOS E INTERVENÇÃO — VERSÃO FINAL v12.0"`;
