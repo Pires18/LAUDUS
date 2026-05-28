@@ -472,16 +472,19 @@ export function ExamEditor({ examId }: Props) {
     let intervalId: ReturnType<typeof setInterval>;
 
     const startPolling = () => {
-      // Usa refs para ler o estado mais recente sem recriar o intervalo.
-      // 5s se viewer/modal estiver aberto, 30s em background (reduzido de 15s
-      // para diminuir a frequência de polls desnecessários).
+      // Tick base de 5s. Quando o viewer está fechado, só executa a cada 6 ticks (30s).
+      // Quando o viewer/modal estiver aberto, executa todo tick (5s).
+      // Isso evita recriar o intervalo ao abrir/fechar o viewer.
+      let tickCount = 0;
       intervalId = setInterval(() => {
         if (!active) return;
-        const intervalMs = (showIntegratedViewerRef.current || showDicomImagesRef.current) ? 5000 : 30000;
-        // Verifica se o intervalo atual corresponde ao esperado; se não, não faz nada
-        // (o próximo tick já usará o ref atualizado)
-        checkImages(false);
-      }, 5000); // tick base de 5s; a lógica interna decide se executa
+        tickCount++;
+        const isViewerOpen = showIntegratedViewerRef.current || showDicomImagesRef.current;
+        // Viewer aberto: a cada 5s. Background: a cada 30s (6 ticks de 5s).
+        if (isViewerOpen || tickCount % 6 === 0) {
+          checkImages(false);
+        }
+      }, 5000);
     };
 
     startPolling();
