@@ -527,7 +527,7 @@ function getModelForMode(settings: AppSettings, mode: string, area: string): str
   if (mode === 'generation' && (area === 'medicina-fetal' || area === 'vascular')) {
     return settings.geminiModelPro || 'gemini-2.5-pro';
   }
-  return settings.geminiModel || 'gemini-2.5-flash';
+  return settings.geminiModel || 'gemini-3.1-flash';
 }
 
 async function callGemini(

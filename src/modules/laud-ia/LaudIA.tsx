@@ -910,7 +910,8 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                             onChange={(e) => patchLocal({ geminiModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash — Última Geração (Recomendado)</option>
+                            <option value="gemini-3.1-flash">Gemini 3.1 Flash — Última Geração (Recomendado)</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                             <option value="gemini-2.5-pro">Gemini 2.5 Pro — Raciocínio Clínico Premium</option>
                             <option value="gemini-2.0-flash">Gemini 2.0 Flash — Velocidade Máxima</option>
                             <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro — Experimental</option>
@@ -918,7 +919,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
-                              { model: 'gemini-2.5-flash', label: '2.5 Flash', desc: 'Velocidade + Qualidade', color: 'brand' },
+                              { model: 'gemini-3.1-flash', label: '3.1 Flash', desc: 'Última Geração', color: 'brand' },
                               { model: 'gemini-2.5-pro', label: '2.5 Pro', desc: 'Máxima Precisão', color: 'violet' },
                             ].map(m => (
                               <button

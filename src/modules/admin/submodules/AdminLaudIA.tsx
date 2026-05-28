@@ -639,7 +639,8 @@ export function AdminLaudIA() {
                           onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
                           className="w-full rounded-2xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-14 px-6 font-black text-xs uppercase tracking-wider cursor-pointer bg-white"
                         >
-                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado / Equilíbrio Excelente)</option>
+                          <option value="gemini-3.1-flash">Gemini 3.1 Flash (Última Geração / Recomendado)</option>
+                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Equilíbrio Excelente)</option>
                           <option value="gemini-2.5-pro">Gemini 2.5 Pro (Raciocínio Clínico Premium)</option>
                           <option value="gemini-2.0-flash">Gemini 2.0 Flash (Velocidade Máxima)</option>
                           <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Experimental)</option>
@@ -670,6 +671,7 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
                               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                               <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
@@ -691,6 +693,7 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
                               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                               <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
@@ -712,6 +715,7 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
                               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                               <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
@@ -733,6 +737,7 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
+                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
                               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
                               <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
