@@ -20,7 +20,14 @@ function localOrthancWorklistPlugin() {
             return;
           }
           try {
-            const targetUrlObj = new URL(targetUrl);
+            let resolvedTargetUrl = targetUrl;
+            // Se estiver rodando dentro do Docker, substitui localhost/127.0.0.1 por host.docker.internal para conseguir conectar ao host
+            if (process.env.RUNNING_IN_DOCKER === 'true') {
+              resolvedTargetUrl = targetUrl
+                .replace('://localhost:', '://host.docker.internal:')
+                .replace('://127.0.0.1:', '://host.docker.internal:');
+            }
+            const targetUrlObj = new URL(resolvedTargetUrl);
             const headers: any = {};
             
             // Extract credentials from query parameters first, then URL, then fallback to orthanc:orthanc
@@ -42,7 +49,7 @@ function localOrthancWorklistPlugin() {
               authSource = 'default fallback (admin:123456789)';
             }
 
-            console.log(`[Orthanc Proxy] Requesting: ${req.method} ${targetUrl} (Auth source: ${authSource})`);
+            console.log(`[Orthanc Proxy] Requesting: ${req.method} ${resolvedTargetUrl} (Auth source: ${authSource})`);
 
             const fetchOptions: any = {
               method: req.method,
@@ -58,8 +65,8 @@ function localOrthancWorklistPlugin() {
               fetchOptions.body = body;
               fetchOptions.headers['Content-Type'] = 'application/json';
             }
-            const response = await fetch(targetUrl, fetchOptions);
-            console.log(`[Orthanc Proxy] Response status: ${response.status} from ${targetUrl}`);
+            const response = await fetch(resolvedTargetUrl, fetchOptions);
+            console.log(`[Orthanc Proxy] Response status: ${response.status} from ${resolvedTargetUrl}`);
             res.statusCode = response.status;
             response.headers.forEach((value, key) => {
               const lowerKey = key.toLowerCase();
@@ -86,6 +93,11 @@ function localOrthancWorklistPlugin() {
             req.on('end', () => {
               try {
                 const payload = JSON.parse(body);
+                // Se rodando no Docker, força o diretório da worklist para a montagem de volume
+                if (process.env.RUNNING_IN_DOCKER === 'true') {
+                  payload.outputDir = '/app/pacs-worklist/';
+                }
+                
                 // Resolve python executable path dynamically (cross-platform compatibility)
                 let pythonExecutable = 'python3';
                 if (process.platform === 'win32') {
@@ -128,7 +140,10 @@ function localOrthancWorklistPlugin() {
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
                   : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/';
-                const outputDir = payload.outputDir || defaultOutputDir;
+                let outputDir = payload.outputDir || defaultOutputDir;
+                if (process.env.RUNNING_IN_DOCKER === 'true') {
+                  outputDir = '/app/pacs-worklist/';
+                }
                 const filePath = path.join(outputDir, `agendamento_${examId}.wl`);
                 if (fs.existsSync(filePath)) {
                   fs.unlinkSync(filePath);
@@ -253,7 +268,7 @@ export default defineConfig({
     strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
-    open: true
+    open: process.env.RUNNING_IN_DOCKER === 'true' ? false : true
   }
 })
 

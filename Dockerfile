@@ -1,29 +1,25 @@
-# --- Estágio 1: Compilação ---
-FROM node:20-alpine AS build
+FROM node:20-alpine
+
+# Instala Python 3, pip e a biblioteca pydicom necessária para gerar os arquivos .wl da Worklist
+RUN apk add --no-cache python3 py3-pip && \
+    pip3 install --no-cache-dir --break-system-packages pydicom
 
 WORKDIR /app
 
-# Copia os manifestos de dependência
+# Copia manifestos de dependências
 COPY package*.json ./
 
-# Instala as dependências de forma limpa e rápida
+# Instala dependências do projeto
 RUN npm ci
 
-# Copia todo o código fonte do projeto
+# Copia o restante do código fonte
 COPY . .
 
-# Compila a aplicação gerando os arquivos estáticos na pasta dist/
-RUN npm run build
+# Expõe a porta padrão do Vite (5173)
+EXPOSE 5173
 
-# --- Estágio 2: Servidor de Produção ---
-FROM nginx:alpine
+# Sinaliza ao servidor Vite/plugin que está rodando em ambiente conteinerizado
+ENV RUNNING_IN_DOCKER=true
 
-# Copia os arquivos compilados do estágio anterior para a pasta pública do Nginx
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copia a configuração personalizada do Nginx (para rotas do React funcionarem)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Inicializa o servidor de desenvolvimento do Vite (com suporte ao middleware de PACS e Python)
+CMD ["npm", "run", "dev"]
