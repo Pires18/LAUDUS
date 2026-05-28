@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { setBroadcast } from '../../store/db';
+import { callMetricsHistory } from '../ai/gemini';
 
 // Submodules
 import { AdminUsers } from './submodules/AdminUsers';
@@ -81,7 +82,7 @@ export function Admin() {
 }
 
 function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) {
-  const { showToast } = useApp();
+  const { showToast, settings } = useApp();
   const [broadcastMsg, setBroadcastMsg] = useState('');
   const [broadcastType, setBroadcastType] = useState<'info' | 'warning' | 'error'>('info');
   const [isSending, setIsSending] = useState(false);
@@ -215,13 +216,29 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           <div className="space-y-4">
              <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100 flex items-center justify-between">
                 <div>
-                   <p className="text-xs font-bold text-brand-900">Modelo em Produção</p>
-                   <p className="text-[10px] text-brand-600 font-mono">gemini-2.5-flash</p>
+                   <p className="text-xs font-bold text-brand-900">
+                     {settings.aiProvider === 'anthropic' ? 'Anthropic Claude' : 'Google Gemini'}
+                   </p>
+                   <p className="text-[10px] text-brand-600 font-mono">
+                     {settings.aiProvider === 'anthropic'
+                       ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                       : (settings.geminiModel || 'gemini-2.5-flash')}
+                   </p>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
              </div>
              <p className="text-sm text-ink-600 leading-relaxed">
-               O motor de inteligência está operando normalmente com latência média de 1.2s. 
+               {(() => {
+                 const successfulCalls = callMetricsHistory.filter(m => m.success);
+                 const avgLatency = successfulCalls.length > 0
+                   ? (successfulCalls.reduce((acc, curr) => acc + curr.latencyMs, 0) / successfulCalls.length / 1000).toFixed(1) + 's'
+                   : '1.2s';
+                 const totalCalls = callMetricsHistory.length;
+                 const successRate = totalCalls > 0
+                   ? Math.round((successfulCalls.length / totalCalls) * 100) + '%'
+                   : '100%';
+                 return `O motor de inteligência está operando normalmente com latência média de ${avgLatency} (taxa de sucesso: ${successRate} nas últimas requisições).`;
+               })()}
              </p>
              <button onClick={() => onNavigate('laud-ia')} className="btn-ghost text-xs font-black text-brand-600 uppercase tracking-widest">
                Gerenciar IA Command Center →

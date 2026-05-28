@@ -191,9 +191,6 @@ function buildUniversalContext(settings: AppSettings): string {
   const rules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
 
   const parts = [master, global, skeleton, rules];
-  if (settings.normalDoctrine?.trim()) {
-    parts.push(`═══════════════════════════════════════════\nDOUTRINA DE NORMALIDADE HABITUAL DO MÉDICO:\n═══════════════════════════════════════════\n${settings.normalDoctrine.trim()}`);
-  }
   return parts.join('\n\n');
 }
 

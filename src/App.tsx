@@ -103,9 +103,12 @@ function AuthenticatedApp() {
   }, [loadSettings]);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-ink-50/30">
+    <div
+      className="flex flex-col overflow-hidden bg-ink-50/30"
+      style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)' }}
+    >
       <BroadcastBanner />
-      <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
         <Sidebar />
         <ViewRenderer />
       </div>

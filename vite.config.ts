@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { exec } from 'child_process'
 import fs from 'fs'
@@ -153,7 +154,95 @@ function localOrthancWorklistPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), localOrthancWorklistPlugin()],
+  plugins: [
+    react(),
+    localOrthancWorklistPlugin(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      includeAssets: ['favicon.svg', 'icons/*.png', 'logo-icon.png'],
+      manifest: {
+        name: 'LAUD.US',
+        short_name: 'LAUD.US',
+        description: 'Plataforma Inteligente de Laudos Ultrassonográficos com IA',
+        theme_color: '#0568c5',
+        background_color: '#0a0a0c',
+        display: 'standalone',
+        orientation: 'portrait-primary',
+        lang: 'pt-BR',
+        start_url: '/',
+        scope: '/',
+        categories: ['medical', 'productivity'],
+        icons: [
+          { src: '/icons/icon-72x72.png', sizes: '72x72', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-128x128.png', sizes: '128x128', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icons/icon-384x384.png', sizes: '384x384', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+        ],
+        shortcuts: [
+          {
+            name: 'Novo Laudo',
+            short_name: 'Novo Laudo',
+            description: 'Criar um novo laudo',
+            url: '/?action=new-exam',
+            icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }]
+          },
+          {
+            name: 'Worklist',
+            short_name: 'Worklist',
+            description: 'Ver exames pendentes',
+            url: '/?view=worklist',
+            icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }]
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB — handles large main bundle
+        runtimeCaching: [
+          {
+            // Google Fonts
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gstatic-fonts-cache',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] }
+            }
+          },
+          {
+            // Firebase Auth / Firestore (network-first)
+            urlPattern: /^https:\/\/.*\.firebaseio\.com\/.*/i,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'firebase-cache', networkTimeoutSeconds: 10 }
+          },
+          {
+            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'firestore-cache', networkTimeoutSeconds: 10 }
+          }
+        ],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//]
+      },
+      devOptions: {
+        enabled: false // disable SW in dev to avoid conflicts with HMR
+      }
+    })
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -2,8 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════
+   SAFE AREA + VIEWPORT FIXES
+   ═══════════════════════════════════════════ */
+
+:root {
+  /* safe-area env() fallbacks */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* BottomNav height: 64px + safe area */
+  --bottom-nav-height: calc(4rem + var(--safe-bottom));
+
+  /* Brand RGB for glow effects */
+  --brand-500-rgb: 17, 134, 231;
+}
+
 html, body, #root {
-  height: 100vh;
+  /* 100dvh: dynamic viewport height — handles Safari mobile URL bar correctly */
+  height: 100dvh;
   margin: 0;
   padding: 0;
   overflow: hidden;
@@ -58,6 +77,11 @@ html, body, #root {
   50% { opacity: 0.7; }
 }
 
+@keyframes pill-slide {
+  from { opacity: 0; transform: scaleX(0.5); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
 /* ═══════════════════════════════════════════
    BASE STYLES
    ═══════════════════════════════════════════ */
@@ -66,22 +90,27 @@ html, body, #root {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Reduzindo o zoom global do sistema para uma interface mais densa e profissional */
     font-size: 14.5px;
+    /* iOS momentum scroll fix */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent text size adjustment on orientation change */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-white text-ink-800 font-sans antialiased;
-    /* Evita bounces indesejados em iOS */
     overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
     line-height: 1.5;
+    /* Prevent pull-to-refresh on mobile browsers */
+    overscroll-behavior: none;
   }
 
   ::selection {
     @apply bg-brand-100 text-brand-900;
   }
 
-  /* Better focus styles for accessibility */
   :focus-visible {
     @apply outline-2 outline-brand-500 outline-offset-2;
     outline-style: solid;
@@ -122,6 +151,32 @@ html, body, #root {
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
     background-size: 200% 100%;
   }
+
+  /* Safe area padding utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .pb-nav {
+    /* padding to not be hidden below bottom nav on mobile */
+    padding-bottom: var(--bottom-nav-height);
+  }
+
+  /* 100dvh for full screen dynamic viewport */
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -140,12 +195,10 @@ html, body, #root {
     overflow: visible !important;
   }
 
-  /* Hides the main react app root completely to prevent parent viewport constraints */
   #root {
     display: none !important;
   }
 
-  /* Reset body styles for print */
   body {
     background: white !important;
     color: black !important;
@@ -153,7 +206,6 @@ html, body, #root {
     padding: 0 !important;
   }
 
-  /* Show the active print area */
   body:not(.print-mode-images) #print-area {
     display: block !important;
     position: relative !important;
@@ -178,7 +230,7 @@ html, body, #root {
     page-break-after: always;
     page-break-inside: avoid;
     box-sizing: border-box;
-    height: 287mm; /* Printable height for A4 with 5mm margin */
+    height: 287mm;
     max-height: 287mm;
     display: flex;
     flex-direction: column;
@@ -217,6 +269,7 @@ html, body, #root {
     display: none !important;
   }
 }
+
 /* ═══════════════════════════════════════════
    COMPONENT STYLES
    ═══════════════════════════════════════════ */
@@ -225,6 +278,8 @@ html, body, #root {
   /* ── Buttons ── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none;
+    /* Minimum touch target 44px for accessibility (WCAG 2.5.5) */
+    min-height: 44px;
   }
   .btn-primary {
     @apply btn bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white hover:from-brand-600 hover:to-brand-800 shadow-soft hover:shadow-medium active:scale-[0.98] border border-brand-500/20;
@@ -245,6 +300,8 @@ html, body, #root {
   /* ── Form elements ── */
   .input {
     @apply w-full px-4 py-2.5 rounded-xl border-2 border-ink-100 bg-white text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all text-sm font-medium hover:border-ink-200;
+    /* Minimum touch target */
+    min-height: 44px;
   }
   .label {
     @apply block text-[10px] font-black text-ink-500 mb-2 uppercase tracking-widest;
@@ -305,9 +362,15 @@ html, body, #root {
   /* ── Segmented Tab Group (unified pattern) ── */
   .tab-group {
     @apply flex gap-1 p-1.5 bg-ink-100/80 backdrop-blur-sm rounded-2xl overflow-x-auto w-fit border border-ink-200/50;
+    /* Scroll snap for swipeable tabs on mobile */
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
   }
   .tab-item {
     @apply px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 text-ink-500 hover:text-ink-800 cursor-pointer select-none;
+    scroll-snap-align: start;
+    /* Minimum touch target */
+    min-height: 40px;
   }
   .tab-item-active {
     @apply bg-white text-brand-700 shadow-premium border border-brand-100;
@@ -329,8 +392,28 @@ html, body, #root {
     @apply grid grid-cols-1 md:grid-cols-2 gap-8;
   }
 
+  /* ── Module Container — responsive padding + bottom nav clearance ── */
   .module-container {
-    @apply flex-1 flex flex-col w-full max-w-7xl mx-auto p-4 md:p-8 lg:p-12 pb-24 md:pb-12 animate-fade-in;
+    @apply flex-1 flex flex-col w-full max-w-7xl mx-auto animate-fade-in;
+    padding: 1rem 1rem var(--bottom-nav-height) 1rem;
+  }
+  @media (min-width: 768px) {
+    .module-container {
+      padding: 2rem 2rem 3rem 2rem;
+    }
+  }
+  @media (min-width: 1024px) {
+    .module-container {
+      padding: 3rem 3rem 3rem 3rem;
+    }
+  }
+
+  /* ── Sidebar nav tooltip (when collapsed) ── */
+  .sidebar-tooltip {
+    @apply absolute left-full ml-3 px-3 py-2 bg-ink-900 text-white text-xs font-bold rounded-xl whitespace-nowrap pointer-events-none opacity-0 transition-all duration-200 z-50 shadow-lg;
+  }
+  .sidebar-nav-item:hover .sidebar-tooltip {
+    @apply opacity-100;
   }
 }
 
@@ -344,7 +427,13 @@ html, body, #root {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Evita o tremido de scrollbar */
+/* Sidebar width transition */
+aside {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* Avoid scrollbar layout shift */
 html, body {
   scrollbar-gutter: stable;
 }
@@ -388,13 +477,27 @@ html, body {
 }
 
 /* ═══════════════════════════════════════════
-   CUSTOM SCROLLBAR
+   CUSTOM SCROLLBAR — elegant & subtle
    ═══════════════════════════════════════════ */
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
-::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
+/* Desktop — subtle thin scrollbar */
+@media (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
+}
+
+/* Mobile — hide scrollbar but keep scrolling functional */
+@media (hover: none) and (pointer: coarse) {
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
 
 /* ═══════════════════════════════════════════
    VIEW TRANSITIONS
@@ -412,4 +515,68 @@ html, body {
 
 .overlay-content {
   animation: scaleIn 0.2s ease-out both;
+}
+
+/* ═══════════════════════════════════════════
+   BOTTOM NAV — mobile PWA chrome
+   ═══════════════════════════════════════════ */
+
+.bottom-nav-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
+}
+
+/* Active pill indicator in bottom nav */
+.bottom-nav-pill {
+  animation: pill-slide 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE UTILITIES
+   ═══════════════════════════════════════════ */
+
+/* Fluid container for main content with sidebar offset */
+@media (max-width: 767px) {
+  /* Mobile: content takes full width, bottom nav provides clearance */
+  .app-main-content {
+    padding-bottom: var(--bottom-nav-height);
+  }
+
+  /* Prevent horizontal overflow on mobile */
+  .module-container {
+    overflow-x: hidden;
+  }
+
+  /* Make modals slide up as bottom sheets on mobile */
+  .modal-mobile-sheet {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 90dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Tablet — 768px to 1023px */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tablet-sidebar-collapsed {
+    width: 64px !important;
+  }
+}
+
+/* Ensure tap highlights are disabled on interactive elements */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* iOS input zoom prevention — keep font >= 16px in inputs */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }

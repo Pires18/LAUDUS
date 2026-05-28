@@ -203,3 +203,25 @@ Executa a validação de tipos de forma estática:
 ```bash
 npx tsc --noEmit
 ```
+
+---
+
+## 🐳 Executando via Docker (Produção)
+
+A aplicação conta com suporte completo para conteinerização via Docker utilizando build multi-stage e servidor Nginx configurado para Single Page Applications (SPA) e PWA.
+
+### 1. Iniciar o Container
+Para compilar e iniciar o container em segundo plano mapeando a porta `5173` do seu computador:
+```bash
+docker compose up -d --build
+```
+
+### 2. Acessar a Aplicação
+Uma vez iniciado o container, acesse:
+[http://localhost:5173](http://localhost:5173)
+
+### 3. Parar o Container
+Para encerrar a execução do container e remover os recursos criados:
+```bash
+docker compose down
+```

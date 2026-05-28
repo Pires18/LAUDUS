@@ -3,15 +3,16 @@ import { useApp } from '../../store/app';
 import { PageHeader } from '../../components/PageHeader';
 import {
   BrainCircuit, ShieldAlert,
-  Settings2, Save, RotateCcw, Zap,
+  Save, RotateCcw, Zap,
   GraduationCap, CheckCircle2, AlertCircle, Loader2,
   Sliders, LayoutList, FileText, Layout, ShieldCheck,
-  Code, Copy, Check, Plus, Trash2, Pencil, X,
-  BookOpen, Sparkles, ChevronDown, ChevronUp,
+  Code, Copy, Check,
+  Sparkles, ChevronDown, ChevronUp,
   Activity, Cpu, Database, Wifi, WifiOff,
   TrendingUp, FlaskConical, BarChart3, Clock, Coins,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
+import { useCollection } from '../../hooks/useFirestore';
 import { EXAM_AREAS, ExamArea, AppSettings } from '../../types';
 import {
   DEFAULT_MASTER_PROMPT,
@@ -21,10 +22,9 @@ import {
   DEFAULT_RIGID_RULES,
 } from '../ai/prompts';
 import { callMetricsHistory, type CallMetrics } from '../ai/gemini';
-import { genId } from '../../store/db';
 
-type TabId = 'prompts' | 'areas' | 'snippets' | 'engine' | 'training' | 'status';
-type PromptSubTab = 'master' | 'global' | 'structure' | 'rigid' | 'doctrine';
+type TabId = 'prompts' | 'areas' | 'engine' | 'training' | 'status';
+type PromptSubTab = 'master' | 'global' | 'structure' | 'rigid';
 
 // ==========================================
 // IDE CODE EDITOR COMPONENT
@@ -172,6 +172,8 @@ function readLS<T extends string>(key: string, fallback: T, valid: readonly T[])
 
 export function LaudIA() {
   const { settings, updateSettings, showToast } = useApp();
+  const { data: exams } = useCollection<any>('exams');
+  const finalizedCount = exams.filter(e => e.status === 'finalizado').length;
   const [isSaving, setIsSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
   // Track whether the user has unsaved local edits — prevents Firestore pushes
@@ -179,8 +181,8 @@ export function LaudIA() {
   const isDirty = useRef(false);
 
   // ── Navigation state — persisted across unmounts via localStorage ──
-  const ALL_TABS:    readonly TabId[]       = ['prompts','areas','snippets','engine','training','status'];
-  const ALL_SUBTABS: readonly PromptSubTab[] = ['master','global','structure','rigid','doctrine'];
+  const ALL_TABS:    readonly TabId[]       = ['prompts','areas','engine','training','status'];
+  const ALL_SUBTABS: readonly PromptSubTab[] = ['master','global','structure','rigid'];
   const ALL_AREAS    = EXAM_AREAS.map(a => a.id) as readonly ExamArea[];
 
   const [activeTab, _setActiveTab] = useState<TabId>(
@@ -221,11 +223,7 @@ export function LaudIA() {
   const [areaImprovePrompt, setAreaImprovePrompt] = useState('');
   const [showImprovePanel, setShowImprovePanel] = useState(false);
 
-  // Snippets state
-  const [snippetEditId, setSnippetEditId] = useState<string | null>(null);
-  const [snippetForm, setSnippetForm] = useState({ title: '', content: '', area: '' });
-  const [showSnippetForm, setShowSnippetForm] = useState(false);
-  const [snippetSearch, setSnippetSearch] = useState('');
+
 
   useEffect(() => {
     import('../../store/db').then(({ getAdminSettings }) => {
@@ -380,59 +378,12 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
     }
   }
 
-  // ── Snippets helpers ────────────────────────────────────────────
-  const snippets = localSettings.snippets || [];
 
-  function openNewSnippet() {
-    setSnippetEditId(null);
-    setSnippetForm({ title: '', content: '', area: '' });
-    setShowSnippetForm(true);
-  }
-
-  function openEditSnippet(id: string) {
-    const s = snippets.find(x => x.id === id);
-    if (!s) return;
-    setSnippetEditId(id);
-    setSnippetForm({ title: s.title, content: s.content, area: s.area || '' });
-    setShowSnippetForm(true);
-  }
-
-  function saveSnippet() {
-    if (!snippetForm.title.trim() || !snippetForm.content.trim()) {
-      showToast('Preencha o título e o conteúdo da frase.', 'error');
-      return;
-    }
-    let updated;
-    if (snippetEditId) {
-      updated = snippets.map(s =>
-        s.id === snippetEditId
-          ? { ...s, title: snippetForm.title.trim(), content: snippetForm.content.trim(), area: snippetForm.area || undefined }
-          : s
-      );
-    } else {
-      updated = [...snippets, { id: genId(), title: snippetForm.title.trim(), content: snippetForm.content.trim(), area: snippetForm.area || undefined }];
-    }
-    patchLocal({ snippets: updated });
-    setShowSnippetForm(false);
-    showToast(snippetEditId ? 'Frase atualizada!' : 'Frase adicionada!', 'success');
-  }
-
-  function deleteSnippet(id: string) {
-    patchLocal({ snippets: snippets.filter(s => s.id !== id) });
-    showToast('Frase removida.', 'info');
-  }
-
-  const filteredSnippets = snippets.filter(s =>
-    s.title.toLowerCase().includes(snippetSearch.toLowerCase()) ||
-    s.content.toLowerCase().includes(snippetSearch.toLowerCase()) ||
-    (s.area || '').toLowerCase().includes(snippetSearch.toLowerCase())
-  );
 
   // ── Sidebar items ───────────────────────────────────────────────
   const sidebarItems = [
     { id: 'prompts',   label: 'Doutrina & Prompts', icon: ShieldAlert },
     { id: 'areas',     label: 'Especialidades',      icon: LayoutList },
-    { id: 'snippets',  label: 'Frases Prontas',      icon: BookOpen },
     { id: 'engine',    label: 'Motor & API',          icon: Sliders },
     { id: 'training',  label: 'Aprendizado IA',       icon: GraduationCap },
     { id: 'status',    label: 'Status da IA',         icon: Activity },
@@ -443,7 +394,6 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
     { id: 'global',    label: 'Instruções Globais',  color: 'emerald', icon: FileText },
     { id: 'structure', label: 'Skeleton',             color: 'amber',   icon: Layout },
     { id: 'rigid',     label: 'Regras Rígidas',       color: 'rose',    icon: ShieldCheck },
-    { id: 'doctrine',  label: 'Doutrina Normal',      color: 'teal',    icon: Settings2 },
   ];
 
   // ── Helpers ─────────────────────────────────────────────────────
@@ -779,50 +729,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                   icon={ShieldAlert}
                 />
 
-                {/* Doutrina Normal */}
-                {activePromptSubTab === 'doctrine' && (
-                  <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
-                    <div className="p-6 border-b border-ink-100 flex items-start justify-between bg-ink-50/30">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center">
-                          <Settings2 size={20} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-ink-900">Doutrina de Normalidade</h4>
-                            {!localSettings.normalDoctrine?.trim() ? (
-                              <span className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 text-[8px] font-black uppercase tracking-wider border border-slate-200 flex items-center gap-1">
-                                Não configurada
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 text-[8px] font-black uppercase tracking-wider border border-teal-100/60 flex items-center gap-1">
-                                <CheckCircle2 size={9} /> Ativa
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Padrões de Normalidade do Seu Serviço</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl text-[11px] text-teal-900 leading-relaxed">
-                        <strong>Para que serve:</strong> Descreva aqui os valores de normalidade habituais do seu serviço, padrões anatômicos esperados, faixas etárias, parâmetros Doppler de referência e qualquer critério clínico que a IA deve incorporar automaticamente em todos os laudos. Este bloco é injetado diretamente no contexto da IA antes de cada geração.
-                      </div>
-                      <CodeEditor
-                        fileName="normal_doctrine.md"
-                        badge="DOUTRINA ATIVA"
-                        glowColor="teal"
-                        placeholder={`Exemplo:\n- Rins com dimensões normais para a faixa etária entre 9-12cm\n- Espessura do endométrio em menacme até 14mm\n- Resistência das artérias renais: IR < 0.70\n- Volume prostático normal até 30ml antes dos 60 anos...`}
-                        value={localSettings.normalDoctrine || ''}
-                        onChange={(v) => patchLocal({ normalDoctrine: v })}
-                        onRestore={() => {
-                          patchLocal({ normalDoctrine: '' });
-                          showToast('Doutrina de normalidade removida.', 'info');
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
+
               </div>
             )}
 
@@ -943,154 +850,8 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
               </div>
             )}
 
-            {/* ═══ TAB: SNIPPETS (Frases Prontas) ═══ */}
-            {activeTab === 'snippets' && (
-              <div className="space-y-6 animate-fade-in">
-                {/* Header */}
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                      <BookOpen size={24} />
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-black text-ink-900">Banco de Frases Prontas</h4>
-                      <p className="text-sm text-ink-500">
-                        {snippets.length} {snippets.length === 1 ? 'frase cadastrada' : 'frases cadastradas'} — insira rapidamente durante a laudagem.
-                      </p>
-                    </div>
-                  </div>
-                  <button onClick={openNewSnippet} className="btn-primary flex items-center gap-2">
-                    <Plus size={16} /> Nova Frase
-                  </button>
-                </div>
 
-                {/* Form modal inline */}
-                {showSnippetForm && (
-                  <div className="bg-white rounded-3xl border border-brand-200 shadow-lg p-6 space-y-5 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-black text-ink-900 text-base">
-                        {snippetEditId ? 'Editar Frase' : 'Nova Frase Pronta'}
-                      </h5>
-                      <button onClick={() => setShowSnippetForm(false)} className="p-1.5 rounded-xl hover:bg-ink-100 text-ink-500">
-                        <X size={18} />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <label className="label text-[10px] uppercase tracking-widest">Título / Atalho *</label>
-                        <input
-                          value={snippetForm.title}
-                          onChange={(e) => setSnippetForm({ ...snippetForm, title: e.target.value })}
-                          className="input h-11"
-                          placeholder="Ex: Rim Normal, BIRADS 2, Tireoide Homogênea..."
-                        />
-                      </div>
-                      <div>
-                        <label className="label text-[10px] uppercase tracking-widest">Área Médica (opcional)</label>
-                        <select
-                          value={snippetForm.area}
-                          onChange={(e) => setSnippetForm({ ...snippetForm, area: e.target.value })}
-                          className="input h-11"
-                        >
-                          <option value="">Todas as áreas</option>
-                          {EXAM_AREAS.map(a => (
-                            <option key={a.id} value={a.id}>{a.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label text-[10px] uppercase tracking-widest">Conteúdo da Frase *</label>
-                      <textarea
-                        value={snippetForm.content}
-                        onChange={(e) => setSnippetForm({ ...snippetForm, content: e.target.value })}
-                        rows={6}
-                        className="w-full rounded-2xl border-ink-200 text-sm p-4 focus:ring-brand-500 focus:border-brand-500 leading-relaxed bg-ink-50/30"
-                        placeholder="Digite o texto completo da frase que será inserida no laudo..."
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={saveSnippet} className="btn-primary flex items-center gap-2">
-                        <Save size={16} /> {snippetEditId ? 'Salvar Alterações' : 'Adicionar Frase'}
-                      </button>
-                      <button onClick={() => setShowSnippetForm(false)} className="btn-ghost text-ink-500">
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
 
-                {/* Search */}
-                {snippets.length > 0 && (
-                  <div className="relative">
-                    <input
-                      value={snippetSearch}
-                      onChange={(e) => setSnippetSearch(e.target.value)}
-                      className="input h-11 pl-10"
-                      placeholder="Buscar frases por título, conteúdo ou área..."
-                    />
-                    <FileText size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-                  </div>
-                )}
-
-                {/* Snippet list */}
-                {filteredSnippets.length === 0 && (
-                  <div className="bg-white rounded-3xl border border-ink-100 p-12 text-center space-y-3">
-                    <BookOpen size={36} className="text-ink-300 mx-auto" />
-                    <p className="font-bold text-ink-500">
-                      {snippets.length === 0 ? 'Nenhuma frase cadastrada ainda.' : 'Nenhuma frase encontrada.'}
-                    </p>
-                    {snippets.length === 0 && (
-                      <p className="text-sm text-ink-400">
-                        Crie frases prontas para agilizar sua laudagem. Elas ficam disponíveis no editor de laudos.
-                      </p>
-                    )}
-                    {snippets.length === 0 && (
-                      <button onClick={openNewSnippet} className="btn-primary mx-auto flex items-center gap-2 mt-4">
-                        <Plus size={16} /> Criar primeira frase
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-4">
-                  {filteredSnippets.map((snippet) => (
-                    <div key={snippet.id} className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 flex gap-4 group hover:border-brand-200 hover:shadow-md transition-all">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-black text-ink-900 text-sm">{snippet.title}</span>
-                          {snippet.area && (
-                            <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 text-[9px] font-black uppercase tracking-wider border border-brand-100">
-                              {EXAM_AREAS.find(a => a.id === snippet.area)?.label || snippet.area}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-ink-600 leading-relaxed line-clamp-3">{snippet.content}</p>
-                        <p className="text-[9px] text-ink-400 uppercase tracking-wider mt-2 font-bold">
-                          {snippet.content.length} caracteres
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => openEditSnippet(snippet.id)}
-                          className="p-2 rounded-xl hover:bg-brand-50 text-brand-500 transition-all"
-                          title="Editar"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => deleteSnippet(snippet.id)}
-                          className="p-2 rounded-xl hover:bg-red-50 text-red-400 transition-all"
-                          title="Remover"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* ═══ TAB: ENGINE ═══ */}
             {activeTab === 'engine' && (
@@ -1333,7 +1094,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     {/* Stats Cards */}
                     <div className="grid grid-cols-3 gap-4">
                       {[
-                        { icon: Database, label: 'Laudos no Banco', value: '—', sub: 'Finalizados', color: 'indigo' },
+                        { icon: Database, label: 'Laudos no Banco', value: finalizedCount.toString(), sub: 'Finalizados', color: 'indigo' },
                         { icon: TrendingUp, label: 'Mimetismo Ativo', value: localSettings.aiTrainingContextSize || 3, sub: 'exames p/ geração', color: 'violet' },
                         { icon: FlaskConical, label: 'Qualidade Est.', value: localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 5 ? 'Alta' : localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 3 ? 'Média' : 'Baixa', sub: 'calibração', color: 'emerald' },
                       ].map((stat) => (
@@ -1523,8 +1284,6 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                       { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-2.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
                       { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
                       { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
-                      { label: 'Doutrina', value: localSettings.normalDoctrine?.trim() ? 'Configurada' : 'Padrão (Admin)', icon: ShieldAlert },
-                      { label: 'Snippets', value: `${(localSettings.snippets || []).length} frases cadastradas`, icon: BookOpen },
                     ].map(item => (
                       <div key={item.label} className="p-4 bg-ink-50 rounded-2xl border border-ink-100">
                         <div className="flex items-center gap-2 mb-1">

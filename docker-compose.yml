@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  laud-us:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laud-us-app
+    ports:
+      - "5173:80"
+    restart: always

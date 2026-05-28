@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
-  LayoutDashboard, ClipboardList, UserCircle, FileSignature, 
-  Calculator, Sparkles, Hospital, Sliders, PanelLeftClose, 
+  LayoutDashboard, ClipboardList, UserCircle, FileSignature,
+  Calculator, Sparkles, Hospital, Sliders, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
   Users, LogOut
 } from 'lucide-react';
@@ -19,19 +19,40 @@ const items = [
   { key: 'worklist', label: 'Worklist', icon: ClipboardList, view: { name: 'worklist' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
+  { key: 'laud-ia', label: 'LaudIA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin'] },
   { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 
+/** Detects if viewport is tablet-sized (768–1023px) */
+function useIsTablet() {
+  const [isTablet, setIsTablet] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px) and (max-width: 1023px)');
+    const handler = (e: MediaQueryListEvent) => setIsTablet(e.matches);
+    setIsTablet(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return isTablet;
+}
+
 export function Sidebar() {
-  const { 
-    view, setView, selectedClinicId, setSelectedClinic, 
-    showToast, setShowCreateExamModal, setShowSupportModal, settings 
+  const {
+    view, setView, selectedClinicId, setSelectedClinic,
+    showToast, setShowCreateExamModal, setShowSupportModal, settings
   } = useApp();
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
+  const isTablet = useIsTablet();
+
+  // Auto-collapse on tablet, expanded on desktop
   const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    setCollapsed(isTablet);
+  }, [isTablet]);
+
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
 
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -43,12 +64,13 @@ export function Sidebar() {
   return (
     <aside
       className={classNames(
-        'hidden md:flex shrink-0 border-r border-ink-100 bg-white flex-col h-full transition-all duration-300 ease-in-out',
+        'hidden md:flex shrink-0 border-r border-ink-100 bg-white flex-col h-full',
         collapsed ? 'w-[64px]' : 'w-60'
       )}
+      style={{ transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
     >
       {/* Logo / Brand */}
-      <div className="p-3 border-b border-ink-100 bg-brand-50/30">
+      <div className={classNames("border-b border-ink-100 bg-brand-50/30", collapsed ? "p-2.5" : "p-3")}>
         <div className={classNames(
           'flex items-center',
           collapsed ? 'justify-center' : 'gap-3'
@@ -61,6 +83,9 @@ export function Sidebar() {
               <h1 className="text-xl font-black text-ink-900 leading-none tracking-tighter select-none">
                 LAUD<span className="text-brand-600">.US</span>
               </h1>
+              <p className="text-[9px] text-ink-400 font-bold uppercase tracking-[0.15em] mt-0.5">
+                Laudos com IA
+              </p>
             </div>
           )}
         </div>
@@ -83,27 +108,30 @@ export function Sidebar() {
                 {selectedClinic ? selectedClinic.name : 'Todas as Clínicas'}
               </span>
             </div>
-            <ChevronDown size={14} className="text-ink-500 shrink-0" />
+            <ChevronDown size={14} className={classNames(
+              "text-ink-500 shrink-0 transition-transform duration-200",
+              showClinicDropdown ? "rotate-180" : ""
+            )} />
           </button>
 
           {showClinicDropdown && (
-            <div className="absolute top-full left-3 right-3 mt-1 bg-white border border-ink-200 shadow-lg rounded-xl overflow-hidden z-50">
+            <div className="absolute top-full left-3 right-3 mt-1 bg-white border border-ink-200 shadow-lg rounded-xl overflow-hidden z-50 animate-scale-in">
               <button
                 onClick={() => { setSelectedClinic(null); setShowClinicDropdown(false); showToast('Filtro removido', 'info'); }}
                 className={classNames(
-                  "w-full text-left px-3 py-2 text-xs transition-colors flex items-center gap-2",
+                  "w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2",
                   !selectedClinicId ? "bg-brand-50 text-brand-700 font-medium" : "hover:bg-ink-50 text-ink-700"
                 )}
               >
                 <ClipboardList size={14} /> Todas as Clínicas
               </button>
-              <div className="max-h-48 overflow-y-auto">
+              <div className="max-h-48 overflow-y-auto custom-scrollbar">
                 {clinics.map(c => (
                   <button
                     key={c.id}
                     onClick={() => { setSelectedClinic(c.id); setShowClinicDropdown(false); showToast(`Filtrando: ${c.name}`, 'info'); }}
                     className={classNames(
-                      "w-full text-left px-3 py-2 text-xs transition-colors flex items-center gap-2 truncate",
+                      "w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2 truncate",
                       selectedClinicId === c.id ? "bg-brand-50 text-brand-700 font-medium" : "hover:bg-ink-50 text-ink-700"
                     )}
                   >
@@ -122,13 +150,15 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto custom-scrollbar">
+        {/* New Exam CTA */}
         <button
           onClick={() => setShowCreateExamModal(true)}
           className={classNames(
-            'w-full flex items-center rounded-lg text-sm font-bold transition-all duration-200 mb-4 bg-brand-600 text-white shadow-md hover:bg-brand-700',
+            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]',
             collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
           )}
+          title="Novo Laudo"
         >
           <FilePlus size={collapsed ? 18 : 16} className="shrink-0" />
           {!collapsed && <span className="animate-fade-in">Novo Laudo</span>}
@@ -141,42 +171,70 @@ export function Sidebar() {
             (item.key === 'worklist' && view.name === 'exam-editor') ||
             (item.key === 'clinics' && (view.name === 'clinic-detail' || view.name === 'clinic-form'));
           const Icon = item.icon;
+          const isLaudIA = item.key === 'laud-ia';
+
           return (
             <button
               key={item.key}
               onClick={() => setView(item.view)}
-              title={collapsed ? item.label : undefined}
               className={classNames(
-                'w-full flex items-center rounded-lg text-sm font-medium transition-all duration-200 relative',
+                'sidebar-nav-item w-full flex items-center rounded-xl text-sm font-medium transition-all duration-200 relative group',
                 collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
                 isActive
-                  ? 'bg-brand-50 text-brand-700 shadow-soft'
-                  : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900'
+                  ? 'bg-brand-50 text-brand-700 shadow-soft border border-brand-100/50'
+                  : isLaudIA
+                    ? 'text-violet-600 hover:bg-violet-50 hover:text-violet-700'
+                    : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900'
               )}
             >
-              <Icon size={collapsed ? 18 : 16} className="shrink-0" />
-              {!collapsed && <span className="animate-fade-in">{item.label}</span>}
+              <Icon
+                size={collapsed ? 18 : 16}
+                className={classNames(
+                  "shrink-0 transition-transform duration-200 group-hover:scale-110",
+                  isLaudIA && !isActive ? "text-violet-500" : ""
+                )}
+              />
+              {!collapsed && (
+                <span className="animate-fade-in flex-1 text-left">{item.label}</span>
+              )}
+
+              {/* Pending badge — worklist */}
               {!collapsed && item.key === 'worklist' && pendingCount > 0 && (
-                <span className="ml-auto bg-brand-100 text-brand-700 py-0.5 px-2 rounded-full text-[10px] font-bold animate-fade-in">
+                <span className="ml-auto bg-brand-100 text-brand-700 py-0.5 px-2 rounded-full text-[10px] font-black animate-fade-in">
                   {pendingCount}
                 </span>
               )}
               {collapsed && item.key === 'worklist' && pendingCount > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white shadow-sm" />
+              )}
+
+              {/* LaudIA sparkle badge */}
+              {!collapsed && isLaudIA && (
+                <span className="ml-auto text-[9px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider animate-fade-in">IA</span>
+              )}
+
+              {/* Tooltip for collapsed state */}
+              {collapsed && (
+                <span className="sidebar-tooltip">
+                  {item.label}
+                  {item.key === 'worklist' && pendingCount > 0 && (
+                    <span className="ml-1.5 bg-brand-500 text-white px-1.5 py-0.5 rounded-full text-[9px] font-black">{pendingCount}</span>
+                  )}
+                </span>
               )}
             </button>
           );
         })}
       </nav>
-      
+
       {/* Admin Quick Access (Bottom) */}
       {isAdmin && (
-        <div className="px-3 pb-4">
+        <div className={classNames("pb-3", collapsed ? "px-2" : "px-3")}>
           <button
             onClick={() => setView({ name: 'admin' })}
             title={collapsed ? 'Administração' : undefined}
             className={classNames(
-              'w-full flex items-center rounded-[1.5rem] transition-all duration-500 relative overflow-hidden group shadow-premium',
+              'sidebar-nav-item w-full flex items-center rounded-[1.5rem] transition-all duration-500 relative overflow-hidden group shadow-premium',
               collapsed ? 'justify-center p-3.5' : 'gap-3 px-5 py-4',
               view.name === 'admin'
                 ? 'bg-ink-900 text-white ring-4 ring-brand-500/20'
@@ -191,7 +249,10 @@ export function Sidebar() {
               </div>
             )}
             {view.name !== 'admin' && !collapsed && (
-              <div className="ml-auto w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(var(--brand-500-rgb),0.5)] animate-pulse" />
+              <div className="ml-auto w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(17,134,231,0.5)] animate-pulse" />
+            )}
+            {collapsed && (
+              <span className="sidebar-tooltip">Administração</span>
             )}
           </button>
         </div>
@@ -205,14 +266,14 @@ export function Sidebar() {
               <img
                 src={user.photoURL}
                 onClick={() => setView({ name: 'settings' })}
-                alt=""
+                alt="Perfil"
                 className="w-8 h-8 rounded-full border border-ink-200 object-cover cursor-pointer hover:scale-110 transition-transform shadow-sm"
                 title="Meu Perfil"
               />
             ) : (
               <div
                 onClick={() => setView({ name: 'settings' })}
-                className="w-8 h-8 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-black shadow-inner text-xs cursor-pointer hover:scale-110 transition-transform border border-ink-200"
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-black shadow-inner text-xs cursor-pointer hover:scale-110 transition-transform border-2 border-white"
                 title="Meu Perfil"
               >
                 {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
@@ -230,7 +291,7 @@ export function Sidebar() {
 
         {!collapsed && (
           <div className="p-4 animate-fade-in">
-            <div 
+            <div
               onClick={() => setView({ name: 'settings' })}
               className="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-white border border-transparent hover:border-ink-200/50 hover:shadow-soft transition-all duration-300 group cursor-pointer"
               title="Acessar Meu Perfil"
@@ -238,7 +299,7 @@ export function Sidebar() {
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full border-2 border-white shadow-md object-cover group-hover:scale-105 transition-transform" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-ink-200 flex items-center justify-center text-ink-600 font-black shadow-inner text-xs group-hover:scale-105 transition-transform border-2 border-white">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-black shadow-md text-xs group-hover:scale-105 transition-transform border-2 border-white">
                   {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                 </div>
               )}
@@ -274,7 +335,7 @@ export function Sidebar() {
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]" />
                 Online
               </span>
-              <button 
+              <button
                 onClick={() => setShowSupportModal(true)}
                 className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-brand-50 text-brand-700 px-3 py-1.5 rounded-full font-black border border-brand-100 shadow-sm uppercase tracking-widest hover:bg-brand-600 hover:text-white transition-all active:scale-95"
               >
@@ -282,7 +343,7 @@ export function Sidebar() {
                 Suporte
               </button>
             </div>
-            
+
             <button
               onClick={signOut}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[10px] bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white font-black uppercase tracking-widest transition-all duration-300 border border-rose-100/60 shadow-sm hover:shadow-md active:scale-95 mt-1"

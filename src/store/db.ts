@@ -401,17 +401,44 @@ const EXAM_AREAS_SET = new Set([
 export async function getRecentFinalizedReports(templateIdOrArea: string, limitCount: number = 3): Promise<string[]> {
   try {
     const isArea = EXAM_AREAS_SET.has(templateIdOrArea);
-    const filterField = isArea ? 'area' : 'templateId';
 
+    // Fetch all finalized exams for this user.
+    // Filtering by status == 'finalizado' is simple equality and doesn't require composite indexes.
     const q = query(
       getCollectionRef('exams'),
-      where(filterField, '==', templateIdOrArea),
-      where('status', '==', 'finalizado'),
-      orderBy('finalizedAt', 'desc'),
-      limit(limitCount)
+      where('status', '==', 'finalizado')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(doc => doc.data().reportContent).filter(Boolean);
+    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+    let filtered: any[] = [];
+
+    if (isArea) {
+      // If templateIdOrArea is an area, filter by area.
+      filtered = docs.filter(d => d.area === templateIdOrArea);
+      filtered.sort((a, b) => (b.finalizedAt || b.createdAt || 0) - (a.finalizedAt || a.createdAt || 0));
+    } else {
+      // First, try filtering by the specific templateId.
+      filtered = docs.filter(d => d.templateId === templateIdOrArea);
+      filtered.sort((a, b) => (b.finalizedAt || b.createdAt || 0) - (a.finalizedAt || a.createdAt || 0));
+
+      // If we don't have enough matches for this template, fallback to the same area/specialty
+      if (filtered.length < limitCount) {
+        // Find the area of the active template
+        const template = await getItem<any>('templates', templateIdOrArea);
+        const area = template?.area;
+        if (area) {
+          const areaFallback = docs.filter(d => d.area === area && d.templateId !== templateIdOrArea);
+          areaFallback.sort((a, b) => (b.finalizedAt || b.createdAt || 0) - (a.finalizedAt || a.createdAt || 0));
+          filtered = [...filtered, ...areaFallback];
+        }
+      }
+    }
+
+    return filtered
+      .slice(0, limitCount)
+      .map(doc => doc.reportContent)
+      .filter(Boolean);
   } catch (err) {
     console.error('Erro ao buscar laudos recentes:', err);
     return [];
