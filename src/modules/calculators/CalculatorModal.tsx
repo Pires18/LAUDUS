@@ -42,7 +42,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.94, opacity: 0, y: 30 }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="relative bg-white/95 backdrop-blur-xl w-full max-w-6xl h-full sm:h-[90vh] lg:h-full lg:max-h-[850px] rounded-none sm:rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 shadow-slate-950/20"
+        className="relative bg-white/95 backdrop-blur-xl w-full max-w-6xl h-dvh sm:h-[90vh] lg:h-full lg:max-h-[850px] rounded-none sm:rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 shadow-slate-950/20"
       >
         {/* Header with Premium Mesh Gradient */}
         <div className="relative h-20 sm:h-28 shrink-0 overflow-hidden bg-slate-900 border-b border-slate-800">
@@ -153,7 +153,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
               
               {/* Editor Workspace (Stackable on Mobile) */}
               <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-4 sm:p-10 custom-scrollbar">
+                <div className="flex-1 overflow-y-visible lg:overflow-y-auto p-4 sm:p-10 custom-scrollbar">
                   <div className="max-w-3xl mx-auto bg-white rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm p-4 sm:p-10">
                     {selectedCalc && (
                       <>
@@ -183,7 +183,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                       <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-tight">Resultado sincronizado em tempo real</p>
                    </div>
                    
-                   <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 custom-scrollbar bg-slate-50/20 max-h-[300px] lg:max-h-none">
+                   <div className="flex-1 overflow-y-visible lg:overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 custom-scrollbar bg-slate-50/20 max-h-none lg:max-h-none">
                       <AnimatePresence mode="wait">
                         {calcResult?._summary ? (
                           <motion.div 

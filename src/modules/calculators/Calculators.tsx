@@ -181,7 +181,7 @@ export function Calculators() {
       {/* Modal da Calculadora */}
       {selectedCalcId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-900/60 p-2 sm:p-4 lg:p-8 animate-in fade-in duration-200 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100 flex flex-col">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] shadow-2xl w-full max-w-5xl my-4 max-h-fit lg:max-h-[90vh] overflow-visible lg:overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100 flex flex-col">
             <div className="px-5 py-4 sm:px-8 sm:py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/20 shrink-0">
@@ -200,7 +200,7 @@ export function Calculators() {
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6">
+            <div className="flex-1 overflow-y-visible lg:overflow-y-auto p-4 sm:p-8 custom-scrollbar space-y-6">
               <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-6 shadow-sm">
                 {activeCalc && React.createElement(activeCalc.component, {
                   value: calcResult ?? {},

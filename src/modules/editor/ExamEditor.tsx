@@ -777,7 +777,7 @@ export function ExamEditor({ examId }: Props) {
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Integrated Dicom Image Viewer Sidebar */}
             {showIntegratedViewer && (
-              <div className="w-[380px] md:w-[460px] xl:w-[540px] border-r border-slate-800 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in relative z-20">
+               <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-slate-850 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0">
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-4">
@@ -1234,7 +1234,7 @@ export function ExamEditor({ examId }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 30 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed inset-0 w-full h-full rounded-none sm:inset-auto sm:bottom-24 sm:right-6 lg:right-10 sm:w-[420px] sm:h-[72vh] sm:max-h-[660px] bg-white sm:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[120] overflow-hidden"
+              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[120] overflow-hidden"
             >
               {/* Premium Header with Mesh-style Gradient */}
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">

@@ -61,7 +61,7 @@ export function LaudCopilot({
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
-  const [autoRefineEnabled, setAutoRefineEnabled] = useState(true);
+  const [autoRefineEnabled, setAutoRefineEnabled] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const cancelActiveRequest = () => {
@@ -582,7 +582,7 @@ export function LaudCopilot({
 
   return (
     <div className={classNames(
-      "flex flex-col h-full bg-slate-50 relative overflow-hidden",
+      "flex flex-col h-full min-h-0 bg-slate-50 relative overflow-hidden",
       isDocked ? "shadow-none" : "rounded-none md:rounded-b-[2.5rem]"
     )}>
       {/* Tab Navigation */}

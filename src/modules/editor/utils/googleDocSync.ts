@@ -82,11 +82,7 @@ export async function syncGoogleDoc(
 
   const sections: Record<string, string> = {};
   Object.keys(sectionBuffer).forEach(key => {
-    if (key === 'conclusao_laudo' || key === 'recomendacao_laudo' || key === 'observacao_laudo') {
-      sections[key] = sectionBuffer[key].join('\n');
-    } else {
-      sections[key] = sectionBuffer[key].join('\n\n');
-    }
+    sections[key] = sectionBuffer[key].join('\n');
   });
 
   const replacements: Record<string, string> = {
