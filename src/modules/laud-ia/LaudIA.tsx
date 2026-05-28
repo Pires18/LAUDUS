@@ -263,7 +263,7 @@ export function LaudIA() {
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
         const result = await model.generateContent('Responda apenas: OK');
         if (result.response.text()) {
           setTestStatus('success');
@@ -338,7 +338,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -910,17 +910,15 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                             onChange={(e) => patchLocal({ geminiModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="gemini-3.1-flash">Gemini 3.1 Flash — Última Geração (Recomendado)</option>
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro — Raciocínio Clínico Premium</option>
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash — Velocidade Máxima</option>
-                            <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro — Experimental</option>
-                            <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking — Experimental</option>
+                            <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
+                            <option value="gemini-3-flash">GEMINI 3 FLASH</option>
+                            <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
+                            <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
-                              { model: 'gemini-3.1-flash', label: '3.1 Flash', desc: 'Última Geração', color: 'brand' },
-                              { model: 'gemini-2.5-pro', label: '2.5 Pro', desc: 'Máxima Precisão', color: 'violet' },
+                              { model: 'gemini-3.5-flash', label: '3.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
+                              { model: 'gemini-3.1-pro', label: '3.1 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
                             ].map(m => (
                               <button
                                 key={m.model}

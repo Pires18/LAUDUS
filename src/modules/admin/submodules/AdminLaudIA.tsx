@@ -200,7 +200,7 @@ export function AdminLaudIA() {
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
         const result = await model.generateContent('Responda apenas: OK');
         const text = result.response.text();
         if (text) {
@@ -269,7 +269,7 @@ export function AdminLaudIA() {
               COGNITIVE HUB: ACTIVE
             </span>
             <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
-              {localSettings.geminiModel || 'gemini-2.0-flash-exp'}
+              {localSettings.geminiModel || 'gemini-3.5-flash'}
             </span>
           </div>
           <h3 className="text-xl font-black text-ink-900">IA Command Center</h3>
@@ -639,12 +639,10 @@ export function AdminLaudIA() {
                           onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
                           className="w-full rounded-2xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-14 px-6 font-black text-xs uppercase tracking-wider cursor-pointer bg-white"
                         >
-                          <option value="gemini-3.1-flash">Gemini 3.1 Flash (Última Geração / Recomendado)</option>
-                          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Equilíbrio Excelente)</option>
-                          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Raciocínio Clínico Premium)</option>
-                          <option value="gemini-2.0-flash">Gemini 2.0 Flash (Velocidade Máxima)</option>
-                          <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Experimental)</option>
-                          <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Flash Thinking (Experimental)</option>
+                          <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
+                          <option value="gemini-3-flash">GEMINI 3 FLASH</option>
+                          <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
+                          <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                         </select>
                       </div>
 
@@ -671,12 +669,10 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
-                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
-                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
+                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
+                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                             </select>
                           </div>
                           {/* Refinamento */}
@@ -693,12 +689,10 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
-                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
-                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
+                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
+                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                             </select>
                           </div>
                           {/* Copiloto */}
@@ -715,12 +709,10 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
-                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
-                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
+                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
+                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                             </select>
                           </div>
                           {/* Templates */}
@@ -737,12 +729,10 @@ export function AdminLaudIA() {
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.1-flash">Gemini 3.1 Flash</option>
-                              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                              <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                              <option value="gemini-2.0-pro-exp">Gemini 2.0 Pro (Exp)</option>
-                              <option value="gemini-2.0-flash-thinking-exp">Gemini 2.0 Thinking (Exp)</option>
+                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
+                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
+                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                             </select>
                           </div>
                         </div>

@@ -222,7 +222,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
                    <p className="text-[10px] text-brand-600 font-mono">
                      {settings.aiProvider === 'anthropic'
                        ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                       : (settings.geminiModel || 'gemini-2.5-flash')}
+                       : (settings.geminiModel || 'gemini-3.5-flash')}
                    </p>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />

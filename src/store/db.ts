@@ -108,7 +108,7 @@ export async function getSettings(): Promise<AppSettings> {
     const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
     
     let defaultSettings: AppSettings = { 
-      geminiModel: 'gemini-3.1-flash', 
+      geminiModel: 'gemini-3.5-flash', 
       aiProvider: 'gemini', 
       anthropicModel: 'claude-3-5-sonnet-latest',
       dicomSyncEnabled: true,
@@ -163,7 +163,7 @@ export async function getSettings(): Promise<AppSettings> {
   }
   const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
   return { 
-    geminiModel: 'gemini-3.1-flash', 
+    geminiModel: 'gemini-3.5-flash', 
     aiProvider: 'gemini', 
     anthropicModel: 'claude-3-5-sonnet-latest',
     dicomSyncEnabled: true,

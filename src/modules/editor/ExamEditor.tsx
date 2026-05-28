@@ -1119,7 +1119,7 @@ export function ExamEditor({ examId }: Props) {
                 geminiModel={
                   settings.aiProvider === 'anthropic'
                     ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                    : (settings.geminiModel || 'gemini-2.5-flash')
+                    : (settings.geminiModel || 'gemini-3.5-flash')
                 }
               />
 
@@ -1402,7 +1402,7 @@ export function ExamEditor({ examId }: Props) {
                 <p className="text-xs text-ink-500 mt-0.5">Prompt exato enviado ao modelo {
                   settings.aiProvider === 'anthropic'
                     ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                    : (settings.geminiModel || 'gemini-2.5-flash')
+                    : (settings.geminiModel || 'gemini-3.5-flash')
                 }</p>
               </div>
               <button onClick={() => setShowPromptPreview(false)} className="p-1.5 rounded-lg hover:bg-ink-100 text-ink-400"><X size={18} /></button>
@@ -1428,7 +1428,7 @@ export function ExamEditor({ examId }: Props) {
                 Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {
                   settings.aiProvider === 'anthropic'
                     ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                    : (settings.geminiModel || 'gemini-2.5-flash')
+                    : (settings.geminiModel || 'gemini-3.5-flash')
                 }
               </span>
               <button
