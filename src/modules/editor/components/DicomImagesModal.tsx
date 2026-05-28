@@ -1,97 +1,66 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../../../components/Modal';
 import { AppSettings, ExamRequest } from '../../../types';
 import { Loader2, Camera, Printer, CheckSquare, Square, AlertTriangle, RefreshCw } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { DicomThumbnail } from './DicomThumbnail';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   exam: ExamRequest;
   settings: AppSettings;
+  instances: any[];
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
   onPrint: (instances: any[], gridType: string) => void;
 }
 
-export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Props) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [instances, setInstances] = useState<any[]>([]);
+export function DicomImagesModal({ 
+  open, 
+  onClose, 
+  exam, 
+  settings, 
+  instances, 
+  loading, 
+  error, 
+  onRefresh, 
+  onPrint 
+}: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [gridType, setGridType] = useState<string>('2x3');
 
   const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
 
+  const initializedRef = useRef(false);
+  const prevInstanceIdsRef = useRef<string[]>([]);
+
+  // Keep selection in sync: select all initially, and auto-select new instances as they arrive,
+  // without overriding any manual deselection of existing instances.
   useEffect(() => {
     if (open) {
-      fetchImages();
-    }
-  }, [open, exam.id, baseUrl]);
-
-  const fetchImages = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-      const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
-      
-      // 1. Localiza o estudo no Orthanc usando o StudyInstanceUID via POST /tools/find
-      const lookupRes = await fetch(
-        `/api/orthanc-proxy?url=${encodeURIComponent(findUrl)}${authParams}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            Level: 'Study',
-            Query: {
-              StudyInstanceUID: studyUid
-            }
-          })
+      const currentIds = instances.map((inst: any) => inst.ID);
+      if (!initializedRef.current) {
+        setSelectedIds(new Set(currentIds));
+        initializedRef.current = true;
+      } else {
+        const prevIds = prevInstanceIdsRef.current;
+        const newIds = currentIds.filter(id => !prevIds.includes(id));
+        if (newIds.length > 0) {
+          setSelectedIds(prev => {
+            const next = new Set(prev);
+            newIds.forEach(id => next.add(id));
+            return next;
+          });
         }
-      );
-      
-      if (!lookupRes.ok) {
-        throw new Error(`Não foi possível conectar ao Orthanc (${lookupRes.status}).`);
       }
-      
-      const studies = await lookupRes.json();
-      if (!studies || studies.length === 0) {
-        setError(`Estudo não localizado no Orthanc. Certifique-se de que o exame foi realizado na máquina de ultrassom com o ID ${exam.id} e enviado ao PACS.`);
-        setInstances([]);
-        return;
-      }
-      
-      const studyId = studies[0];
-      
-      // 2. Busca todas as instâncias (imagens/fatias) daquele estudo
-      const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-      const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
-      
-      if (!instancesRes.ok) {
-        throw new Error(`Erro ao obter imagens do estudo do Orthanc.`);
-      }
-      
-      const data = await instancesRes.json();
-      
-      // Ordena por InstanceNumber
-      const sorted = data.sort((a: any, b: any) => {
-        const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
-        const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
-        return numA - numB;
-      });
-      
-      setInstances(sorted);
-      // Seleciona todas por padrão
-      setSelectedIds(new Set(sorted.map((inst: any) => inst.ID)));
-    } catch (err: any) {
-      console.error('[Orthanc Fetch Error]', err);
-      setError(err.message || 'Erro de conexão com o servidor local Orthanc.');
-    } finally {
-      setLoading(false);
+      prevInstanceIdsRef.current = currentIds;
+    } else {
+      initializedRef.current = false;
+      prevInstanceIdsRef.current = [];
     }
-  };
+  }, [open, instances]);
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -123,12 +92,20 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
     <Modal open={open} onClose={onClose} title="Imagens do Exame (Orthanc PACS)" size="lg">
       <div className="space-y-5">
         {/* Info Header */}
-        <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-          <Camera className="text-slate-500 shrink-0 mt-0.5" size={18} />
-          <div className="text-xs leading-normal font-semibold text-slate-600">
-            Busca direta de imagens no servidor Orthanc local em <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[10px]">{baseUrl}</code>.
-            Selecione as fotos do PACS que deseja incluir na documentação fotográfica impressa.
+        <div className="flex items-start justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <div className="flex items-start gap-3">
+            <Camera className="text-slate-500 shrink-0 mt-0.5" size={18} />
+            <div className="text-xs leading-normal font-semibold text-slate-600">
+              Busca direta de imagens no servidor Orthanc local em <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[10px]">{baseUrl}</code>.
+              Selecione as fotos do PACS que deseja incluir na documentação fotográfica impressa.
+            </div>
           </div>
+          {settings.dicomSyncEnabled !== false && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-black uppercase tracking-wider text-emerald-700 shrink-0 select-none shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Sincronismo Ativo
+            </div>
+          )}
         </div>
 
         {/* Loading / Error States */}
@@ -149,7 +126,8 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
               </p>
             </div>
             <button
-              onClick={fetchImages}
+              type="button"
+              onClick={onRefresh}
               className="mt-2 h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all"
             >
               <RefreshCw size={12} />
@@ -216,17 +194,16 @@ export function DicomImagesModal({ open, onClose, exam, settings, onPrint }: Pro
                     </div>
 
                     {/* Dicom Image Preview */}
-                    <div className="flex-1 flex items-center justify-center overflow-hidden">
-                      <img
+                    <div className="flex-1 flex items-center justify-center overflow-hidden w-full h-full">
+                      <DicomThumbnail
                         src={previewUrl}
                         alt={`Instance ${instNum}`}
-                        loading="lazy"
-                        className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform"
+                        className="group-hover:scale-105"
                       />
                     </div>
 
                     {/* Metadata Footer */}
-                    <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 text-left w-full text-[9px] font-bold text-slate-300 border-t border-white/5">
+                    <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 text-left w-full text-[9px] font-bold text-slate-300 border-t border-white/5 z-10">
                       Foto {idx + 1} {instance.MainDicomTags?.InstanceNumber ? `(Inst. ${instance.MainDicomTags.InstanceNumber})` : ''}
                     </div>
                   </button>

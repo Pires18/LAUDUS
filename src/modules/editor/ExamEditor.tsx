@@ -8,13 +8,14 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
 import { PrintImagesLayout } from '../export/PrintImagesLayout';
+import { DicomThumbnail } from './components/DicomThumbnail';
 
 // Refactored Hooks
 import { useExamActions } from './hooks/useExamActions';
@@ -28,6 +29,140 @@ import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
 import { ReportVersionsModal } from './components/ReportVersionsModal';
 
+const locateStudy = async (
+  baseUrl: string,
+  authParams: string,
+  exam: ExamRequest,
+  patient: Patient | null
+): Promise<any | null> => {
+  const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
+  
+  const queryOrthanc = async (query: any) => {
+    try {
+      const res = await fetch(
+        `/api/orthanc-proxy?url=${encodeURIComponent(findUrl)}${authParams}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            Level: 'Study',
+            Expand: true,
+            Query: query
+          })
+        }
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (err) {
+      console.warn('[locateStudy Query Error]', err);
+      return [];
+    }
+  };
+
+  // 1. Try exact StudyInstanceUID (standard DICOM worklist mapping)
+  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+  let studies = await queryOrthanc({ StudyInstanceUID: studyUid });
+  if (studies && studies.length > 0) {
+    return studies[0];
+  }
+
+  // 2. Try AccessionNumber matching exam.id (in case of manual entry of accession)
+  studies = await queryOrthanc({ AccessionNumber: exam.id });
+  if (studies && studies.length > 0) {
+    return studies[0];
+  }
+
+  // 3. Try AccessionNumber matching exam.friendlyId
+  if (exam.friendlyId) {
+    studies = await queryOrthanc({ AccessionNumber: exam.friendlyId });
+    if (studies && studies.length > 0) {
+      return studies[0];
+    }
+  }
+
+  // 4. Try PatientID matching exam.patientId or patient.id
+  const patientIds = new Set<string>();
+  if (exam.patientId) patientIds.add(exam.patientId);
+  if (patient?.id) patientIds.add(patient.id);
+
+  let candidates: any[] = [];
+  for (const pid of patientIds) {
+    const found = await queryOrthanc({ PatientID: pid });
+    if (found && found.length > 0) {
+      candidates.push(...found);
+    }
+  }
+
+  // 5. Try PatientID matching exam.id (common user workaround where exam ID is typed as patient ID)
+  studies = await queryOrthanc({ PatientID: exam.id });
+  if (studies && studies.length > 0) {
+    candidates.push(...studies);
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+
+  // Filter & score to find the study closest to the exam creation date
+  const examTime = exam.createdAt; // timestamp ms
+  const scored = candidates.map((c) => {
+    const studyDate = c.MainDicomTags?.StudyDate || ''; // YYYYMMDD
+    const studyTime = c.MainDicomTags?.StudyTime || '000000'; // HHMMSS
+    
+    let diffMs = Infinity;
+    if (studyDate.length === 8) {
+      const year = parseInt(studyDate.substring(0, 4), 10);
+      const month = parseInt(studyDate.substring(4, 6), 10) - 1;
+      const day = parseInt(studyDate.substring(6, 8), 10);
+      
+      let hour = 0, minute = 0, second = 0;
+      if (studyTime.length >= 6) {
+        hour = parseInt(studyTime.substring(0, 2), 10);
+        minute = parseInt(studyTime.substring(2, 4), 10);
+        second = parseInt(studyTime.substring(4, 6), 10);
+      }
+      
+      const sDate = new Date(year, month, day, hour, minute, second);
+      diffMs = Math.abs(sDate.getTime() - examTime);
+    }
+    return { study: c, diffMs };
+  });
+
+  // Sort by time difference ascending
+  scored.sort((a, b) => a.diffMs - b.diffMs);
+  return scored[0].study;
+};
+
+const preloadImages = (urls: string[]): Promise<void> => {
+  return new Promise((resolve) => {
+    if (urls.length === 0) {
+      resolve();
+      return;
+    }
+    let loadedCount = 0;
+    const total = urls.length;
+    
+    const checkResolve = () => {
+      loadedCount++;
+      if (loadedCount === total) {
+        resolve();
+      }
+    };
+
+    urls.forEach(url => {
+      const img = new Image();
+      img.onload = checkResolve;
+      img.onerror = checkResolve; // Resolve anyway on error to avoid hanging
+      img.src = url;
+    });
+  });
+};
 
 interface Props {
   examId: string;
@@ -85,6 +220,10 @@ export function ExamEditor({ examId }: Props) {
   const [showIntegratedViewer, setShowIntegratedViewer] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
+  const [dicomLoading, setDicomLoading] = useState(false);
+  const [dicomError, setDicomError] = useState<string | null>(null);
+  const [dicomRefreshKey, setDicomRefreshKey] = useState(0);
+  const dicomLoadingRef = useRef(false);
 
   useEffect(() => {
     setActiveImageIndex(0);
@@ -135,87 +274,92 @@ export function ExamEditor({ examId }: Props) {
       return;
     }
 
-    const checkImages = async () => {
+    const checkImages = async (isManual = false) => {
+      if (!isManual && dicomLoadingRef.current) return;
+      dicomLoadingRef.current = true;
+      if (isManual) {
+        setDicomLoading(true);
+        setDicomError(null);
+      }
       try {
         const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-        const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
         const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-        const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
         
-        const res = await fetch(
-          `/api/orthanc-proxy?url=${encodeURIComponent(findUrl)}${authParams}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              Level: 'Study',
-              Query: {
-                StudyInstanceUID: studyUid
-              }
-            })
-          }
-        );
-
-        if (!res.ok) {
-          console.warn('[PACS Check] Erro na resposta do proxy:', res.status);
+        const study = await locateStudy(baseUrl, authParams, exam, patient);
+        if (!study) {
           if (active) {
-            setHasDicomImages(false);
             setDicomInstances([]);
+            setHasDicomImages(false);
+            setDicomError(`Estudo não localizado no Orthanc. Certifique-se de que o exame foi realizado na máquina de ultrassom com o ID de Paciente ${exam.patientId} ou ID de Exame ${exam.id}.`);
           }
           return;
         }
 
-        const studies = await res.json();
-        if (studies && studies.length > 0) {
-          const studyId = studies[0];
-          const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-          const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
-          
-          if (instancesRes.ok) {
-            const instances = await instancesRes.json();
-            const sorted = (instances || []).sort((a: any, b: any) => {
-              const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
-              const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
-              return numA - numB;
-            });
-            if (active) {
-              setDicomInstances(sorted);
-              setHasDicomImages(sorted.length > 0);
-            }
-          } else {
-            if (active) {
-              setHasDicomImages(false);
-              setDicomInstances([]);
-            }
-          }
-        } else {
-          if (active) {
-            setHasDicomImages(false);
-            setDicomInstances([]);
-          }
+        const studyId = study.ID || study;
+        const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+        const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
+        
+        if (!instancesRes.ok) {
+          throw new Error(`Erro ao obter imagens do estudo do Orthanc.`);
         }
-      } catch (e) {
-        console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
+        
+        const instances = await instancesRes.json();
+        const sorted = (instances || []).sort((a: any, b: any) => {
+          const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
+          const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
+          return numA - numB;
+        });
+
         if (active) {
-          setHasDicomImages(false);
-          setDicomInstances([]);
+          setDicomInstances(sorted);
+          setHasDicomImages(sorted.length > 0);
+          setDicomError(null);
+        }
+      } catch (e: any) {
+        console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
+        if (active && isManual) {
+          setDicomError(e.message || 'Erro de conexão com o servidor local Orthanc.');
+        }
+      } finally {
+        dicomLoadingRef.current = false;
+        if (active && isManual) {
+          setDicomLoading(false);
         }
       }
     };
 
-    checkImages();
+    // Initial check (manual to show initial loaders/errors if any)
+    checkImages(true);
+
+    // Setup polling: dynamic interval based on whether the viewer/modal is open
+    let intervalId: ReturnType<typeof setInterval>;
+
+    const startPolling = () => {
+      // 5s if active viewer or print modal is open, 15s in the background
+      const intervalMs = (showIntegratedViewer || showDicomImages) ? 5000 : 15000;
+      intervalId = setInterval(() => {
+        if (active) {
+          checkImages(false);
+        }
+      }, intervalMs);
+    };
+
+    startPolling();
 
     return () => {
       active = false;
+      clearInterval(intervalId);
     };
   }, [
     exam?.id,
+    patient?.id,
     settings.dicomSyncEnabled,
     settings.dicomViewerUrl,
     settings.dicomUsername,
-    settings.dicomPassword
+    settings.dicomPassword,
+    showIntegratedViewer,
+    showDicomImages,
+    dicomRefreshKey
   ]);
   
 
@@ -347,15 +491,43 @@ export function ExamEditor({ examId }: Props) {
 
 
   const [selectedGridType, setSelectedGridType] = useState<string>('2x3');
+  const [isPrintingImages, setIsPrintingImages] = useState(false);
 
-  const handlePrintImages = (instances: any[], gridType: string = '2x3') => {
-    setSelectedInstancesForPrint(instances);
-    setSelectedGridType(gridType);
-    document.body.classList.add('print-mode-images');
-    setTimeout(() => {
-      window.print();
-      document.body.classList.remove('print-mode-images');
-    }, 200);
+  const handlePrintImages = async (instances: any[], gridType: string = '2x3') => {
+    if (instances.length === 0) return;
+    setIsPrintingImages(true);
+    showToast('Preparando imagens para a impressão...', 'info');
+
+    try {
+      const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+      const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+      const urls = instances.map(instance => 
+        `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${authParams}`
+      );
+
+      // Preload all image URLs into browser cache
+      await preloadImages(urls);
+
+      setSelectedInstancesForPrint(instances);
+      setSelectedGridType(gridType);
+      
+      document.body.classList.add('print-mode-images');
+      
+      // Tiny delay to let DOM render the images loaded from cache
+      setTimeout(() => {
+        window.print();
+        document.body.classList.remove('print-mode-images');
+        setIsPrintingImages(false);
+        // Delay resetting instances to avoid tearing during viewport restore
+        setTimeout(() => {
+          setSelectedInstancesForPrint([]);
+        }, 500);
+      }, 150);
+    } catch (err) {
+      console.error('[PACS Print Preload Error]', err);
+      showToast('Erro ao carregar imagens para a impressão.', 'error');
+      setIsPrintingImages(false);
+    }
   };
 
   const originalTitleRef = useRef<string | null>(null);
@@ -489,10 +661,25 @@ export function ExamEditor({ examId }: Props) {
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    {dicomLoading ? (
+                      <Loader2 size={12} className="animate-spin text-emerald-500" />
+                    ) : (
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    )}
                     <span className="font-black text-xs uppercase tracking-widest text-slate-200">PACS Integrado</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDicomRefreshKey(prev => prev + 1)}
+                      disabled={dicomLoading}
+                      className={classNames(
+                        "p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-slate-700",
+                        dicomLoading && "animate-spin"
+                      )}
+                      title="Atualizar Imagens"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
                     <button
                       onClick={() => setShowDicomImages(true)}
                       className="h-8 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-95 text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all shadow-md border border-brand-500/20"
@@ -526,26 +713,26 @@ export function ExamEditor({ examId }: Props) {
                           onClick={() => setShowFullScreenImage(true)}
                           className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
                         >
-                          <img 
+                          <DicomThumbnail 
                             src={previewUrl} 
                             alt={`Instance ${instanceNum}`}
-                            className="max-w-full max-h-full object-contain hover:scale-[1.02] transition-transform duration-300"
+                            className="hover:scale-[1.02]"
                           />
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20"
                             title="Anterior"
                           >
                             <ChevronLeft size={16} />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20"
                             title="Próxima"
                           >
                             <ChevronRight size={16} />
                           </button>
-                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md animate-fade-in">
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md animate-fade-in z-20">
                             FOTO {activeImageIndex + 1} / {dicomInstances.length}
                           </div>
                         </div>
@@ -557,30 +744,46 @@ export function ExamEditor({ examId }: Props) {
                   })()}
                 </div>
 
-                {/* Thumbnails Grid List */}
+                {/* Thumbnails Grid List or Error State */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  <div className="grid grid-cols-3 gap-2">
-                    {dicomInstances.map((instance, idx) => {
-                      const isActive = idx === activeImageIndex;
-                      const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-                      const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-                      
-                      return (
-                        <button
-                          key={instance.ID}
-                          onClick={() => setActiveImageIndex(idx)}
-                          className={classNames(
-                            "relative aspect-square bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md",
-                            isActive 
-                              ? "border-emerald-500 ring-2 ring-emerald-500/25 scale-[0.98]" 
-                              : "border-slate-800 hover:border-slate-600 hover:scale-[1.02]"
-                          )}
-                        >
-                          <img src={previewUrl} className="max-w-full max-h-full object-contain" loading="lazy" />
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {dicomError && dicomInstances.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 flex flex-col items-center text-center gap-2.5 my-4">
+                      <AlertTriangle className="text-amber-500" size={24} />
+                      <p className="text-[10px] text-amber-200/80 font-medium leading-relaxed">
+                        {dicomError}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setDicomRefreshKey(prev => prev + 1)}
+                        className="h-7 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 active:scale-95 text-white text-[9px] font-black uppercase tracking-wider transition-all"
+                      >
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {dicomInstances.map((instance, idx) => {
+                        const isActive = idx === activeImageIndex;
+                        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+                        const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+                        
+                        return (
+                          <button
+                            key={instance.ID}
+                            onClick={() => setActiveImageIndex(idx)}
+                            className={classNames(
+                              "relative aspect-square bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md",
+                              isActive 
+                                ? "border-emerald-500 ring-2 ring-emerald-500/25 scale-[0.98]" 
+                                : "border-slate-800 hover:border-slate-600 hover:scale-[1.02]"
+                            )}
+                          >
+                            <DicomThumbnail src={previewUrl} alt={`Instance ${idx + 1}`} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1043,6 +1246,10 @@ export function ExamEditor({ examId }: Props) {
           onClose={() => setShowDicomImages(false)}
           exam={exam}
           settings={settings}
+          instances={dicomInstances}
+          loading={dicomLoading}
+          error={dicomError}
+          onRefresh={() => setDicomRefreshKey(prev => prev + 1)}
           onPrint={(instances, gridType) => {
             handlePrintImages(instances, gridType);
           }}
@@ -1099,12 +1306,13 @@ export function ExamEditor({ examId }: Props) {
 
             return (
               <div className="relative max-w-full max-h-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                <img 
+                <DicomThumbnail 
                   src={previewUrl} 
                   alt={`Instance ${instanceNum}`}
-                  className="max-w-[95vw] max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/5"
+                  className="max-w-[95vw] max-h-[85vh] rounded-lg shadow-2xl border border-white/5"
+                  containerClassName="bg-transparent"
                 />
-                <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-black tracking-widest text-white uppercase select-none">
+                <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-black tracking-widest text-white uppercase select-none z-10">
                   FOTO {activeImageIndex + 1} DE {dicomInstances.length} (INSTÂNCIA {instanceNum})
                 </div>
               </div>
