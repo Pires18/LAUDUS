@@ -249,10 +249,21 @@ export function ExamEditor({ examId }: Props) {
     return `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
   }, [candidateStudies, selectedStudyId, settings, exam?.id]);
   const dicomLoadingRef = useRef(false);
+  // Refs para showIntegratedViewer e showDicomImages — permite que o polling
+  // leia os valores mais recentes SEM precisar recriar o intervalo a cada render.
+  const showIntegratedViewerRef = useRef(showIntegratedViewer);
+  const showDicomImagesRef = useRef(showDicomImages);
+  useEffect(() => { showIntegratedViewerRef.current = showIntegratedViewer; }, [showIntegratedViewer]);
+  useEffect(() => { showDicomImagesRef.current = showDicomImages; }, [showDicomImages]);
 
+  // Reseta o índice SOMENTE quando muda o estudo selecionado (não quando o array é recriado pelo polling)
+  const lastStudyIdForIndexRef = useRef<string | null>(null);
   useEffect(() => {
-    setActiveImageIndex(0);
-  }, [dicomInstances]);
+    if (selectedStudyId !== lastStudyIdForIndexRef.current) {
+      lastStudyIdForIndexRef.current = selectedStudyId;
+      setActiveImageIndex(0);
+    }
+  }, [selectedStudyId]);
 
   const handlePrevImage = useCallback(() => {
     if (dicomInstances.length === 0) return;
@@ -427,7 +438,17 @@ export function ExamEditor({ examId }: Props) {
             ...inst,
             serverSource: activeStudy.serverSource
           }));
-          setDicomInstances(taggedInstances);
+          // Compara IDs antes de atualizar — evita re-renders e reset de índice
+          // quando o polling retorna as mesmas instâncias (conteúdo idêntico).
+          setDicomInstances(prev => {
+            if (
+              prev.length === taggedInstances.length &&
+              prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)
+            ) {
+              return prev; // mesmo conteúdo: não gera novo array, não dispara effects
+            }
+            return taggedInstances;
+          });
           setHasDicomImages(taggedInstances.length > 0);
           setDicomError(null);
         }
@@ -451,13 +472,16 @@ export function ExamEditor({ examId }: Props) {
     let intervalId: ReturnType<typeof setInterval>;
 
     const startPolling = () => {
-      // 5s if active viewer or print modal is open, 15s in the background
-      const intervalMs = (showIntegratedViewer || showDicomImages) ? 5000 : 15000;
+      // Usa refs para ler o estado mais recente sem recriar o intervalo.
+      // 5s se viewer/modal estiver aberto, 30s em background (reduzido de 15s
+      // para diminuir a frequência de polls desnecessários).
       intervalId = setInterval(() => {
-        if (active) {
-          checkImages(false);
-        }
-      }, intervalMs);
+        if (!active) return;
+        const intervalMs = (showIntegratedViewerRef.current || showDicomImagesRef.current) ? 5000 : 30000;
+        // Verifica se o intervalo atual corresponde ao esperado; se não, não faz nada
+        // (o próximo tick já usará o ref atualizado)
+        checkImages(false);
+      }, 5000); // tick base de 5s; a lógica interna decide se executa
     };
 
     startPolling();
@@ -476,8 +500,8 @@ export function ExamEditor({ examId }: Props) {
     settings.dicomBackupViewerUrl,
     settings.dicomBackupUsername,
     settings.dicomBackupPassword,
-    showIntegratedViewer,
-    showDicomImages,
+    // showIntegratedViewer e showDicomImages REMOVIDOS das deps — agora via ref.
+    // Isso evita que o intervalo seja destruído/recriado ao abrir/fechar o viewer.
     dicomRefreshKey,
     selectedStudyId
   ]);
