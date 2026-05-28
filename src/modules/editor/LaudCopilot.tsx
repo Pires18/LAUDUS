@@ -62,13 +62,18 @@ export function LaudCopilot({
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
   const [autoRefineEnabled, setAutoRefineEnabled] = useState(() => {
-    const stored = localStorage.getItem('laudus_auto_refine');
+    const stored = localStorage.getItem(`laudus_auto_refine_${exam.id}`);
     return stored ? stored === 'true' : false;
   });
   const handleToggleAutoRefine = (val: boolean) => {
     setAutoRefineEnabled(val);
-    localStorage.setItem('laudus_auto_refine', String(val));
+    localStorage.setItem(`laudus_auto_refine_${exam.id}`, String(val));
   };
+
+  useEffect(() => {
+    const stored = localStorage.getItem(`laudus_auto_refine_${exam.id}`);
+    setAutoRefineEnabled(stored ? stored === 'true' : false);
+  }, [exam.id]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const cancelActiveRequest = () => {
