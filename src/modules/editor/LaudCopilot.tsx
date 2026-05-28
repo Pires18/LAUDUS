@@ -567,6 +567,7 @@ export function LaudCopilot({
   };
 
   // Mantém ref sempre atualizado com a versão mais recente de handleSend
+  handleSendRef.current = handleSend;
   const handleCompileForm = () => {
     if (!formText.trim()) {
       showToast('Preencha o formulário antes de compilar.', 'info');

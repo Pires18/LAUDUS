@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { CALCULATORS } from './registry';
 import { 
-  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, Zap, CheckCircle2
+  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, Zap, CheckCircle2, Copy
 } from 'lucide-react';
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
@@ -14,6 +14,7 @@ export function Calculators() {
   const [search, setSearch] = useState('');
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
 
   const activeCalc = useMemo(() => {
     return CALCULATORS.find(c => c.id === selectedCalcId);
@@ -253,7 +254,13 @@ export function Calculators() {
               </button>
               {calcResult && (calcResult._summary || Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0) && (
                 <button 
-                  className="px-6 py-3 rounded-xl sm:rounded-2xl text-xs font-black text-white bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-600/20 transition-all uppercase tracking-widest flex items-center gap-2 active:scale-95"
+                  className={classNames(
+                    "px-6 py-3 rounded-xl sm:rounded-2xl text-xs font-black transition-all uppercase tracking-widest flex items-center gap-2 active:scale-95 shadow-lg",
+                    copied 
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20" 
+                      : "bg-brand-600 hover:bg-brand-700 text-white shadow-brand-600/20"
+                  )}
+                  disabled={copied}
                   onClick={() => {
                     const cleanData = { ...calcResult };
                     Object.keys(cleanData).forEach(key => {
@@ -265,13 +272,25 @@ export function Calculators() {
                       `MÉTRICAS COLETADAS:\n${Object.entries(cleanData).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`;
 
                     navigator.clipboard.writeText(finalMessage);
-                    alert('Resultado técnico copiado com sucesso para a área de transferência!');
-                    setSelectedCalcId(null);
-                    setCalcResult(null);
+                    setCopied(true);
+                    setTimeout(() => {
+                      setCopied(false);
+                      setSelectedCalcId(null);
+                      setCalcResult(null);
+                    }, 1500);
                   }}
                 >
-                  <Zap size={14} className="fill-white" />
-                  Copiar Resultado
+                  {copied ? (
+                    <>
+                      <CheckCircle2 size={14} className="fill-white text-emerald-600 animate-in zoom-in duration-200" />
+                      Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} className="group-hover:scale-110 transition-transform" />
+                      Copiar Resultado
+                    </>
+                  )}
                 </button>
               )}
             </div>

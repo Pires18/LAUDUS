@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles } from 'lucide-react';
+import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2 } from 'lucide-react';
 import { CALCULATORS } from './registry';
 
 import { ExamArea } from '../../types';
@@ -19,6 +19,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
   const [showAll, setShowAll] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const filteredCalculators = CALCULATORS.filter(calc => 
     showAll || !area || calc.areas.includes(area)
@@ -219,8 +220,41 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                       </AnimatePresence>
                    </div>
 
-                   <div className="p-4 sm:p-8 border-t border-slate-100 bg-slate-50/40">
+                   <div className="p-4 sm:p-8 border-t border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row gap-3">
                       <button
+                        type="button"
+                        onClick={() => {
+                          const cleanData = { ...calcResult };
+                          Object.keys(cleanData).forEach(key => {
+                            if (key.startsWith('_')) delete cleanData[key];
+                          });
+
+                          const finalMessage = `[RESULTADO TÉCNICO: ${selectedCalc?.name}]\n\n` +
+                            (calcResult?._summary ? `CONCLUSÃO: ${calcResult._summary}\n\n` : '') +
+                            `MÉTRICAS COLETADAS:\n${Object.entries(cleanData).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`;
+
+                          navigator.clipboard.writeText(finalMessage);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        disabled={!calcResult || (!calcResult._summary && Object.keys(calcResult).length === 0)}
+                        className="flex-1 h-14 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-350 text-slate-700 font-black text-[10px] sm:text-[11px] uppercase tracking-[0.2em] disabled:opacity-30 disabled:grayscale transition-all flex items-center justify-center gap-2 sm:gap-3 group active:scale-95 shadow-sm"
+                      >
+                        {copied ? (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 animate-in zoom-in duration-200" />
+                            <span className="text-emerald-700 font-black">Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 group-hover:scale-110 transition-transform" />
+                            <span>Copiar Resultado</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => {
                           const cleanData = { ...calcResult };
                           Object.keys(cleanData).forEach(key => {
@@ -235,7 +269,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                           onClose();
                         }}
                         disabled={!calcResult || (!calcResult._summary && Object.keys(calcResult).length === 0)}
-                        className="w-full h-14 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] bg-gradient-to-r from-brand-600 to-brand-700 text-white font-black text-[10px] sm:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-brand-500/25 hover:from-brand-700 hover:to-brand-800 disabled:opacity-30 disabled:grayscale disabled:shadow-none transition-all flex items-center justify-center gap-2 sm:gap-3 group active:scale-95"
+                        className="flex-1 h-14 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] bg-gradient-to-r from-brand-600 to-brand-700 text-white font-black text-[10px] sm:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-brand-500/25 hover:from-brand-700 hover:to-brand-800 disabled:opacity-30 disabled:grayscale disabled:shadow-none transition-all flex items-center justify-center gap-2 sm:gap-3 group active:scale-95"
                       >
                         <Zap className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform fill-white" />
                         Usar no Copiloto
