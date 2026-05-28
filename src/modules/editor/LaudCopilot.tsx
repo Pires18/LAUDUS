@@ -8,7 +8,6 @@ import { useApp } from '../../store/app';
 import { updateItem, saveVersionSnapshot } from '../../store/db';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/gemini';
-import { parseAnamnesis, serializeAnamnesis } from './components/AnamnesisConsentModal';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -61,18 +60,19 @@ export function LaudCopilot({
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
-  const [autoRefineEnabled, setAutoRefineEnabled] = useState(() => {
-    const stored = localStorage.getItem(`laudus_auto_refine_${exam.id}`);
-    return stored ? stored === 'true' : false;
-  });
+  // Refino Auto: SEMPRE inicia desativado ao abrir/trocar de exame.
+  // O usuário deve ativar manualmente. O localStorage armazena a preferência
+  // para o caso de ele ativar e recarregar na MESMA sessão, mas ao montar
+  // o componente pela primeira vez o padrão é sempre false.
+  const [autoRefineEnabled, setAutoRefineEnabled] = useState(false);
   const handleToggleAutoRefine = (val: boolean) => {
     setAutoRefineEnabled(val);
     localStorage.setItem(`laudus_auto_refine_${exam.id}`, String(val));
   };
 
+  // Reseta para false toda vez que o exame muda (troca de paciente/exame)
   useEffect(() => {
-    const stored = localStorage.getItem(`laudus_auto_refine_${exam.id}`);
-    setAutoRefineEnabled(stored ? stored === 'true' : false);
+    setAutoRefineEnabled(false);
   }, [exam.id]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -1072,47 +1072,25 @@ export function LaudCopilot({
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0 space-y-3 custom-scrollbar pr-2">
-              {(() => {
-                const fields = parseAnamnesis(formText);
-                const hasStructured = fields.some(f => f.isStructured);
-                
-                if (hasStructured) {
-                  return fields.map((field, idx) => (
-                    <div key={idx}>
-                      {field.isStructured ? (
-                        <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block mb-1.5 ml-1">
-                            {field.label}
-                          </label>
-                          <input
-                            type="text"
-                            value={field.value}
-                            onChange={(e) => {
-                              const newFields = [...fields];
-                              newFields[idx].value = e.target.value;
-                              handleFormTextChange(serializeAnamnesis(newFields));
-                            }}
-                            className="w-full bg-white border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 rounded-xl px-4 py-2.5 outline-none transition-all text-sm text-slate-800 font-medium placeholder-slate-300"
-                            placeholder={`Preencher ${field.label.toLowerCase()}...`}
-                          />
-                        </div>
-                      ) : (
-                        field.rawLine.trim() ? <p className="text-xs text-slate-500 italic px-2 py-1">{field.rawLine}</p> : null
-                      )}
-                    </div>
-                  ));
-                } else {
-                  return (
-                    <textarea
-                      value={formText}
-                      onChange={(e) => handleFormTextChange(e.target.value)}
-                      placeholder="Preencha os achados clínicos deste exame aqui..."
-                      className="w-full h-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
-                    />
-                  );
-                }
-              })()}
+            {/* Texto Livre — única modalidade de preenchimento */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              <textarea
+                value={formText}
+                onChange={(e) => {
+                  // Preserva a posição do cursor para evitar o salto ao final
+                  const { selectionStart, selectionEnd } = e.target;
+                  handleFormTextChange(e.target.value).then(() => {
+                    // Restaura o cursor após o re-render via microtask
+                    requestAnimationFrame(() => {
+                      e.target.selectionStart = selectionStart;
+                      e.target.selectionEnd = selectionEnd;
+                    });
+                  });
+                }}
+                placeholder="Preencha os achados clínicos deste exame aqui..."
+                className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
+                style={{ minHeight: 0 }}
+              />
             </div>
           </div>
 
