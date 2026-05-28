@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import { signInWithPopup, signOut as firebaseSignOut, GoogleAuthProvider } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { useApp } from '../store/app';
+import { storeGoogleAccessToken, clearGoogleAccessToken } from '../lib/googleAuth';
 
 /**
  * Hook de autenticação.
@@ -22,7 +23,11 @@ export function useAuth() {
     try {
       setLoading(true);
       setError(null);
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential && credential.accessToken) {
+        storeGoogleAccessToken(credential.accessToken);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao entrar com Google';
       setError(message);
@@ -34,6 +39,7 @@ export function useAuth() {
   const signOutUser = useCallback(async () => {
     try {
       await firebaseSignOut(auth);
+      clearGoogleAccessToken();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erro ao sair';
       setError(message);
@@ -48,3 +54,4 @@ export function useAuth() {
     signOut: signOutUser,
   };
 }
+

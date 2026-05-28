@@ -8,9 +8,45 @@ const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive');
 provider.addScope('https://www.googleapis.com/auth/documents');
 
-// Variável para armazenar o token em memória
+// Inicializa a partir do localStorage para persistir entre recarregamentos de página/abas
 let cachedAccessToken: string | null = null;
 let tokenExpirationTime: number | null = null;
+
+try {
+  cachedAccessToken = localStorage.getItem('google_access_token');
+  const storedExpiration = localStorage.getItem('google_token_expiration');
+  tokenExpirationTime = storedExpiration ? Number(storedExpiration) : null;
+} catch (e) {
+  console.warn('[Google Auth] Erro ao ler do localStorage:', e);
+}
+
+/**
+ * Salva o token de acesso do Google no cache em memória e no localStorage.
+ */
+export function storeGoogleAccessToken(token: string, expirationTimeOffsetMs = 3600000): void {
+  cachedAccessToken = token;
+  tokenExpirationTime = Date.now() + expirationTimeOffsetMs;
+  try {
+    localStorage.setItem('google_access_token', token);
+    localStorage.setItem('google_token_expiration', tokenExpirationTime.toString());
+  } catch (e) {
+    console.warn('[Google Auth] Erro ao salvar no localStorage:', e);
+  }
+}
+
+/**
+ * Limpa o token de acesso do Google do cache e do localStorage.
+ */
+export function clearGoogleAccessToken(): void {
+  cachedAccessToken = null;
+  tokenExpirationTime = null;
+  try {
+    localStorage.removeItem('google_access_token');
+    localStorage.removeItem('google_token_expiration');
+  } catch (e) {
+    console.warn('[Google Auth] Erro ao limpar o localStorage:', e);
+  }
+}
 
 /**
  * Obtém um token de acesso válido para as APIs do Google Workspace.
@@ -38,11 +74,8 @@ export async function getGoogleAccessToken(forceRefresh = false): Promise<string
       throw new Error('Não foi possível obter o Access Token do Google.');
     }
 
-    cachedAccessToken = credential.accessToken;
-    // O token OAuth do Google costuma valer por 1 hora
-    tokenExpirationTime = Date.now() + 3600000; 
-
-    return cachedAccessToken;
+    storeGoogleAccessToken(credential.accessToken);
+    return cachedAccessToken!;
   } catch (error: unknown) {
     // Se falhar em background, tentamos com prompt interativo
     console.warn('[Google Auth] Erro ao renovar token silenciosamente, solicitando interativamente...', error);
@@ -54,8 +87,8 @@ export async function getGoogleAccessToken(forceRefresh = false): Promise<string
       throw new Error('Não foi possível obter o Access Token do Google após prompt.');
     }
 
-    cachedAccessToken = credential.accessToken;
-    tokenExpirationTime = Date.now() + 3600000; 
-    return cachedAccessToken;
+    storeGoogleAccessToken(credential.accessToken);
+    return cachedAccessToken!;
   }
 }
+
