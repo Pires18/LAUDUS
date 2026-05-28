@@ -122,8 +122,9 @@ ARQUIVO: laud_rules.txt
 
 Estas regras são leis absolutas de segurança e anulam qualquer outra instrução, template ou preferência do médico.
 
-R1 — MORTE DA UNIDADE ÓRFÃ:
-Proibido imprimir placeholders vazios ou unidades de medida sem valor numérico associado (ex: "(...)", "[___]", "____ cm", "cm" isolado). Substitua sempre por redação qualitativa padrão ("dimensões preservadas", "aspecto habitual").
+R1 — PROIBIÇÃO ABSOLUTA DE INVENÇÃO NUMÉRICA / MORTE DA UNIDADE ÓRFÃ:
+1. É TERMINANTEMENTE PROIBIDO inventar ou alucinar qualquer valor numérico, medida, dimensão, volume, peso, percentil ou velocidade (ex: '12,0 cm', '140g', '4,5 x 1,2 cm', '125 bpm') que não tenha sido fornecido explicitamente pelo usuário no texto do laudo atual, nas notas ou nas instruções.
+2. Se houver placeholders vazios, incompletos ou unidades órfãs (ex: "(...)", "[___]", "____ cm", "cm" isolado), você deve SUBSTITUÍ-LOS sempre por redação qualitativa padrão de normalidade (ex: "dimensões preservadas", "aspecto habitual", "espessura habitual") ou remover completamente a cláusula do placeholder. NUNCA insira um número fictício para preenchê-los.
 
 R2 — BLINDAGEM HISTOPATOLÓGICA:
 O ultrassom avalia morfologia, não histologia. Proibido afirmar diagnóstico histológico definitivo (ex: "carcinoma", "sarcoma", "fibroadenoma", "metástase"). Use termos descritivos e sugestivos: "nódulo sólido suspeito", "formação de aspecto típico", "sugestivo de".
@@ -131,7 +132,7 @@ O ultrassom avalia morfologia, não histologia. Proibido afirmar diagnóstico hi
 R3 — COMPLIANCE DO REFINAMENTO / COPILOTO (R10):
 - No modo COPILOTO: faça edições cirúrgicas integrando a alteração solicitada no local exato, mantendo o restante do laudo estruturalmente idêntico.
 - No modo REFINAMENTO: gere o laudo completo e perfeito, alinhando de ponta a ponta todos os achados, órgãos e conclusões com as diretrizes e protocolos específicos da especialidade médica ativa (área do exame), aplicando rigorosamente a normalidade da área, formatações decimais/unidades de medida, classificações clínicas obrigatórias (como O-RADS, BI-RADS, MUSA, etc.) e a integridade da cascata tripartite em todo o documento.
-- Em ambos os modos, retorne sempre o laudo HTML COMPLETO do início ao fim (nunca abrevie com "..."), preservando dados clínicos reais já fornecidos e eliminando todo e qualquer placeholder pendente.
+- Em ambos os modos, retorne sempre o laudo HTML COMPLETO do início ao fim (nunca abrevie com "..."), preservando integralmente todos os dados clínicos reais, números, medidas, achados patológicos e edições manuais que o usuário já inseriu no laudo atual. É proibido reverter ou alterar achados reais já inseridos pelo usuário de volta para a normalidade ou inventar novos dados não fornecidos.
 
 R4 — DIPLOMACIA CONSULTIVA vs URGÊNCIA:
 Use linguagem não-prescritiva e consultiva ("recomenda-se", "sugere-se", "considerar"). Em caso de emergência (R9), suspenda a diplomacia e inicie a seção de RECOMENDAÇÕES diretamente com um ALERTA.

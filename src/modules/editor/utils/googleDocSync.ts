@@ -40,11 +40,12 @@ export async function syncGoogleDoc(
     titulo_laudo: []
   };
 
-  const cleanNodeText = (html: string) => {
+  const cleanNodeText = (html: string, useSoftBreak = false) => {
     const div = document.createElement('div');
+    const breakChar = useSoftBreak ? '\v' : '\n';
     const processedHtml = html
-      .replace(/<br\s*\/?>/g, '\n')
-      .replace(/<\/p>/g, '\n')
+      .replace(/<br\s*\/?>/g, breakChar)
+      .replace(/<\/p>/g, breakChar)
       .replace(/\(…\)/g, '( \u00A0\u00A0\u00A0\u00A0 )'); // Espaçamento adequado para o placeholder
     div.innerHTML = processedHtml;
     return (div.textContent || '').trim();
@@ -67,12 +68,13 @@ export async function syncGoogleDoc(
         currentSection = 'titulo_laudo';
       }
     } else if (currentSection) {
+      const useSoftBreak = currentSection === 'analise_laudo';
       if (tag === 'UL' || tag === 'OL') {
         Array.from(node.children).forEach(li => {
-          sectionBuffer[currentSection].push(`• ${cleanNodeText(li.innerHTML)}`);
+          sectionBuffer[currentSection].push(`• ${cleanNodeText(li.innerHTML, useSoftBreak)}`);
         });
       } else {
-        const cleaned = cleanNodeText(node.innerHTML);
+        const cleaned = cleanNodeText(node.innerHTML, useSoftBreak);
         if (cleaned) {
           sectionBuffer[currentSection].push(cleaned);
         }
@@ -82,7 +84,8 @@ export async function syncGoogleDoc(
 
   const sections: Record<string, string> = {};
   Object.keys(sectionBuffer).forEach(key => {
-    sections[key] = sectionBuffer[key].join('\n');
+    const joinChar = key === 'analise_laudo' ? '\v' : '\n';
+    sections[key] = sectionBuffer[key].join(joinChar);
   });
 
   const replacements: Record<string, string> = {
