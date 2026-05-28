@@ -60,17 +60,13 @@ export function LaudCopilot({
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
-  // Refino Auto: SEMPRE inicia desativado ao abrir/trocar de exame.
-  // O usuário deve ativar manualmente. O localStorage armazena a preferência
-  // para o caso de ele ativar e recarregar na MESMA sessão, mas ao montar
-  // o componente pela primeira vez o padrão é sempre false.
+  // Refino Auto: SEMPRE inicia desativado. O usuário ativa manualmente por exame.
   const [autoRefineEnabled, setAutoRefineEnabled] = useState(false);
   const handleToggleAutoRefine = (val: boolean) => {
     setAutoRefineEnabled(val);
-    localStorage.setItem(`laudus_auto_refine_${exam.id}`, String(val));
   };
 
-  // Reseta para false toda vez que o exame muda (troca de paciente/exame)
+  // Garante reset ao trocar de exame
   useEffect(() => {
     setAutoRefineEnabled(false);
   }, [exam.id]);
