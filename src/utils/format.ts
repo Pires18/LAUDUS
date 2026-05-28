@@ -31,11 +31,11 @@ export function formatDateTime(date: number | undefined): string {
 /**
  * Calcula a idade a partir da data de nascimento.
  */
-export function calculateAge(birthDate: string | undefined): string {
+export function calculateAge(birthDate: string | undefined, referenceDate?: number | string | Date): string {
   if (!birthDate) return '';
   const birth = new Date(birthDate);
   if (isNaN(birth.getTime())) return '';
-  const today = new Date();
+  const today = referenceDate ? new Date(referenceDate) : new Date();
   let years = today.getFullYear() - birth.getFullYear();
   const monthDiff = today.getMonth() - birth.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {

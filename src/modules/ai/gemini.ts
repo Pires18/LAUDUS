@@ -138,11 +138,11 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
 
 // ─── Helpers utilitários ─────────────────────────────────────────────────────
 
-function calculateAge(birthDateStr?: string): string {
+function calculateAge(birthDateStr?: string, referenceDateMs?: number): string {
   if (!birthDateStr) return '';
   try {
     const birthDate = new Date(birthDateStr);
-    const today = new Date();
+    const today = referenceDateMs ? new Date(referenceDateMs) : new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -253,7 +253,7 @@ function buildContextMessage({
 }): string {
   const dateObj = examDateMs ? new Date(examDateMs) : new Date();
   const examDate = dateObj.toLocaleDateString('pt-BR');
-  const patientAge = patient?.birthDate ? calculateAge(patient.birthDate) : 'Não informada';
+  const patientAge = patient?.birthDate ? calculateAge(patient.birthDate, examDateMs) : 'Não informada';
   const genderMap = { M: 'Masculino', F: 'Feminino', O: 'Outro' } as const;
   const patientGender = patient?.gender ? genderMap[patient.gender as keyof typeof genderMap] || 'Não informado' : 'Não informado';
 

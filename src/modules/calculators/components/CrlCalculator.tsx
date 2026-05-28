@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Activity, Info, Zap } from 'lucide-react';
 
-export function CrlCalculator({ value, onChange }: CalculatorProps) {
+export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) {
   const [crl, setCrl] = useState(value?.crl || '');
 
   useEffect(() => {
@@ -28,8 +28,8 @@ export function CrlCalculator({ value, onChange }: CalculatorProps) {
       const days = totalDays % 7;
       ga = `${weeks}s ${days}d`;
 
-      // DDP Calculation: Exams are usually today, so DDP = Today + (280 - totalDays)
-      const today = new Date();
+      // DDP Calculation: use examDateMs if available, otherwise fallback to today
+      const today = examDateMs ? new Date(examDateMs) : new Date();
       today.setHours(12, 0, 0, 0);
       const eddDate = new Date(today.getTime() + (280 - totalDays) * 24 * 60 * 60 * 1000);
       
@@ -48,7 +48,7 @@ export function CrlCalculator({ value, onChange }: CalculatorProps) {
       _summary: summary
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crl]);
+  }, [crl, examDateMs]);
 
   return (
     <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">

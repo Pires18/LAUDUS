@@ -45,10 +45,14 @@ Para estruturas da máscara sem dados patológicos fornecidos, aplique a normali
 
 FASE 4 — AUTOCÁLCULOS E MATEMÁTICA DE EIXOS:
 - Volume do elipsoide: V = D1 x D2 x D3 x 0,523 (útero, ovários, próstata, tireoide, testículos, cistos, nódulos, massas).
-- Peso prostático estimado: Volume x 1,05.
+  * CONVERSÃO DE UNIDADES (CRÍTICA): Se as dimensões D1, D2, D3 forem fornecidas em milímetros (mm), você DEVE converter cada uma para centímetros (cm) dividindo por 10 antes do cálculo (ou dividir o produto final D1xD2xD3 por 1000) para que o volume seja reportado corretamente em cm³ (mL). Nunca apresente volumes em mm³ ou cm³ gigantes/incorretos (ex: cisto de 20x15x18 mm tem volume de 2,82 cm³, e NÃO 2824 cm³).
+- Peso prostático estimado: Volume x 1,05 (densidade de 1,05 g/cm³, resultando em gramas).
 - IP médio uterino: (IP artéria uterina direita + IP artéria uterina esquerda) / 2.
-- RCP: IP ACM / IP umbilical.
+- RCP (Relação Cérebro-Placentária): IP ACM / IP umbilical.
+- Ancoragem Cronológica (CRÍTICA): Use sempre a "DATA DO EXAME" informada no contexto do usuário como a referência absoluta ("Hoje") para qualquer matemática ou cálculo de datas (como a data de nascimento com base na idade, ou idade gestacional por DUM ou exames anteriores).
+- Datação e DDP por DUM: Idade Gestacional = DATA DO EXAME - DUM (expressar em semanas e dias). DDP = DUM + 280 dias.
 Se dados incompletos ou ausentes, não calcule nem invente. Use: "Dados insuficientes para cálculo/classificação".
+
 
 FASE 5 — EXPANSÃO MORFOLÓGICA E TRADUÇÃO:
 Traduzir jargões médicos para termos técnicos formais e expandir achados em descrição morfológica completa.
