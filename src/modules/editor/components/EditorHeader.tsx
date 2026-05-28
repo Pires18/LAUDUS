@@ -72,7 +72,7 @@ export function EditorHeader({
               </h1>
               {age && (
                 <span className="text-[9px] font-bold text-ink-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded-md shrink-0">
-                  {age} anos
+                  {age}
                 </span>
               )}
               <span className={classNames(

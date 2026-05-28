@@ -72,7 +72,7 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
             </div>
             <div className="text-right text-[11px] space-y-0.5 leading-tight">
               <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest block mb-1">Documentação Fotográfica</span>
-              <p><strong>Paciente:</strong> {patient.name} ({calculateAge(patient.birthDate)} anos)</p>
+              <p><strong>Paciente:</strong> {patient.name} ({calculateAge(patient.birthDate)})</p>
               <p><strong>Exame:</strong> <span className="uppercase font-bold">{examType}</span></p>
               <p><strong>Data:</strong> {formatDate(examDate)}</p>
               <p className="text-slate-400 text-[10px] font-medium pt-0.5">Página {pageIdx + 1} de {pages.length}</p>
