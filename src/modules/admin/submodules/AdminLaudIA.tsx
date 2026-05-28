@@ -6,11 +6,13 @@ import {
   GraduationCap, CheckCircle2, AlertCircle, Loader2,
   Sliders, LayoutList, ShieldCheck,
   FlaskConical, Play, FileText, History,
-  Terminal, Code, Copy, Check, Cpu, Key, Eye, EyeOff
+  Terminal, Code, Copy, Check, Cpu, Key, Eye, EyeOff,
+  Activity, BarChart3, Database, Coins, Clock, Sparkles,
+  ChevronDown, ChevronUp, Wifi, WifiOff, TrendingUp
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { EXAM_AREAS, ExamArea, ReportTemplate } from '../../../types';
-import { generateReport } from '../../ai/gemini';
+import { generateReport, callMetricsHistory, type CallMetrics } from '../../ai/gemini';
 import { 
   DEFAULT_MASTER_PROMPT, 
   DEFAULT_STRUCTURE_PROMPT, 
@@ -19,7 +21,7 @@ import {
   DEFAULT_RIGID_RULES,
 } from '../../ai/prompts';
 
-type TabId = 'prompts' | 'areas' | 'engine' | 'training';
+type TabId = 'prompts' | 'areas' | 'engine' | 'training' | 'status';
 
 // ==========================================
 // HIGH-FIDELITY IDE CODE EDITOR COMPONENT
@@ -32,7 +34,8 @@ interface CognitiveCodeEditorProps {
   placeholder?: string;
   rows?: number;
   onRestore?: () => void;
-  glowColor?: 'brand' | 'amber' | 'rose' | 'emerald' | 'violet';
+  glowColor?: 'brand' | 'amber' | 'rose' | 'emerald' | 'violet' | 'teal';
+  extraActions?: React.ReactNode;
 }
 
 function CognitiveCodeEditor({
@@ -43,7 +46,8 @@ function CognitiveCodeEditor({
   placeholder = 'Digite as instruções aqui...',
   rows = 12,
   onRestore,
-  glowColor = 'brand'
+  glowColor = 'brand',
+  extraActions,
 }: CognitiveCodeEditorProps) {
   const lineRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -57,6 +61,7 @@ function CognitiveCodeEditor({
     rose: 'focus-within:ring-2 focus-within:ring-rose-500/30 focus-within:shadow-[0_0_30px_rgba(244,63,94,0.15)] border-zinc-800 focus-within:border-rose-500/50',
     emerald: 'focus-within:ring-2 focus-within:ring-emerald-500/30 focus-within:shadow-[0_0_30px_rgba(16,185,129,0.15)] border-zinc-800 focus-within:border-emerald-500/50',
     violet: 'focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:shadow-[0_0_30px_rgba(139,92,246,0.15)] border-zinc-800 focus-within:border-violet-500/50',
+    teal: 'focus-within:ring-2 focus-within:ring-teal-500/30 focus-within:shadow-[0_0_30px_rgba(20,184,166,0.15)] border-zinc-800 focus-within:border-teal-500/50',
   };
 
   const handleCopy = async () => {
@@ -96,6 +101,7 @@ function CognitiveCodeEditor({
         </div>
 
         <div className="flex items-center gap-2">
+          {extraActions}
           {onRestore && (
             <button
               onClick={onRestore}
@@ -159,6 +165,105 @@ function CognitiveCodeEditor({
 }
 
 // ==========================================
+// TELEMETRY DASHBOARD COMPONENT
+// ==========================================
+function TelemetryDashboard() {
+  const [metrics, setMetrics] = useState<CallMetrics[]>([]);
+
+  useEffect(() => {
+    setMetrics([...callMetricsHistory]);
+    const interval = setInterval(() => {
+      setMetrics([...callMetricsHistory]);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (metrics.length === 0) {
+    return (
+      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 text-center w-full">
+        <BarChart3 size={32} className="text-ink-300 mx-auto mb-3" />
+        <p className="font-black text-ink-500 text-sm">Nenhuma chamada de IA registrada ainda.</p>
+        <p className="text-xs text-ink-400 mt-1">As métricas aparecerão aqui após gerar o primeiro laudo.</p>
+      </div>
+    );
+  }
+
+  const totalTokensIn = metrics.reduce((s, m) => s + m.estimatedInputTokens, 0);
+  const totalTokensOut = metrics.reduce((s, m) => s + m.estimatedOutputTokens, 0);
+  const avgLatency = Math.round(metrics.reduce((s, m) => s + m.latencyMs, 0) / metrics.length);
+  const successRate = Math.round((metrics.filter(m => m.success).length / metrics.length) * 100);
+
+  const modeColors: Record<string, string> = {
+    generation: 'bg-brand-100 text-brand-700',
+    refine: 'bg-amber-100 text-amber-700',
+    copilot: 'bg-violet-100 text-violet-700',
+    template: 'bg-teal-100 text-teal-700',
+  };
+  const modeLabels: Record<string, string> = {
+    generation: 'Geração',
+    refine: 'Refinamento',
+    copilot: 'Copiloto',
+    template: 'Template',
+  };
+
+  return (
+    <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden w-full">
+      <div className="p-6 border-b border-ink-100 bg-ink-50/30 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+          <BarChart3 size={20} />
+        </div>
+        <div>
+          <h5 className="font-black text-ink-900">Telemetria de Chamadas</h5>
+          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Últimas {metrics.length} chamadas de IA nesta sessão</p>
+        </div>
+      </div>
+
+      {/* Resumo */}
+      <div className="grid grid-cols-4 gap-px bg-ink-100">
+        {[
+          { label: 'Tokens Entrada', value: totalTokensIn.toLocaleString('pt-BR'), icon: Database, color: 'brand' },
+          { label: 'Tokens Saída', value: totalTokensOut.toLocaleString('pt-BR'), icon: Coins, color: 'emerald' },
+          { label: 'Latência Média', value: `${(avgLatency / 1000).toFixed(1)}s`, icon: Clock, color: 'amber' },
+          { label: 'Taxa de Sucesso', value: `${successRate}%`, icon: CheckCircle2, color: successRate >= 90 ? 'emerald' : 'rose' },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white p-5 text-center">
+            <stat.icon size={18} className={`text-${stat.color}-500 mx-auto mb-2`} />
+            <span className={`text-xl font-black text-${stat.color}-700 block`}>{stat.value}</span>
+            <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mt-0.5">{stat.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Log das últimas chamadas */}
+      <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
+        {metrics.slice(0, 10).map((m, i) => (
+          <div key={i} className={classNames(
+            'flex items-center gap-3 p-3 rounded-2xl border text-xs',
+            m.success ? 'bg-ink-50/60 border-ink-100' : 'bg-rose-50 border-rose-100'
+          )}>
+            <div className={classNames('px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0', modeColors[m.mode] || 'bg-ink-100 text-ink-600')}>
+              {modeLabels[m.mode] || m.mode}
+            </div>
+            <span className="text-[10px] font-mono text-ink-600 shrink-0">{m.area || '—'}</span>
+            <div className="flex-1 flex items-center gap-3 min-w-0">
+              <span className="text-ink-500 shrink-0">↑ {m.estimatedInputTokens.toLocaleString('pt-BR')} tok</span>
+              <span className="text-ink-500 shrink-0">↓ {m.estimatedOutputTokens.toLocaleString('pt-BR')} tok</span>
+              <span className="text-ink-500 shrink-0">{(m.latencyMs / 1000).toFixed(1)}s</span>
+            </div>
+            <span className={classNames('text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-lg',
+              m.provider === 'gemini' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
+            )}>{m.provider}</span>
+            {m.success
+              ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+              : <AlertCircle size={14} className="text-rose-500 shrink-0" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
 // MAIN ADMIN LAUD.IA CENTER
 // ==========================================
 export function AdminLaudIA() {
@@ -171,7 +276,81 @@ export function AdminLaudIA() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
 
+  // AI improvement for area prompts
+  const [isImprovingArea, setIsImprovingArea] = useState(false);
+  const [areaImprovePrompt, setAreaImprovePrompt] = useState('');
+  const [showImprovePanel, setShowImprovePanel] = useState(false);
 
+  async function handleImproveAreaPrompt() {
+    const provider = localSettings.aiProvider || 'gemini';
+    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
+    if (!hasKey) {
+      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
+      return;
+    }
+    const currentPrompt = localSettings.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] || '';
+    if (!currentPrompt.trim()) {
+      showToast('Não há prompt de área para melhorar. Adicione instruções primeiro.', 'error');
+      return;
+    }
+    setIsImprovingArea(true);
+
+    const areaLabel = EXAM_AREAS.find(a => a.id === selectedArea)?.label || selectedArea;
+    const userRequest = areaImprovePrompt.trim()
+      ? `\n\nInstrução adicional do médico: "${areaImprovePrompt.trim()}"`
+      : '';
+    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é melhorar o prompt de área de ${areaLabel} a seguir, tornando-o mais completo,
+claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
+Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+    const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${currentPrompt}`;
+
+    try {
+      let improved = '';
+
+      if (provider === 'gemini') {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
+        });
+        improved = result.response.text().trim();
+      } else {
+        // Anthropic
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': localSettings.anthropicApiKey!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+            max_tokens: 8192,
+            messages: [{ role: 'user', content: fullMessage }],
+            temperature: 0.2,
+          }),
+        });
+        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+        const result = await response.json();
+        improved = (result.content?.[0]?.text || '').trim();
+      }
+
+      if (improved) {
+        const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: improved };
+        setLocalSettings(prev => ({ ...prev, aiAreaPrompts: updated }));
+        showToast('Prompt melhorado com sucesso pela IA!', 'success');
+        setShowImprovePanel(false);
+        setAreaImprovePrompt('');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
+    } finally {
+      setIsImprovingArea(false);
+    }
+  }
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -257,6 +436,7 @@ export function AdminLaudIA() {
     { id: 'areas', label: 'Especialidades', icon: LayoutList },
     { id: 'engine', label: 'Motor & API', icon: Sliders },
     { id: 'training', label: 'Aprendizado IA', icon: GraduationCap },
+    { id: 'status', label: 'Status da IA', icon: Activity },
   ] as const;
 
   return (
@@ -524,7 +704,7 @@ export function AdminLaudIA() {
 
               {/* Specialty Protocol Editor Container */}
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div>
                     <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100">
                       SPECIFIC DIRECTIVE
@@ -533,7 +713,61 @@ export function AdminLaudIA() {
                       Protocolo Ativo: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}
                     </h5>
                   </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setShowImprovePanel(!showImprovePanel)}
+                      className={classNames(
+                        'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
+                        showImprovePanel
+                          ? 'bg-violet-600 text-white border-violet-700'
+                          : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+                      )}
+                    >
+                      <Sparkles size={12} />
+                      Melhorar com IA
+                      {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                  </div>
                 </div>
+
+                {/* AI Improve Panel */}
+                {showImprovePanel && (
+                  <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-violet-600" />
+                      <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
+                    </div>
+                    <p className="text-[11px] text-violet-700 leading-relaxed">
+                      A IA analisará o prompt atual desta área e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
+                    </p>
+                    <textarea
+                      value={areaImprovePrompt}
+                      onChange={(e) => setAreaImprovePrompt(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
+                      placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BIRADS, melhorar conclusão para tireoide...)"
+                    />
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleImproveAreaPrompt}
+                        disabled={isImprovingArea}
+                        className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
+                      >
+                        {isImprovingArea ? (
+                          <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
+                        ) : (
+                          <><Sparkles size={16} /> Melhorar Prompt</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => { setShowImprovePanel(false); setAreaImprovePrompt(''); }}
+                        className="text-sm text-violet-500 hover:underline"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="w-full">
                   <CognitiveCodeEditor
@@ -542,7 +776,7 @@ export function AdminLaudIA() {
                       const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: val };
                       setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
                     }}
-                    fileName={`${selectedArea}_protocol.md`}
+                    fileName={`${selectedArea.toLowerCase().replace(/\s+/g, '_')}_protocol.md`}
                     badge={`CLINICAL MODULE: ${selectedArea.toUpperCase()}`}
                     glowColor="violet"
                     placeholder={`Digite as diretrizes clínicas para a especialidade ${selectedArea}...`}
@@ -896,6 +1130,163 @@ export function AdminLaudIA() {
                   </div>
                 </div>
 
+              </div>
+            </div>
+          )}
+
+          {/* TAB: STATUS */}
+          {activeTab === 'status' && (
+            <div className="max-w-3xl space-y-6 animate-fade-in">
+              {/* Telemetria */}
+              <TelemetryDashboard />
+
+              {/* Connection Status */}
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                    <Activity size={28} />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-black text-ink-900">Status da IA</h4>
+                    <p className="text-sm text-ink-500">Diagnóstico de conexão e configuração do motor.</p>
+                  </div>
+                </div>
+
+                {/* Provider Status */}
+                <div className="space-y-4 mb-8">
+                  <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Provedor Ativo</h5>
+                  {[
+                    {
+                      name: 'Google Gemini',
+                      provider: 'gemini',
+                      icon: Cpu,
+                      color: 'brand',
+                      hasKey: !!localSettings.geminiApiKey,
+                      model: localSettings.geminiModel || 'gemini-3.5-flash',
+                      isActive: (localSettings.aiProvider || 'gemini') === 'gemini',
+                    },
+                    {
+                      name: 'Anthropic Claude',
+                      provider: 'anthropic',
+                      icon: BrainCircuit,
+                      color: 'violet',
+                      hasKey: !!localSettings.anthropicApiKey,
+                      model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+                      isActive: localSettings.aiProvider === 'anthropic',
+                    },
+                  ].map((prov) => (
+                    <div
+                      key={prov.provider}
+                      className={classNames(
+                        'p-5 rounded-2xl border flex items-center justify-between transition-all',
+                        prov.isActive
+                          ? 'bg-brand-50/50 border-brand-200/50'
+                          : 'bg-ink-50/30 border-ink-100'
+                      )}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={classNames(
+                          'w-10 h-10 rounded-xl flex items-center justify-center',
+                          prov.isActive ? 'bg-brand-100 text-brand-600' : 'bg-ink-100 text-ink-400'
+                        )}>
+                          <prov.icon size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sm text-ink-900">{prov.name}</span>
+                            {prov.isActive && (
+                              <span className="px-2 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full">Ativo</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-ink-500 font-mono">{prov.model}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {prov.hasKey ? (
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                            <Wifi size={12} className="text-emerald-600" />
+                            <span className="text-[10px] font-black text-emerald-700 uppercase">Configurado</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl">
+                            <WifiOff size={12} className="text-red-500" />
+                            <span className="text-[10px] font-black text-red-600 uppercase">Sem API Key</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quick Test */}
+                <div className="pt-6 border-t border-ink-100">
+                  <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-4">Teste de Conectividade</h5>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={testConnection}
+                      disabled={testStatus === 'testing'}
+                      className={classNames(
+                        'flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black transition-all border bg-white',
+                        testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        testStatus === 'error'   ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                        testStatus === 'testing' ? 'bg-brand-50 text-brand-600 border-brand-200' :
+                                                   'bg-ink-50 text-ink-700 border-ink-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200'
+                      )}
+                    >
+                      {testStatus === 'testing' ? (
+                        <><Loader2 size={16} className="animate-spin" /> Testando Conexão...</>
+                      ) : testStatus === 'success' ? (
+                        <><CheckCircle2 size={16} /> Conexão OK!</>
+                      ) : testStatus === 'error' ? (
+                        <><AlertCircle size={16} /> Falha na Conexão</>
+                      ) : (
+                        <><Zap size={16} /> Testar Agora</>
+                      )}
+                    </button>
+                    {testStatus !== 'idle' && (
+                      <button
+                        onClick={() => setTestStatus('idle')}
+                        className="text-sm text-ink-400 hover:text-ink-600 font-bold"
+                      >
+                        Resetar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Config Summary */}
+              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
+                <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-6">Resumo de Configuração</h5>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { label: 'Motor', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
+                    { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
+                    { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
+                    { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
+                  ].map(item => (
+                    <div key={item.label} className="p-4 bg-ink-50 rounded-2xl border border-ink-100">
+                      <div className="flex items-center gap-2 mb-1">
+                        <item.icon size={14} className="text-ink-400" />
+                        <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">{item.label}</span>
+                      </div>
+                      <span className="text-sm font-bold text-ink-800 leading-tight">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Versão */}
+              <div className="bg-gradient-to-r from-brand-50 to-indigo-50/50 border border-brand-100/50 rounded-2xl p-5 flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest block">Laud.IA Core</span>
+                  <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
+                    Motor cognitivo radiológico v13.0 — Cascata Tripartite + Regras Rígidas + Temperatura Adaptativa + Retry Automático + Telemetria.
+                  </p>
+                </div>
+                <div className="px-4 py-2 bg-white border border-brand-200 rounded-xl text-[10px] font-black text-brand-700 shadow-sm">
+                  v13.0 PROD
+                </div>
               </div>
             </div>
           )}

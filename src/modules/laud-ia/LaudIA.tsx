@@ -26,10 +26,7 @@ import { callMetricsHistory, type CallMetrics } from '../ai/gemini';
 type TabId = 'prompts' | 'areas' | 'engine' | 'training' | 'status';
 type PromptSubTab = 'master' | 'global' | 'structure' | 'rigid';
 
-// ==========================================
-// IDE CODE EDITOR COMPONENT
-// ==========================================
-interface CodeEditorProps {
+interface CognitiveCodeEditorProps {
   value: string;
   onChange: (val: string) => void;
   fileName: string;
@@ -41,7 +38,7 @@ interface CodeEditorProps {
   extraActions?: React.ReactNode;
 }
 
-function CodeEditor({
+function CognitiveCodeEditor({
   value = '',
   onChange,
   fileName,
@@ -51,7 +48,7 @@ function CodeEditor({
   onRestore,
   glowColor = 'brand',
   extraActions,
-}: CodeEditorProps) {
+}: CognitiveCodeEditorProps) {
   const lineRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -84,9 +81,9 @@ function CodeEditor({
       <div className="bg-zinc-900/90 px-6 py-4 flex items-center justify-between border-b border-zinc-800/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="flex gap-1.5 mr-2">
-            <span className="w-3 h-3 rounded-full bg-rose-500/85" />
-            <span className="w-3 h-3 rounded-full bg-amber-500/85" />
-            <span className="w-3 h-3 rounded-full bg-emerald-500/85" />
+            <span className="w-3 h-3 rounded-full bg-rose-500/85 hover:bg-rose-600 transition-colors cursor-pointer" />
+            <span className="w-3 h-3 rounded-full bg-amber-500/85 hover:bg-amber-600 transition-colors cursor-pointer" />
+            <span className="w-3 h-3 rounded-full bg-emerald-500/85 hover:bg-emerald-600 transition-colors cursor-pointer" />
           </div>
           <div className="bg-zinc-950 px-4 py-2 rounded-xl border border-zinc-800/80 flex items-center gap-2">
             <Code size={13} className="text-zinc-400" />
@@ -102,10 +99,11 @@ function CodeEditor({
           {onRestore && (
             <button
               onClick={onRestore}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-50 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95"
+              title="Restaurar padrão"
             >
               <RotateCcw size={12} />
-              Restaurar
+              Restaurar Padrão
             </button>
           )}
           <button
@@ -119,7 +117,7 @@ function CodeEditor({
       </div>
 
       {/* Editor Body */}
-      <div className="flex font-mono text-xs overflow-hidden h-[480px] relative bg-zinc-950">
+      <div className="flex font-mono text-xs overflow-hidden h-[520px] relative bg-zinc-950">
         <div
           ref={lineRef}
           className="w-12 py-4 select-none text-right pr-3 text-zinc-600 bg-zinc-950 border-r border-zinc-900 overflow-y-hidden font-mono"
@@ -421,64 +419,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
     );
   }
 
-  // ── Prompt Section builder ───────────────────────────────────────
-  function PromptSection({
-    subTab,
-    field,
-    defaultVal,
-    title,
-    subtitle,
-    glowColor,
-    placeholder,
-    fileName,
-    icon: Icon,
-  }: {
-    subTab: PromptSubTab;
-    field: keyof AppSettings;
-    defaultVal: string;
-    title: string;
-    subtitle: string;
-    glowColor: 'brand' | 'amber' | 'rose' | 'emerald' | 'violet' | 'teal';
-    placeholder: string;
-    fileName: string;
-    icon: React.ElementType;
-  }) {
-    if (activePromptSubTab !== subTab) return null;
-    const inherited = isPromptInherited(field, defaultVal);
-    return (
-      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
-        <div className="p-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
-          <div className="flex items-center gap-3">
-            <div className={classNames('w-10 h-10 rounded-xl flex items-center justify-center', `bg-${glowColor}-100 text-${glowColor}-600`)}>
-              <Icon size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-bold text-ink-900">{title}</h4>
-                <InheritedBadge inherited={inherited} />
-              </div>
-              <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">{subtitle}</p>
-            </div>
-          </div>
-        </div>
-        <div className="p-6">
-          <CodeEditor
-            fileName={fileName}
-            badge="PROMPT CONFIG"
-            glowColor={glowColor}
-            placeholder={placeholder}
-            value={(localSettings[field] as string | undefined) || ''}
-            onChange={(v) => patchLocal({ [field]: v })}
-            onRestore={() => {
-              const restored = (adminSettings?.[field] as string | undefined) || defaultVal;
-              patchLocal({ [field]: restored });
-              showToast(`${title} restaurado para o padrão oficial.`, 'info');
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
+
 
   // ── Telemetry Dashboard ─────────────────────────────────────────
   function TelemetryDashboard() {
@@ -579,69 +520,74 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
 
   return (
     <div className="module-container">
-      <div className="space-y-6 animate-fade-in">
-        <PageHeader
-          title="Configurações LAUD.IA"
-          subtitle="Gerencie o comportamento e a inteligência do sistema de laudos."
-          icon={BrainCircuit}
-          actions={
-            <div className="flex items-center gap-3">
-              <button onClick={() => { setLocalSettings(settings); isDirty.current = false; }} className="btn-ghost text-ink-400">
-                <RotateCcw size={16} />
-                Descartar
-              </button>
-              <button onClick={handleSave} disabled={isSaving} className="btn-primary">
-                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                Salvar Alterações
-              </button>
+      <div className="space-y-8 animate-fade-in pb-16">
+        {/* Light Glassmorphic Header aligned with other sections */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-ink-100 pb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest border border-emerald-100 animate-pulse">
+                LAUD.IA PERSONAL: ACTIVE
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
+                {localSettings.geminiModel || 'gemini-3.5-flash'}
+              </span>
             </div>
-          }
-        />
+            <h3 className="text-xl font-black text-ink-900">Personalização LAUD.IA</h3>
+            <p className="text-xs text-ink-500 mt-1 max-w-xl font-medium">
+              Gerencie seu estilo de redação, personalize diretrizes por especialidade e monitore a telemetria do seu copiloto clínico.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 shrink-0 self-start md:self-auto">
+            <button 
+              onClick={() => {
+                setLocalSettings(settings);
+                isDirty.current = false;
+                showToast('Alterações descartadas', 'info');
+              }} 
+              className="h-12 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 bg-white border border-slate-200/80 hover:border-brand-500 transition-all flex items-center gap-2"
+            >
+              <RotateCcw size={12} />
+              Descartar
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={isSaving} 
+              className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white shadow-xl shadow-brand-500/20 hover:shadow-brand-500/35 transition-all flex items-center gap-2 disabled:opacity-50 scale-100 active:scale-95"
+            >
+              {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              Salvar Alterações
+            </button>
+          </div>
+        </div>
 
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
-          {/* Sidebar Navigation */}
-          <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
-            <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Configurações</p>
-            {sidebarItems.map((item) => (
+        {/* Sub-Tab Navigation */}
+        <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200/60 shadow-sm w-fit overflow-x-auto scrollbar-hide">
+          {sidebarItems.map((item) => {
+            const isActive = activeTab === item.id;
+            return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={classNames(
-                  'w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3',
-                  activeTab === item.id
-                    ? 'bg-brand-50 text-brand-700 shadow-sm border border-brand-100'
-                    : 'text-ink-600 hover:bg-ink-50'
+                  "px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
+                  isActive 
+                    ? "bg-white text-brand-600 shadow-sm border border-slate-200/10 scale-[1.02]" 
+                    : "text-slate-500 hover:text-slate-700"
                 )}
               >
-                <div className={classNames('p-1.5 rounded-lg', activeTab === item.id ? 'bg-brand-100 text-brand-600' : 'bg-ink-50 text-ink-400')}>
-                  <item.icon size={16} />
-                </div>
+                <item.icon size={12} />
                 {item.label}
               </button>
-            ))}
-          </aside>
+            );
+          })}
+        </div>
 
-          <div className="flex-1 w-full space-y-6">
-            {/* Mobile Navigation */}
-            <div className="lg:hidden flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={classNames(
-                    'px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2',
-                    activeTab === item.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-ink-600 border-ink-100'
-                  )}
-                >
-                  <item.icon size={14} />
-                  {item.label}
-                </button>
-              ))}
-            </div>
+        {/* Content Area */}
+        <div className="w-full space-y-8">
 
             {/* ═══ TAB: PROMPTS ═══ */}
             {activeTab === 'prompts' && (
-              <div className="space-y-8 animate-fade-in">
+              <div className="space-y-8 animate-fade-in-up">
                 {/* Sync banner */}
                 <div className="p-5 bg-gradient-to-r from-brand-50 to-indigo-50/50 border border-brand-100/50 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -658,121 +604,226 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                   </div>
                 </div>
 
-                {/* Sub-tab pills */}
-                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 border border-slate-200/50 rounded-2xl w-fit">
-                  {promptSubTabs.map((sub) => (
-                    <button
-                      key={sub.id}
-                      onClick={() => setActivePromptSubTab(sub.id)}
-                      className={classNames(
-                        'px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5',
-                        activePromptSubTab === sub.id
-                          ? 'bg-white text-ink-800 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
-                      )}
-                    >
-                      <sub.icon size={11} />
-                      {sub.label}
-                    </button>
-                  ))}
+                {/* Primary Master Prompt Editor */}
+                <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl overflow-hidden p-6 md:p-8 space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ink-50 pb-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/50 shadow-inner shrink-0">
+                        <BrainCircuit size={28} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-ink-900 uppercase tracking-wider">Diretrizes Operacionais do LAUD.IA</h4>
+                        <p className="text-[10px] text-ink-400 font-bold uppercase tracking-[0.15em] mt-0.5">Doutrina, Raciocínio, Skeleton e Compliance Médico-Legal</p>
+                      </div>
+                    </div>
+                    
+                    {/* Prompt Sub-Selector Pills */}
+                    <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 border border-slate-200/50 rounded-2xl shrink-0">
+                      <button
+                        onClick={() => setActivePromptSubTab('master')}
+                        className={classNames(
+                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                          activePromptSubTab === 'master' 
+                            ? "bg-white text-indigo-650 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-800"
+                        )}
+                      >
+                        Prompt Mestre
+                      </button>
+                      <button
+                        onClick={() => setActivePromptSubTab('global')}
+                        className={classNames(
+                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                          activePromptSubTab === 'global' 
+                            ? "bg-white text-emerald-650 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-800"
+                        )}
+                      >
+                        Instruções Globais
+                      </button>
+                      <button
+                        onClick={() => setActivePromptSubTab('structure')}
+                        className={classNames(
+                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                          activePromptSubTab === 'structure' 
+                            ? "bg-white text-amber-650 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-800"
+                        )}
+                      >
+                        Skeleton (Estrutura)
+                      </button>
+                      <button
+                        onClick={() => setActivePromptSubTab('rigid')}
+                        className={classNames(
+                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                          activePromptSubTab === 'rigid' 
+                            ? "bg-white text-rose-650 shadow-sm" 
+                            : "text-slate-500 hover:text-slate-800"
+                        )}
+                      >
+                        Regras Rígidas
+                      </button>
+                    </div>
+                  </div>
+
+                  {activePromptSubTab === 'master' && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="p-4 bg-indigo-50/50 rounded-2xl text-[11px] text-indigo-900 font-semibold leading-relaxed flex items-center justify-between">
+                        <div>
+                          💡 <strong>Prompt Mestre (Doutrina):</strong> Define a personalidade central da IA como radiologista sênior, a cascata tripartite, o mimetismo de estilo e a tradução semântica de notas rápidas.
+                        </div>
+                        <div className="ml-4 shrink-0">
+                          <InheritedBadge inherited={isPromptInherited('aiMasterPrompt', DEFAULT_MASTER_PROMPT)} />
+                        </div>
+                      </div>
+                      <CognitiveCodeEditor
+                        value={localSettings.aiMasterPrompt || ''}
+                        onChange={(val) => patchLocal({ aiMasterPrompt: val })}
+                        fileName="master_prompt.md"
+                        badge="CENTRAL MASTER DIRECTIVE"
+                        glowColor="brand"
+                        placeholder="Defina o papel principal, tom e escopo da IA..."
+                        onRestore={() => {
+                          const restored = (adminSettings?.aiMasterPrompt as string | undefined) || DEFAULT_MASTER_PROMPT;
+                          patchLocal({ aiMasterPrompt: restored });
+                          showToast('Prompt Mestre restaurado para o padrão oficial.', 'info');
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {activePromptSubTab === 'global' && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="p-4 bg-emerald-50/50 rounded-2xl text-[11px] text-emerald-950 font-semibold leading-relaxed flex items-center justify-between">
+                        <div>
+                          💡 <strong>Instruções Globais (Raciocínio Clínico):</strong> Regula o motor de cognição em 5 fases sequenciais (ancoragem, normalidade habitual, autocalculo e matemática de eixos, etc.) e as regras métricas (1 casa para mm, 2 para cm).
+                        </div>
+                        <div className="ml-4 shrink-0">
+                          <InheritedBadge inherited={isPromptInherited('aiGlobalInstructions', DEFAULT_GLOBAL_INSTRUCTIONS)} />
+                        </div>
+                      </div>
+                      <CognitiveCodeEditor
+                        value={localSettings.aiGlobalInstructions || ''}
+                        onChange={(val) => patchLocal({ aiGlobalInstructions: val })}
+                        fileName="global_instructions.md"
+                        badge="GLOBAL REASONING SYSTEM"
+                        glowColor="emerald"
+                        placeholder="Defina as instruções de raciocínio lógico e matemático global..."
+                        onRestore={() => {
+                          const restored = (adminSettings?.aiGlobalInstructions as string | undefined) || DEFAULT_GLOBAL_INSTRUCTIONS;
+                          patchLocal({ aiGlobalInstructions: restored });
+                          showToast('Instruções Globais restauradas para o padrão oficial.', 'info');
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {activePromptSubTab === 'structure' && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="p-4 bg-amber-50/50 rounded-2xl text-[11px] text-amber-950 font-semibold leading-relaxed flex items-center justify-between">
+                        <div>
+                          💡 <strong>Arquitetura Obrigatória (Skeleton):</strong> Define a formatação das tags de marcação HTML e os tópicos obrigatórios (TÍTULO, TÉCNICA, ANÁLISE, CONCLUSÃO, RECOMENDAÇÕES) que protegem a integridade do editor.
+                        </div>
+                        <div className="ml-4 shrink-0">
+                          <InheritedBadge inherited={isPromptInherited('aiStructurePrompt', DEFAULT_STRUCTURE_PROMPT)} />
+                        </div>
+                      </div>
+                      <CognitiveCodeEditor
+                        value={localSettings.aiStructurePrompt || ''}
+                        onChange={(val) => patchLocal({ aiStructurePrompt: val })}
+                        fileName="structure_prompt.md"
+                        badge="SKELETON CODE SPECIFICATION"
+                        glowColor="amber"
+                        placeholder="Defina as diretrizes obrigatórias de formatação e tags do laudo..."
+                        onRestore={() => {
+                          const restored = (adminSettings?.aiStructurePrompt as string | undefined) || DEFAULT_STRUCTURE_PROMPT;
+                          patchLocal({ aiStructurePrompt: restored });
+                          showToast('Skeleton estrutural restaurado para o padrão oficial.', 'info');
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {activePromptSubTab === 'rigid' && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="p-4 bg-rose-50/50 rounded-2xl text-[11px] text-rose-950 font-semibold leading-relaxed flex items-center justify-between">
+                        <div>
+                          💡 <strong>Regras Rígidas (Compliance & Segurança):</strong> Regras inquebráveis e proibitivas de blindagem médico-legal, tratamento de red flags e urgências clínicas, e proibição absoluta de prescrição de condutas cirúrgicas diretas.
+                        </div>
+                        <div className="ml-4 shrink-0">
+                          <InheritedBadge inherited={isPromptInherited('aiRigidRules', DEFAULT_RIGID_RULES)} />
+                        </div>
+                      </div>
+                      <CognitiveCodeEditor
+                        value={localSettings.aiRigidRules || ''}
+                        onChange={(val) => patchLocal({ aiRigidRules: val })}
+                        fileName="rigid_rules.md"
+                        badge="LAUD.IA SECURITY GUARDIAN"
+                        glowColor="rose"
+                        placeholder="Defina as regras restritivas que a IA sob nenhuma hipótese pode violar..."
+                        onRestore={() => {
+                          const restored = (adminSettings?.aiRigidRules as string | undefined) || DEFAULT_RIGID_RULES;
+                          patchLocal({ aiRigidRules: restored });
+                          showToast('Regras Rígidas de Segurança restauradas para o padrão oficial.', 'info');
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
-
-                {/* Prompt Mestre */}
-                <PromptSection
-                  subTab="master"
-                  field="aiMasterPrompt"
-                  defaultVal={DEFAULT_MASTER_PROMPT}
-                  title="Prompt Mestre"
-                  subtitle="Base de Personalidade da IA"
-                  glowColor="brand"
-                  placeholder="Defina o papel principal da IA..."
-                  fileName="master_prompt.md"
-                  icon={BrainCircuit}
-                />
-
-                {/* Instruções Globais */}
-                <PromptSection
-                  subTab="global"
-                  field="aiGlobalInstructions"
-                  defaultVal={DEFAULT_GLOBAL_INSTRUCTIONS}
-                  title="Instruções Globais"
-                  subtitle="Raciocínio Clínico Global"
-                  glowColor="emerald"
-                  placeholder="Defina as instruções de raciocínio clínico global..."
-                  fileName="global_instructions.md"
-                  icon={FileText}
-                />
-
-                {/* Skeleton */}
-                <PromptSection
-                  subTab="structure"
-                  field="aiStructurePrompt"
-                  defaultVal={DEFAULT_STRUCTURE_PROMPT}
-                  title="Skeleton (Estrutura)"
-                  subtitle="Estrutura Obrigatória do Laudo"
-                  glowColor="amber"
-                  placeholder="Defina as diretrizes obrigatórias de formatação e tags do laudo..."
-                  fileName="structure_prompt.md"
-                  icon={Layout}
-                />
-
-                {/* Regras Rígidas */}
-                <PromptSection
-                  subTab="rigid"
-                  field="aiRigidRules"
-                  defaultVal={DEFAULT_RIGID_RULES}
-                  title="Regras Rígidas"
-                  subtitle="Compliance e Segurança Médico-Legal"
-                  glowColor="rose"
-                  placeholder="Defina as regras restritivas que a IA não pode violar..."
-                  fileName="rigid_rules.md"
-                  icon={ShieldAlert}
-                />
-
-
               </div>
             )}
 
             {/* ═══ TAB: AREAS (Especialidades) ═══ */}
             {activeTab === 'areas' && (
-              <div className="flex flex-col lg:flex-row bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden min-h-[700px] animate-fade-in">
-                {/* Area list */}
-                <div className="w-full lg:w-64 bg-ink-50/50 border-r border-ink-100 p-4 space-y-1">
-                  <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Áreas Médicas</p>
-                  {EXAM_AREAS.map((area) => (
-                    <button
-                      key={area.id}
-                      onClick={() => { setSelectedArea(area.id); setShowImprovePanel(false); }}
-                      className={classNames(
-                        'w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between',
-                        selectedArea === area.id ? 'bg-brand-600 text-white shadow-md' : 'text-ink-600 hover:bg-ink-100'
-                      )}
-                    >
-                      <span>{area.label}</span>
-                      {!isAreaInherited(area.id) && (
-                        <span className="w-2 h-2 rounded-full bg-indigo-300 shrink-0" title="Customizado" />
-                      )}
-                    </button>
-                  ))}
+              <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl p-8 lg:p-10 space-y-8 animate-fade-in">
+                <div className="border-b border-ink-50 pb-6 space-y-6">
+                  <div>
+                    <h4 className="text-lg font-black text-ink-900 uppercase tracking-wider">Diretrizes por Especialidade</h4>
+                    <p className="text-xs text-ink-400 font-semibold uppercase tracking-wider mt-0.5">Mapeamento de comportamentos e terminologias específicas do LAUD.IA</p>
+                  </div>
+
+                  {/* Specialty Pill Selector */}
+                  <div className="flex flex-wrap gap-2 pt-2 pb-2">
+                    {EXAM_AREAS.map((area) => {
+                      const isSelected = selectedArea === area.id;
+                      const inherited = isAreaInherited(area.id);
+                      return (
+                        <button
+                          key={area.id}
+                          onClick={() => { setSelectedArea(area.id); setShowImprovePanel(false); }}
+                          className={classNames(
+                            "px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-1.5",
+                            isSelected 
+                              ? "bg-brand-600 text-white border-brand-600 shadow-md shadow-brand-500/10 scale-[1.02]" 
+                              : "bg-white text-ink-600 border-ink-100 hover:border-brand-300"
+                          )}
+                        >
+                          {area.label}
+                          {!inherited && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" title="Customizado" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Editor panel */}
-                <div className="flex-1 p-8 space-y-6">
+                {/* Specialty Protocol Editor Container */}
+                <div className="space-y-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-xl font-black text-ink-900">
-                          {EXAM_AREAS.find(a => a.id === selectedArea)?.label}
-                        </h4>
-                        <InheritedBadge inherited={isAreaInherited(selectedArea)} />
-                      </div>
-                      <p className="text-sm text-ink-500 mt-0.5">Diretrizes específicas para análise e conclusão desta área.</p>
+                      <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100 flex items-center gap-1.5 w-fit">
+                        SPECIFIC DIRECTIVE <InheritedBadge inherited={isAreaInherited(selectedArea)} />
+                      </span>
+                      <h5 className="text-sm font-black text-ink-900 mt-2">
+                        Protocolo Ativo: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}
+                      </h5>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => setShowImprovePanel(!showImprovePanel)}
                         className={classNames(
-                          'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm',
+                          'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
                           showImprovePanel
                             ? 'bg-violet-600 text-white border-violet-700'
                             : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
@@ -781,17 +832,6 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                         <Sparkles size={12} />
                         Melhorar com IA
                         {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] };
-                          patchLocal({ aiAreaPrompts: updated });
-                          showToast(`Protocolo de ${selectedArea} restaurado.`, 'info');
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black text-brand-600 hover:bg-brand-50 rounded-xl transition-all border border-brand-100 uppercase tracking-widest active:scale-95 shadow-sm bg-white"
-                      >
-                        <RotateCcw size={12} />
-                        Sincronizar Admin
                       </button>
                     </div>
                   </div>
@@ -835,17 +875,24 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     </div>
                   )}
 
-                  <CodeEditor
-                    fileName={`${selectedArea.toLowerCase().replace(/\s+/g, '_')}_protocol.md`}
-                    badge="ÁREA PROTOCOL"
-                    glowColor="brand"
-                    placeholder={`Instruções clínicas para ${EXAM_AREAS.find(a => a.id === selectedArea)?.label}...`}
-                    value={localSettings.aiAreaPrompts?.[selectedArea] || ''}
-                    onChange={(v) => {
-                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: v };
-                      patchLocal({ aiAreaPrompts: updated });
-                    }}
-                  />
+                  <div className="w-full">
+                    <CognitiveCodeEditor
+                      value={localSettings.aiAreaPrompts?.[selectedArea] || ''}
+                      onChange={(v) => {
+                        const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: v };
+                        patchLocal({ aiAreaPrompts: updated });
+                      }}
+                      fileName={`${selectedArea.toLowerCase().replace(/\s+/g, '_')}_protocol.md`}
+                      badge={`CLINICAL MODULE: ${selectedArea.toUpperCase()}`}
+                      glowColor="violet"
+                      placeholder={`Digite as diretrizes clínicas para a especialidade ${selectedArea}...`}
+                      onRestore={() => {
+                        const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: adminSettings?.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] };
+                        patchLocal({ aiAreaPrompts: updated });
+                        showToast(`Protocolo de ${selectedArea} restaurado para o padrão do administrador.`, 'info');
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -1307,9 +1354,8 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     v13.0 PROD
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
