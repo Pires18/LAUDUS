@@ -123,7 +123,10 @@ export async function getSettings(): Promise<AppSettings> {
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
       dicomPreset: isWindows ? 'notebook' : 'macmini',
       dicomUsername: 'admin',
-      dicomPassword: '123456789'
+      dicomPassword: '123456789',
+      dicomBackupViewerUrl: '',
+      dicomBackupUsername: '',
+      dicomBackupPassword: ''
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
@@ -175,7 +178,10 @@ export async function getSettings(): Promise<AppSettings> {
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
     dicomPreset: isWindows ? 'notebook' : 'macmini',
     dicomUsername: 'admin',
-    dicomPassword: '123456789'
+    dicomPassword: '123456789',
+    dicomBackupViewerUrl: '',
+    dicomBackupUsername: '',
+    dicomBackupPassword: ''
   };
 }
 

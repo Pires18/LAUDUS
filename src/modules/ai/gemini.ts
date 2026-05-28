@@ -14,6 +14,7 @@ interface GenerateReportParams {
   anamnesis?: string;
   previousExams?: string[];
   examDateMs?: number;
+  signal?: AbortSignal;
 }
 
 interface CopilotParams {
@@ -24,6 +25,7 @@ interface CopilotParams {
   settings: AppSettings;
   previousExams?: string[];
   template?: ReportTemplate | null;
+  signal?: AbortSignal;
 }
 
 interface RefineParams {
@@ -37,6 +39,7 @@ interface RefineParams {
   previousExams?: string[];
   customPrompt?: string;
   examDateMs?: number;
+  signal?: AbortSignal;
 }
 
 export interface BuiltPrompt {
@@ -111,6 +114,9 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
     try {
       return await fn();
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw err;
+      }
       lastError = err;
       const msg = String(err);
       const isRetryable =
@@ -387,31 +393,28 @@ export function buildRefinePrompt({
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"
 [REGRAS DE OURO DO REFINAMENTO — EXECUÇÃO OBRIGATÓRIA:
-• OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
-• PROIBIDO: Adicionar ou concatenar texto no final do laudo. As alterações DEVEM ser integradas no local correto.
-• COMPLIANCE RÍGIDO DA MÁSCARA: O laudo refinado deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME. É terminantemente proibido alterar nomes de seções ou remover cabeçalhos originais. Mantenha intacta toda a formatação HTML, a redação e os parágrafos originais da máscara modelo para todos os órgãos que não foram alterados. ATENÇÃO: As seções e a estrutura do HTML da MÁSCARA MODELO ORIGINAL DO EXAME têm prioridade absoluta sobre qualquer outra regra de estrutura (como a do Bloco 3); mantenha a estrutura e estilos da máscara original exatamente como estão.
-• PRESERVAÇÃO E PREENCHIMENTO: Mantenha intactos todos os dados clínicos, medidas, descrições e alterações que já foram preenchidos ou editados no LAUDO ATUAL. Resolva e preencha todos os placeholders restantes na forma de "(...)" ou "[___]" do LAUDO ATUAL, substituindo-os por descrições qualitativas ou valores normais coerentes com o contexto, de modo que o laudo final seja totalmente preenchido e livre de placeholders.
+• LAUDO COMPLETO E PERFEITO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
+• ADEQUAÇÃO INTEGRAL À ÁREA: Adapte, formate e alinhe todo o laudo (incluindo todas as seções e órgãos) de acordo com os protocolos, diretrizes, terminologias formais e regras específicas da especialidade médica ativa (área do exame). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme o protocolo da área.
+• PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
+  - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
+  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas no prompt/protocolo da especialidade ativa (área do exame). É proibido inventar condutas personalizadas, prolixas ou fora das padronizações do protocolo da área (N1, N2, N3, N4, O-RADS, BI-RADS, MUSA, etc.), a menos que expressamente solicitado pelo médico.
+• PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL, mas formate-os e adeque sua redação para seguir as regras da área.
+• ELIMINAÇÃO DE PLACEHOLDERS: Resolva e preencha todos os placeholders restantes na forma de "(...)" ou "[___]" do LAUDO ATUAL, substituindo-os por descrições qualitativas ou valores normais coerentes com o protocolo da área e com a doutrina de normalidade do médico.
+• INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
 • ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
-• Aplicar a instrução em TODOS os locais que ela afeta no laudo.
-• Atualizar OBRIGATORIAMENTE as 3 seções impactadas:
-  1. ANÁLISE: descrição morfológica correta e adequada do achado.
-  2. CONCLUSÃO: bullet específico e clinicamente preciso para o achado.
-  3. RECOMENDAÇÕES: conduta adequada ao achado (N1/N2/N3/N4) seguindo o nível de urgência clínica correto.
-• Cascata Análise→Conclusão→Recomendação deve ser íntegra após a mudança.
-• Achado patológico adicionado → criar bullet de conclusão + conduta correspondente.
-• Achado removido ou normalizado → remover seu bullet de conclusão e conduta.
-• Usar anamnese e contexto clínico do paciente para calibrar a conduta.
-• O laudo completo deve ser retornado na íntegra, incluindo todas as seções. As partes, parágrafos, valores, descrições e linhas do laudo que não foram afetados pela instrução de alteração devem ser reproduzidos na íntegra e exatamente iguais ao texto original, byte a byte, sem qualquer modificação ou reescrita.
-• PROIBIDO adicionar bullets extras além dos derivados da instrução.
-• PROIBIDO reformatar ou reescrever seções não afetadas.]`
-    : `INSTRUÇÃO: Sanitizar e higienizar o laudo completo.
-• COMPLIANCE RÍGIDO DA MÁSCARA: O laudo refinado deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME. É terminantemente proibido alterar nomes de seções ou remover cabeçalhos originais. Mantenha intacta toda a formatação HTML, a redação e os parágrafos originais da máscara modelo para todos os órgãos que não foram alterados. ATENÇÃO: As seções e a estrutura do HTML da MÁSCARA MODELO ORIGINAL DO EXAME têm prioridade absoluta sobre qualquer outra regra de estrutura (como a do Bloco 3); mantenha a estrutura e estilos da máscara original exatamente como estão.
-• Eliminar todos os placeholders (R1: "(...)", "[___]", unidades sem valor).
-• Garantir Cascata Tripartite completa (Análise→Conclusão→Recomendação).
-• Aplicar normalidade habitual para estruturas sem dado fornecido.
-• Aplicar Lei da Conclusão Enxuta: colapsar normalidades em 1 bullet de síntese.
-• Manter fidelidade ao contexto clínico do paciente (indicação, sexo, idade).
-• Usar anamnese fornecida para calibrar recomendações e contexto diagnóstico.`;
+• COMPLIANCE DA MÁSCARA: O laudo deve seguir a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME, mas com liberdade para formatar, preencher e adequar o texto de forma a torná-lo perfeito e alinhado com a área médica.]`
+    : `INSTRUÇÃO: Sanitizar, higienizar e alinhar o laudo completo.
+[REGRAS DE OURO DO REFINAMENTO E SANITIZAÇÃO — EXECUÇÃO OBRIGATÓRIA:
+• LAUDO COMPLETO E PERFEITO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
+• ADEQUAÇÃO INTEGRAL À ÁREA: Adapte, formate e alinhe todo o laudo de acordo com os protocolos, diretrizes, terminologias formais e regras específicas da especialidade médica ativa (área do exame). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme o protocolo da área.
+• PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
+  - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
+  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas no prompt/protocolo da especialidade ativa (área do exame). É proibido inventar condutas personalizadas, prolixas ou fora das padronizações do protocolo da área (N1, N2, N3, N4, O-RADS, BI-RADS, MUSA, etc.), a menos que expressamente solicitado pelo médico.
+• ELIMINAÇÃO DE PLACEHOLDERS: Resolva e preencha todos os placeholders restantes na forma de "(...)" ou "[___]" do LAUDO ATUAL, substituindo-os por descrições qualitativas ou valores normais coerentes com o protocolo da área e com a doutrina de normalidade do médico.
+• INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
+• PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL, formatando-os de acordo com a área.
+• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
+• COMPLIANCE DA MÁSCARA: O laudo deve seguir a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME, mas com liberdade para formatar, preencher e adequar o texto de forma a torná-lo perfeito e alinhado com a área médica.]`;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const contextMessage = buildContextMessage({
@@ -484,12 +487,14 @@ REGRAS DE OURO DO COPILOTO:
 • ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
 • Atualizar ANÁLISE (descrição morfológica adequada do achado, no órgão correto).
 • Atualizar CONCLUSÃO (bullet específico e preciso para o achado).
-• Atualizar RECOMENDAÇÕES (conduta N1-N4 adequada ao achado e contexto clínico).
+• PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
+  - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
+  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas no prompt/protocolo da especialidade ativa (área do exame). É proibido inventar condutas personalizadas, prolixas ou fora das padronizações do protocolo da área (N1, N2, N3, N4, O-RADS, BI-RADS, MUSA, etc.), a menos que expressamente solicitado pelo médico.
 • A cascata Análise→Conclusão→Recomendação deve ser íntegra.
 • Achado patológico → bullet de conclusão obrigatório + conduta.
 • Usar anamnese e contexto clínico para calibrar recomendações.
-• PROIBIDO alterar qualquer seção não relacionada à instrução.
-• Todo o restante permanece byte a byte idêntico ao laudo original.]`;
+• PROIBIDO alterar qualquer seção não relacionada à instrução (exceto para aplicar a padronização de recomendações e técnica caso estejam violando os padrões da área médica).
+• Todo o restante permanece estruturalmente idêntico, com a técnica e recomendações perfeitamente padronizadas de acordo com as regras da especialidade.]`;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const contextMessage = buildContextMessage({
@@ -532,7 +537,8 @@ async function callGemini(
   built: BuiltPrompt,
   settings: AppSettings,
   area: string,
-  mode: string
+  mode: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
   const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
@@ -546,7 +552,7 @@ async function callGemini(
       maxOutputTokens: getMaxTokens(area),
     }
   });
-  const result = await withRetry(() => model.generateContent(built.userMessage));
+  const result = await withRetry(() => model.generateContent(built.userMessage, { signal }));
   return cleanMarkdownFromResponse(result.response.text());
 }
 
@@ -555,7 +561,8 @@ async function callGeminiStream(
   settings: AppSettings,
   area: string,
   mode: string,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
   const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
@@ -570,7 +577,7 @@ async function callGeminiStream(
     }
   });
 
-  const result = await withRetry(() => model.generateContentStream(built.userMessage));
+  const result = await withRetry(() => model.generateContentStream(built.userMessage, { signal }));
   let fullText = '';
 
   for await (const chunk of result.stream) {
@@ -585,7 +592,8 @@ async function callAnthropic(
   built: BuiltPrompt,
   settings: AppSettings,
   area: string,
-  mode: string
+  mode: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const systemBlocks: Array<{ type: string; text: string; cache_control?: { type: string } }> = [
     {
@@ -615,7 +623,8 @@ async function callAnthropic(
       system: systemBlocks,
       messages: [{ role: 'user', content: built.userMessage }],
       temperature: getModeTemperature(mode, settings.aiTemperature)
-    })
+    }),
+    signal
   }));
 
   if (!response.ok) {
@@ -632,7 +641,8 @@ async function callAnthropicStream(
   settings: AppSettings,
   area: string,
   mode: string,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<string> {
   const systemBlocks: Array<{ type: string; text: string; cache_control?: { type: string } }> = [
     {
@@ -663,7 +673,8 @@ async function callAnthropicStream(
       messages: [{ role: 'user', content: built.userMessage }],
       temperature: getModeTemperature(mode, settings.aiTemperature),
       stream: true
-    })
+    }),
+    signal
   }));
 
   if (!response.ok) {
@@ -725,7 +736,7 @@ function detectArea(params: GenerateReportParams | CopilotParams | RefineParams)
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
-  const { settings } = params;
+  const { settings, signal } = params as any;
   const provider = settings.aiProvider || 'gemini';
   const mode = detectMode(params);
   const area = detectArea(params);
@@ -745,10 +756,10 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     let text: string;
     if (provider === 'gemini') {
       if (!settings.geminiApiKey) throw new Error('API Key do Gemini não configurada.');
-      text = await callGemini(built, settings, area, mode);
+      text = await callGemini(built, settings, area, mode, signal);
     } else {
       if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
-      text = await callAnthropic(built, settings, area, mode);
+      text = await callAnthropic(built, settings, area, mode, signal);
     }
     success = true;
     recordMetrics({
@@ -781,7 +792,7 @@ export async function generateReportStream(
   params: GenerateReportParams | CopilotParams | RefineParams,
   onChunk: (text: string) => void
 ): Promise<string> {
-  const { settings } = params;
+  const { settings, signal } = params as any;
   const provider = settings.aiProvider || 'gemini';
   const mode = detectMode(params);
   const area = detectArea(params);
@@ -800,10 +811,10 @@ export async function generateReportStream(
     let text: string;
     if (provider === 'gemini') {
       if (!settings.geminiApiKey) throw new Error('API Key do Gemini não configurada.');
-      text = await callGeminiStream(built, settings, area, mode, onChunk);
+      text = await callGeminiStream(built, settings, area, mode, onChunk, signal);
     } else {
       if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
-      text = await callAnthropicStream(built, settings, area, mode, onChunk);
+      text = await callAnthropicStream(built, settings, area, mode, onChunk, signal);
     }
     recordMetrics({
       mode: mode as CallMetrics['mode'],

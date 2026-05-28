@@ -8,7 +8,7 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/gemini';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw, SlidersHorizontal, ExternalLink } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
@@ -29,12 +29,13 @@ import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
 import { ReportVersionsModal } from './components/ReportVersionsModal';
 
-const locateStudy = async (
+const locateStudies = async (
   baseUrl: string,
   authParams: string,
   exam: ExamRequest,
-  patient: Patient | null
-): Promise<any | null> => {
+  patient: Patient | null,
+  serverSource: 'primary' | 'backup'
+): Promise<any[]> => {
   const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
   
   const queryOrthanc = async (query: any) => {
@@ -61,56 +62,49 @@ const locateStudy = async (
     }
   };
 
-  // 1. Try exact StudyInstanceUID (standard DICOM worklist mapping)
   const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
-  let studies = await queryOrthanc({ StudyInstanceUID: studyUid });
-  if (studies && studies.length > 0) {
-    return studies[0];
-  }
+  
+  const queries = [
+    queryOrthanc({ StudyInstanceUID: studyUid }),
+    queryOrthanc({ AccessionNumber: exam.id })
+  ];
 
-  // 2. Try AccessionNumber matching exam.id (in case of manual entry of accession)
-  studies = await queryOrthanc({ AccessionNumber: exam.id });
-  if (studies && studies.length > 0) {
-    return studies[0];
-  }
-
-  // 3. Try AccessionNumber matching exam.friendlyId
   if (exam.friendlyId) {
-    studies = await queryOrthanc({ AccessionNumber: exam.friendlyId });
-    if (studies && studies.length > 0) {
-      return studies[0];
-    }
+    queries.push(queryOrthanc({ AccessionNumber: exam.friendlyId }));
   }
 
-  // 4. Try PatientID matching exam.patientId or patient.id
   const patientIds = new Set<string>();
   if (exam.patientId) patientIds.add(exam.patientId);
   if (patient?.id) patientIds.add(patient.id);
 
-  let candidates: any[] = [];
   for (const pid of patientIds) {
-    const found = await queryOrthanc({ PatientID: pid });
-    if (found && found.length > 0) {
-      candidates.push(...found);
+    queries.push(queryOrthanc({ PatientID: pid }));
+  }
+
+  queries.push(queryOrthanc({ PatientID: exam.id }));
+
+  const results = await Promise.all(queries);
+
+  const candidatesMap = new Map<string, any>();
+  for (const list of results) {
+    for (const item of (list || [])) {
+      if (item) {
+        if (typeof item === 'string') {
+          candidatesMap.set(item, { ID: item, MainDicomTags: {}, serverSource });
+        } else {
+          const id = item.ID || item.id;
+          if (id) {
+            candidatesMap.set(id, { ...item, ID: id, serverSource });
+          }
+        }
+      }
     }
   }
 
-  // 5. Try PatientID matching exam.id (common user workaround where exam ID is typed as patient ID)
-  studies = await queryOrthanc({ PatientID: exam.id });
-  if (studies && studies.length > 0) {
-    candidates.push(...studies);
-  }
+  return Array.from(candidatesMap.values());
+};
 
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  if (candidates.length === 1) {
-    return candidates[0];
-  }
-
-  // Filter & score to find the study closest to the exam creation date
-  const examTime = exam.createdAt; // timestamp ms
+const scoreStudies = (candidates: any[], examTime: number): any[] => {
   const scored = candidates.map((c) => {
     const studyDate = c.MainDicomTags?.StudyDate || ''; // YYYYMMDD
     const studyTime = c.MainDicomTags?.StudyTime || '000000'; // HHMMSS
@@ -136,7 +130,7 @@ const locateStudy = async (
 
   // Sort by time difference ascending
   scored.sort((a, b) => a.diffMs - b.diffMs);
-  return scored[0].study;
+  return scored.map(item => item.study);
 };
 
 const preloadImages = (urls: string[]): Promise<void> => {
@@ -207,6 +201,11 @@ export function ExamEditor({ examId }: Props) {
   const [copilotPrompt, setCopilotPrompt] = useState('');
   const [showSnippets, setShowSnippets] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
+  const [pacsConnected, setPacsConnected] = useState<'loading' | 'connected' | 'disconnected'>('loading');
+  const [pacsBackupConnected, setPacsBackupConnected] = useState<'loading' | 'connected' | 'disconnected' | 'disabled'>('loading');
+  const [candidateStudies, setCandidateStudies] = useState<any[]>([]);
+  const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
+  const [showStudySelector, setShowStudySelector] = useState(false);
 
   // Estado LOCAL do histórico do copiloto — evita spam de escritas no Firestore
   // durante o streaming (sem isso, cada chunk geraria uma escrita no Firestore).
@@ -223,6 +222,32 @@ export function ExamEditor({ examId }: Props) {
   const [dicomLoading, setDicomLoading] = useState(false);
   const [dicomError, setDicomError] = useState<string | null>(null);
   const [dicomRefreshKey, setDicomRefreshKey] = useState(0);
+  const getExternalViewerUrl = useCallback(() => {
+    if (!candidateStudies || candidateStudies.length === 0) return null;
+    const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId) || candidateStudies[0];
+    if (!activeStudy) return null;
+
+    const isBackup = activeStudy.serverSource === 'backup';
+    const baseUrl = isBackup 
+      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042') 
+      : (settings.dicomViewerUrl || 'http://localhost:8042');
+    const studyUid = activeStudy.MainDicomTags?.StudyInstanceUID || `1.2.276.0.7230010.3.1.2.${exam?.id}`;
+
+    const viewerType = settings.dicomViewerType || 'stone';
+    if (viewerType === 'stone') {
+      return `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
+    } else if (viewerType === 'oe2') {
+      return `${baseUrl.replace(/\/$/, '')}/ui/app/retrieve-and-view.html?StudyInstanceUID=${studyUid}`;
+    } else if (viewerType === 'ohif') {
+      return `${baseUrl.replace(/\/$/, '')}/viewer?StudyInstanceUIDs=${studyUid}`;
+    } else if (viewerType === 'custom' && settings.dicomViewerUrlPattern) {
+      return settings.dicomViewerUrlPattern
+        .replace('{{baseUrl}}', baseUrl.replace(/\/$/, ''))
+        .replace('{{StudyInstanceUID}}', studyUid)
+        .replace('{{examId}}', exam?.id || '');
+    }
+    return `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
+  }, [candidateStudies, selectedStudyId, settings, exam?.id]);
   const dicomLoadingRef = useRef(false);
 
   useEffect(() => {
@@ -285,8 +310,78 @@ export function ExamEditor({ examId }: Props) {
         const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
         const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
         
-        const study = await locateStudy(baseUrl, authParams, exam, patient);
-        if (!study) {
+        const backupUrl = settings.dicomBackupViewerUrl;
+        const backupAuth = backupUrl ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
+
+        // Check primary health
+        const pingPrimary = async () => {
+          const pingUrl = `${baseUrl.replace(/\/$/, '')}/system`;
+          try {
+            const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${authParams}`);
+            return res.ok;
+          } catch {
+            return false;
+          }
+        };
+
+        // Check backup health
+        const pingBackup = async () => {
+          if (!backupUrl) return false;
+          const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
+          try {
+            const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
+            return res.ok;
+          } catch {
+            return false;
+          }
+        };
+
+        const [primaryOk, backupOk] = await Promise.all([
+          pingPrimary(),
+          backupUrl ? pingBackup() : Promise.resolve(false)
+        ]);
+
+        if (active) {
+          setPacsConnected(primaryOk ? 'connected' : 'disconnected');
+          if (backupUrl) {
+            setPacsBackupConnected(backupOk ? 'connected' : 'disconnected');
+          } else {
+            setPacsBackupConnected('disabled');
+          }
+        }
+
+        // Fetch candidates from both servers in parallel
+        const fetchPrimary = primaryOk 
+          ? locateStudies(baseUrl, authParams, exam, patient, 'primary') 
+          : Promise.resolve([]);
+        const fetchBackup = (backupUrl && backupOk)
+          ? locateStudies(backupUrl, backupAuth, exam, patient, 'backup')
+          : Promise.resolve([]);
+
+        const [primaryCandidates, backupCandidates] = await Promise.all([
+          fetchPrimary,
+          fetchBackup
+        ]);
+
+        // Merge candidates. Deduplicate by study ID / StudyInstanceUID.
+        // If present in both, keep the primary one (which defaults to primaryOk).
+        const mergedMap = new Map<string, any>();
+        
+        // Merge backup candidates first so primary candidates (if any) override them
+        for (const c of backupCandidates) {
+          mergedMap.set(c.ID, c);
+        }
+        for (const c of primaryCandidates) {
+          mergedMap.set(c.ID, c);
+        }
+
+        const candidates = Array.from(mergedMap.values());
+
+        if (active) {
+          setCandidateStudies(candidates);
+        }
+
+        if (candidates.length === 0) {
           if (active) {
             setDicomInstances([]);
             setHasDicomImages(false);
@@ -295,9 +390,25 @@ export function ExamEditor({ examId }: Props) {
           return;
         }
 
-        const studyId = study.ID || study;
-        const instancesUrl = `${baseUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-        const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${authParams}`);
+        let activeStudy = null;
+        if (selectedStudyId) {
+          activeStudy = candidates.find(c => c.ID === selectedStudyId);
+        }
+        if (!activeStudy) {
+          const sorted = scoreStudies(candidates, exam.createdAt);
+          activeStudy = sorted[0];
+          if (active) {
+            setSelectedStudyId(activeStudy.ID);
+          }
+        }
+
+        const isBackupStudy = activeStudy.serverSource === 'backup';
+        const currentUrl = isBackupStudy ? (backupUrl || 'http://localhost:8042') : baseUrl;
+        const currentAuth = isBackupStudy ? backupAuth : authParams;
+
+        const studyId = activeStudy.ID;
+        const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+        const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
         
         if (!instancesRes.ok) {
           throw new Error(`Erro ao obter imagens do estudo do Orthanc.`);
@@ -311,8 +422,13 @@ export function ExamEditor({ examId }: Props) {
         });
 
         if (active) {
-          setDicomInstances(sorted);
-          setHasDicomImages(sorted.length > 0);
+          // Tag instances with the serverSource
+          const taggedInstances = sorted.map((inst: any) => ({
+            ...inst,
+            serverSource: activeStudy.serverSource
+          }));
+          setDicomInstances(taggedInstances);
+          setHasDicomImages(taggedInstances.length > 0);
           setDicomError(null);
         }
       } catch (e: any) {
@@ -357,9 +473,13 @@ export function ExamEditor({ examId }: Props) {
     settings.dicomViewerUrl,
     settings.dicomUsername,
     settings.dicomPassword,
+    settings.dicomBackupViewerUrl,
+    settings.dicomBackupUsername,
+    settings.dicomBackupPassword,
     showIntegratedViewer,
     showDicomImages,
-    dicomRefreshKey
+    dicomRefreshKey,
+    selectedStudyId
   ]);
   
 
@@ -656,19 +776,59 @@ export function ExamEditor({ examId }: Props) {
 
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Integrated Dicom Image Viewer Sidebar */}
-            {showIntegratedViewer && hasDicomImages && dicomInstances.length > 0 && (
+            {showIntegratedViewer && (
               <div className="w-[380px] md:w-[460px] xl:w-[540px] border-r border-slate-800 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in relative z-20">
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2">
-                    {dicomLoading ? (
+                  <div className="flex items-center gap-4">
+                    {dicomLoading && (
                       <Loader2 size={12} className="animate-spin text-emerald-500" />
-                    ) : (
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     )}
-                    <span className="font-black text-xs uppercase tracking-widest text-slate-200">PACS Integrado</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <div 
+                          className={classNames(
+                            "w-2 h-2 rounded-full",
+                            pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                          )} 
+                          title={`PACS Principal: ${pacsConnected === 'connected' ? 'Online' : pacsConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
+                        />
+                        <span className="font-black text-[9px] uppercase tracking-widest text-slate-450">
+                          PACS Principal
+                        </span>
+                      </div>
+                      {settings.dicomBackupViewerUrl && (
+                        <div className="flex items-center gap-1.5 border-l border-slate-850 pl-3">
+                          <div 
+                            className={classNames(
+                              "w-2 h-2 rounded-full",
+                              pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                            )} 
+                            title={`PACS Backup: ${pacsBackupConnected === 'connected' ? 'Online' : pacsBackupConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
+                          />
+                          <span className="font-black text-[9px] uppercase tracking-widest text-slate-450">
+                            Backup
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {candidateStudies.length > 1 && (
+                      <button
+                        onClick={() => setShowStudySelector(!showStudySelector)}
+                        className={classNames(
+                          "h-8 px-2.5 rounded-xl flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border",
+                          showStudySelector
+                            ? "bg-brand-600 text-white border-brand-500"
+                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
+                        )}
+                        title="Vários estudos localizados para este paciente"
+                      >
+                        <SlidersHorizontal size={12} />
+                        <span>Estudos ({candidateStudies.length})</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => setDicomRefreshKey(prev => prev + 1)}
                       disabled={dicomLoading}
@@ -680,6 +840,22 @@ export function ExamEditor({ examId }: Props) {
                     >
                       <RefreshCw size={14} />
                     </button>
+                    {(() => {
+                      const extUrl = getExternalViewerUrl();
+                      if (!extUrl) return null;
+                      return (
+                        <a
+                          href={extUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="h-8 px-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-slate-750 hover:border-slate-700 active:scale-95 shadow-sm select-none"
+                          title="Abrir no Visualizador Orthanc Externo (Stone Viewer, etc.)"
+                        >
+                          <ExternalLink size={12} className="text-brand-400" />
+                          <span>Viewer</span>
+                        </a>
+                      );
+                    })()}
                     <button
                       onClick={() => setShowDicomImages(true)}
                       className="h-8 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-95 text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all shadow-md border border-brand-500/20"
@@ -698,13 +874,76 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                 </div>
 
+                {/* Candidate Studies Dropdown Selector Panel */}
+                {showStudySelector && candidateStudies.length > 0 && (
+                  <div className="bg-slate-900 border-b border-slate-850 p-4 space-y-2 shrink-0 animate-slide-down">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
+                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+                      {candidateStudies.map((study) => {
+                        const date = study.MainDicomTags?.StudyDate || '';
+                        const time = study.MainDicomTags?.StudyTime || '';
+                        const desc = study.MainDicomTags?.StudyDescription || study.RequestedProcedureDescription || 'Sem descrição';
+                        const formattedDate = date ? `${date.substring(6, 8)}/${date.substring(4, 6)}/${date.substring(0, 4)}` : 'Data ignorada';
+                        const formattedTime = time ? `${time.substring(0, 2)}:${time.substring(2, 4)}` : '';
+                        const isCurrent = study.ID === selectedStudyId;
+
+                        return (
+                          <button
+                            key={study.ID}
+                            onClick={() => {
+                              setSelectedStudyId(study.ID);
+                              setShowStudySelector(false);
+                            }}
+                            className={classNames(
+                              "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3",
+                              isCurrent
+                                ? "bg-emerald-950/30 border-emerald-500/50 text-emerald-300"
+                                : "bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white"
+                            )}
+                          >
+                            <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold truncate text-[11px]">{desc}</p>
+                                <p className="text-[9px] opacity-75 mt-0.5">{formattedDate} {formattedTime} • ID: {study.MainDicomTags?.PatientID || '—'}</p>
+                              </div>
+                              <span className={classNames(
+                                "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 select-none",
+                                study.serverSource === 'backup' 
+                                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
+                                  : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              )}>
+                                {study.serverSource === 'backup' ? 'Backup' : 'Principal'}
+                              </span>
+                            </div>
+                            {isCurrent && (
+                              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Main Preview Area */}
                 <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-slate-800 bg-slate-900/50">
                   {(() => {
                     const activeInstance = dicomInstances[activeImageIndex];
-                    if (!activeInstance) return null;
-                    const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-                    const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+                    if (!activeInstance) {
+                      return (
+                        <div className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex flex-col items-center justify-center text-slate-650 p-6 text-center">
+                          <Eye size={32} className="opacity-25 mb-2" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Sem Imagem Selecionada</span>
+                        </div>
+                      );
+                    }
+                    const isBackup = activeInstance.serverSource === 'backup';
+                    const currentBaseUrl = isBackup
+                      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                      : (settings.dicomViewerUrl || 'http://localhost:8042');
+                    const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+                    const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+                    const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
                     const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
                     return (
@@ -746,7 +985,12 @@ export function ExamEditor({ examId }: Props) {
 
                 {/* Thumbnails Grid List or Error State */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {dicomError && dicomInstances.length === 0 ? (
+                  {dicomLoading && dicomInstances.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-center">
+                      <Loader2 size={24} className="animate-spin text-brand-500 mb-3" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Buscando Exames no PACS...</span>
+                    </div>
+                  ) : dicomError && dicomInstances.length === 0 ? (
                     <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 flex flex-col items-center text-center gap-2.5 my-4">
                       <AlertTriangle className="text-amber-500" size={24} />
                       <p className="text-[10px] text-amber-200/80 font-medium leading-relaxed">
@@ -760,12 +1004,23 @@ export function ExamEditor({ examId }: Props) {
                         Tentar Novamente
                       </button>
                     </div>
+                  ) : dicomInstances.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-center px-4">
+                      <AlertCircle className="text-slate-500 mb-3" size={24} />
+                      <span className="text-[10px] font-black uppercase tracking-wider block text-slate-300">Nenhum Estudo Selecionado</span>
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-2">
                       {dicomInstances.map((instance, idx) => {
                         const isActive = idx === activeImageIndex;
-                        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-                        const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+                        const isBackup = instance.serverSource === 'backup';
+                        const currentBaseUrl = isBackup
+                          ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                          : (settings.dicomViewerUrl || 'http://localhost:8042');
+                        const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+                        const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+                        const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
                         
                         return (
                           <button
@@ -1300,8 +1555,13 @@ export function ExamEditor({ examId }: Props) {
 
           {(() => {
             const activeInstance = dicomInstances[activeImageIndex];
-            const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-            const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+            const isBackup = activeInstance.serverSource === 'backup';
+            const currentBaseUrl = isBackup
+              ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+              : (settings.dicomViewerUrl || 'http://localhost:8042');
+            const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+            const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+            const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
             const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
             return (

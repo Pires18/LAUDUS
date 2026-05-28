@@ -23,7 +23,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const { data: templates } = useCollection<ReportTemplate>('templates');
   const { data: clinics } = useCollection<Clinic>('clinics');
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [showQuickPatient, setShowQuickPatient] = useState(false);
@@ -34,6 +34,9 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [selectedArea, setSelectedArea] = useState<ExamArea | 'todas'>('todas');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
+
+  const [anamnesis, setAnamnesis] = useState('');
 
   // Configura clínica inicial
   useEffect(() => {
@@ -65,6 +68,33 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       p.id.toLowerCase().includes(s)
     ).slice(0, 8);
   }, [patients, search]);
+
+  const hasExactMatch = useMemo(() => {
+    if (!search.trim()) return true;
+    const s = search.trim().toLowerCase();
+    return patients.some(p => p.name.toLowerCase() === s);
+  }, [patients, search]);
+
+  // Auto-open quick patient registration when search has no matches
+  useEffect(() => {
+    if (search.trim() && filteredPatients.length === 0 && !selectedPatient && !showQuickPatient) {
+      setNewPatientName(search.trim());
+      setShowQuickPatient(true);
+    }
+  }, [search, filteredPatients, selectedPatient, showQuickPatient]);
+
+  const handleToggleQuickPatient = () => {
+    if (showQuickPatient) {
+      setShowQuickPatient(false);
+      setSearch('');
+      setNewPatientName('');
+      setNewPatientBirthDate('');
+      setNewPatientGender('F');
+    } else {
+      setShowQuickPatient(true);
+      setNewPatientName(search.trim());
+    }
+  };
 
   const filteredTemplates = useMemo(() => {
     let list = templates;
@@ -120,6 +150,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         templateId: template.id,
         status: 'pendente',
         reportContent: getInitialReportContent(template),
+        anamnesis: anamnesis.trim() || undefined,
+        consentTerm: template.consentTemplate || undefined,
+        consentAccepted: false,
+        clinicalIndication: anamnesis.trim() || undefined,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -215,11 +249,12 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
         {/* Progress Bar with Steps */}
         <div className="bg-ink-50/50 px-6 py-2 flex items-center justify-between border-b border-ink-100 z-10 shrink-0">
-           <div className="flex items-center gap-6">
+           <div className="flex items-center gap-2">
              {[
                { step: 1, label: 'Identificação' },
-               { step: 2, label: 'Máscara Técnica' }
-             ].map((s) => (
+               { step: 2, label: 'Máscara' },
+               { step: 3, label: 'Anamnese' }
+             ].map((s, idx) => (
                <div key={s.step} className="flex items-center gap-2">
                   <div className={classNames(
                     "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black transition-all",
@@ -231,7 +266,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                     "text-[9px] font-black uppercase tracking-wider",
                     step >= s.step ? "text-ink-900" : "text-ink-300"
                   )}>{s.label}</span>
-                  {s.step === 1 && <div className="w-6 h-px bg-ink-200 ml-4" />}
+                  {idx < 2 && <div className="w-4 h-px bg-ink-200 ml-1 shrink-0" />}
                </div>
              ))}
            </div>
@@ -309,7 +344,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                           <p className="text-[10px] text-ink-400 font-bold uppercase tracking-wider">Busque no banco ou crie um registro rápido</p>
                        </div>
                        <button 
-                        onClick={() => setShowQuickPatient(!showQuickPatient)}
+                        onClick={handleToggleQuickPatient}
                         className="px-3 py-1.5 rounded-xl bg-brand-600 text-white font-black text-[9px] uppercase tracking-widest hover:bg-brand-700 transition-all flex items-center gap-1.5 shadow-md shadow-brand-100"
                       >
                         {showQuickPatient ? <ArrowRight size={12} className="rotate-180" /> : <UserPlus size={12} />}
@@ -371,6 +406,13 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                             className="w-full h-12 pl-11 pr-4 bg-ink-50 border-2 border-ink-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white outline-none transition-all font-bold text-xs text-ink-900 shadow-sm"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !hasExactMatch && search.trim()) {
+                                e.preventDefault();
+                                setNewPatientName(search.trim());
+                                setShowQuickPatient(true);
+                              }
+                            }}
                             autoFocus
                           />
                         </div>
@@ -396,10 +438,58 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                               </div>
                             </button>
                           ))}
+                          {search.trim() && !hasExactMatch && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewPatientName(search.trim());
+                                setShowQuickPatient(true);
+                              }}
+                              className="w-full flex items-center justify-between p-3 rounded-xl bg-brand-50/30 border border-dashed border-brand-300 hover:border-brand-500 hover:bg-brand-50 transition-all group shadow-sm text-brand-700 font-bold"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                 <div className="w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center font-black text-sm shrink-0 group-hover:bg-brand-600 group-hover:text-white transition-all">
+                                    <UserPlus size={14} />
+                                 </div>
+                                 <div className="text-left min-w-0">
+                                    <p className="font-black text-xs text-brand-700 truncate">Cadastrar "{search.trim()}" como novo paciente</p>
+                                    <p className="text-[8px] text-brand-500 font-bold mt-0.5 uppercase tracking-wider">Criar registro rápido no banco</p>
+                                 </div>
+                              </div>
+                              <div className="w-8 h-8 rounded-lg bg-brand-100/55 text-brand-600 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all shrink-0">
+                                <Sparkles size={12} />
+                              </div>
+                            </button>
+                          )}
                           {filteredPatients.length === 0 && (
-                            <div className="text-center py-6 opacity-60">
-                              <p className="text-xs font-bold text-ink-400">Nenhum paciente cadastrado.</p>
-                            </div>
+                            search.trim() ? (
+                              <div className="p-5 rounded-2xl bg-brand-50/50 border border-brand-100/50 flex flex-col items-center text-center gap-3 animate-fade-in my-1">
+                                <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
+                                  <UserPlus size={18} />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <h4 className="text-xs font-black text-ink-900 uppercase">Paciente não localizado</h4>
+                                  <p className="text-[10px] text-ink-500 font-semibold leading-relaxed">
+                                    Não encontramos nenhum cadastro para "{search}".
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewPatientName(search.trim());
+                                    setShowQuickPatient(true);
+                                  }}
+                                  className="h-9 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-md shadow-brand-100 transition-all active:scale-95"
+                                >
+                                  <Sparkles size={12} />
+                                  Criar Cadastro Rápido
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center py-6 opacity-60">
+                                <p className="text-xs font-bold text-ink-400">Nenhum paciente cadastrado.</p>
+                              </div>
+                            )
                           )}
                         </div>
                       </div>
@@ -467,7 +557,12 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                       {filteredTemplates.map(t => (
                         <button
                           key={t.id}
-                          onClick={() => handleCreateDirect(t)}
+                          onClick={() => {
+                            setSelectedTemplate(t);
+                            setAnamnesis(t.anamnesisTemplate || '');
+                            setStep(3);
+                            setSearch('');
+                          }}
                           disabled={loading}
                           className="w-full flex items-center justify-between p-3 rounded-xl bg-white border border-ink-100 hover:border-brand-500 hover:bg-brand-50/50 transition-all group shadow-sm"
                         >
@@ -494,14 +589,48 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                  </div>
               </motion.div>
             )}
+
+            {step === 3 && selectedTemplate && (
+              <motion.div 
+                key="step3"
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -15 }}
+                className="space-y-4 animate-in fade-in duration-200"
+              >
+                <div className="space-y-1 bg-brand-50/40 p-4 rounded-2xl border border-brand-100/60 shadow-sm relative overflow-hidden shrink-0">
+                  <p className="text-[8px] font-black text-brand-600 uppercase tracking-widest leading-none mb-1">Procedimento Selecionado</p>
+                  <h4 className="text-xs font-black text-ink-900 truncate leading-tight">{selectedTemplate.name}</h4>
+                  <p className="text-[8px] text-ink-400 font-black uppercase tracking-wider leading-none mt-0.5">{selectedTemplate.area}</p>
+                </div>
+
+                 <div className="flex flex-col space-y-2">
+                   {/* Anamnese / Indicação Clínica */}
+                   <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Anamnese / Indicação Clínica</label>
+                   <textarea
+                     value={anamnesis}
+                     onChange={(e) => setAnamnesis(e.target.value)}
+                     placeholder="Ex: Dor abdominal a esclarecer. Suspeita de litíase vesicular."
+                     className="w-full h-56 p-4 bg-white border border-ink-150 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-semibold text-xs text-ink-900 resize-none custom-scrollbar"
+                   />
+                 </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-ink-100 bg-white/50 backdrop-blur-sm flex items-center justify-between z-10 shrink-0">
-           {step === 2 ? (
+           {step > 1 ? (
              <button 
-               onClick={() => { setStep(1); setSearch(''); }}
+               onClick={() => {
+                 if (step === 3) {
+                   setStep(2);
+                 } else {
+                   setStep(1);
+                   setSearch('');
+                 }
+               }}
                className="flex items-center gap-1 text-[10px] font-black text-ink-400 hover:text-ink-900 uppercase tracking-widest transition-all active:scale-95"
              >
                <ArrowRight size={14} className="rotate-180" />
@@ -512,7 +641,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
            )}
            
            <div className="flex gap-2">
-             {[1, 2].map(i => (
+             {[1, 2, 3].map(i => (
                <div key={i} className={classNames(
                  "w-2 h-2 rounded-full transition-all duration-300",
                  step === i ? "bg-brand-600 w-6 shadow-md shadow-brand-100" : "bg-ink-200"
@@ -528,6 +657,15 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
              >
                Prosseguir
                <ArrowRight size={12} />
+             </button>
+           ) : step === 3 ? (
+             <button 
+               onClick={() => handleCreateDirect(selectedTemplate!)}
+               disabled={loading}
+               className="flex items-center gap-1.5 px-4 h-9 rounded-xl bg-brand-600 text-white font-black text-[9px] uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all shadow-md shadow-brand-100 active:scale-95"
+             >
+               {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+               Iniciar Laudo
              </button>
            ) : (
              <div className="w-16" />

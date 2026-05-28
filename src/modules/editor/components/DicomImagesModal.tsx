@@ -166,7 +166,13 @@ export function DicomImagesModal({
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[260px] overflow-y-auto pr-1.5 custom-scrollbar">
               {instances.map((instance, idx) => {
                 const isSelected = selectedIds.has(instance.ID);
-                const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+                const isBackup = instance.serverSource === 'backup';
+                const currentBaseUrl = isBackup
+                  ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                  : (settings.dicomViewerUrl || 'http://localhost:8042');
+                const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+                const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+                const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
                 const instNum = instance.MainDicomTags?.InstanceNumber || (idx + 1);
 
                 return (

@@ -219,6 +219,11 @@ export interface AppSettings {
   dicomPreset?: 'macmini' | 'notebook' | 'custom';
   dicomUsername?: string;
   dicomPassword?: string;
+  
+  // Configurações do PACS de Backup (Redundância)
+  dicomBackupViewerUrl?: string;
+  dicomBackupUsername?: string;
+  dicomBackupPassword?: string;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */

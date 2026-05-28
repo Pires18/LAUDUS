@@ -61,6 +61,21 @@ export function LaudCopilot({
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
+  const [autoRefineEnabled, setAutoRefineEnabled] = useState(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelActiveRequest = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      cancelActiveRequest();
+    };
+  }, []);
 
   useEffect(() => {
     setFormText(exam.customFormValue ?? template?.customForm ?? '');
@@ -140,17 +155,61 @@ export function LaudCopilot({
     };
   }, [showToast]);
 
-  // Simulate volume for animation
+  // Real voice volume analyzer using Web Audio API
   useEffect(() => {
-    let interval: any;
+    let audioContext: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let stream: MediaStream | null = null;
+    let animationId: number | null = null;
+
+    const getVolume = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        analyser.fftSize = 256;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const updateVolume = () => {
+          if (!analyser) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          setVoiceVolume(Math.min(100, Math.round(average * 2.5)));
+          animationId = requestAnimationFrame(updateVolume);
+        };
+        updateVolume();
+      } catch (err) {
+        console.warn('[Voice Analyser] Microfone não acessível ou permissão negada:', err);
+        // Fallback para volume simulado caso falhe
+        let mockInterval = setInterval(() => {
+          setVoiceVolume(Math.random() * 100);
+        }, 100);
+        return () => clearInterval(mockInterval);
+      }
+    };
+
     if (isListening) {
-      interval = setInterval(() => {
-        setVoiceVolume(Math.random() * 100);
-      }, 100);
+      getVolume();
     } else {
       setVoiceVolume(0);
     }
-    return () => clearInterval(interval);
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close();
+      }
+    };
   }, [isListening]);
 
   const toggleListening = () => {
@@ -248,19 +307,33 @@ export function LaudCopilot({
     let conversation = content;
     let proposal = '';
 
-    if (content.includes('=== PROPOSTA ===')) {
-      const parts = content.split('=== PROPOSTA ===');
-      conversation = parts[0].replace('=== CONVERSA ===', '').trim();
-      let rawProposal = parts[1].trim();
-      // Limpa delimitadores de código markdown residual (como ```html ... ```)
-      proposal = rawProposal
-        .replace(/^```html\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
-    } else if (content.includes('=== CONVERSA ===')) {
-      conversation = content.replace('=== CONVERSA ===', '').trim();
+    const conversaIndex = content.indexOf('=== CONVERSA ===');
+    const propostaIndex = content.indexOf('=== PROPOSTA ===');
+
+    if (conversaIndex !== -1) {
+      if (propostaIndex !== -1) {
+        conversation = content.substring(conversaIndex + '=== CONVERSA ==='.length, propostaIndex).trim();
+        let rawProposal = content.substring(propostaIndex + '=== PROPOSTA ==='.length).trim();
+        proposal = rawProposal
+          .replace(/^```html\s*/i, '')
+          .replace(/```\s*$/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/```\s*$/i, '')
+          .trim();
+      } else {
+        conversation = content.substring(conversaIndex + '=== CONVERSA ==='.length).trim();
+      }
+    } else {
+      if (propostaIndex !== -1) {
+        conversation = content.substring(0, propostaIndex).trim();
+        let rawProposal = content.substring(propostaIndex + '=== PROPOSTA ==='.length).trim();
+        proposal = rawProposal
+          .replace(/^```html\s*/i, '')
+          .replace(/```\s*$/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/```\s*$/i, '')
+          .trim();
+      }
     }
 
     // Strip scratchpad case-insensitively from both conversation and proposal
@@ -343,7 +416,7 @@ export function LaudCopilot({
             );
           }
 
-          // Regular paragraph
+// Regular paragraph
           return (
             <p key={pIdx} className="text-xs text-slate-700 font-semibold leading-relaxed">
               {renderInlineFormat(para)}
@@ -371,6 +444,10 @@ export function LaudCopilot({
       showToast(`Configure a API do ${settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'}`, 'error');
       return;
     }
+
+    cancelActiveRequest();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     onChangePrompt('');
     const newHistory = [...chatHistory, { role: 'user' as const, content: messageToSend }];
@@ -404,7 +481,8 @@ export function LaudCopilot({
         },
         template,
         settings,
-        previousExams
+        previousExams,
+        signal: controller.signal
       }, (chunk) => {
         currentResponse = chunk;
         // Durante o stream: o parseMessageContent já sabe lidar com texto parcial
@@ -427,7 +505,7 @@ export function LaudCopilot({
         const assistantMsgIndex = newHistory.length;
         setAppliedIndices(prev => [...prev, assistantMsgIndex]);
 
-        if (template) {
+        if (template && autoRefineEnabled) {
           showToast('Alterações integradas! Refinando...', 'info');
           // Adiciona balão de status no chat
           const chatWithRefining = [
@@ -447,7 +525,8 @@ export function LaudCopilot({
             requestingPhysician: exam.requestingPhysician,
             anamnesis: exam.anamnesis,
             previousExams,
-            examDateMs: exam.createdAt
+            examDateMs: exam.createdAt,
+            signal: controller.signal
           }, (chunk) => {
             refinedHtml = chunk;
             onUpdate(sanitizeHtml(refinedHtml));
@@ -465,7 +544,11 @@ export function LaudCopilot({
           showToast('Alterações integradas com sucesso! ✓', 'success');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error && error.name === 'AbortError') {
+        console.log('[LaudCopilot] Requisição cancelada pelo usuário.');
+        return;
+      }
       console.error('[LaudCopilot] handleSend error:', error);
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
       // Mensagem amigável para erros comuns de API
@@ -484,8 +567,6 @@ export function LaudCopilot({
   };
 
   // Mantém ref sempre atualizado com a versão mais recente de handleSend
-  handleSendRef.current = handleSend;
-
   const handleCompileForm = () => {
     if (!formText.trim()) {
       showToast('Preencha o formulário antes de compilar.', 'info');
@@ -921,7 +1002,7 @@ export function LaudCopilot({
             </div>
 
             <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-5">
+              <div className="flex items-center gap-4">
                 <button
                   onClick={onShowCalculators}
                   className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-brand-600 uppercase tracking-widest transition-colors group"
@@ -930,10 +1011,24 @@ export function LaudCopilot({
                   Calculadoras
                 </button>
                 <div className="h-3 w-px bg-slate-200" />
-                <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <Command size={14} />
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-lg text-[9px] font-black text-slate-500">Enter</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setAutoRefineEnabled(!autoRefineEnabled)}
+                  className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-colors"
+                  style={{ color: autoRefineEnabled ? '#6366f1' : '#94a3b8' }}
+                  title="Refinamento pós-copiloto automático com regras de máscara"
+                >
+                  <div className={classNames(
+                    "w-6 h-3.5 rounded-full p-0.5 transition-colors duration-200 relative",
+                    autoRefineEnabled ? "bg-brand-500" : "bg-slate-300"
+                  )}>
+                    <div className={classNames(
+                      "w-2.5 h-2.5 rounded-full bg-white transition-transform duration-200 shadow-sm",
+                      autoRefineEnabled && "translate-x-2.5"
+                    )} />
+                  </div>
+                  <span>Refino Auto</span>
+                </button>
               </div>
               <div className="flex items-center gap-2 px-2.5 py-1.5 bg-brand-50 rounded-xl border border-brand-100/50">
                 <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />

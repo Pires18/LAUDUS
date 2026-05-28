@@ -90,7 +90,14 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
             {pageInstances.map((instance, instIdx) => {
               const globalIndex = pageIdx * chunkSize + instIdx + 1;
               const instanceNum = instance.MainDicomTags?.InstanceNumber || globalIndex;
-              const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+              
+              const isBackup = (instance as any).serverSource === 'backup';
+              const currentBaseUrl = isBackup
+                ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                : (settings.dicomViewerUrl || 'http://localhost:8042');
+              const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+              const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+              const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
               
               return (
                 <div key={instance.ID} className="print-image-card">

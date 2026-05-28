@@ -515,6 +515,48 @@ export function Settings() {
                     </p>
                   </div>
 
+                  {/* Servidor PACS de Backup */}
+                  <div className="border-t border-ink-100 pt-6">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-ink-500 mb-4">Servidor PACS de Backup (Redundância em Tempo Real)</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="label">URL Base do Orthanc Backup</label>
+                        <input
+                          className="input h-14"
+                          value={draft.dicomBackupViewerUrl || ''}
+                          onChange={(e) => u('dicomBackupViewerUrl', e.target.value)}
+                          placeholder="Ex: http://localhost:8043"
+                        />
+                        <p className="text-[11px] text-ink-400 mt-1">URL do servidor Orthanc secundário para redundância em tempo real.</p>
+                      </div>
+
+                      <div className="hidden md:block" />
+
+                      <div>
+                        <label className="label">Usuário do Orthanc Backup</label>
+                        <input
+                          className="input h-14"
+                          value={draft.dicomBackupUsername || ''}
+                          onChange={(e) => u('dicomBackupUsername', e.target.value)}
+                          placeholder="Ex: admin"
+                        />
+                        <p className="text-[11px] text-ink-400 mt-1">Usuário de autenticação básica para o servidor de backup.</p>
+                      </div>
+
+                      <div>
+                        <label className="label">Senha do Orthanc Backup</label>
+                        <input
+                          type="password"
+                          className="input h-14"
+                          value={draft.dicomBackupPassword || ''}
+                          onChange={(e) => u('dicomBackupPassword', e.target.value)}
+                          placeholder="Ex: 123456789"
+                        />
+                        <p className="text-[11px] text-ink-400 mt-1">Senha de autenticação básica para o servidor de backup.</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Modalidade */}
                     <div>

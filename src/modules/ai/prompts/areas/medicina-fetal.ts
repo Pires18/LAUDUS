@@ -913,11 +913,11 @@ RECOMENDAÇÕES POR FAIXA IG (quando exame normal):
 
 <11 semanas: "Recomenda-se seguimento pré-natal e realização do morfológico de primeiro trimestre no período adequado."
 
-11+0 a 13+6: "Recomenda-se seguimento pré-natal, integração com rastreamento clínico-laboratorial e programação do morfológico de segundo trimestre."
+11+0 a 13+6: "Recomenda-se seguimento pré-natal, integração com rastreamento clínico-laboratorial, programação do morfológico de segundo trimestre e da ecocardiografia fetal."
 
-14-24 semanas sem morfológico 2º trimestre: "Recomenda-se programação do morfológico de segundo trimestre no período adequado, conforme disponibilidade e idade gestacional."
+14-24 semanas sem morfológico 2º trimestre: "Recomenda-se programação do morfológico de segundo trimestre no período adequado, conforme disponibilidade e idade gestacional, além de programação de ecocardiografia fetal."
 
-14-24 semanas, morfológico normal: "Recomenda-se seguimento pré-natal habitual, conforme orientação obstétrica."
+14-24 semanas, morfológico normal: "Recomenda-se seguimento pré-natal habitual, conforme orientação obstétrica. Programar ecocardiografia fetal"
 
 24-32 semanas: "Recomenda-se seguimento pré-natal, com controle de crescimento, líquido amniótico e Doppler quando houver indicação clínica ou fator de risco."
 
