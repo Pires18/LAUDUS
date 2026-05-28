@@ -20,12 +20,19 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
   const [calcResult, setCalcResult] = useState<any>(null);
   const [showAll, setShowAll] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'params' | 'result'>('params');
 
   const filteredCalculators = CALCULATORS.filter(calc => 
     showAll || !area || calc.areas.includes(area)
   );
 
   const selectedCalc = CALCULATORS.find(c => c.id === selectedCalcId);
+
+  const handleSelectCalc = (id: string | null) => {
+    setSelectedCalcId(id);
+    setCalcResult(null);
+    setActiveTab('params');
+  };
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-0 sm:p-4 lg:p-10">
@@ -42,7 +49,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.94, opacity: 0, y: 30 }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="relative bg-white/95 backdrop-blur-xl w-full max-w-6xl h-dvh sm:h-[90vh] lg:h-full lg:max-h-[850px] rounded-none sm:rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 shadow-slate-950/20"
+        className="relative bg-white/95 backdrop-blur-xl w-full max-w-6xl h-dvh sm:h-[90vh] lg:h-[90vh] lg:max-h-[800px] rounded-none sm:rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-100 shadow-slate-950/20"
       >
         {/* Header with Premium Mesh Gradient */}
         <div className="relative h-20 sm:h-28 shrink-0 overflow-hidden bg-slate-900 border-b border-slate-800">
@@ -109,7 +116,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                   <motion.button
                     whileHover={{ y: -5 }}
                     key={calc.id}
-                    onClick={() => setSelectedCalcId(calc.id)}
+                    onClick={() => handleSelectCalc(calc.id)}
                     className="group flex flex-col text-left p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 bg-white hover:border-brand-500 hover:shadow-xl hover:shadow-brand-500/5 transition-all relative overflow-hidden shadow-sm"
                   >
                     <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-slate-50 text-slate-500 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-brand-600 group-hover:text-white transition-all shadow-inner border border-slate-100">
@@ -138,7 +145,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
               {/* Back Bar */}
               <div className="px-4 sm:px-10 py-3 sm:py-5 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
                 <button 
-                  onClick={() => { setSelectedCalcId(null); setCalcResult(null); }}
+                  onClick={() => handleSelectCalc(null)}
                   className="flex items-center gap-2 text-[10px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-[0.2em] group"
                 >
                   <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
@@ -151,9 +158,45 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                 <div className="w-10 sm:w-24" />
               </div>
               
-              {/* Editor Workspace (Stackable on Mobile) */}
-              <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
-                <div className="flex-1 overflow-y-visible lg:overflow-y-auto p-4 sm:p-10 custom-scrollbar">
+              {/* Mobile/Tablet Tabs */}
+              <div className="flex lg:hidden bg-slate-50 border-b border-slate-100 p-1.5 shrink-0 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('params')}
+                  className={classNames(
+                    "flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2",
+                    activeTab === 'params'
+                      ? "bg-white text-slate-800 shadow-sm border border-slate-100"
+                      : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  <Calculator size={14} className={activeTab === 'params' ? 'text-brand-600' : ''} />
+                  Parâmetros
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('result')}
+                  className={classNames(
+                    "flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 relative",
+                    activeTab === 'result'
+                      ? "bg-white text-slate-800 shadow-sm border border-slate-100"
+                      : "text-slate-400 hover:text-slate-600"
+                  )}
+                >
+                  <Activity size={14} className={activeTab === 'result' ? 'text-brand-600' : ''} />
+                  Conclusão
+                  {calcResult?._summary && activeTab !== 'result' && (
+                    <span className="absolute top-2.5 right-3 w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
+                  )}
+                </button>
+              </div>
+
+              {/* Editor Workspace */}
+              <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+                <div className={classNames(
+                  "flex-1 overflow-y-auto p-4 sm:p-10 custom-scrollbar",
+                  activeTab === 'params' ? "block" : "hidden lg:block"
+                )}>
                   <div className="max-w-3xl mx-auto bg-white rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm p-4 sm:p-10">
                     {selectedCalc && (
                       <>
@@ -174,7 +217,10 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                 </div>
 
                 {/* Live Preview Panel (Glassmorphic look) */}
-                <div className="w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l border-slate-100 bg-white flex flex-col shrink-0">
+                <div className={classNames(
+                  "w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l border-slate-100 bg-white flex flex-col shrink-0 min-h-0",
+                  activeTab === 'result' ? "flex" : "hidden lg:flex"
+                )}>
                    <div className="p-4 sm:p-8 border-b border-slate-100 bg-slate-50/40">
                       <div className="flex items-center gap-3 mb-1 sm:mb-2">
                          <Activity size={16} className="text-brand-600 animate-pulse" />
@@ -183,7 +229,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                       <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-tight">Resultado sincronizado em tempo real</p>
                    </div>
                    
-                   <div className="flex-1 overflow-y-visible lg:overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 custom-scrollbar bg-slate-50/20 max-h-none lg:max-h-none">
+                   <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4 sm:space-y-6 custom-scrollbar bg-slate-50/20">
                       <AnimatePresence mode="wait">
                         {calcResult?._summary ? (
                           <motion.div 
@@ -265,6 +311,11 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                             (calcResult?._summary ? `CONCLUSÃO: ${calcResult._summary}\n\n` : '') +
                             `MÉTRICAS COLETADAS:\n${Object.entries(cleanData).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`;
                             
+                          // Copy to clipboard in addition to sending to copilot
+                          navigator.clipboard.writeText(finalMessage).catch(err => {
+                            console.error('Failed to copy to clipboard in Usar no Copiloto:', err);
+                          });
+
                           onSendToCopilot(finalMessage);
                           onClose();
                         }}

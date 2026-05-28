@@ -61,7 +61,14 @@ export function LaudCopilot({
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
-  const [autoRefineEnabled, setAutoRefineEnabled] = useState(false);
+  const [autoRefineEnabled, setAutoRefineEnabled] = useState(() => {
+    const stored = localStorage.getItem('laudus_auto_refine');
+    return stored ? stored === 'true' : false;
+  });
+  const handleToggleAutoRefine = (val: boolean) => {
+    setAutoRefineEnabled(val);
+    localStorage.setItem('laudus_auto_refine', String(val));
+  };
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const cancelActiveRequest = () => {
@@ -1014,7 +1021,7 @@ export function LaudCopilot({
                 <div className="h-3 w-px bg-slate-200" />
                 <button
                   type="button"
-                  onClick={() => setAutoRefineEnabled(!autoRefineEnabled)}
+                  onClick={() => handleToggleAutoRefine(!autoRefineEnabled)}
                   className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-colors"
                   style={{ color: autoRefineEnabled ? '#6366f1' : '#94a3b8' }}
                   title="Refinamento pós-copiloto automático com regras de máscara"
