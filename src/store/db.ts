@@ -133,6 +133,20 @@ export async function getSettings(): Promise<AppSettings> {
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
+    // Realiza a migração automática de caminhos antigos para o novo local no SSD do usuário
+    let migrated = false;
+    if (data.dicomWorklistFolder && data.dicomWorklistFolder.includes('/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase')) {
+      data.dicomWorklistFolder = data.dicomWorklistFolder.replace(
+        '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase',
+        '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase'
+      );
+      migrated = true;
+    }
+
+    if (migrated && snap.exists()) {
+      saveSettings(data).catch(err => console.warn('[DB] Falha ao persistir migração de settings:', err));
+    }
+
     // Se o preset não for customizado (notebook, macmini ou não definido), resolve dinamicamente com base no OS
     if (data.dicomPreset !== 'custom') {
       data.dicomPreset = isWindows ? 'notebook' : 'macmini';
