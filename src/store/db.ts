@@ -126,7 +126,7 @@ export async function getSettings(): Promise<AppSettings> {
       dicomPassword: '123456789',
       dicomLocalAgentUrl: isWindows 
         ? 'http://localhost:5173' 
-        : 'http://servidor-mac.tail861dda.ts.net:5173',
+        : 'https://servidor-mac.tail861dda.ts.net:10000',
       dicomBackupViewerUrl: '',
       dicomBackupUsername: '',
       dicomBackupPassword: '',
@@ -151,6 +151,11 @@ export async function getSettings(): Promise<AppSettings> {
       migrated = true;
     }
 
+    if (data.dicomLocalAgentUrl === 'http://servidor-mac.tail861dda.ts.net:5173') {
+      data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net:10000';
+      migrated = true;
+    }
+
     if (migrated && snap.exists()) {
       saveSettings(data).catch(err => console.warn('[DB] Falha ao persistir migração de settings:', err));
     }
@@ -165,7 +170,7 @@ export async function getSettings(): Promise<AppSettings> {
       data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
       data.dicomLocalAgentUrl = isWindows 
         ? 'http://localhost:5173' 
-        : 'http://servidor-mac.tail861dda.ts.net:5173';
+        : 'https://servidor-mac.tail861dda.ts.net:10000';
     }
     
     // Fallback de segurança para buscar prompts oficiais do administrador
@@ -209,7 +214,7 @@ export async function getSettings(): Promise<AppSettings> {
     dicomPassword: '123456789',
     dicomLocalAgentUrl: isWindows 
       ? 'http://localhost:5173' 
-      : 'http://servidor-mac.tail861dda.ts.net:5173',
+      : 'https://servidor-mac.tail861dda.ts.net:10000',
     dicomBackupViewerUrl: '',
     dicomBackupUsername: '',
     dicomBackupPassword: '',

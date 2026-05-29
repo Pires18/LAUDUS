@@ -633,7 +633,7 @@ export function Settings() {
                             dicomOrthancAETitle: 'ORTHANCPACS',
                             dicomViewerType: 'stone',
                             dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-                            dicomLocalAgentUrl: 'http://servidor-mac.tail861dda.ts.net:5173'
+                            dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10000'
                           }));
                         }}
                         className={classNames(
@@ -727,7 +727,7 @@ export function Settings() {
                         u('dicomLocalAgentUrl', e.target.value);
                         u('dicomPreset', 'custom');
                       }}
-                      placeholder="Ex: http://servidor-mac.tail861dda.ts.net:5173"
+                      placeholder="Ex: https://servidor-mac.tail861dda.ts.net:10000"
                     />
                     <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP da aplicação rodando localmente na clínica para receber requisições de worklist da nuvem (Vercel).</p>
                   </div>
