@@ -446,4 +446,4 @@ export function AdminLicenses() {
     </div>
   );
 }
-export default AdminLicenses;
+

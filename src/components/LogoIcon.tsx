@@ -51,4 +51,4 @@ export function LogoIcon({ className = '', size = 36 }: Props) {
   );
 }
 
-export default LogoIcon;
+

@@ -55,20 +55,6 @@ export function classNames(...classes: (string | false | undefined | null)[]): s
  * Cria uma versão debounced de uma função.
  * Atrasa a execução até que `ms` milissegundos tenham passado sem nova chamada.
  */
-export function debounce<TArgs extends unknown[]>(
-  fn: (...args: TArgs) => void,
-  ms = 400
-): (...args: TArgs) => void {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  return (...args: TArgs) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
-  };
-}
-
-/**
- * Formata CPF: 000.000.000-00
- */
 export function formatCPF(cpf: string): string {
   const digits = cpf.replace(/\D/g, '').slice(0, 11);
   if (digits.length <= 3) return digits;
@@ -90,15 +76,6 @@ export function formatPhone(phone: string): string {
 
 /**
  * Formata CEP: 00000-000
- */
-export function formatCEP(cep: string): string {
-  const digits = cep.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 5) return digits;
-  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
-}
-
-/**
- * Formata CNPJ: 00.000.000/0000-00
  */
 export function formatCNPJ(cnpj: string): string {
   const digits = cnpj.replace(/\D/g, '').slice(0, 14);

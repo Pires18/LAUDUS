@@ -63,7 +63,7 @@ export interface Patient {
 }
 
 /** Mensagem do chat do Copiloto */
-export interface ChatMessage {
+interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;

@@ -253,4 +253,4 @@ export function useDocument<T extends { id: string }>(
 }
 
 // ─── Re-export query helpers for use in components ───
-export { where, orderBy, query } from 'firebase/firestore';
+export { where, orderBy } from 'firebase/firestore';
