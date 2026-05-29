@@ -7,10 +7,15 @@ import { PageHeader } from '../../components/PageHeader';
 import { 
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
-  RotateCcw, Clock, Database, Info
+  RotateCcw, Clock, Database, Info, Upload, Loader2
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { updateProfile } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { storage, firestore, auth } from '../../lib/firebase';
+import { addAuditLog } from '../../store/db';
 
 type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit';
 
@@ -22,6 +27,9 @@ export function Settings() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
+
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+  const [isUploadingSignature, setIsUploadingSignature] = useState(false);
 
   useEffect(() => {
     setDraft(settings);
@@ -35,11 +43,74 @@ export function Settings() {
     setIsSaving(true);
     try {
       await updateSettings(draft);
+      
+      // Grava log de auditoria
+      await addAuditLog({
+        action: 'ATUALIZAR_CONFIGURACOES',
+        details: `Configurações do médico ${draft.physicianName || user?.displayName || user?.email} atualizadas com sucesso.`,
+        module: 'PERFIL'
+      });
+
       showToast('Configurações aplicadas com sucesso', 'success');
     } catch {
       showToast('Falha ao salvar configurações', 'error');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleProfilePictureUpload(file: File) {
+    if (!user) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Selecione uma imagem válida', 'error');
+      return;
+    }
+    setIsUploadingProfile(true);
+    try {
+      const path = `users/${user.uid}/profile-picture/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      // Atualiza o Firebase Auth User Profile
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { photoURL: url });
+      }
+      
+      // Atualiza o documento de usuário no Firestore
+      const userRef = doc(firestore, 'users', user.uid);
+      await updateDoc(userRef, { photoURL: url, updatedAt: Date.now() });
+
+      showToast('Foto de perfil atualizada com sucesso!', 'success');
+    } catch (err: any) {
+      console.error('Erro de upload da foto:', err);
+      showToast('Erro ao atualizar foto de perfil no Storage.', 'error');
+    } finally {
+      setIsUploadingProfile(false);
+    }
+  }
+
+  async function handleSignatureImageUpload(file: File) {
+    if (!user) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Selecione uma imagem válida', 'error');
+      return;
+    }
+    setIsUploadingSignature(true);
+    try {
+      const path = `users/${user.uid}/signatures/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      // Atualiza o draft local
+      u('signatureImageUrl', url);
+      showToast('Imagem de assinatura carregada! Clique em Salvar para gravar.', 'success');
+    } catch (err: any) {
+      console.error('Erro de upload da assinatura:', err);
+      showToast('Erro ao carregar assinatura digitalizada.', 'error');
+    } finally {
+      setIsUploadingSignature(false);
     }
   }
 
@@ -161,7 +232,7 @@ export function Settings() {
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden text-center p-8 sticky top-24">
                   <div className="relative inline-block mb-4">
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 p-1 shadow-lg">
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 p-1 shadow-lg overflow-hidden relative">
                       {user?.photoURL ? (
                         <img src={user.photoURL} alt="User" className="w-full h-full rounded-full border-2 border-white object-cover" />
                       ) : (
@@ -169,10 +240,31 @@ export function Settings() {
                           {user?.displayName?.charAt(0) || user?.email?.charAt(0).toUpperCase()}
                         </div>
                       )}
+                      {isUploadingProfile && (
+                        <div className="absolute inset-0 bg-white/85 flex items-center justify-center rounded-full">
+                          <Loader2 className="animate-spin text-brand-600" size={24} />
+                        </div>
+                      )}
                     </div>
                     <div className="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 border-2 border-white rounded-full" />
                   </div>
-                  <h3 className="font-black text-ink-900 text-xl">{user?.displayName || 'Usuário'}</h3>
+
+                  <label className="mx-auto max-w-[160px] mb-6 py-2 px-3 rounded-xl bg-ink-50 hover:bg-ink-100 text-ink-600 border border-ink-100 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Upload size={12} />
+                    {isUploadingProfile ? 'Enviando...' : 'Alterar Foto'}
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      disabled={isUploadingProfile} 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleProfilePictureUpload(file);
+                      }} 
+                    />
+                  </label>
+                  
+                  <h3 className="font-black text-ink-900 text-xl">{draft.physicianName || user?.displayName || 'Usuário'}</h3>
                   <p className="text-sm text-ink-500 mb-8">{user?.email}</p>
                   
                   <div className="space-y-3">
@@ -220,6 +312,57 @@ export function Settings() {
                   </div>
                 </div>
 
+                <div className="space-y-4 py-6 border-t border-ink-50">
+                  <label className="label">Assinatura Digitalizada (Imagem)</label>
+                  <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
+                    <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
+                      {draft.signatureImageUrl ? (
+                        <img src={draft.signatureImageUrl} alt="Assinatura" className="max-w-full max-h-full object-contain p-2" />
+                      ) : (
+                        <span className="text-[10px] font-bold text-ink-400 uppercase">Sem Imagem</span>
+                      )}
+                      {isUploadingSignature && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                          <Loader2 className="animate-spin text-brand-600" size={20} />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex-1 w-full space-y-3 text-left">
+                      <p className="text-xs text-ink-500 leading-relaxed">
+                        Faça upload da imagem da sua assinatura manuscrita (preferencialmente com fundo transparente em formato PNG) para exibição direta nos laudos impressos ou copiados.
+                      </p>
+                      
+                      <div className="flex items-center gap-2">
+                        <label className="py-2 px-4 rounded-xl bg-white hover:bg-ink-100 text-ink-700 border border-ink-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95">
+                          <Upload size={14} />
+                          {isUploadingSignature ? 'Enviando...' : 'Carregar Imagem'}
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            disabled={isUploadingSignature} 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleSignatureImageUpload(file);
+                            }} 
+                          />
+                        </label>
+                        
+                        {draft.signatureImageUrl && (
+                          <button
+                            type="button"
+                            onClick={() => u('signatureImageUrl', '')}
+                            className="py-2 px-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-4 pt-6 border-t border-ink-50">
                   <label className="label">Texto da Assinatura Digital</label>
                   <textarea
@@ -256,9 +399,19 @@ export function Settings() {
                         <p className="text-xs text-ink-500">Alertas ao receber novos exames na worklist.</p>
                       </div>
                     </div>
-                    <div className="w-10 h-6 bg-ink-200 rounded-full relative cursor-pointer opacity-50">
-                      <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('soundNotifications', draft.soundNotifications === false)}
+                      className={classNames(
+                        "w-12 h-7 rounded-full transition-all relative shrink-0",
+                        draft.soundNotifications !== false ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.soundNotifications !== false ? "left-6" : "left-1"
+                      )} />
+                    </button>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-2xl bg-ink-50 border border-ink-100">
@@ -266,12 +419,22 @@ export function Settings() {
                       <Clock size={20} className="text-indigo-600" />
                       <div>
                         <p className="text-sm font-bold text-ink-900">Salvamento Automático</p>
-                        <p className="text-xs text-ink-500">Persistir rascunhos a cada 30 segundos no editor.</p>
+                        <p className="text-xs text-ink-500">Persistir rascunhos automaticamente no editor conforme digitação.</p>
                       </div>
                     </div>
-                    <div className="w-10 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
-                      <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('autoSave', draft.autoSave === false)}
+                      className={classNames(
+                        "w-12 h-7 rounded-full transition-all relative shrink-0",
+                        draft.autoSave !== false ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.autoSave !== false ? "left-6" : "left-1"
+                      )} />
+                    </button>
                   </div>
                 </div>
               </div>

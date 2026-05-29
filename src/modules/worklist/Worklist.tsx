@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2, FileText,
   LayoutList, Building2, SlidersHorizontal, UserCog, Loader2, X,
@@ -45,6 +45,62 @@ export function Worklist() {
   // Build lookup maps
   const patientMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients]);
   const clinicMap = useMemo(() => new Map(clinics.map((c) => [c.id, c])), [clinics]);
+
+  // Notificação sonora de novos exames na Fila
+  const prevExamIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (examsLoading) return;
+    const currentIds = exams.map(e => e.id);
+
+    // Na primeira carga, apenas armazena os IDs sem tocar o chime
+    if (prevExamIdsRef.current.length === 0) {
+      prevExamIdsRef.current = currentIds;
+      return;
+    }
+
+    // Identifica exames recém-adicionados que não estavam na lista anterior
+    const newExams = exams.filter(e => !prevExamIdsRef.current.includes(e.id));
+    if (newExams.length > 0) {
+      const hasNewPendente = newExams.some(e => e.status === 'pendente');
+      if (hasNewPendente && settings.soundNotifications !== false) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            
+            // Tom 1: C5
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.frequency.value = 523.25;
+            osc1.type = 'sine';
+            gain1.gain.setValueAtTime(0, ctx.currentTime);
+            gain1.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
+            gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc1.start(ctx.currentTime);
+            osc1.stop(ctx.currentTime + 0.3);
+
+            // Tom 2: E5
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.frequency.value = 659.25;
+            osc2.type = 'sine';
+            gain2.gain.setValueAtTime(0, ctx.currentTime + 0.12);
+            gain2.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.17);
+            gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.52);
+            osc2.start(ctx.currentTime + 0.12);
+            osc2.stop(ctx.currentTime + 0.52);
+          }
+        } catch (err) {
+          console.warn('[Worklist Sound] Falha ao sintetizar áudio:', err);
+        }
+      }
+    }
+    prevExamIdsRef.current = currentIds;
+  }, [exams, examsLoading, settings.soundNotifications]);
 
   // Apply filters and sort
   const filtered = useMemo(() => {

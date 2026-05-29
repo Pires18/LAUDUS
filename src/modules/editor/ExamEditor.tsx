@@ -725,7 +725,7 @@ export function ExamEditor({ examId }: Props) {
       }
       if (isMod && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        debouncedSave(reportContent);
+        debouncedSave(reportContent, true);
         showToast('Laudo salvo!', 'success');
       }
       if (isMod && e.key.toLowerCase() === 'p') {

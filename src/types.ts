@@ -224,6 +224,11 @@ export interface AppSettings {
   dicomBackupViewerUrl?: string;
   dicomBackupUsername?: string;
   dicomBackupPassword?: string;
+
+  // Preferências do Sistema
+  soundNotifications?: boolean;
+  autoSave?: boolean;
+  signatureImageUrl?: string;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */

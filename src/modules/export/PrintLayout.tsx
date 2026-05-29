@@ -59,8 +59,12 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
       />
 
       {/* Footer / Signature */}
-      <div className="absolute bottom-8 left-0 right-0 text-center flex flex-col items-center">
-        <div className="w-64 border-t border-black pt-2 mb-1"></div>
+      <div className="absolute bottom-8 left-0 right-0 text-center flex flex-col items-center page-break-inside-avoid">
+        {settings.signatureImageUrl ? (
+          <img src={settings.signatureImageUrl} alt="Assinatura" className="h-16 object-contain mb-1" />
+        ) : (
+          <div className="w-64 border-t border-black pt-2 mb-1"></div>
+        )}
         <div className="text-sm font-bold whitespace-pre-wrap">{signature}</div>
       </div>
       

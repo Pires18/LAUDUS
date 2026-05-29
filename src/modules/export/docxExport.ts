@@ -243,7 +243,7 @@ export async function copyReportToClipboard(reportHtml: string, patient: Patient
   `;
   const signature = settings.physicianName ? `
     <br/><br/>
-    <hr style="width:300px;margin:0 auto;"/>
+    ${settings.signatureImageUrl ? `<div style="text-align:center;margin-bottom:8px;"><img src="${settings.signatureImageUrl}" alt="Assinatura" style="height:64px;max-height:64px;object-fit:contain;"/></div>` : '<hr style="width:300px;margin:0 auto;"/>'}
     <p style="text-align:center;"><strong>${settings.physicianName}</strong><br/>
     <small>CRM ${settings.physicianCRM || ''}${settings.physicianRQE ? ` · RQE ${settings.physicianRQE}` : ''}</small></p>
   ` : '';

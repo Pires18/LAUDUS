@@ -35,10 +35,15 @@ export function useExamActions({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef<string | null>(null);
   const debouncedSave = useCallback(
-    (reportContent: string) => {
+    (reportContent: string, force: boolean = false) => {
       latestContentRef.current = reportContent;
 
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+      if (settings.autoSave === false && !force) {
+        return;
+      }
+
       setSaveState('saving');
       saveTimerRef.current = setTimeout(async () => {
         try {
@@ -50,14 +55,14 @@ export function useExamActions({
           setTimeout(() => setSaveState('idle'), 2000);
         } catch (err) {
           console.error('[useExamActions] Erro ao salvar:', err);
-          showToast('Erro ao salvar automaticamente', 'error');
+          showToast('Erro ao salvar', 'error');
           setSaveState('idle');
         } finally {
           latestContentRef.current = null;
         }
       }, 800);
     },
-    [examId, showToast]
+    [examId, showToast, settings.autoSave]
   );
 
   useEffect(() => {

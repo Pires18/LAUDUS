@@ -126,7 +126,10 @@ export async function getSettings(): Promise<AppSettings> {
       dicomPassword: '123456789',
       dicomBackupViewerUrl: '',
       dicomBackupUsername: '',
-      dicomBackupPassword: ''
+      dicomBackupPassword: '',
+      soundNotifications: true,
+      autoSave: true,
+      signatureImageUrl: ''
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
@@ -181,7 +184,10 @@ export async function getSettings(): Promise<AppSettings> {
     dicomPassword: '123456789',
     dicomBackupViewerUrl: '',
     dicomBackupUsername: '',
-    dicomBackupPassword: ''
+    dicomBackupPassword: '',
+    soundNotifications: true,
+    autoSave: true,
+    signatureImageUrl: ''
   };
 }
 
