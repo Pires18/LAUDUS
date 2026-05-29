@@ -363,32 +363,64 @@ export function LaudCopilot({
     let conversation = content;
     let proposal = '';
 
-    const conversaIndex = content.indexOf('=== CONVERSA ===');
-    const propostaIndex = content.indexOf('=== PROPOSTA ===');
+    // Procura os marcadores de forma case-insensitive e tolerante a espaços
+    const conversaRegex = /===\s*CONVERSA\s*===/i;
+    const propostaRegex = /===\s*PROPOSTA\s*===/i;
 
-    if (conversaIndex !== -1) {
-      if (propostaIndex !== -1) {
-        conversation = content.substring(conversaIndex + '=== CONVERSA ==='.length, propostaIndex).trim();
-        let rawProposal = content.substring(propostaIndex + '=== PROPOSTA ==='.length).trim();
-        proposal = rawProposal
-          .replace(/^```html\s*/i, '')
-          .replace(/```\s*$/i, '')
-          .replace(/^```\s*/i, '')
-          .replace(/```\s*$/i, '')
-          .trim();
+    const conversaMatch = content.match(conversaRegex);
+    const propostaMatch = content.match(propostaRegex);
+
+    if (conversaMatch || propostaMatch) {
+      const conversaIndex = conversaMatch ? conversaMatch.index! : -1;
+      const conversaLength = conversaMatch ? conversaMatch[0].length : 0;
+      const propostaIndex = propostaMatch ? propostaMatch.index! : -1;
+      const propostaLength = propostaMatch ? propostaMatch[0].length : 0;
+
+      if (conversaIndex !== -1) {
+        if (propostaIndex !== -1) {
+          conversation = content.substring(conversaIndex + conversaLength, propostaIndex).trim();
+          let rawProposal = content.substring(propostaIndex + propostaLength).trim();
+          proposal = rawProposal
+            .replace(/^```html\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .trim();
+        } else {
+          conversation = content.substring(conversaIndex + conversaLength).trim();
+        }
       } else {
-        conversation = content.substring(conversaIndex + '=== CONVERSA ==='.length).trim();
+        if (propostaIndex !== -1) {
+          conversation = content.substring(0, propostaIndex).trim();
+          let rawProposal = content.substring(propostaIndex + propostaLength).trim();
+          proposal = rawProposal
+            .replace(/^```html\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/```\s*$/i, '')
+            .trim();
+        }
       }
     } else {
-      if (propostaIndex !== -1) {
-        conversation = content.substring(0, propostaIndex).trim();
-        let rawProposal = content.substring(propostaIndex + '=== PROPOSTA ==='.length).trim();
-        proposal = rawProposal
-          .replace(/^```html\s*/i, '')
-          .replace(/```\s*$/i, '')
-          .replace(/^```\s*/i, '')
-          .replace(/```\s*$/i, '')
-          .trim();
+      // ESTRATÉGIA DE FALLBACK: Se não houver marcadores explícitos
+      // 1. Tentar encontrar blocos de código HTML
+      const htmlBlockMatch = content.match(/```html\s*([\s\S]*?)\s*```/i) || content.match(/```\s*(<h1[\s\S]*?)\s*```/i);
+      if (htmlBlockMatch) {
+        proposal = htmlBlockMatch[1].trim();
+        conversation = content.substring(0, htmlBlockMatch.index).trim();
+      } else {
+        // 2. Se não houver bloco de código, mas houver tag h1/h2 estruturando o HTML
+        const h1Index = content.search(/<h1[\s>]/i);
+        if (h1Index !== -1) {
+          conversation = content.substring(0, h1Index).trim();
+          proposal = content.substring(h1Index).trim();
+        } else {
+          const h2Index = content.search(/<h2[\s>]/i);
+          if (h2Index !== -1) {
+            conversation = content.substring(0, h2Index).trim();
+            proposal = content.substring(h2Index).trim();
+          }
+        }
       }
     }
 
@@ -544,7 +576,9 @@ export function LaudCopilot({
         // Durante o stream: o parseMessageContent já sabe lidar com texto parcial
         // (o marcador === CONVERSA === é removido, === PROPOSTA === ainda não apareceu)
         // → o usuário vê a frase clínica sendo digitada em tempo real, sem ruído de markup
-        onChatUpdate([...newHistory, { role: 'assistant', content: currentResponse }]);
+        // Evita esvaziar o balão de chat se o chunk estiver vazio (ainda no scratchpad)
+        const displayResponse = currentResponse.trim() || 'Pensando e analisando laudo...';
+        onChatUpdate([...newHistory, { role: 'assistant', content: displayResponse }]);
       });
 
       // Garante que o estado final use o texto completo retornado (idêntico ao último chunk)
@@ -585,7 +619,10 @@ export function LaudCopilot({
             signal: controller.signal
           }, (chunk) => {
             refinedHtml = chunk;
-            onUpdate(sanitizeHtml(refinedHtml));
+            // Apenas atualiza se houver conteúdo no chunk para evitar apagar o texto antigo
+            if (refinedHtml.trim()) {
+              onUpdate(sanitizeHtml(refinedHtml));
+            }
           });
 
           onUpdate(sanitizeHtml(finalRefined));

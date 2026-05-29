@@ -303,16 +303,29 @@ export function stripScratchpad(text: string): string {
   if (!text) return '';
   let cleaned = text;
 
+  // 1. Remove complete scratchpad/thinking blocks
   cleaned = cleaned.replace(/<(scratchpad|think|thinking|thought)>[\s\S]*?<\/\1>/gi, '');
-  cleaned = cleaned.replace(/```(?:tool_code|python|code)?[\s\S]*?```/gi, '');
+  
+  // 2. Remove python/tool_code/code blocks (internal tool calls), but do NOT match html blocks
+  cleaned = cleaned.replace(/```(?:tool_code|python|code|javascript|typescript|bash)[\s\S]*?```/gi, '');
 
+  // 3. If there is an active/incomplete scratchpad tag, truncate at the opening tag
   const match = cleaned.match(/<(scratchpad|think|thinking|thought)>/i);
   if (match && match.index !== undefined) {
     cleaned = cleaned.substring(0, match.index);
   }
   
+  // 4. Remove any incomplete closing/opening tags
   cleaned = cleaned.replace(/<\/?(scratchpad|think|thinking|thought)>/gi, '');
 
+  // 5. Keep HTML block contents but strip markdown backticks if the HTML is wrapped in them
+  cleaned = cleaned.replace(/```html\s*([\s\S]*?)\s*```/gi, '$1');
+  cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/gi, '$1');
+
+  // 6. Clean leading/trailing markdown from the response
+  cleaned = cleanMarkdownFromResponse(cleaned);
+
+  // 7. Extract HTML content if it doesn't have copilot format
   const hasCopilotFormat = cleaned.includes('=== CONVERSA ===') || cleaned.includes('=== PROPOSTA ===');
   if (!hasCopilotFormat) {
     const h1Index = cleaned.search(/<h1[\s>]/i);

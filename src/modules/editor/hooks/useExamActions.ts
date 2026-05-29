@@ -119,7 +119,9 @@ export function useExamActions({
             previousExams,
             examDateMs,
           }, (chunk) => {
-            onReportChange(chunk);
+            if (chunk.trim()) {
+              onReportChange(chunk);
+            }
           });
           showToast('Laudo gerado com IA! ✓', 'success');
         } else {
@@ -138,7 +140,9 @@ export function useExamActions({
             customPrompt,
             examDateMs,
           }, (chunk) => {
-            onReportChange(chunk);
+            if (chunk.trim()) {
+              onReportChange(chunk);
+            }
           });
           showToast('Laudo refinado com sucesso! ✓', 'success');
         }
