@@ -632,7 +632,8 @@ export function Settings() {
                             dicomViewerUrl: 'https://servidor-mac.tail861dda.ts.net/',
                             dicomOrthancAETitle: 'ORTHANCPACS',
                             dicomViewerType: 'stone',
-                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
+                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
+                            dicomLocalAgentUrl: 'http://servidor-mac.tail861dda.ts.net:5173'
                           }));
                         }}
                         className={classNames(
@@ -659,7 +660,8 @@ export function Settings() {
                             dicomViewerUrl: 'http://localhost:8043',
                             dicomOrthancAETitle: 'ORTHANCBACKUP',
                             dicomViewerType: 'stone',
-                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
+                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
+                            dicomLocalAgentUrl: 'http://localhost:5173'
                           }));
                         }}
                         className={classNames(
@@ -713,6 +715,21 @@ export function Settings() {
                       placeholder="Ex: /Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/"
                     />
                     <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc lê os arquivos .wl. A aplicação deve ter permissão de escrita.</p>
+                  </div>
+
+                  {/* URL do Agente Local (Worklist) */}
+                  <div>
+                    <label className="label">URL do Agente Local (Worklist no Vercel)</label>
+                    <input
+                      className="input h-14"
+                      value={draft.dicomLocalAgentUrl || ''}
+                      onChange={(e) => {
+                        u('dicomLocalAgentUrl', e.target.value);
+                        u('dicomPreset', 'custom');
+                      }}
+                      placeholder="Ex: http://servidor-mac.tail861dda.ts.net:5173"
+                    />
+                    <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP da aplicação rodando localmente na clínica para receber requisições de worklist da nuvem (Vercel).</p>
                   </div>
 
                   {/* URL do Visualizador Orthanc */}

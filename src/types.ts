@@ -219,6 +219,7 @@ export interface AppSettings {
   dicomPreset?: 'macmini' | 'notebook' | 'custom';
   dicomUsername?: string;
   dicomPassword?: string;
+  dicomLocalAgentUrl?: string;
   
   // Configurações do PACS de Backup (Redundância)
   dicomBackupViewerUrl?: string;

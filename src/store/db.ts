@@ -124,6 +124,9 @@ export async function getSettings(): Promise<AppSettings> {
       dicomPreset: isWindows ? 'notebook' : 'macmini',
       dicomUsername: 'admin',
       dicomPassword: '123456789',
+      dicomLocalAgentUrl: isWindows 
+        ? 'http://localhost:5173' 
+        : 'http://servidor-mac.tail861dda.ts.net:5173',
       dicomBackupViewerUrl: '',
       dicomBackupUsername: '',
       dicomBackupPassword: '',
@@ -155,6 +158,9 @@ export async function getSettings(): Promise<AppSettings> {
         : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
       data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/';
       data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
+      data.dicomLocalAgentUrl = isWindows 
+        ? 'http://localhost:5173' 
+        : 'http://servidor-mac.tail861dda.ts.net:5173';
     }
     
     // Fallback de segurança para buscar prompts oficiais do administrador
@@ -196,6 +202,9 @@ export async function getSettings(): Promise<AppSettings> {
     dicomPreset: isWindows ? 'notebook' : 'macmini',
     dicomUsername: 'admin',
     dicomPassword: '123456789',
+    dicomLocalAgentUrl: isWindows 
+      ? 'http://localhost:5173' 
+      : 'http://servidor-mac.tail861dda.ts.net:5173',
     dicomBackupViewerUrl: '',
     dicomBackupUsername: '',
     dicomBackupPassword: '',

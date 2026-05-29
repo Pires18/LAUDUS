@@ -168,7 +168,8 @@ export function Worklist() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               examId: deleteId,
-              outputDir: settings.dicomWorklistFolder
+              outputDir: settings.dicomWorklistFolder,
+              localAgentUrl: settings.dicomLocalAgentUrl
             })
           });
         } catch (err) {
@@ -217,7 +218,8 @@ export function Worklist() {
           stepDate,
           stepTime,
           stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
-          outputDir: settings.dicomWorklistFolder
+          outputDir: settings.dicomWorklistFolder,
+          localAgentUrl: settings.dicomLocalAgentUrl
         })
       });
       const result = await res.json();
