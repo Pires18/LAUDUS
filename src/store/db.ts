@@ -118,7 +118,7 @@ export async function getSettings(): Promise<AppSettings> {
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
       dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
-      dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042',
+      dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
       dicomPreset: isWindows ? 'notebook' : 'macmini',
@@ -139,7 +139,7 @@ export async function getSettings(): Promise<AppSettings> {
       data.dicomWorklistFolder = isWindows 
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
         : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/';
-      data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042';
+      data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/';
       data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
     }
     
@@ -176,7 +176,7 @@ export async function getSettings(): Promise<AppSettings> {
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
     dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
-    dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'http://100.93.111.95:8042',
+    dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
     dicomPreset: isWindows ? 'notebook' : 'macmini',

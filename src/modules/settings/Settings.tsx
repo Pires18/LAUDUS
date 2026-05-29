@@ -629,7 +629,7 @@ export function Settings() {
                             ...d,
                             dicomPreset: 'macmini',
                             dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
-                            dicomViewerUrl: 'http://100.93.111.95:8042',
+                            dicomViewerUrl: 'https://servidor-mac.tail861dda.ts.net/',
                             dicomOrthancAETitle: 'ORTHANCPACS',
                             dicomViewerType: 'stone',
                             dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}'
@@ -645,7 +645,7 @@ export function Settings() {
                         <span className="text-[10px] font-black uppercase tracking-wider text-brand-600">Servidor Principal</span>
                         <div>
                           <p className="text-xs font-black text-ink-900 leading-tight">Mac Mini</p>
-                          <p className="text-[9px] text-ink-400 mt-0.5">IP 100.93.111.95</p>
+                          <p className="text-[9px] text-ink-400 mt-0.5">Tailscale HTTPS</p>
                         </div>
                       </button>
 

@@ -1,5 +1,14 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 
+// Desabilita o bodyParser padrão do Vercel Serverless Functions.
+// Isso impede que a Vercel tente analisar payloads binários brutos (como arquivos DICOM)
+// como JSON ou strings UTF-8, o que poderia corromper os dados enviados.
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req: any, res: any) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -60,21 +69,15 @@ export default async function handler(req: any, res: any) {
       headers['Content-Type'] = req.headers['content-type'];
     }
 
-    // Read body for writing requests
+    // Read raw request body stream directly (since bodyParser is disabled)
     let body: any = undefined;
     if (['POST', 'PUT', 'PATCH'].includes(req.method || '')) {
-      if (typeof req.body === 'object') {
-        body = JSON.stringify(req.body);
-      } else if (req.body) {
-        body = req.body;
-      } else {
-        body = await new Promise<Buffer>((resolve, reject) => {
-          const chunks: Buffer[] = [];
-          req.on('data', (chunk: Buffer) => chunks.push(chunk));
-          req.on('end', () => resolve(Buffer.concat(chunks)));
-          req.on('error', (err: Error) => reject(err));
-        });
-      }
+      body = await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', (err: Error) => reject(err));
+      });
     }
 
     // Perform fetch to target Orthanc server
