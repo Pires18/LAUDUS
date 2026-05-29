@@ -139,7 +139,7 @@ function localOrthancWorklistPlugin() {
                 }
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/';
+                  : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
                 let outputDir = payload.outputDir || defaultOutputDir;
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
                   outputDir = '/app/pacs-worklist/';

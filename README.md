@@ -178,7 +178,7 @@ sequenceDiagram
 
 ### 2. Configurações de Presets do Servidor PACS
 Nas configurações do sistema, o médico pode selecionar o tipo de servidor PACS local:
-- **Mac Mini (Padrão macOS)**: Aponta a pasta de destino para `/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/` e o servidor para `http://100.93.111.95:8042`.
+- **Mac Mini (Padrão macOS)**: Aponta a pasta de destino para `/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/` e o servidor para `http://100.93.111.95:8042`.
 - **Notebook (Padrão Windows)**: Aponta a pasta de destino para `C:\OrthancServer\db\WorklistsDatabase\` e o servidor para `http://localhost:8043`.
 - **Customizado**: Permite configurar caminhos de rede e endereços IP arbitrários.
 

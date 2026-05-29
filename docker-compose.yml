@@ -12,7 +12,7 @@ services:
       - RUNNING_IN_DOCKER=true
     volumes:
       # Sincroniza a pasta de worklist local do host com o container
-      - /Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase:/app/pacs-worklist
+      - /Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase:/app/pacs-worklist
     extra_hosts:
       # Permite que o container conecte a serviços no localhost do host (como o Orthanc local na porta 8042/8043)
       - "host.docker.internal:host-gateway"

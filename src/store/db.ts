@@ -114,7 +114,7 @@ export async function getSettings(): Promise<AppSettings> {
       dicomSyncEnabled: true,
       dicomWorklistFolder: isWindows 
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-        : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+        : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
       dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
@@ -138,7 +138,7 @@ export async function getSettings(): Promise<AppSettings> {
       data.dicomPreset = isWindows ? 'notebook' : 'macmini';
       data.dicomWorklistFolder = isWindows 
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-        : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/';
+        : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
       data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/';
       data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
     }
@@ -172,7 +172,7 @@ export async function getSettings(): Promise<AppSettings> {
     dicomSyncEnabled: true,
     dicomWorklistFolder: isWindows 
       ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-      : '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+      : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
     dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',

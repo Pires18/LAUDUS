@@ -31,7 +31,7 @@ def main():
             if platform.system() == 'Windows':
                 output_dir = 'C:/OrthancServer/db/WorklistsDatabase/'
             else:
-                output_dir = '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/'
+                output_dir = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/'
             
         os.makedirs(output_dir, exist_ok=True)
         

@@ -628,7 +628,7 @@ export function Settings() {
                           setDraft((d) => ({
                             ...d,
                             dicomPreset: 'macmini',
-                            dicomWorklistFolder: '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase/',
+                            dicomWorklistFolder: '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
                             dicomViewerUrl: 'https://servidor-mac.tail861dda.ts.net/',
                             dicomOrthancAETitle: 'ORTHANCPACS',
                             dicomViewerType: 'stone',
