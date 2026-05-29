@@ -154,12 +154,21 @@ export function useExamActions({
       await updateItem('exams', examId, { reportContent: html });
     } catch (e: unknown) {
       console.error('[useExamActions] Erro na geração/refinamento:', e);
-      const message = e instanceof Error ? e.message : 'Erro ao processar laudo com IA';
+      const rawMsg = e instanceof Error ? e.message : String(e) || 'Erro ao processar laudo com IA';
+      const message = rawMsg.includes('404') || rawMsg.includes('not found') || rawMsg.includes('models/')
+        ? `Modelo de IA não encontrado. Verifique o nome do modelo em Configurações. (${rawMsg.substring(0, 60)})`
+        : rawMsg.includes('403') || rawMsg.includes('unauthorized') || rawMsg.includes('Unauthorized')
+          ? 'API Key inválida ou sem permissão. Verifique em Configurações.'
+          : rawMsg.includes('API Key') || rawMsg.includes('api key')
+            ? 'Chave de API não configurada. Acesse Configurações para adicionar.'
+            : rawMsg.includes('429') || rawMsg.includes('quota') || rawMsg.includes('RESOURCE_EXHAUSTED')
+              ? 'Limite de requisições da API atingido. Aguarde alguns segundos.'
+              : rawMsg;
       showToast(message, 'error');
     } finally {
       setIsGenerating(false);
     }
-  }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, onReportChange, showToast]);
+  }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, examDateMs, onReportChange, showToast]);
 
   const updateStatus = useCallback(async (status: ExamStatus) => {
     try {

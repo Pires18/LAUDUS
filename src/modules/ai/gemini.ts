@@ -536,9 +536,9 @@ function getModelForMode(settings: AppSettings, mode: string, area: string): str
     return settings.geminiModelByMode[mode as keyof typeof settings.geminiModelByMode]!;
   }
   if (mode === 'generation' && (area === 'medicina-fetal' || area === 'vascular')) {
-    return settings.geminiModelPro || 'gemini-3.1-pro';
+    return settings.geminiModelPro || 'gemini-1.5-pro';
   }
-  return settings.geminiModel || 'gemini-3.5-flash';
+  return settings.geminiModel || 'gemini-2.0-flash';
 }
 
 async function callGemini(
@@ -596,6 +596,15 @@ async function callGeminiStream(
   return stripScratchpad(cleanMarkdownFromResponse(fullText));
 }
 
+// ─── URL da API Anthropic (resolve CORS em desenvolvimento via proxy Vite) ───
+// Em produção, as chamadas vão direto para api.anthropic.com (sem proxy Vite).
+// Em desenvolvimento (localhost), usamos o proxy configurado em vite.config.ts.
+function getAnthropicBaseUrl(): string {
+  const isLocalDev = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  return isLocalDev ? '/api/anthropic' : 'https://api.anthropic.com';
+}
+
 async function callAnthropic(
   built: BuiltPrompt,
   settings: AppSettings,
@@ -617,12 +626,12 @@ async function callAnthropic(
     });
   }
 
-  const response = await withRetry(() => fetch('https://api.anthropic.com/v1/messages', {
+  const response = await withRetry(() => fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
     method: 'POST',
     headers: {
       'x-api-key': settings.anthropicApiKey!,
       'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'prompt-caching-1-0',
+      'anthropic-beta': 'prompt-caching-2024-07-31',
       'content-type': 'application/json'
     },
     body: JSON.stringify({
@@ -666,12 +675,12 @@ async function callAnthropicStream(
     });
   }
 
-  const response = await withRetry(() => fetch('https://api.anthropic.com/v1/messages', {
+  const response = await withRetry(() => fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
     method: 'POST',
     headers: {
       'x-api-key': settings.anthropicApiKey!,
       'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'prompt-caching-1-0',
+      'anthropic-beta': 'prompt-caching-2024-07-31',
       'content-type': 'application/json'
     },
     body: JSON.stringify({

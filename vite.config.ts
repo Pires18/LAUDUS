@@ -311,7 +311,15 @@ export default defineConfig({
     strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
-    open: process.env.RUNNING_IN_DOCKER === 'true' ? false : true
+    open: process.env.RUNNING_IN_DOCKER === 'true' ? false : true,
+    proxy: {
+      '/api/anthropic': {
+        target: 'https://api.anthropic.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
+        secure: true,
+      }
+    }
   }
 })
 

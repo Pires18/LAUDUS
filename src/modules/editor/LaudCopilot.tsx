@@ -603,20 +603,25 @@ export function LaudCopilot({
     } catch (error: any) {
       if (error && error.name === 'AbortError') {
         console.log('[LaudCopilot] Requisição cancelada pelo usuário.');
+        setIsGenerating(false);
         return;
       }
       console.error('[LaudCopilot] handleSend error:', error);
-      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      const msg = error instanceof Error ? error.message : String(error) || 'Erro desconhecido';
       // Mensagem amigável para erros comuns de API
-      const friendlyMsg = msg.includes('API Key') || msg.includes('api key')
+      const friendlyMsg = msg.includes('API Key') || msg.includes('api key') || msg.includes('apiKey')
         ? 'Chave de API não configurada. Acesse Configurações para adicionar.'
-        : msg.includes('429') || msg.includes('quota')
-          ? 'Limite de requisições da API atingido. Aguarde alguns segundos.'
-          : msg.includes('network') || msg.includes('Failed to fetch')
-            ? 'Erro de conexão. Verifique sua internet e tente novamente.'
-            : `Erro na IA: ${msg.substring(0, 80)}`;
+        : msg.includes('403') || msg.includes('unauthorized') || msg.includes('Unauthorized')
+          ? 'API Key inválida ou sem permissão. Verifique em Configurações.'
+          : msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')
+            ? 'Limite de requisições da API atingido. Aguarde alguns segundos.'
+            : msg.includes('network') || msg.includes('Failed to fetch') || msg.includes('CORS')
+              ? 'Erro de conexão com a API. Verifique sua internet e a chave configurada.'
+              : msg.includes('404') || msg.includes('not found') || msg.includes('models/')
+                ? `Modelo de IA não encontrado. Verifique o nome do modelo em Configurações.`
+                : `Erro na IA: ${msg.substring(0, 100)}`;
       showToast(friendlyMsg, 'error');
-      onChatUpdate([...newHistory, { role: 'assistant', content: `Erro ao processar: ${friendlyMsg}` }]);
+      onChatUpdate([...newHistory, { role: 'assistant', content: `❌ ${friendlyMsg}` }]);
     } finally {
       setIsGenerating(false);
     }
