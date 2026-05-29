@@ -629,7 +629,7 @@ export function Settings() {
                             ...d,
                             dicomPreset: 'macmini',
                             dicomWorklistFolder: '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
-                            dicomViewerUrl: 'https://servidor-mac.tail861dda.ts.net/',
+                            dicomViewerUrl: 'https://servidor-mac.tail861dda.ts.net:8443/',
                             dicomOrthancAETitle: 'ORTHANCPACS',
                             dicomViewerType: 'stone',
                             dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',

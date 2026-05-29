@@ -118,7 +118,7 @@ export async function getSettings(): Promise<AppSettings> {
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
       dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
-      dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/',
+      dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net:8443/',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
       dicomPreset: isWindows ? 'notebook' : 'macmini',
@@ -146,6 +146,11 @@ export async function getSettings(): Promise<AppSettings> {
       migrated = true;
     }
 
+    if (data.dicomViewerUrl === 'https://servidor-mac.tail861dda.ts.net/') {
+      data.dicomViewerUrl = 'https://servidor-mac.tail861dda.ts.net:8443/';
+      migrated = true;
+    }
+
     if (migrated && snap.exists()) {
       saveSettings(data).catch(err => console.warn('[DB] Falha ao persistir migração de settings:', err));
     }
@@ -156,7 +161,7 @@ export async function getSettings(): Promise<AppSettings> {
       data.dicomWorklistFolder = isWindows 
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
         : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-      data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/';
+      data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net:8443/';
       data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
       data.dicomLocalAgentUrl = isWindows 
         ? 'http://localhost:5173' 
@@ -196,7 +201,7 @@ export async function getSettings(): Promise<AppSettings> {
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
     dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
-    dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net/',
+    dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net:8443/',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
     dicomPreset: isWindows ? 'notebook' : 'macmini',
