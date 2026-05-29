@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
-import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, AREA_SPECIFIC_PROMPTS, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES } from './prompts';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
@@ -194,21 +194,9 @@ function buildUniversalContext(settings: AppSettings): string {
   return parts.join('\n\n');
 }
 
-function buildAreaContext(settings: AppSettings, area: string, templateName: string = '', clinicalIndication: string = '', anamnesis: string = ''): string {
-  const areaRuleOrGenerator = AREA_SPECIFIC_PROMPTS[area];
-  const areaRules = typeof areaRuleOrGenerator === 'function' 
-    ? areaRuleOrGenerator(templateName, clinicalIndication, anamnesis) 
-    : (areaRuleOrGenerator || '');
-  const areaExtra = settings.aiAreaPrompts?.[area as ExamArea] || '';
-
-  const parts: string[] = [];
-  if (areaRules) {
-    parts.push(`═══════════════════════════════════════════\nPROTOCOLO DE ÁREA ATIVO:\n═══════════════════════════════════════════\n${areaRules}`);
-  }
-  if (areaExtra) {
-    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES PERSONALIZADAS DA ÁREA:\n═══════════════════════════════════════════\n${areaExtra}`);
-  }
-  return parts.join('\n\n');
+function buildSpecificContext(template?: ReportTemplate | null): string {
+  if (!template || !template.aiInstructions) return '';
+  return `═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions}`;
 }
 
 function buildMaskHtml(template: ReportTemplate): string {
@@ -223,9 +211,6 @@ function buildMaskHtml(template: ReportTemplate): string {
   }
   parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
   parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate || '<p>(…)</p>'}`);
-  if (template.aiInstructions) {
-    parts.push(`INSTRUÇÕES ESPECÍFICAS DA MÁSCARA:\n${template.aiInstructions}`);
-  }
   return parts.join('\n\n');
 }
 
@@ -363,7 +348,7 @@ export function buildPrompt({
   examDateMs,
 }: GenerateReportParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildAreaContext(settings, template.area, template.name, clinicalIndication || '', anamnesis || '');
+  const areaContext = buildSpecificContext(template);
   const maskHtml = buildMaskHtml(template);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const contextMessage = buildContextMessage({
@@ -402,7 +387,7 @@ export function buildRefinePrompt({
   examDateMs,
 }: RefineParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildAreaContext(settings, template.area, template.name, clinicalIndication || '', anamnesis || '');
+  const areaContext = buildSpecificContext(template);
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"
@@ -491,7 +476,7 @@ Violar este formato invalida completamente a resposta.
 ═══════════════════════════════════════════════════════════════`;
 
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildAreaContext(settings, exam.area, exam.examType, exam.clinicalIndication || '', exam.anamnesis || '') + copilotModeOverride;
+  const areaContext = buildSpecificContext(template) + copilotModeOverride;
 
   // Detecta se a instrução é um formulário compilado (dados estruturados densos)
   const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');

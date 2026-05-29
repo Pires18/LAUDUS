@@ -282,6 +282,21 @@ export function TemplateEditor({ templateId }: Props) {
               onChange={(val) => u('recommendationsTemplate', val)}
               placeholder="Ex: Sugere-se correlação clínica..."
             />
+
+            <div className="card p-6 space-y-4 shadow-sm border border-ink-100">
+              <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
+                <BrainCircuit size={12} className="text-brand-500" /> Prompt Específico do Exame (LAUD.IA)
+              </label>
+              <p className="text-xs text-ink-500 leading-relaxed">
+                Insira as diretrizes, protocolos, tabelas e regras específicas que o motor de IA deve seguir estritamente ao laudar ou refinar este exame.
+              </p>
+              <textarea
+                className="input min-h-[220px] font-mono text-xs p-4 bg-slate-50 border border-slate-250 focus:bg-white transition-all rounded-xl leading-relaxed"
+                value={draft.aiInstructions || ''}
+                onChange={(e) => u('aiInstructions', e.target.value)}
+                placeholder="Ex: Para a realização deste laudo de Mama, siga estritamente a classificação BI-RADS e a fraseologia descrita no protocolo ACR..."
+              />
+            </div>
           </div>
         )}
 

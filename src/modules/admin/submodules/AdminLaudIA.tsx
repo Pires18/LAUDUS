@@ -16,12 +16,11 @@ import { generateReport, callMetricsHistory, type CallMetrics } from '../../ai/g
 import { 
   DEFAULT_MASTER_PROMPT, 
   DEFAULT_STRUCTURE_PROMPT, 
-  AREA_SPECIFIC_PROMPTS,
   DEFAULT_GLOBAL_INSTRUCTIONS,
   DEFAULT_RIGID_RULES,
 } from '../../ai/prompts';
 
-type TabId = 'prompts' | 'areas' | 'engine' | 'training' | 'status';
+type TabId = 'prompts' | 'engine' | 'training' | 'status';
 
 // ==========================================
 // HIGH-FIDELITY IDE CODE EDITOR COMPONENT
@@ -271,89 +270,9 @@ export function AdminLaudIA() {
   const [isSaving, setIsSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
   const [activeTab, setActiveTab] = useState<TabId>('prompts');
-  const [selectedArea, setSelectedArea] = useState<ExamArea>(EXAM_AREAS[0].id);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showApiKey, setShowApiKey] = useState(false);
   const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
-
-  // AI improvement for area prompts
-  const [isImprovingArea, setIsImprovingArea] = useState(false);
-  const [areaImprovePrompt, setAreaImprovePrompt] = useState('');
-  const [showImprovePanel, setShowImprovePanel] = useState(false);
-
-  async function handleImproveAreaPrompt() {
-    const provider = localSettings.aiProvider || 'gemini';
-    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
-    if (!hasKey) {
-      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
-      return;
-    }
-    const defaultPrompt = typeof AREA_SPECIFIC_PROMPTS[selectedArea] === 'function'
-      ? (AREA_SPECIFIC_PROMPTS[selectedArea] as any)('', '', '')
-      : AREA_SPECIFIC_PROMPTS[selectedArea];
-    const currentPrompt = (localSettings.aiAreaPrompts?.[selectedArea] || defaultPrompt || '') as string;
-    if (!currentPrompt.trim()) {
-      showToast('Não há prompt de área para melhorar. Adicione instruções primeiro.', 'error');
-      return;
-    }
-    setIsImprovingArea(true);
-
-    const areaLabel = EXAM_AREAS.find(a => a.id === selectedArea)?.label || selectedArea;
-    const userRequest = areaImprovePrompt.trim()
-      ? `\n\nInstrução adicional do médico: "${areaImprovePrompt.trim()}"`
-      : '';
-    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
-Sua tarefa é melhorar o prompt de área de ${areaLabel} a seguir, tornando-o mais completo,
-claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
-Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
-    const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${currentPrompt}`;
-
-    try {
-      let improved = '';
-
-      if (provider === 'gemini') {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
-        });
-        improved = result.response.text().trim();
-      } else {
-        // Anthropic
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': localSettings.anthropicApiKey!,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-            max_tokens: 8192,
-            messages: [{ role: 'user', content: fullMessage }],
-            temperature: 0.2,
-          }),
-        });
-        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
-        const result = await response.json();
-        improved = (result.content?.[0]?.text || '').trim();
-      }
-
-      if (improved) {
-        const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: improved };
-        setLocalSettings(prev => ({ ...prev, aiAreaPrompts: updated }));
-        showToast('Prompt melhorado com sucesso pela IA!', 'success');
-        setShowImprovePanel(false);
-        setAreaImprovePrompt('');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
-    } finally {
-      setIsImprovingArea(false);
-    }
-  }
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -436,7 +355,6 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
 
   const sidebarItems = [
     { id: 'prompts', label: 'Doutrina & Prompts', icon: ShieldAlert },
-    { id: 'areas', label: 'Especialidades', icon: LayoutList },
     { id: 'engine', label: 'Motor & API', icon: Sliders },
     { id: 'training', label: 'Aprendizado IA', icon: GraduationCap },
     { id: 'status', label: 'Status da IA', icon: Activity },
@@ -463,14 +381,13 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
         <div className="flex flex-wrap items-center gap-3 shrink-0 self-start md:self-auto">
           <button
             onClick={() => {
-              if (window.confirm('Tem certeza que deseja restaurar TODOS os prompts (Mestre, Globais, Estrutura, Regras e Áreas) para o padrão de fábrica? Isso sobrescreverá as alterações atuais.')) {
+              if (window.confirm('Tem certeza que deseja restaurar os prompts (Mestre, Globais, Estrutura e Regras) para o padrão de fábrica? Isso sobrescreverá as alterações atuais.')) {
                 setLocalSettings({
                   ...localSettings,
                   aiMasterPrompt: DEFAULT_MASTER_PROMPT,
                   aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
                   aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT,
                   aiRigidRules: DEFAULT_RIGID_RULES,
-                  aiAreaPrompts: { ...AREA_SPECIFIC_PROMPTS }
                 });
                 showToast('Reset de Fábrica concluído. Clique em Publicar para salvar.', 'success');
               }
@@ -670,129 +587,6 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     />
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB: AREAS */}
-          {activeTab === 'areas' && (
-            <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl p-8 lg:p-10 space-y-8 animate-fade-in">
-              <div className="border-b border-ink-50 pb-6 space-y-6">
-                <div>
-                  <h4 className="text-lg font-black text-ink-900 uppercase tracking-wider">Diretrizes por Especialidade</h4>
-                  <p className="text-xs text-ink-400 font-semibold uppercase tracking-wider mt-0.5">Mapeamento de comportamentos e terminologias específicas do LAUD.IA</p>
-                </div>
-
-                {/* Specialty Pill Selector */}
-                <div className="flex flex-wrap gap-2 pt-2 pb-2">
-                  {EXAM_AREAS.map((area) => {
-                    const isSelected = selectedArea === area.id;
-                    return (
-                      <button
-                        key={area.id}
-                        onClick={() => setSelectedArea(area.id)}
-                        className={classNames(
-                          "px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border",
-                          isSelected 
-                            ? "bg-brand-600 text-white border-brand-600 shadow-md shadow-brand-500/10 scale-[1.02]" 
-                            : "bg-white text-ink-600 border-ink-100 hover:border-brand-300"
-                        )}
-                      >
-                        {area.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Specialty Protocol Editor Container */}
-              <div className="space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100">
-                      SPECIFIC DIRECTIVE
-                    </span>
-                    <h5 className="text-sm font-black text-ink-900 mt-2">
-                      Protocolo Ativo: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}
-                    </h5>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setShowImprovePanel(!showImprovePanel)}
-                      className={classNames(
-                        'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
-                        showImprovePanel
-                          ? 'bg-violet-600 text-white border-violet-700'
-                          : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
-                      )}
-                    >
-                      <Sparkles size={12} />
-                      Melhorar com IA
-                      {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* AI Improve Panel */}
-                {showImprovePanel && (
-                  <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={16} className="text-violet-600" />
-                      <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
-                    </div>
-                    <p className="text-[11px] text-violet-700 leading-relaxed">
-                      A IA analisará o prompt atual desta área e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
-                    </p>
-                    <textarea
-                      value={areaImprovePrompt}
-                      onChange={(e) => setAreaImprovePrompt(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
-                      placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BIRADS, melhorar conclusão para tireoide...)"
-                    />
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleImproveAreaPrompt}
-                        disabled={isImprovingArea}
-                        className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
-                      >
-                        {isImprovingArea ? (
-                          <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
-                        ) : (
-                          <><Sparkles size={16} /> Melhorar Prompt</>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => { setShowImprovePanel(false); setAreaImprovePrompt(''); }}
-                        className="text-sm text-violet-500 hover:underline"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="w-full">
-                  <CognitiveCodeEditor
-                    value={localSettings.aiAreaPrompts?.[selectedArea] || ''}
-                    onChange={(val) => {
-                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: val };
-                      setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
-                    }}
-                    fileName={`${selectedArea.toLowerCase().replace(/\s+/g, '_')}_protocol.md`}
-                    badge={`CLINICAL MODULE: ${selectedArea.toUpperCase()}`}
-                    glowColor="violet"
-                    placeholder={`Digite as diretrizes clínicas para a especialidade ${selectedArea}...`}
-                    onRestore={() => {
-                      const defaultVal = typeof AREA_SPECIFIC_PROMPTS[selectedArea] === 'function'
-                        ? (AREA_SPECIFIC_PROMPTS[selectedArea] as any)('', '', '')
-                        : AREA_SPECIFIC_PROMPTS[selectedArea];
-                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: defaultVal as string };
-                      setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
-                      showToast(`Protocolo de ${selectedArea} restaurado`, 'info');
-                    }}
-                  />
-                </div>
               </div>
             </div>
           )}
