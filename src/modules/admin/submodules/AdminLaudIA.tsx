@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../../store/app';
 import { 
   BrainCircuit, ShieldAlert, 
-  RotateCcw, Zap,
+  RotateCcw, Zap, Save,
   GraduationCap, CheckCircle2, AlertCircle, Loader2,
   Sliders, LayoutList, ShieldCheck,
   FlaskConical, Play, FileText, History,
@@ -19,8 +19,10 @@ import {
   DEFAULT_GLOBAL_INSTRUCTIONS,
   DEFAULT_RIGID_RULES,
 } from '../../ai/prompts';
+import { useCollection } from '../../../hooks/useFirestore';
+import { updateItem } from '../../../store/db';
 
-type TabId = 'prompts' | 'engine' | 'training' | 'status';
+type TabId = 'prompts' | 'templates' | 'engine' | 'training' | 'status';
 
 // ==========================================
 // HIGH-FIDELITY IDE CODE EDITOR COMPONENT
@@ -274,6 +276,24 @@ export function AdminLaudIA() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
 
+  const { data: templates } = useCollection<ReportTemplate>('templates');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [editingTemplatePrompt, setEditingTemplatePrompt] = useState<string>('');
+  const [isImprovingTemplate, setIsImprovingTemplate] = useState(false);
+  const [templateImprovePrompt, setTemplateImprovePrompt] = useState('');
+  const [showImprovePanel, setShowImprovePanel] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
+  // Sync selected template prompt when selection changes or templates load
+  useEffect(() => {
+    if (selectedTemplateId && templates.length > 0) {
+      const template = templates.find(t => t.id === selectedTemplateId);
+      setEditingTemplatePrompt(template?.aiInstructions || '');
+    } else if (templates.length > 0 && !selectedTemplateId) {
+      setSelectedTemplateId(templates[0].id);
+    }
+  }, [selectedTemplateId, templates]);
+
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
@@ -287,6 +307,94 @@ export function AdminLaudIA() {
       showToast('Erro ao salvar configurações', 'error');
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleSaveTemplatePrompt() {
+    if (!selectedTemplateId) return;
+    setIsSavingTemplate(true);
+    try {
+      await updateItem('templates', selectedTemplateId, {
+        aiInstructions: editingTemplatePrompt,
+      });
+      showToast('Prompt do exame salvo com sucesso! ✓', 'success');
+    } catch {
+      showToast('Erro ao salvar prompt do exame', 'error');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  }
+
+  async function handleImproveTemplatePrompt() {
+    const provider = localSettings.aiProvider || 'gemini';
+    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
+    if (!hasKey) {
+      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
+      return;
+    }
+    if (!selectedTemplateId) {
+      showToast('Selecione um exame primeiro.', 'error');
+      return;
+    }
+    if (!editingTemplatePrompt.trim()) {
+      showToast('Adicione instruções ou um prompt inicial para melhorar.', 'error');
+      return;
+    }
+    setIsImprovingTemplate(true);
+
+    const templateName = templates.find(t => t.id === selectedTemplateId)?.name || 'Exame';
+    const userRequest = templateImprovePrompt.trim()
+      ? `\n\nInstrução adicional do médico: "${templateImprovePrompt.trim()}"`
+      : '';
+    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é melhorar o prompt de IA para o exame de "${templateName}" a seguir, tornando-o mais completo,
+claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
+Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+    const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${editingTemplatePrompt}`;
+
+    try {
+      let improved = '';
+
+      if (provider === 'gemini') {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
+        });
+        improved = result.response.text().trim();
+      } else {
+        // Anthropic
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': localSettings.anthropicApiKey!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+            max_tokens: 8192,
+            messages: [{ role: 'user', content: fullMessage }],
+            temperature: 0.2,
+          }),
+        });
+        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+        const result = await response.json();
+        improved = (result.content?.[0]?.text || '').trim();
+      }
+
+      if (improved) {
+        setEditingTemplatePrompt(improved);
+        showToast('Prompt do exame melhorado com sucesso pela IA!', 'success');
+        setShowImprovePanel(false);
+        setTemplateImprovePrompt('');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
+    } finally {
+      setIsImprovingTemplate(false);
     }
   }
 
@@ -355,6 +463,7 @@ export function AdminLaudIA() {
 
   const sidebarItems = [
     { id: 'prompts', label: 'Doutrina & Prompts', icon: ShieldAlert },
+    { id: 'templates', label: 'Prompts por Exame', icon: LayoutList },
     { id: 'engine', label: 'Motor & API', icon: Sliders },
     { id: 'training', label: 'Aprendizado IA', icon: GraduationCap },
     { id: 'status', label: 'Status da IA', icon: Activity },
@@ -591,7 +700,130 @@ export function AdminLaudIA() {
             </div>
           )}
 
+          {/* TAB: TEMPLATES (Prompts por Exame) */}
+          {activeTab === 'templates' && (
+            <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl p-8 lg:p-10 space-y-8 animate-fade-in">
+              <div className="border-b border-ink-50 pb-6 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-lg font-black text-ink-900 uppercase tracking-wider">Prompts por Exame (Máscara)</h4>
+                    <p className="text-xs text-ink-400 font-semibold uppercase tracking-wider mt-0.5">Gestão e refinamento das diretrizes específicas aplicadas a cada máscara de laudo</p>
+                  </div>
+                  {selectedTemplateId && (
+                    <button
+                      onClick={handleSaveTemplatePrompt}
+                      disabled={isSavingTemplate}
+                      className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-all flex items-center gap-2"
+                    >
+                      {isSavingTemplate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                      Salvar Prompt do Exame
+                    </button>
+                  )}
+                </div>
 
+                {/* Template Dropdown Selector */}
+                <div className="pt-2">
+                  <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="w-full max-w-md rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
+                  >
+                    <option value="">Selecione um exame...</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {selectedTemplateId ? (
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100 flex items-center gap-1.5 w-fit">
+                        EXAM SPECIFIC DIRECTIVE
+                      </span>
+                      <h5 className="text-sm font-black text-ink-900 mt-2">
+                        Exame: {templates.find(t => t.id === selectedTemplateId)?.name}
+                      </h5>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setShowImprovePanel(!showImprovePanel)}
+                        className={classNames(
+                          'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
+                          showImprovePanel
+                            ? 'bg-violet-600 text-white border-violet-700'
+                            : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+                        )}
+                      >
+                        <Sparkles size={12} />
+                        Melhorar com IA
+                        {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* AI Improve Panel */}
+                  {showImprovePanel && (
+                    <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-violet-600" />
+                        <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
+                      </div>
+                      <p className="text-[11px] text-violet-700 leading-relaxed">
+                        A IA analisará o prompt atual deste exame e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
+                      </p>
+                      <textarea
+                        value={templateImprovePrompt}
+                        onChange={(e) => setTemplateImprovePrompt(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
+                        placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BI-RADS detalhados, focar em condutas específicas...)"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleImproveTemplatePrompt}
+                          disabled={isImprovingTemplate}
+                          className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
+                        >
+                          {isImprovingTemplate ? (
+                            <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
+                          ) : (
+                            <><Sparkles size={16} /> Melhorar Prompt</>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => { setShowImprovePanel(false); setTemplateImprovePrompt(''); }}
+                          className="text-sm text-violet-500 hover:underline"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="w-full">
+                    <CognitiveCodeEditor
+                      value={editingTemplatePrompt}
+                      onChange={(v) => setEditingTemplatePrompt(v)}
+                      fileName={`${(templates.find(t => t.id === selectedTemplateId)?.name || '').toLowerCase().replace(/\s+/g, '_')}_prompt.md`}
+                      badge="EXAM SPECIFIC DIRECTIVE"
+                      glowColor="violet"
+                      placeholder="Digite as instruções e diretrizes clínicas específicas para este exame..."
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center border border-dashed border-ink-200 rounded-3xl text-ink-400">
+                  Nenhum exame cadastrado ou selecionado.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* TAB: ENGINE */}
           {activeTab === 'engine' && (
