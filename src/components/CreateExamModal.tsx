@@ -194,7 +194,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
               stepDate,
               stepTime,
               stepDescription,
-              outputDir: settings.dicomWorklistFolder
+              outputDir: settings.dicomWorklistFolder,
+              localAgentUrl: settings.dicomLocalAgentUrl
             })
           });
         }
