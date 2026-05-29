@@ -710,7 +710,7 @@ export function Settings() {
                         u('dicomWorklistFolder', e.target.value);
                         u('dicomPreset', 'custom');
                       }}
-                      placeholder="Ex: /Users/usuario/Documents/OrthancServer/db/WorklistsDatabase/"
+                      placeholder="Ex: /Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/"
                     />
                     <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc lê os arquivos .wl. A aplicação deve ter permissão de escrita.</p>
                   </div>
