@@ -277,6 +277,8 @@ export function AdminLaudIA() {
   const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
 
   const { data: templates } = useCollection<ReportTemplate>('templates');
+
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState<ExamArea | ''>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [editingTemplatePrompt, setEditingTemplatePrompt] = useState<string>('');
   const [isImprovingTemplate, setIsImprovingTemplate] = useState(false);
@@ -722,20 +724,41 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                 </div>
 
                 {/* Template Dropdown Selector */}
-                <div className="pt-2">
-                  <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="w-full max-w-md rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
-                  >
-                    <option value="">Selecione um exame...</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})
-                      </option>
-                    ))}
-                  </select>
+                <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                  <div>
+                    <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Filtrar por Área</label>
+                    <select
+                      value={selectedAreaFilter}
+                      onChange={(e) => {
+                        setSelectedAreaFilter(e.target.value as ExamArea | '');
+                        setSelectedTemplateId('');
+                      }}
+                      className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
+                    >
+                      <option value="">Todas as Áreas</option>
+                      {EXAM_AREAS.map(a => (
+                        <option key={a.id} value={a.id}>{a.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border disabled:opacity-50"
+                      disabled={selectedAreaFilter !== '' && templates.filter(t => t.area === selectedAreaFilter).length === 0}
+                    >
+                      <option value="">Selecione um exame...</option>
+                      {templates
+                        .filter(t => selectedAreaFilter === '' || t.area === selectedAreaFilter)
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} {!selectedAreaFilter && `(${EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})`}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
