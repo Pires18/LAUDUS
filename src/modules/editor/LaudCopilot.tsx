@@ -640,9 +640,47 @@ export function LaudCopilot({
       updateItem('exams', exam.id, { customFormValue: formText });
       isDirtyRef.current = false;
     }
+
     // Prefix DEVE corresponder ao que parseFormMessage espera (startsWith check na linha 199)
     const templateName = template?.name || exam.examType || 'Formulário';
-    const findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]\n\n${formText.trim()}`;
+    const area = exam.area || template?.area || '';
+
+    // Gera instrução contextual baseada na área para guiar a IA
+    let areaInstruction = '';
+    if (area === 'medicina-fetal') {
+      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA DE INSERÇÃO — MEDICINA FETAL:
+Estes são os dados biométricos, obstétricos e de vitalidade do exame coletados via formulário. Você DEVE:
+1. Inserir cada dado fornecido no campo correspondente da ANÁLISE (biometria: DBP, DOF, CC, CA, CF, úmero, cerebelo, cisterna magna, ventrículos; PFE e percentil; vitalidade/BCF; Doppler: AU, ACM, RCP, DV, uterinas; placenta; líquido amniótico: MBV/ILA; colo uterino; apresentação/situação).
+2. Calcular automaticamente: RCP = IP ACM / IP umbilical (se ambos fornecidos); IP médio uterinas = (D+E)/2 (se ambas fornecidas); IG atual e DPP se DUM ou datação precoce for fornecida.
+3. Classificar o PFE: AIG (P10–P90), GIG (>P90), PIG (P3–P10), RCIU (<P3 ou critérios Delphi) — apenas se PFE e percentil forem fornecidos.
+4. Substituir todos os placeholders (…) e [___] na ANÁLISE pelos dados reais fornecidos.
+5. NÃO inventar nenhum dado não fornecido — manter (…) ou descrição qualitativa de normalidade para campos sem dados.
+6. Atualizar CONCLUSÃO e RECOMENDAÇÕES conforme os achados reais inseridos.`;
+    } else if (area === 'ginecologia') {
+      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA DE INSERÇÃO — GINECOLOGIA:
+Estes são os dados do exame coletados via formulário. Você DEVE:
+1. Inserir cada dado fornecido no campo correspondente da ANÁLISE (útero: posição, dimensões, miométrio, endométrio; ovários: dimensões, folículos, cistos; anexos; Douglas).
+2. Substituir todos os placeholders (…) e [___] pelos dados reais fornecidos.
+3. Aplicar classificações obrigatórias: O-RADS para massas anexiais, MUSA para adenomiose/miomas, BI-RADS para mama (se aplicável).
+4. NÃO inventar dados não fornecidos — manter descrição qualitativa de normalidade.
+5. Atualizar CONCLUSÃO e RECOMENDAÇÕES conforme os achados reais.`;
+    } else if (area === 'vascular') {
+      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA DE INSERÇÃO — VASCULAR:
+Estes são os dados do exame coletados via formulário. Você DEVE:
+1. Inserir cada valor Doppler no campo correspondente da ANÁLISE (VPS, VDF, IR, IP, EIM das carótidas; compressibilidade venosa; calibre da aorta; etc.).
+2. Substituir todos os placeholders (…) e [___] pelos dados reais fornecidos.
+3. NÃO inventar dados não fornecidos.
+4. Atualizar CONCLUSÃO e RECOMENDAÇÕES conforme os achados.`;
+    } else {
+      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA DE INSERÇÃO:
+Estes são os achados do exame coletados via formulário. Você DEVE:
+1. Inserir cada dado/achado fornecido no campo correspondente da ANÁLISE.
+2. Substituir todos os placeholders (…) e [___] pelos dados reais fornecidos.
+3. NÃO inventar dados não fornecidos — manter normalidade qualitativa para campos sem dados.
+4. Atualizar CONCLUSÃO e RECOMENDAÇÕES conforme os achados reais.`;
+    }
+
+    const findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${areaInstruction}\n\nDADOS DO FORMULÁRIO:\n${formText.trim()}`;
     setActiveTab('chat');
     handleSend(findingsSummary);
   };

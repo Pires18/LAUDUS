@@ -465,7 +465,7 @@ NOVA REGRA ABSOLUTA DE FORMATO (substitui as acima):
 1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
 2. APÓS fechar a tag </scratchpad>, você DEVE gerar exatamente a estrutura:
 === CONVERSA ===
-[UMA única frase (máx. 15 palavras) descrevendo a alteração]
+[Descrição da alteração/inserção realizada]
 === PROPOSTA ===
 [HTML COMPLETO do laudo]
 Violar este formato invalida completamente a resposta.
@@ -474,7 +474,32 @@ Violar este formato invalida completamente a resposta.
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildAreaContext(settings, exam.area, exam.examType, exam.clinicalIndication || '', exam.anamnesis || '') + copilotModeOverride;
 
-  const copilotFormat = `═══════════════════════════════════════════════════════════════
+  // Detecta se a instrução é um formulário compilado (dados estruturados densos)
+  const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
+
+  const copilotFormat = isFormCompilation
+    ? `═══════════════════════════════════════════════════════════════
+MODO COPILOTO — INSERÇÃO DE DADOS DE FORMULÁRIO (FORMATO OBRIGATÓRIO)
+═══════════════════════════════════════════════════════════════
+Você recebeu dados estruturados de formulário clínico para inserção no laudo. Responda EXCLUSIVAMENTE nesta estrutura:
+
+=== CONVERSA ===
+[Resumo clínico conciso (máx. 3 frases) listando os principais dados inseridos e achados relevantes identificados.
+SEM saudações. SEM prolixidade. Puramente clínico. NÃO inclua raciocínio interno aqui — este fica exclusivamente dentro do <scratchpad>.]
+
+=== PROPOSTA ===
+[HTML COMPLETO do laudo com TODOS os dados do formulário integrados.
+REGRAS DE OURO DA INSERÇÃO DE FORMULÁRIO:
+• OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
+• INSERÇÃO ESTRUTURADA OBRIGATÓRIA: Cada dado do formulário (medida, valor Doppler, biometria, achado) DEVE ser inserido no parágrafo correto da ANÁLISE, substituindo o placeholder (…) ou [___] correspondente. NÃO concatene dados ao final do laudo.
+• CÁLCULOS AUTOMÁTICOS (quando dados suficientes forem fornecidos): RCP = IP ACM / IP umbilical; IP médio uterinas = (D+E)/2; IG e DPP por DUM; classificação ponderal AIG/GIG/PIG/RCIU.
+• PROIBIÇÃO ABSOLUTA DE INVENÇÃO: É terminantemente proibido inventar ou alucinar qualquer dado, medida, volume, peso, percentil ou valor clínico que NÃO tenha sido fornecido no formulário. Para campos do laudo sem dado correspondente no formulário, manter o placeholder (…) ou substituir por descrição qualitativa de normalidade.
+• COMPLIANCE RÍGIDO DA MÁSCARA: O laudo deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos) da MÁSCARA MODELO ORIGINAL. É proibido alterar nomes de seções, remover cabeçalhos ou reestruturar a hierarquia HTML.
+• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve estar em seu próprio parágrafo <p>. Nunca junte múltiplas estruturas ou use <br> para separá-las.
+• CASCATA TRIPARTITE: Após inserir os dados na ANÁLISE, atualizar a CONCLUSÃO (bullets específicos para achados patológicos + síntese de normalidade) e as RECOMENDAÇÕES (condutas proporcionais e padronizadas para a área médica).
+• TÉCNICA: Reproduzir exatamente como no laudo atual. Proibido alterar.
+• RECOMENDAÇÕES: Usar rigorosamente as condutas padronizadas do protocolo da especialidade ativa (área do exame).]`
+    : `═══════════════════════════════════════════════════════════════
 MODO COPILOTO — FORMATO DE RESPOSTA OBRIGATÓRIO
 ═══════════════════════════════════════════════════════════════
 Responda EXCLUSIVAMENTE nesta estrutura:
