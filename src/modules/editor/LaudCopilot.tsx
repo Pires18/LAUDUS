@@ -66,6 +66,12 @@ export function LaudCopilot({
     setAutoRefineEnabled(val);
   };
 
+  // Referências para controle de sincronização e digitação no formulário
+  const isDirtyRef = useRef(false);
+  const prevExamIdRef = useRef(exam.id);
+  const formSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestValueRef = useRef(formText);
+
   // Garante reset ao trocar de exame
   useEffect(() => {
     setAutoRefineEnabled(false);
@@ -82,23 +88,65 @@ export function LaudCopilot({
   useEffect(() => {
     return () => {
       cancelActiveRequest();
+      if (formSaveTimerRef.current) {
+        clearTimeout(formSaveTimerRef.current);
+      }
     };
   }, []);
 
   useEffect(() => {
-    setFormText(exam.customFormValue ?? template?.customForm ?? '');
-  }, [exam.customFormValue, template?.customForm]);
+    if (prevExamIdRef.current !== exam.id) {
+      if (formSaveTimerRef.current) {
+        clearTimeout(formSaveTimerRef.current);
+        formSaveTimerRef.current = null;
+      }
+      const val = exam.customFormValue ?? template?.customForm ?? '';
+      setFormText(val);
+      latestValueRef.current = val;
+      isDirtyRef.current = false;
+      prevExamIdRef.current = exam.id;
+    } else {
+      if (!isDirtyRef.current) {
+        const val = exam.customFormValue ?? template?.customForm ?? '';
+        setFormText(val);
+        latestValueRef.current = val;
+      }
+    }
+  }, [exam.id, exam.customFormValue, template?.customForm]);
 
-  const handleFormTextChange = async (val: string) => {
+  const handleFormTextChange = (val: string) => {
     setFormText(val);
-    await updateItem('exams', exam.id, { customFormValue: val });
+    latestValueRef.current = val;
+    isDirtyRef.current = true;
+
+    if (formSaveTimerRef.current) {
+      clearTimeout(formSaveTimerRef.current);
+    }
+
+    formSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await updateItem('exams', exam.id, { customFormValue: val });
+        if (latestValueRef.current === val) {
+          isDirtyRef.current = false;
+        }
+      } catch (err) {
+        console.error('Erro ao salvar customFormValue:', err);
+      }
+    }, 800);
   };
 
   const handleResetForm = async () => {
     if (!template?.customForm) return;
     if (window.confirm('Deseja restaurar o formulário padrão da máscara? Isso apagará as alterações locais.')) {
-      setFormText(template.customForm);
-      await updateItem('exams', exam.id, { customFormValue: template.customForm });
+      if (formSaveTimerRef.current) {
+        clearTimeout(formSaveTimerRef.current);
+        formSaveTimerRef.current = null;
+      }
+      const val = template.customForm;
+      setFormText(val);
+      latestValueRef.current = val;
+      isDirtyRef.current = false;
+      await updateItem('exams', exam.id, { customFormValue: val });
       showToast('Formulário restaurado!', 'success');
     }
   };
@@ -580,6 +628,12 @@ export function LaudCopilot({
     if (!formText.trim()) {
       showToast('Preencha o formulário antes de compilar.', 'info');
       return;
+    }
+    if (formSaveTimerRef.current) {
+      clearTimeout(formSaveTimerRef.current);
+      formSaveTimerRef.current = null;
+      updateItem('exams', exam.id, { customFormValue: formText });
+      isDirtyRef.current = false;
     }
     // Prefix DEVE corresponder ao que parseFormMessage espera (startsWith check na linha 199)
     const templateName = template?.name || exam.examType || 'Formulário';
@@ -1072,17 +1126,7 @@ export function LaudCopilot({
             <div className="flex-1 min-h-0 flex flex-col">
               <textarea
                 value={formText}
-                onChange={(e) => {
-                  // Preserva a posição do cursor para evitar o salto ao final
-                  const { selectionStart, selectionEnd } = e.target;
-                  handleFormTextChange(e.target.value).then(() => {
-                    // Restaura o cursor após o re-render via microtask
-                    requestAnimationFrame(() => {
-                      e.target.selectionStart = selectionStart;
-                      e.target.selectionEnd = selectionEnd;
-                    });
-                  });
-                }}
+                onChange={(e) => handleFormTextChange(e.target.value)}
                 placeholder="Preencha os achados clínicos deste exame aqui..."
                 className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
                 style={{ minHeight: 0 }}
