@@ -393,10 +393,10 @@ export function buildRefinePrompt({
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"
 [REGRAS DE OURO DO REFINAMENTO — EXECUÇÃO OBRIGATÓRIA:
 • LAUDO COMPLETO E PERFEITO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
-• ADEQUAÇÃO INTEGRAL À ÁREA: Adapte, formate e alinhe todo o laudo (incluindo todas as seções e órgãos) de acordo com os protocolos, diretrizes, terminologias formais e regras específicas da especialidade médica ativa (área do exame). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme o protocolo da área.
+• ADEQUAÇÃO INTEGRAL AO EXAME: Adapte, formate e alinhe todo o laudo (incluindo todas as seções e órgãos) de acordo com as diretrizes e regras específicas do exame ativo (indicadas nas INSTRUÇÕES ESPECÍFICAS DO EXAME). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme as diretrizes do exame.
 • PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
   - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
-  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas no prompt/protocolo da especialidade ativa (área do exame). É proibido inventar condutas personalizadas, prolixas ou fora das padronizações do protocolo da área (N1, N2, N3, N4, O-RADS, BI-RADS, MUSA, etc.), a menos que expressamente solicitado pelo médico.
+  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas nas INSTRUÇÕES ESPECÍFICAS DO EXAME. É proibido inventar condutas personalizadas, prolixas ou fora das padronizações indicadas, a menos que expressamente solicitado pelo médico.
 • PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL (por você ou pelo usuário), sendo proibido reverter ou alterar achados reais de volta para a normalidade ou inventar novos valores não fornecidos.
 • ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Remova ou resolva todos os placeholders restantes na forma de "(...)", "[___]" ou unidades órfãs (ex: "____ cm") do LAUDO ATUAL. É terminantemente proibido inventar valores numéricos arbitrários (como medidas, volumes, pesos ou velocidades) se não fornecidos pelo usuário. Substitua-os exclusivamente por descrições qualitativas de normalidade (ex: "de dimensões preservadas", "com espessura habitual", "de aspecto habitual") ou remova a menção ao placeholder/medida. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos ou fornecidos nas notas/instruções, sendo proibido substituí-los por texto qualitativo ou remover a linha/campo do laudo.]
 • INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
@@ -405,10 +405,10 @@ export function buildRefinePrompt({
     : `INSTRUÇÃO: Sanitizar, higienizar e alinhar o laudo completo.
 [REGRAS DE OURO DO REFINAMENTO E SANITIZAÇÃO — EXECUÇÃO OBRIGATÓRIAS:
 • LAUDO COMPLETO E PERFEITO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
-• ADEQUAÇÃO INTEGRAL À ÁREA: Adapte, formate e alinhe todo o laudo de acordo com os protocolos, diretrizes, terminologias formais e regras específicas da especialidade médica ativa (área do exame). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme o protocolo da área.
+• ADEQUAÇÃO INTEGRAL AO EXAME: Adapte, formate e alinhe todo o laudo de acordo com as diretrizes e regras específicas do exame ativo (indicadas nas INSTRUÇÕES ESPECÍFICAS DO EXAME). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme as diretrizes do exame.
 • PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
   - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
-  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas no prompt/protocolo da especialidade ativa (área do exame). É proibido inventar condutas personalizadas, prolixas ou fora das padronizações do protocolo da área (N1, N2, N3, N4, O-RADS, BI-RADS, MUSA, etc.), a menos que expressamente solicitado pelo médico.
+  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas nas INSTRUÇÕES ESPECÍFICAS DO EXAME. É proibido inventar condutas personalizadas, prolixas ou fora das padronizações indicadas, a menos que expressamente solicitado pelo médico.
 • ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Remova ou resolva todos os placeholders restantes na forma de "(...)", "[___]" ou unidades órfãs (ex: "____ cm") do LAUDO ATUAL. É terminantemente proibido inventar valores numéricos arbitrários (como medidas, volumes, pesos ou velocidades) se não fornecidos pelo usuário. Substitua-os exclusivamente por descrições qualitativas de normalidade (ex: "de dimensões preservadas", "com espessura habitual", "de aspecto habitual") ou remova a menção ao placeholder/medida. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos ou fornecidos nas notas/instruções, sendo proibido substituí-los por texto qualitativo ou remover a linha/campo do laudo.]
 • INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
 • PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL (por você ou pelo usuário), sendo proibido reverter ou alterar achados reais de volta para a normalidade ou inventar novos valores não fornecidos.
@@ -482,27 +482,9 @@ Violar este formato invalida completamente a resposta.
   const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
 
   const copilotFormat = isFormCompilation
-    ? `═══════════════════════════════════════════════════════════════
-MODO COPILOTO — INSERÇÃO DE DADOS DE FORMULÁRIO (FORMATO OBRIGATÓRIO)
-═══════════════════════════════════════════════════════════════
-Você recebeu dados estruturados de formulário clínico para inserção no laudo. Responda EXCLUSIVAMENTE nesta estrutura:
-
-=== CONVERSA ===
-[Resumo clínico conciso (máx. 3 frases) listando os principais dados inseridos e achados relevantes identificados.
-SEM saudações. SEM prolixidade. Puramente clínico. É ESTRITAMENTE PROIBIDO incluir raciocínio interno aqui — pensamentos devem ficar EXCLUSIVAMENTE dentro do <scratchpad>.]
-
-=== PROPOSTA ===
-[HTML COMPLETO do laudo com TODOS os dados do formulário integrados.
-REGRAS DE OURO DA INSERÇÃO DE FORMULÁRIO:
-• OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
-• INSERÇÃO ESTRUTURADA OBRIGATÓRIA: Cada dado do formulário (medida, valor Doppler, biometria, achado) DEVE ser inserido no parágrafo correto da ANÁLISE, substituindo o placeholder (…) ou [___] correspondente. NÃO concatene dados ao final do laudo.
-• CÁLCULOS AUTOMÁTICOS (quando dados suficientes forem fornecidos): RCP = IP ACM / IP umbilical; IP médio uterinas = (D+E)/2; IG e DPP por DUM; classificação ponderal AIG/GIG/PIG/RCIU.
-• PROIBIÇÃO ABSOLUTA DE INVENÇÃO: É terminantemente proibido inventar ou alucinar qualquer dado, medida, volume, peso, percentil ou valor clínico que NÃO tenha sido explicitamente fornecido no formulário. Para campos do laudo sem dado correspondente no formulário, você DEVE MANTER INTACTO o placeholder (…) ou substituir por descrição qualitativa de normalidade. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, os placeholders não preenchidos na ANÁLISE e CONCLUSÃO DEVEM ser mantidos OBRIGATORIAMENTE como '(...)' ou '[___]'. É ABSOLUTAMENTE PROIBIDO remover a linha, inventar valores numéricos ou substituí-los por descrições qualitativas. O que não foi medido, fica como '(...)'!]
-• COMPLIANCE RÍGIDO DA MÁSCARA: O laudo deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos) da MÁSCARA MODELO ORIGINAL. É proibido alterar nomes de seções, remover cabeçalhos ou reestruturar a hierarquia HTML.
-• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve estar em seu próprio parágrafo <p>. Nunca junte múltiplas estruturas ou use <br> para separá-las.
-• CASCATA TRIPARTITE: Após inserir os dados na ANÁLISE, atualizar a CONCLUSÃO (bullets específicos para achados patológicos + síntese de normalidade) e as RECOMENDAÇÕES (condutas proporcionais e padronizadas para a área médica).
+    ? `═════════════════════════════════════════════�• CASCATA TRIPARTITE: Após inserir os dados na ANÁLISE, atualizar a CONCLUSÃO (bullets específicos para achados patológicos + síntese de normalidade) e as RECOMENDAÇÕES (condutas proporcionais e padronizadas para a área médica).
 • TÉCNICA: Reproduzir exatamente como no laudo atual. Proibido alterar.
-• RECOMENDAÇÕES: Usar rigorosamente as condutas padronizadas do protocolo da especialidade ativa (área do exame).]`
+• RECOMENDAÇÕES: Usar rigorosamente as condutas padronizadas definidas nas INSTRUÇÕES ESPECÍFICAS DO EXAME.]`
     : `═══════════════════════════════════════════════════════════════
 MODO COPILOTO — FORMATO DE RESPOSTA OBRIGATÓRIO
 ═══════════════════════════════════════════════════════════════
@@ -519,6 +501,19 @@ REGRAS DE OURO DO COPILOTO:
 • OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
 • PROIBIÇÃO ABSOLUTA DE INVENÇÃO NUMÉRICA: É terminantemente proibido inventar ou alucinar qualquer medida, volume, peso, percentil ou valor numérico clínico (ex: "12,0 cm", "140g", "4,5 x 1,2 cm") que não tenha sido fornecido pelo usuário nas notas ou instruções do copiloto. Mantenha intactos todos os números, medidas e achados reais já existentes no laudo.
 • ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Qualquer placeholder restante na forma de "(...)", "[___]" ou unidades de medida órfãs (ex: "____ cm") no local editado deve ser removido ou substituído puramente por descrições qualitativas de normalidade (ex: "dimensões preservadas", "com espessura habitual", "de aspecto habitual"), sendo terminantemente proibido inventar valores numéricos para preenchê-los. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos ou fornecidos, sendo proibido substituí-los por texto qualitativo, inventar valores ou remover a linha/campo do laudo. Deixe como '(...)'.]
+• PROIBIDO: Adicionar ou concatenar o texto no final do laudo. As alterações DEVEM ser mescladas/integradas no local correto dentro da ANÁLISE.
+• COMPLIANCE RÍGIDO DA MÁSCARA: O laudo refinado deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME. É terminantemente proibido alterar nomes de seções ou remover cabeçalhos originais. Mantenha intacta toda a formatação HTML, a redação e os parágrafos originais da máscara modelo para todos os órgãos que não foram alterados. ATENÇÃO: As seções e a estrutura do HTML da MÁSCARA MODELO ORIGINAL DO EXAME têm prioridade absoluta sobre qualquer outra regra de estrutura (como a do Bloco 3); mantenha a estrutura e styles da máscara original exatamente como estão.
+• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
+• Atualizar ANÁLISE (descrição morfológica adequada do achado, no órgão correto).
+• Atualizar CONCLUSÃO (bullet específico e preciso para o achado).
+• PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
+  - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
+  - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas nas INSTRUÇÕES ESPECÍFICAS DO EXAME. É proibido inventar condutas personalizadas, prolixas ou fora das padronizações indicadas, a menos que expressamente solicitado pelo médico.
+• A cascata Análise→Conclusão→Recomendação deve ser íntegra.
+• Achado patológico → bullet de conclusão obrigatório + conduta.
+• Usar anamnese e contexto clínico para calibrar recomendações.
+• PROIBIDO alterar qualquer seção não relacionada à instrução (exceto para aplicar a padronização de recomendações e técnica caso estejam violando os padrões da área médica).
+• Todo o restante permanece estruturalmente idêntico, com a técnica e recomendações perfeitamente padronizadas de acordo com as diretrizes do exame.]`;ituído puramente por descrições qualitativas de normalidade (ex: "dimensões preservadas", "com espessura habitual", "de aspecto habitual"), sendo terminantemente proibido inventar valores numéricos para preenchê-los. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos ou fornecidos, sendo proibido substituí-los por texto qualitativo, inventar valores ou remover a linha/campo do laudo. Deixe como '(...)'.]
 • PROIBIDO: Adicionar ou concatenar o texto no final do laudo. As alterações DEVEM ser mescladas/integradas no local correto dentro da ANÁLISE.
 • COMPLIANCE RÍGIDO DA MÁSCARA: O laudo refinado deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME. É terminantemente proibido alterar nomes de seções ou remover cabeçalhos originais. Mantenha intacta toda a formatação HTML, a redação e os parágrafos originais da máscara modelo para todos os órgãos que não foram alterados. ATENÇÃO: As seções e a estrutura do HTML da MÁSCARA MODELO ORIGINAL DO EXAME têm prioridade absoluta sobre qualquer outra regra de estrutura (como a do Bloco 3); mantenha a estrutura e estilos da máscara original exatamente como estão.
 • ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
@@ -917,17 +912,49 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     }
   }
 
+  const isFetalOrVascular = area === 'medicina-fetal' || area === 'vascular';
+  
+  // Extrai o conteúdo da seção de Observações Metodológicas
+  const obsMatch = html.match(/<h2[^>]*>OBSERVA[ÇC][ÕO]ES\s+METODOL[OÓ]GICAS<\/h2>([\s\S]*?)(?=<h2|$)/i);
+  const obsContent = obsMatch ? obsMatch[1] : '';
+
   const placeholderPatterns = [
-    { pattern: /\(\.\.\.\)/g, name: '(...)' },
-    { pattern: /\[___\]/g, name: '[___]' },
-    { pattern: /____\s*(cm|mm|mL|g)/gi, name: 'unidade órfã (____)' },
-    { pattern: /\[valor\]/gi, name: '[valor]' },
+    { 
+      pattern: /\(\.\.\.\)/g, 
+      name: '(...)', 
+      isForbidden: (inObs: boolean) => !isFetalOrVascular || inObs 
+    },
+    { 
+      pattern: /\[___\]/g, 
+      name: '[___]', 
+      isForbidden: (inObs: boolean) => !isFetalOrVascular || inObs 
+    },
+    { 
+      pattern: /____\s*(cm|mm|mL|g)/gi, 
+      name: 'unidade órfã (____)', 
+      isForbidden: () => true 
+    },
+    { 
+      pattern: /\[valor\]/gi, 
+      name: '[valor]', 
+      isForbidden: () => true 
+    },
   ];
-  for (const { pattern, name } of placeholderPatterns) {
-    const matches = html.match(pattern);
-    if (matches) {
-      issues.push({ type: 'placeholder', severity: 'error', message: `Placeholder "${name}" encontrado (${matches.length}x). Laudo incompleto.` });
-      score -= Math.min(20, matches.length * 5);
+
+  for (const { pattern, name, isForbidden } of placeholderPatterns) {
+    if (isForbidden(false)) {
+      const matches = html.match(pattern);
+      if (matches) {
+        issues.push({ type: 'placeholder', severity: 'error', message: `Placeholder "${name}" encontrado (${matches.length}x). Laudo incompleto.` });
+        score -= Math.min(20, matches.length * 5);
+      }
+    } else {
+      // Para medicina fetal/vascular, só é proibido na seção de Observações Metodológicas
+      const matches = obsContent.match(pattern);
+      if (matches) {
+        issues.push({ type: 'placeholder', severity: 'error', message: `Placeholder "${name}" encontrado na seção de Observações Metodológicas (${matches.length}x). Laudo incompleto.` });
+        score -= Math.min(20, matches.length * 5);
+      }
     }
   }
 
