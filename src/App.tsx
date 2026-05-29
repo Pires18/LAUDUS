@@ -72,13 +72,15 @@ function ViewRenderer() {
   return (
     <main
       className={classNames(
-        "flex-1 min-w-0 relative flex flex-col min-h-0 h-full",
-        isFullBleed ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+        "flex-1 min-w-0 min-h-0 relative",
+        isFullBleed
+          ? "flex flex-col overflow-hidden"
+          : "overflow-y-auto custom-scrollbar"
       )}
-      style={{ WebkitOverflowScrolling: 'touch' }}
+      style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
     >
       <AnimatePresence mode="wait">
-        <PageTransition key={view.name} id={view.name}>
+        <PageTransition key={view.name} id={view.name} fullBleed={isFullBleed}>
           {views[view.name] ?? null}
         </PageTransition>
       </AnimatePresence>
