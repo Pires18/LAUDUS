@@ -303,14 +303,15 @@ export function stripScratchpad(text: string): string {
   if (!text) return '';
   let cleaned = text;
 
-  cleaned = cleaned.replace(/<scratchpad>[\s\S]*?<\/scratchpad>/gi, '');
+  cleaned = cleaned.replace(/<(scratchpad|think|thinking|thought)>[\s\S]*?<\/\1>/gi, '');
   cleaned = cleaned.replace(/```(?:tool_code|python|code)?[\s\S]*?```/gi, '');
 
-  const openXmlIndex = cleaned.toLowerCase().indexOf('<scratchpad>');
-  if (openXmlIndex !== -1) {
-    cleaned = cleaned.substring(0, openXmlIndex);
+  const match = cleaned.match(/<(scratchpad|think|thinking|thought)>/i);
+  if (match && match.index !== undefined) {
+    cleaned = cleaned.substring(0, match.index);
   }
-  cleaned = cleaned.replace(/<\/?scratchpad>/gi, '');
+  
+  cleaned = cleaned.replace(/<\/?(scratchpad|think|thinking|thought)>/gi, '');
 
   const hasCopilotFormat = cleaned.includes('=== CONVERSA ===') || cleaned.includes('=== PROPOSTA ===');
   if (!hasCopilotFormat) {
@@ -414,7 +415,11 @@ export function buildRefinePrompt({
 • INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
 • PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL (por você ou pelo usuário), sendo proibido reverter ou alterar achados reais de volta para a normalidade ou inventar novos valores não fornecidos.
 • ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
-• COMPLIANCE DA MÁSCARA: O laudo deve seguir a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME, mas com liberdade para formatar, preencher e adequar o texto de forma a torná-lo perfeito e alinhado com a área médica.]`;
+• COMPLIANCE DA MÁSCARA: O laudo deve seguir a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME.
+NOVA REGRA ABSOLUTA DE FORMATO:
+1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
+2. APÓS fechar a tag </scratchpad>, você DEVE gerar exatamente o HTML do laudo.
+É EXTREMAMENTE PROIBIDO escrever pensamentos, justificativas ou saudações fora da tag <scratchpad>.]`;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const contextMessage = buildContextMessage({
@@ -438,8 +443,9 @@ ${contextMessage}
 
 Gere agora o laudo REFINADO completo em HTML puro. 
 O output deve OBRIGATORIAMENTE começar com a tag <scratchpad> para o seu raciocínio (Self-Audit).
+Dentro do <scratchpad>, você pode pensar à vontade.
 APÓS fechar a tag </scratchpad>, o laudo deve começar diretamente com a tag <h1>. 
-Zero texto entre </scratchpad> e <h1>.`;
+ZERO texto, avisos ou mensagens de pensamento fora da tag <scratchpad>.`;
 
   return { universalContext, areaContext, userMessage };
 }
@@ -485,7 +491,7 @@ Você recebeu dados estruturados de formulário clínico para inserção no laud
 
 === CONVERSA ===
 [Resumo clínico conciso (máx. 3 frases) listando os principais dados inseridos e achados relevantes identificados.
-SEM saudações. SEM prolixidade. Puramente clínico. NÃO inclua raciocínio interno aqui — este fica exclusivamente dentro do <scratchpad>.]
+SEM saudações. SEM prolixidade. Puramente clínico. É ESTRITAMENTE PROIBIDO incluir raciocínio interno aqui — pensamentos devem ficar EXCLUSIVAMENTE dentro do <scratchpad>.]
 
 === PROPOSTA ===
 [HTML COMPLETO do laudo com TODOS os dados do formulário integrados.
@@ -493,7 +499,7 @@ REGRAS DE OURO DA INSERÇÃO DE FORMULÁRIO:
 • OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
 • INSERÇÃO ESTRUTURADA OBRIGATÓRIA: Cada dado do formulário (medida, valor Doppler, biometria, achado) DEVE ser inserido no parágrafo correto da ANÁLISE, substituindo o placeholder (…) ou [___] correspondente. NÃO concatene dados ao final do laudo.
 • CÁLCULOS AUTOMÁTICOS (quando dados suficientes forem fornecidos): RCP = IP ACM / IP umbilical; IP médio uterinas = (D+E)/2; IG e DPP por DUM; classificação ponderal AIG/GIG/PIG/RCIU.
-• PROIBIÇÃO ABSOLUTA DE INVENÇÃO: É terminantemente proibido inventar ou alucinar qualquer dado, medida, volume, peso, percentil ou valor clínico que NÃO tenha sido fornecido no formulário. Para campos do laudo sem dado correspondente no formulário, manter o placeholder (…) ou substituir por descrição qualitativa de normalidade. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, os placeholders não preenchidos na ANÁLISE e CONCLUSÃO devem ser mantidos como '(...)', não sendo permitido removê-los ou substituí-los por descrições qualitativas de normalidade.]
+• PROIBIÇÃO ABSOLUTA DE INVENÇÃO: É terminantemente proibido inventar ou alucinar qualquer dado, medida, volume, peso, percentil ou valor clínico que NÃO tenha sido explicitamente fornecido no formulário. Para campos do laudo sem dado correspondente no formulário, você DEVE MANTER INTACTO o placeholder (…) ou substituir por descrição qualitativa de normalidade. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, os placeholders não preenchidos na ANÁLISE e CONCLUSÃO DEVEM ser mantidos OBRIGATORIAMENTE como '(...)' ou '[___]'. É ABSOLUTAMENTE PROIBIDO remover a linha, inventar valores numéricos ou substituí-los por descrições qualitativas. O que não foi medido, fica como '(...)'!]
 • COMPLIANCE RÍGIDO DA MÁSCARA: O laudo deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos) da MÁSCARA MODELO ORIGINAL. É proibido alterar nomes de seções, remover cabeçalhos ou reestruturar a hierarquia HTML.
 • ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve estar em seu próprio parágrafo <p>. Nunca junte múltiplas estruturas ou use <br> para separá-las.
 • CASCATA TRIPARTITE: Após inserir os dados na ANÁLISE, atualizar a CONCLUSÃO (bullets específicos para achados patológicos + síntese de normalidade) e as RECOMENDAÇÕES (condutas proporcionais e padronizadas para a área médica).
@@ -507,14 +513,14 @@ Responda EXCLUSIVAMENTE nesta estrutura:
 === CONVERSA ===
 [UMA única frase (máx. 15 palavras) descrevendo a alteração clínica feita.
 Exemplo: "Vesícula biliar alterada para ausente por cirurgia prévia."
-SEM saudações. SEM explicações prolixas. Puramente clínica. ATENÇÃO: NÃO inclua seu raciocínio aqui, o raciocínio deve ficar exclusivamente dentro da tag <scratchpad> que vem antes disso.]
+SEM saudações. SEM explicações prolixas. Puramente clínica. ATENÇÃO: É ESTRITAMENTE PROIBIDO incluir seu raciocínio aqui, os pensamentos DEVEM ficar EXCLUSIVAMENTE dentro da tag <scratchpad>.]
 
 === PROPOSTA ===
 [HTML COMPLETO do laudo com a alteração integrada.
 REGRAS DE OURO DO COPILOTO:
 • OBRIGATÓRIO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
 • PROIBIÇÃO ABSOLUTA DE INVENÇÃO NUMÉRICA: É terminantemente proibido inventar ou alucinar qualquer medida, volume, peso, percentil ou valor numérico clínico (ex: "12,0 cm", "140g", "4,5 x 1,2 cm") que não tenha sido fornecido pelo usuário nas notas ou instruções do copiloto. Mantenha intactos todos os números, medidas e achados reais já existentes no laudo.
-• ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Qualquer placeholder restante na forma de "(...)", "[___]" ou unidades de medida órfãs (ex: "____ cm") no local editado deve ser removido ou substituído puramente por descrições qualitativas de normalidade (ex: "dimensões preservadas", "com espessura habitual", "de aspecto habitual"), sendo terminantemente proibido inventar valores numéricos para preenchê-los. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos ou fornecidos, sendo proibido substituí-los por texto qualitativo ou remover a linha/campo do laudo.]
+• ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Qualquer placeholder restante na forma de "(...)", "[___]" ou unidades de medida órfãs (ex: "____ cm") no local editado deve ser removido ou substituído puramente por descrições qualitativas de normalidade (ex: "dimensões preservadas", "com espessura habitual", "de aspecto habitual"), sendo terminantemente proibido inventar valores numéricos para preenchê-los. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos ou fornecidos, sendo proibido substituí-los por texto qualitativo, inventar valores ou remover a linha/campo do laudo. Deixe como '(...)'.]
 • PROIBIDO: Adicionar ou concatenar o texto no final do laudo. As alterações DEVEM ser mescladas/integradas no local correto dentro da ANÁLISE.
 • COMPLIANCE RÍGIDO DA MÁSCARA: O laudo refinado deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME. É terminantemente proibido alterar nomes de seções ou remover cabeçalhos originais. Mantenha intacta toda a formatação HTML, a redação e os parágrafos originais da máscara modelo para todos os órgãos que não foram alterados. ATENÇÃO: As seções e a estrutura do HTML da MÁSCARA MODELO ORIGINAL DO EXAME têm prioridade absoluta sobre qualquer outra regra de estrutura (como a do Bloco 3); mantenha a estrutura e estilos da máscara original exatamente como estão.
 • ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
@@ -559,9 +565,6 @@ ${contextMessage}`;
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
   if (settings.geminiModelByMode?.[mode as keyof typeof settings.geminiModelByMode]) {
     return settings.geminiModelByMode[mode as keyof typeof settings.geminiModelByMode]!;
-  }
-  if ((mode === 'generation' || mode === 'copilot' || mode === 'refine') && (area === 'medicina-fetal' || area === 'vascular')) {
-    return settings.geminiModelPro || 'gemini-1.5-pro';
   }
   return settings.geminiModel || 'gemini-2.0-flash';
 }
