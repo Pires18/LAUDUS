@@ -8,6 +8,7 @@ import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
 import { CalculatorReference } from './components/CalculatorUI';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function Calculators() {
   const [areaFilter, setAreaFilter] = useState<ExamArea | 'todas'>('todas');
@@ -40,8 +41,10 @@ export function Calculators() {
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Sidebar Áreas (Desktop) */}
-        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
-          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Filtrar por Área</p>
+        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white/60 backdrop-blur-xl p-3 rounded-[2rem] border border-slate-100 shadow-sm sticky top-24 shadow-slate-200/50">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 py-3 flex items-center gap-2">
+            <LayoutList size={12} /> Filtros Clínicos
+          </p>
           <button
             onClick={() => setAreaFilter('todas')}
             className={classNames(
@@ -128,43 +131,57 @@ export function Calculators() {
           </div>
 
           {/* Grid de Calculadoras */}
-          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
-            {filtered.map(calc => (
-              <button
-                key={calc.id}
-                onClick={() => setSelectedCalcId(calc.id)}
-                className="group flex flex-col p-6 bg-white rounded-[2.5rem] border border-ink-100 hover:border-brand-500 hover:shadow-2xl hover:shadow-brand-500/10 transition-all text-left relative overflow-hidden h-full"
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-ink-50 text-ink-400 flex items-center justify-center group-hover:bg-brand-500 group-hover:text-white transition-all shadow-inner">
-                      <AreaIcon area={calc.areas[0]} size={24} />
+          <motion.div 
+            layout 
+            className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6"
+          >
+            <AnimatePresence>
+              {filtered.map(calc => (
+                <motion.button
+                  key={calc.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  whileHover={{ y: -4, scale: 1.01 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={() => setSelectedCalcId(calc.id)}
+                  className="group flex flex-col p-6 sm:p-8 bg-white/80 backdrop-blur-lg rounded-[2rem] border border-slate-100 hover:border-brand-400 hover:shadow-2xl hover:shadow-brand-500/10 transition-all text-left relative overflow-hidden h-full shadow-sm"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center">
+                      <ChevronRight size={16} className="translate-x-0.5" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-4 mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 text-slate-400 flex items-center justify-center group-hover:from-brand-500 group-hover:to-brand-600 group-hover:text-white transition-all shadow-inner border border-slate-100 group-hover:border-brand-400">
+                      <AreaIcon area={calc.areas[0]} size={28} />
                     </div>
                     <div>
-                      <h4 className="font-black text-ink-900 group-hover:text-brand-700 transition-colors">{calc.name}</h4>
-                      <div className="flex gap-1 mt-0.5">
+                      <h4 className="font-black text-slate-800 text-lg group-hover:text-brand-700 transition-colors uppercase tracking-tight">{calc.name}</h4>
+                      <div className="flex gap-1.5 mt-1">
                         {calc.areas.map(aId => {
                           const a = EXAM_AREAS.find(x => x.id === aId);
                           return a && (
-                            <span key={aId} className="text-[8px] font-black uppercase text-ink-300 tracking-tighter">
-                              • {a.label}
+                            <span key={aId} className="text-[9px] font-black uppercase text-slate-400 tracking-widest bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                              {a.label}
                             </span>
                           );
                         })}
                       </div>
                     </div>
                   </div>
-                  <ChevronRight size={18} className="text-ink-200 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" />
-                </div>
-                <p className="text-xs text-ink-500 leading-relaxed font-medium line-clamp-3">
-                  {calc.description}
-                </p>
-                
-                {/* Background Decoration */}
-                <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-brand-50 rounded-full opacity-0 group-hover:opacity-40 transition-all blur-2xl" />
-              </button>
-            ))}
-          </div>
+                  <p className="text-xs text-slate-500 leading-relaxed font-semibold line-clamp-3 mt-2">
+                    {calc.description}
+                  </p>
+                  
+                  {/* Background Decoration */}
+                  <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-brand-400 rounded-full opacity-0 group-hover:opacity-10 transition-all blur-3xl" />
+                </motion.button>
+              ))}
+            </AnimatePresence>
+          </motion.div>
 
           {filtered.length === 0 && (
             <div className="py-20 text-center">

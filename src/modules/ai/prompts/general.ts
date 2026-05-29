@@ -31,7 +31,7 @@ export const DEFAULT_GLOBAL_INSTRUCTIONS = `BLOCO 2 — INSTRUÇÕES GLOBAIS / R
 ARQUIVO: laud_reasoning.txt
 ═══════════════════════════════════════════════════════════════
 
-Execute mental e silenciosamente as 7 fases de raciocínio clínico antes de gerar o output final:
+Execute as 7 fases de raciocínio clínico de forma EXPLÍCITA DENTRO de uma tag <scratchpad> antes de gerar o laudo final em HTML:
 
 FASE 1 — ANCORAGEM CLÍNICA:
 Identifique e calibre a interpretação e a linguagem com base em: [IDADE] × [SEXO] × [INDICAÇÃO/SINTOMAS]. Aplicar filtro de compatibilidade biológica (ex: sem HPB em mulheres, sem ateromatose/artrose degenerativa em crianças).
@@ -73,14 +73,15 @@ FASE 6 — CASCATA E DIPLOMACIA:
 Classificar a conduta em N0 (Sem alteração) | N1 (Benigno, rotina) | N2 (Controle/eletivo) | N3 (Especialista/prioritário/exame complementar/biópsia) | N4 (Urgência/alerta imediato).
 Em condições não emergenciais, use sempre linguagem consultiva e não-prescritiva ("recomenda-se", "sugere-se", "considerar").
 
-FASE 7 — SELF-AUDIT SILENCIOSO:
-Realize verificação final: há unidades órfãs? Há números inventados? O laudo segue a hierarquia HTML do skeleton? Há gatilhos do R9 que necessitam de alerta? Corrija tudo silenciosamente antes da saída.`;
+FASE 7 — SELF-AUDIT NO SCRATCHPAD:
+Realize verificação final dentro da sua análise: há unidades órfãs? Há números inventados? O laudo segue a hierarquia HTML do skeleton? Há gatilhos do R9 que necessitam de alerta? Corrija tudo explicitamente no scratchpad antes de iniciar a saída HTML final.`;
 
 export const DEFAULT_STRUCTURE_PROMPT = `BLOCO 3 — SKELETON / ARQUITETURA OBRIGATÓRIA — VERSÃO v13.0
 ARQUIVO: laud_skeleton.txt
 ═══════════════════════════════════════════════════════════════
 
-O output final do laudo deve ser exclusivamente o código HTML puro, sem Markdown, sem meta-comentários, sem explicações ou textos fora das tags HTML permitidas.
+OBRIGATÓRIO: Antes de gerar qualquer código HTML, você deve redigir todo o seu raciocínio clínico (Fases 1 a 7) dentro de uma tag <scratchpad>. 
+Assim que fechar a tag </scratchpad>, o output final do laudo deve iniciar imediatamente, contendo exclusivamente o código HTML puro, sem Markdown, sem meta-comentários, sem explicações ou textos fora das tags HTML permitidas.
 
 TAGS PERMITIDAS:
 <h1>, <h2>, <h3>, <p>, <strong>, <em>, <br>, <ul>, <li>, <table>, <tr>, <td>, <th>, <tbody>, <thead>.

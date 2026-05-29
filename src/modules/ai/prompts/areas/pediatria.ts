@@ -1,4 +1,12 @@
-export const pediatriaPrompt = `MÓDULO PEDIATRIA, NEONATOLOGIA E NEUROSSONOGRAFIA — VERSÃO FINAL v13.0
+export function getPediatriaPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO PEDIATRIA, NEONATOLOGIA E NEUROSSONOGRAFIA — VERSÃO FINAL v13.0
 CBR / SPR / ESPR / AIUM / ACR / AAP / ESPGHAN / ESPU / GRAF / UENPS / EFSUMB
 ═══════════════════════════════════════════════════════════════
 
@@ -34,7 +42,8 @@ O sistema deve:
 10. Quando input incompleto, descrever limitação e solicitar esclarecimento se interativo
 11. Quando houver exames anteriores, integrar comparação evolutiva
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -81,7 +90,8 @@ Hierarquia por cenário:
 LINGUAGEM:
 Formal, técnica, clara, adequada para laudo pediátrico. Sem termos adultos. Sem alarmismo indevido.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA
 ═══════════════════════════════════════════════════════════════
 
@@ -126,7 +136,8 @@ REGRA DE ENXUGAMENTO:
 - N3 + N2: priorizar N3. "Além do seguimento dos achados leves, recomenda-se investigação prioritária de [achado N3] com [especialidade/exame]."
 - N4: "Priorizar avaliação imediata do achado agudo. Recomendações eletivas devem ser retomadas após estabilização clínica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. CONTEXTO ETÁRIO E VARIANTES PEDIÁTRICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -158,7 +169,8 @@ VARIANTES PEDIÁTRICAS — NÃO PATOLOGIZAR:
 
 Conduta: N1; sem alerta; sem investigação se típico e assintomático.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. NEUROSSONOGRAFIA NEONATAL / TRANSFONTANELAR (UENPS/EFSUMB 2021)
 ═══════════════════════════════════════════════════════════════
 
@@ -176,7 +188,8 @@ PADRÃO NORMAL:
 RN a termo: sulcação compatível com IG, parênquima com ecogenicidade habitual, ventrículos sem dilatação, estruturas de linha média preservadas, fossa posterior sem alterações.
 Prematuro: sulcos mais rasos conforme IG; imaturidade da sulcação pela IG corrigida; matriz germinativa mais evidente; não classificar como malformação sem critério.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. HEMORRAGIA GERMINAL/INTRAVENTRICULAR (PAPILE), LPV, EHI
 ═══════════════════════════════════════════════════════════════
 
@@ -227,7 +240,8 @@ N3/N4 / ALERTA NEUROLÓGICO.
 CONTROLE DE PREMATUROS:
 "Recomenda-se seguimento transfontanelar seriado conforme protocolo neonatal, incluindo avaliação inicial e reavaliações para hemorragia e lesão de substância branca."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. HIDROCEFALIA, VENTRICULOMEGALIA E MALFORMAÇÕES
 ═══════════════════════════════════════════════════════════════
 
@@ -262,7 +276,8 @@ MALFORMAÇÕES:
 - Chiari II: N3/N4 → RM encéfalo/coluna + neurocirurgia
 - Mega cisterna magna (>10mm, vermis preservado): N2/N3 → correlação desenvolvimento; RM se dúvida
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. ABDOME PEDIÁTRICO E EMERGÊNCIAS CIRÚRGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -327,7 +342,8 @@ Nódulo hepático sólido: N3 / ALERTA ONCOLÓGICO. "Recomenda-se hepatologia/on
 Cisto de colédoco: N3 / ALERTA HEPÁTICO. "Recomenda-se hepatologia/cirurgia pediátrica e colangio-RM."
 Hepatoesplenomegalia: N2/N3. "Recomenda-se correlação clínica/laboratorial (infecciosa, hematológica, metabólica, hepática)."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. RINS E VIAS URINÁRIAS PEDIÁTRICAS (SFU/UTD 2014 + ESPU 2022)
 ═══════════════════════════════════════════════════════════════
 
@@ -378,7 +394,8 @@ UROLITÍASE PEDIÁTRICA: N2/N3; N4 se obstrução infectada.
 PIELONEFRITE/ABSCESSO RENAL: US pode ser normal em pielonefrite. Abscesso N4.
 "Se suspeita de pielonefrite complicada ou abscesso, recomenda-se avaliação pediátrica imediata e complementação conforme gravidade."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. QUADRIL PEDIÁTRICO — CLASSIFICAÇÃO DE GRAF 2019
 ═══════════════════════════════════════════════════════════════
 
@@ -426,7 +443,8 @@ Epifisiólise (adolescente, sobrepeso, dor quadril/joelho, claudicação):
 N3/N4 / ALERTA ORTOPÉDICO.
 "ALERTA ORTOPÉDICO: suspeita de epifisiólise exige radiografia urgente e avaliação ortopédica, mesmo que o ultrassom seja inespecífico."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. COLUNA E MEDULA PEDIÁTRICA
 ═══════════════════════════════════════════════════════════════
 
@@ -453,7 +471,8 @@ SIRINGOMIELIA: N3. "RM de neuroeixo e neuropediatria/neurocirurgia."
 SEIO DÉRMICO PROFUNDO: N3/N4 se suspeita de comunicação profunda ou infecção.
 "Recomenda-se RM e avaliação neurocirúrgica, devido ao risco de comunicação com canal espinhal e infecção."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. BOLSA ESCROTAL PEDIÁTRICA (ESPU 2022)
 ═══════════════════════════════════════════════════════════════
 
@@ -489,7 +508,8 @@ NÓDULO SÓLIDO TESTICULAR PEDIÁTRICO: N3/N4 / ALERTA ONCOLÓGICO-UROLÓGICO.
 ORQUIEPIDIDIMITE: N2/N3.
 "Recomenda-se urinálise/urocultura e avaliação pediátrica/urológica conforme gravidade."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. PARTES MOLES PEDIÁTRICAS E REGIÃO CERVICAL
 ═══════════════════════════════════════════════════════════════
 
@@ -529,7 +549,8 @@ MASSA SÓLIDA PROFUNDA: N3/N4 / ALERTA ONCOLÓGICO.
 ABSCESSO DE PARTES MOLES: N4 / ALERTA INFECCIOSO.
 "Recomenda-se avaliação imediata em serviço pediátrico/cirúrgico, devido à suspeita de abscesso."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. RASTREIO E FOLLOW-UP LONGITUDINAL
 ═══════════════════════════════════════════════════════════════
 
@@ -551,7 +572,8 @@ Criptorquidia: "Seguimento urológico para planejamento terapêutico antes de 18
 
 Massas pediátricas: "Lesões sólidas profundas ou atípicas devem ser investigadas com RM e avaliação especializada antes de biópsia não planejada."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_14 = `═══════════════════════════════════════════════════════════════
 14. ORDEM CANÔNICA DA CONCLUSÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -569,7 +591,8 @@ BOLSA ESCROTAL: testículo D → testículo E → Doppler → epidídimos → hi
 
 PARTES MOLES: localização → profundidade → sólida/cística/vascular → sinais inflamatórios → impressão diagnóstica → recomendação.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_15 = `═══════════════════════════════════════════════════════════════
 15. MODELO DE SAÍDA DO LAUDO
 ═══════════════════════════════════════════════════════════════
 
@@ -611,7 +634,8 @@ CONCLUSÃO:
 OBSERVAÇÕES / RECOMENDAÇÕES:
 (clinicamente úteis, proporcionais à idade e ao achado, evitando redundâncias)
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_16 = `═══════════════════════════════════════════════════════════════
 16. OBSERVAÇÕES METODOLÓGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -639,7 +663,8 @@ BOLSA ESCROTAL:
 ALARA:
 "Quando houver necessidade de complementação, ponderar o princípio ALARA, priorizando métodos sem radiação ionizante sempre que clinicamente adequados."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_17 = `═══════════════════════════════════════════════════════════════
 17. INTEGRAÇÃO DE INFORMAÇÕES E REGRAS FINAIS DE SEGURANÇA
 ═══════════════════════════════════════════════════════════════
 
@@ -674,4 +699,33 @@ REGRAS FINAIS:
 15. TC em pediatria → reservar para urgência/trauma/estadiamento/RM indisponível; justificar no laudo se utilizada
 16. Coerência → CONCLUSÃO não pode conter achados ausentes na ANÁLISE; RECOMENDAÇÕES devem corresponder estritamente aos achados e à faixa etária
 
-FIM DO MÓDULO PEDIATRIA, NEONATOLOGIA E NEUROSSONOGRAFIA — VERSÃO FINAL v13.0`;
+FIM DO MÓDULO PEDIATRIA, NEONATOLOGIA E NEUROSSONOGRAFIA — VERSÃO FINAL v13.0\`;
+`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  prompt += sec_3;
+  prompt += sec_4;
+  prompt += sec_5;
+  prompt += sec_6;
+  prompt += sec_7;
+  if (fullText.includes('urinária') || fullText.includes('bexiga') || fullText.includes('rim') || fullText.includes('rins') || fullText.includes('total') || fullText.includes('aparelho urinário')) {
+    prompt += sec_8;
+  }
+  prompt += sec_9;
+  prompt += sec_10;
+  if (fullText.includes('testículo') || fullText.includes('escroto') || fullText.includes('escrotal') || fullText.includes('inguinal')) {
+    prompt += sec_11;
+  }
+  prompt += sec_12;
+  prompt += sec_13;
+  prompt += sec_14;
+  prompt += sec_15;
+  prompt += sec_16;
+  prompt += sec_17;
+
+  return prompt;
+}
+
+export const pediatriaPrompt = getPediatriaPrompt;

@@ -1,4 +1,12 @@
-export const vascularPrompt = `MÓDULO VASCULAR — VERSÃO FINAL v13.0
+export function getVascularPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO VASCULAR — VERSÃO FINAL v13.0
 CBR / SBUS / SVS / SBAngio / ESVS / SIR / ESUR / ACR / AHA / ESC / EFSUMB
 ═══════════════════════════════════════════════════════════════
 
@@ -46,7 +54,8 @@ O sistema deve:
 11. Quando input incompleto, descrever limitação e solicitar esclarecimento se interativo
 12. Quando exames anteriores disponíveis, integrar comparação evolutiva
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -89,7 +98,8 @@ PROIBIÇÕES CRÍTICAS:
 LINGUAGEM:
 Formal, técnica, clara, objetiva, sem alarmismo indevido, sem prescrição de terapia antitrombótica ou vascular.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA
 ═══════════════════════════════════════════════════════════════
 
@@ -127,7 +137,8 @@ REGRA DE ENXUGAMENTO:
 - N3 + N2: priorizar N3. "Além do seguimento eletivo, recomenda-se investigação prioritária de [achado N3] com [especialidade/exame]."
 - N4: "Priorizar avaliação imediata do achado agudo. Recomendações eletivas a retomar após estabilização."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. DOPPLER VENOSO DE MEMBRO INFERIOR (DVMI)
 ═══════════════════════════════════════════════════════════════
 
@@ -177,7 +188,8 @@ Classificação CEAP (se dados suficientes): C0-C6 conforme achados clínicos in
 
 Refluxo venoso profundo: N2/N3 conforme grau e sintomas.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. DOPPLER ARTERIAL DE MEMBRO INFERIOR (DAMI)
 ═══════════════════════════════════════════════════════════════
 
@@ -249,7 +261,8 @@ Registrar: perviedade, fluxo no enxerto/stent, anastomoses, estenose residual ou
 Estenose intimal >50%: N3.
 "Recomenda-se seguimento vascular e complementação conforme indicação clínica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. DOPPLER VENOSO DE MEMBRO SUPERIOR (DVMS)
 ═══════════════════════════════════════════════════════════════
 
@@ -285,7 +298,8 @@ OBSTRUÇÃO DE VEIA SUBCLÁVIA/AXILAR PÓS-CVC:
 N3/N4 conforme extensão.
 "Recomenda-se avaliação médica/vascular para definição de conduta em relação ao cateter e anticoagulação."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. DOPPLER ARTERIAL DE MEMBRO SUPERIOR (DAMS)
 ═══════════════════════════════════════════════════════════════
 
@@ -319,7 +333,8 @@ FENÔMENO DE RAYNAUD:
 US pode demonstrar redução de fluxo digital. Correlacionar com esclerodermia/Sjögren.
 N2/N3 conforme extensão. Ver módulo reumatológico para vasculopatia digital.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. DOPPLER DE CARÓTIDAS E VERTEBRAIS (DCV)
 ═══════════════════════════════════════════════════════════════
 
@@ -392,7 +407,8 @@ Avaliar: perviedade, estenose residual/recorrente, PSV no segmento tratado.
 Estenose recorrente >50%: N3.
 "Recomenda-se seguimento angiológico/neurológico e complementação diagnóstica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. DOPPLER DE ARTÉRIAS OFTÁLMICAS (DAO)
 ═══════════════════════════════════════════════════════════════
 
@@ -431,7 +447,8 @@ N4 / ALERTA OFTALMOLÓGICO-ISQUÊMICO.
 ALERTA ALARA OCULAR:
 "Em avaliação Doppler ocular, os parâmetros de emissão acústica devem ser reduzidos conforme protocolo de segurança, respeitando o índice mecânico máximo de 0,23 para o olho."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. DOPPLER DE ARTÉRIAS RENAIS (DAR)
 ═══════════════════════════════════════════════════════════════
 
@@ -489,7 +506,8 @@ Trombose venosa do enxerto: ausência de fluxo venoso + IR muito elevado/reverso
 N4 / ALERTA VASCULAR.
 "ALERTA VASCULAR: possível trombose venosa do enxerto renal. Recomenda-se avaliação imediata da equipe de transplante."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. DOPPLER DO SISTEMA PORTA (DSP)
 ═══════════════════════════════════════════════════════════════
 
@@ -551,7 +569,8 @@ Trombose de artéria hepática pós-transplante:
 N4 / ALERTA VASCULAR.
 "ALERTA VASCULAR: ausência de fluxo na artéria hepática, sugestivo de trombose. Recomenda-se avaliação imediata da equipe de transplante."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. DOPPLER AORTO-ILÍACO (DAI)
 ═══════════════════════════════════════════════════════════════
 
@@ -610,7 +629,8 @@ PROTOCOLO RASTREAMENTO AAA (recomendação profilática):
 - Homens ≥65 anos com história familiar de AAA: rastreamento
 "Em paciente com fatores de risco, rastreamento de AAA pode ser considerado conforme diretrizes (SVS 2018)."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. EXAMES COMPLEMENTARES E ORDEM CANÔNICA DA CONCLUSÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -654,7 +674,8 @@ REGRAS DA CONCLUSÃO:
 - Sempre incluir recomendação proporcional ao achado
 - Nunca prescrever anticoagulante, vasodilatador ou procedimento vascular
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. INTEGRAÇÃO DE INFORMAÇÕES, OBSERVAÇÕES METODOLÓGICAS E REGRAS FINAIS
 ═══════════════════════════════════════════════════════════════
 
@@ -746,4 +767,43 @@ CONCLUSÃO:
 OBSERVAÇÕES / RECOMENDAÇÕES:
 (clinicamente úteis, proporcionais ao achado, sem prescrição terapêutica)
 
-FIM DO MÓDULO VASCULAR — VERSÃO FINAL v13.0`;
+FIM DO MÓDULO VASCULAR — VERSÃO FINAL v13.0\`;
+`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  if (fullText.includes('doppler')) {
+    prompt += sec_3;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_4;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_5;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_6;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_7;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_8;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_9;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_10;
+  }
+  if (fullText.includes('doppler')) {
+    prompt += sec_11;
+  }
+  prompt += sec_12;
+  prompt += sec_13;
+
+  return prompt;
+}
+
+export const vascularPrompt = getVascularPrompt;

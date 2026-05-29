@@ -194,8 +194,11 @@ function buildUniversalContext(settings: AppSettings): string {
   return parts.join('\n\n');
 }
 
-function buildAreaContext(settings: AppSettings, area: string): string {
-  const areaRules = AREA_SPECIFIC_PROMPTS[area] || '';
+function buildAreaContext(settings: AppSettings, area: string, templateName: string = '', clinicalIndication: string = '', anamnesis: string = ''): string {
+  const areaRuleOrGenerator = AREA_SPECIFIC_PROMPTS[area];
+  const areaRules = typeof areaRuleOrGenerator === 'function' 
+    ? areaRuleOrGenerator(templateName, clinicalIndication, anamnesis) 
+    : (areaRuleOrGenerator || '');
   const areaExtra = settings.aiAreaPrompts?.[area as ExamArea] || '';
 
   const parts: string[] = [];
@@ -346,7 +349,7 @@ export function buildPrompt({
   examDateMs,
 }: GenerateReportParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildAreaContext(settings, template.area);
+  const areaContext = buildAreaContext(settings, template.area, template.name, clinicalIndication || '', anamnesis || '');
   const maskHtml = buildMaskHtml(template);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const contextMessage = buildContextMessage({
@@ -385,7 +388,7 @@ export function buildRefinePrompt({
   examDateMs,
 }: RefineParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildAreaContext(settings, template.area);
+  const areaContext = buildAreaContext(settings, template.area, template.name, clinicalIndication || '', anamnesis || '');
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"
@@ -433,7 +436,10 @@ INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
 ═══════════════════════════════════════════════════════════════
 ${contextMessage}
 
-Gere agora o laudo REFINADO completo em HTML puro. O output deve começar diretamente com <h1>. Zero texto antes do HTML.`;
+Gere agora o laudo REFINADO completo em HTML puro. 
+O output deve OBRIGATORIAMENTE começar com a tag <scratchpad> para o seu raciocínio (Self-Audit).
+APÓS fechar a tag </scratchpad>, o laudo deve começar diretamente com a tag <h1>. 
+Zero texto entre </scratchpad> e <h1>.`;
 
   return { universalContext, areaContext, userMessage };
 }
@@ -456,14 +462,17 @@ OVERRIDE — MODO COPILOTO ATIVO (PRIORIDADE MÁXIMA)
   • "ZERO caractere fora das tags HTML" — SUSPENSA
 
 NOVA REGRA ABSOLUTA DE FORMATO (substitui as acima):
-O output DEVE começar com "=== CONVERSA ===" e conter
-as duas seções exatamente como especificado na mensagem.
-O HTML do laudo modificado vai DENTRO de "=== PROPOSTA ===".
+1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
+2. APÓS fechar a tag </scratchpad>, você DEVE gerar exatamente a estrutura:
+=== CONVERSA ===
+[UMA única frase (máx. 15 palavras) descrevendo a alteração]
+=== PROPOSTA ===
+[HTML COMPLETO do laudo]
 Violar este formato invalida completamente a resposta.
 ═══════════════════════════════════════════════════════════════`;
 
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildAreaContext(settings, exam.area) + copilotModeOverride;
+  const areaContext = buildAreaContext(settings, exam.area, exam.examType, exam.clinicalIndication || '', exam.anamnesis || '') + copilotModeOverride;
 
   const copilotFormat = `═══════════════════════════════════════════════════════════════
 MODO COPILOTO — FORMATO DE RESPOSTA OBRIGATÓRIO
@@ -473,7 +482,7 @@ Responda EXCLUSIVAMENTE nesta estrutura:
 === CONVERSA ===
 [UMA única frase (máx. 15 palavras) descrevendo a alteração clínica feita.
 Exemplo: "Vesícula biliar alterada para ausente por cirurgia prévia."
-SEM saudações. SEM explicações prolixas. Puramente clínica.]
+SEM saudações. SEM explicações prolixas. Puramente clínica. ATENÇÃO: NÃO inclua seu raciocínio aqui, o raciocínio deve ficar exclusivamente dentro da tag <scratchpad> que vem antes disso.]
 
 === PROPOSTA ===
 [HTML COMPLETO do laudo com a alteração integrada.

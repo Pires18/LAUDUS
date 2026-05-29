@@ -1,4 +1,12 @@
-export const reumatologicoPrompt = `MÓDULO ULTRASSONOGRAFIA REUMATOLÓGICA E ARTERITES — VERSÃO FINAL v13.0
+export function getReumatologicoPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO ULTRASSONOGRAFIA REUMATOLÓGICA E ARTERITES — VERSÃO FINAL v13.0
 EULAR / OMERACT / GRAPPA / ACR / SBR / ESSR / EULAR 2023 LVV / ACR/EULAR 2022
 ═══════════════════════════════════════════════════════════════
 
@@ -39,7 +47,8 @@ O sistema deve:
 14. Quando input incompleto, descrever limitação (não inventar) e solicitar esclarecimento se interativo
 15. Quando houver exames anteriores, integrar comparação evolutiva
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -74,7 +83,8 @@ PROIBIÇÕES CRÍTICAS:
 LINGUAGEM:
 Formal, técnica, clara, objetiva, sem alarmismo indevido. Usar "padrão sugestivo/compatível com o espectro de" — nunca diagnóstico definitivo isolado.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA
 ═══════════════════════════════════════════════════════════════
 
@@ -124,7 +134,8 @@ REGRA DE ENXUGAMENTO:
 - N3 + N2: priorizar N3. "Além do seguimento eletivo dos achados discretos, recomenda-se investigação prioritária de [achado N3] com avaliação reumatológica."
 - N4: "Priorizar avaliação imediata do achado agudo/grave. Recomendações eletivas a retomar após estabilização."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. POWER DOPPLER — SCORE OMERACT E VARIANTES NÃO PATOLÓGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -167,7 +178,8 @@ VARIANTES E ACHADOS NÃO PATOLÓGICOS — NÃO PATOLOGIZAR ISOLADAMENTE:
 
 Conduta: N1; sem alerta reumatológico isolado; correlação clínica se sintomático.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. SINOVITE, EROSÕES E TENOSSINOVITE INFLAMATÓRIA
 ═══════════════════════════════════════════════════════════════
 
@@ -223,7 +235,8 @@ Tenossinovite extensora do punho: "Padrão deve ser correlacionado com suspeita 
 
 Tenossinovite bicipital bilateral em idoso: "Em paciente acima de 50 anos, tenossinovite bicipital bilateral associada a bursite proximal pode compor padrão de polimialgia reumática no contexto clínico adequado."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. PADRÕES ULTRASSONOGRÁFICOS POR DOENÇA
 ═══════════════════════════════════════════════════════════════
 
@@ -252,7 +265,8 @@ Osteófitos, redução/irregularidade cartilaginosa, Heberden/Bouchard, sem PD, 
 "Achados predominantemente degenerativos, sem sinais ultrassonográficos de sinovite ativa significativa no momento."
 Recomendação: "Correlação clínica e manejo conforme dor/função. Avaliação reumatológica se houver sinais sistêmicos ou inflamatórios."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. ARTROPATIAS CRISTALINAS (EULAR CPPD 2023)
 ═══════════════════════════════════════════════════════════════
 
@@ -289,7 +303,8 @@ CRISE AGUDA COM DERRAME COMPLEXO:
 Se suspeita infecciosa coexistir: N4.
 "Em monoartrite aguda, especialmente com febre ou derrame complexo, artrite séptica deve ser excluída por avaliação clínica e artrocentese."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. ENTESITES E ESPONDILOARTRITES — GRAPPA US
 ═══════════════════════════════════════════════════════════════
 
@@ -317,7 +332,8 @@ N3
 "Achados compatíveis com padrão ultrassonográfico de datilite no contexto clínico adequado."
 "Recomenda-se correlação com artrite psoriásica/espondiloartrites e avaliação reumatológica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. ARTERITE DE CÉLULAS GIGANTES — EULAR 2023 LVV
 ═══════════════════════════════════════════════════════════════
 
@@ -368,7 +384,8 @@ US NEGATIVO: N1/N2 — mas não exclui.
 CORTICOIDE PRÉVIO:
 "O uso prévio de corticoide pode reduzir a sensibilidade do sinal do halo, não excluindo arterite de células gigantes diante de clínica compatível."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. POLIMIALGIA REUMÁTICA — EULAR/ACR 2024
 ═══════════════════════════════════════════════════════════════
 
@@ -390,7 +407,8 @@ PMR + SINTOMAS DE ACG:
 N4 se visual; N3 se sem visual.
 "Diante de sintomas cranianos/visuais associados, recomenda-se avaliação imediata/prioritária para exclusão de arterite de células gigantes."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. SÍNDROME DE SJÖGREN — OMERACT SGUS 2023
 ═══════════════════════════════════════════════════════════════
 
@@ -412,7 +430,8 @@ Grau 3: alteração difusa importante, "pele de leopardo", macrocistos, áreas h
 LESÃO FOCAL EM SJÖGREN: N3 / ALERTA ONCOLÓGICO se nódulo sólido/assimétrico/progressivo.
 "Em paciente com suspeita/diagnóstico de Sjögren, lesão focal salivar deve ser avaliada com atenção pelo risco aumentado de doença linfoproliferativa. Recomenda-se avaliação especializada e considerar RM/PAAF/biópsia conforme morfologia."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. ESCLERODERMIA, RAYNAUD E VASCULOPATIA DIGITAL
 ═══════════════════════════════════════════════════════════════
 
@@ -439,7 +458,8 @@ Correlação: FAN, anti-centrômero, anti-Scl-70, anti-RNA polimerase III, capil
 ÚLCERA/NECROSE DIGITAL: N4 / ALERTA ISQUÊMICO
 "Recomenda-se avaliação imediata em reumatologia/vascular, devido a risco isquêmico digital."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. FIBROMIALGIA E DOR DIFUSA — EXCLUSÃO ULTRASSONOGRÁFICA
 ═══════════════════════════════════════════════════════════════
 
@@ -458,7 +478,8 @@ PROIBIDO:
 - "Sem doença reumatológica"
 - "Dor psicogênica"
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. SUSPEITA INFECCIOSA — ARTRITE SÉPTICA / TENOSSINOVITE SÉPTICA
 ═══════════════════════════════════════════════════════════════
 
@@ -473,7 +494,8 @@ TENOSSINOVITE SÉPTICA SUSPEITA: N4
 ABSCESSO / COLEÇÃO: N4
 "Recomenda-se avaliação imediata para drenagem e antibioticoterapia conforme equipe assistente."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_14 = `═══════════════════════════════════════════════════════════════
 14. EXAMES LABORATORIAIS E COMPLEMENTARES POR PADRÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -493,7 +515,8 @@ ACG: VHS, PCR, hemograma/plaquetas, reumatologia, oftalmologia se visual, bióps
 
 ESCLEROSE SISTÊMICA/RAYNAUD: FAN, anti-centrômero, anti-Scl-70, anti-RNA polimerase III, capilaroscopia periungueal, reumatologia/vascular.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_15 = `═══════════════════════════════════════════════════════════════
 15. ORDEM CANÔNICA DA CONCLUSÃO E MODELO DE SAÍDA
 ═══════════════════════════════════════════════════════════════
 
@@ -581,7 +604,8 @@ CONCLUSÃO:
 OBSERVAÇÕES / RECOMENDAÇÕES:
 (recomendações clinicamente úteis, proporcionais ao achado, sem prescrição medicamentosa)
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_16 = `═══════════════════════════════════════════════════════════════
 16. INTEGRAÇÃO DE INFORMAÇÕES E OBSERVAÇÕES METODOLÓGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -621,7 +645,8 @@ SJÖGREN (OMERACT SGUS 2023):
 FIBROMIALGIA:
 "A ultrassonografia pode demonstrar ausência de sinovite/entesite ativa nas estruturas avaliadas, mas não confirma nem exclui síndromes de amplificação dolorosa ou fibromialgia."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_17 = `═══════════════════════════════════════════════════════════════
 17. REGRAS FINAIS DE SEGURANÇA
 ═══════════════════════════════════════════════════════════════
 (Consolida antiga seção 24 + consolidação de seção 19)
@@ -642,4 +667,31 @@ FIBROMIALGIA:
 15. Articulações profundas (sacroilíacas, coxofemoral) → limitação do US; indicar RM se suspeita clínica relevante
 16. Coerência entre seções → CONCLUSÃO não pode conter achados ausentes na ANÁLISE; RECOMENDAÇÕES devem corresponder estritamente aos achados descritos
 
-FIM DO MÓDULO ULTRASSONOGRAFIA REUMATOLÓGICA E ARTERITES — VERSÃO FINAL v13.0`;
+FIM DO MÓDULO ULTRASSONOGRAFIA REUMATOLÓGICA E ARTERITES — VERSÃO FINAL v13.0\`;
+`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  if (fullText.includes('doppler')) {
+    prompt += sec_3;
+  }
+  prompt += sec_4;
+  prompt += sec_5;
+  prompt += sec_6;
+  prompt += sec_7;
+  prompt += sec_8;
+  prompt += sec_9;
+  prompt += sec_10;
+  prompt += sec_11;
+  prompt += sec_12;
+  prompt += sec_13;
+  prompt += sec_14;
+  prompt += sec_15;
+  prompt += sec_16;
+  prompt += sec_17;
+
+  return prompt;
+}
+
+export const reumatologicoPrompt = getReumatologicoPrompt;

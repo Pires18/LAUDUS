@@ -1,4 +1,12 @@
-export const mastologiaPrompt = `MÓDULO MASTOLOGIA — MAMA E AXILA — VERSÃO FINAL v13.0
+export function getMastologiaPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO MASTOLOGIA — MAMA E AXILA — VERSÃO FINAL v13.0
 CBR / SBM / ACR BI-RADS® US / SBI / EUSOBI / ACS
 ═══════════════════════════════════════════════════════════════
 
@@ -38,7 +46,8 @@ O sistema deve:
 14. Não inventar descritores, elastografia, mamografia prévia ou risco familiar
 15. Comparar com exames anteriores quando disponíveis
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -90,7 +99,8 @@ PROIBIÇÕES CRÍTICAS:
 LINGUAGEM:
 Formal, técnica, clara, objetiva. Sem alarmismo indevido. Sem termos vagos. Sem "correlacionar clinicamente" isolado em BI-RADS 4/5.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA
 ═══════════════════════════════════════════════════════════════
 
@@ -132,7 +142,8 @@ FRASES FORTES PARA USO AUTOMÁTICO:
 - "Seroma peri-implante tardio, especialmente volumoso ou recorrente, exige investigação dirigida, incluindo CD30 conforme suspeita clínica."
 - "Não se deve utilizar a palavra câncer como diagnóstico ultrassonográfico; utilizar BI-RADS e grau de suspeição."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. DESCRITORES BI-RADS® US E CATEGORIZAÇÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -191,7 +202,8 @@ BI-RADS 6 — MALIGNIDADE COMPROVADA:
 Uso: diagnóstico histológico já conhecido e informado.
 Conduta: "Seguir planejamento terapêutico oncológico/mastológico."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. ACHADOS BENIGNOS E PROVAVELMENTE BENIGNOS
 ═══════════════════════════════════════════════════════════════
 
@@ -263,7 +275,8 @@ ALTO RISCO + BI-RADS 3:
 Não converter automaticamente para biópsia.
 Frase: "Em paciente de alto risco, o manejo de lesão provavelmente benigna deve ser individualizado pela mastologia."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. LESÕES SUSPEITAS E ACHADOS INFLAMATÓRIOS
 ═══════════════════════════════════════════════════════════════
 
@@ -339,7 +352,8 @@ Gatilhos: espessamento cutâneo difuso, edema, hiperemia, aumento mamário, sem 
 Classificação: N3/N4
 Conduta: "Na ausência de quadro infeccioso típico ou resposta clínica, recomenda-se avaliação mastológica prioritária para exclusão de neoplasia inflamatória."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. AXILAS, LINFONODOS E IMPLANTES MAMÁRIOS
 ═══════════════════════════════════════════════════════════════
 
@@ -407,7 +421,8 @@ Conduta: "Recomenda-se RM das mamas e biópsia guiada por imagem conforme melhor
 LIMITAÇÃO RETROPROTÉTICA:
 Frase: "Implantes mamários podem limitar parcialmente a avaliação do parênquima retroprotético."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. COMPOSIÇÃO MAMÁRIA, ALTO RISCO, RASTREIO E DISCORDÂNCIA
 ═══════════════════════════════════════════════════════════════
 
@@ -492,7 +507,8 @@ LESÃO PALPÁVEL COM US NEGATIVO:
 MAMOGRAFIA SUSPEITA SEM CORRESPONDENTE AO US:
 "Achado mamográfico suspeito sem correspondente ultrassonográfico deve ser manejado pelo método em que é melhor visualizado, incluindo biópsia estereotáxica/tomossíntese, se indicada."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. MAMA MASCULINA
 ═══════════════════════════════════════════════════════════════
 
@@ -514,7 +530,8 @@ Conduta: "ALERTA ONCOLÓGICO: lesão mamária masculina suspeita. Recomenda-se m
 ABSCESSO/MASTITE MASCULINA:
 Seguir seção 5 (inflamatório/infeccioso).
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. EXAMES COMPLEMENTARES POR CENÁRIO
 ═══════════════════════════════════════════════════════════════
 
@@ -534,7 +551,8 @@ Implante com suspeita ruptura: RM protocolo implantes; cirurgia plástica/mastol
 Seroma tardio: punção; citologia; CD30; avaliação mastológica/cirurgia plástica
 Abscesso: avaliação imediata; antibioticoterapia conforme assistente; drenagem guiada ou cirúrgica se indicada
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. ORDEM CANÔNICA DA CONCLUSÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -570,7 +588,8 @@ SUSPEITO:
 ALTAMENTE SUSPEITO:
 "Lesão de alta suspeição em [localização], categoria BI-RADS® 5. Recomenda-se biópsia percutânea prioritária e avaliação mastológica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. REGRAS DE PRIORIDADE POR NÍVEL
 ═══════════════════════════════════════════════════════════════
 
@@ -597,7 +616,8 @@ N4 / BI-RADS 5 ou complicação:
 - "Avaliação imediata" se abscesso/infecção grave
 - "Alta suspeição"
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. MODELO FINAL DE RECOMENDAÇÕES
 ═══════════════════════════════════════════════════════════════
 
@@ -613,7 +633,8 @@ Abscesso: "Recomenda-se avaliação mastológica imediata para tratamento clíni
 Implante: "Recomenda-se RM com protocolo para implantes e avaliação com cirurgia plástica/mastologia."
 Discordância: "Recomenda-se correlação clínico-radiológica e complementação pelo método mais adequado."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. OBSERVAÇÕES METODOLÓGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -642,7 +663,8 @@ BIÓPSIA:
 AXILA:
 "A avaliação linfonodal ultrassonográfica deve ser interpretada em conjunto com contexto clínico, vacinal, infeccioso, inflamatório e achados mamários."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_14 = `═══════════════════════════════════════════════════════════════
 14. MODELO DE SAÍDA DO LAUDO
 ═══════════════════════════════════════════════════════════════
 
@@ -696,7 +718,8 @@ RECOMENDAÇÕES:
 OBSERVAÇÕES METODOLÓGICAS:
 - Nota metodológica padrão (léxico BI-RADS, limites e complementação do método).
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_15 = `═══════════════════════════════════════════════════════════════
 15. INTEGRAÇÃO DE INFORMAÇÕES E REGRAS FINAIS
 ═══════════════════════════════════════════════════════════════
 
@@ -743,7 +766,8 @@ REGRAS FINAIS DE SEGURANÇA:
 
 14. Coerência entre seções → CONCLUSÃO não pode conter achados ausentes na ANÁLISE; RECOMENDAÇÕES devem corresponder aos achados descritos
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_16 = `═══════════════════════════════════════════════════════════════
 16. COBERTURA DE EXAMES
 ═══════════════════════════════════════════════════════════════
 
@@ -768,7 +792,8 @@ TIPOS DE EXAME COBERTOS:
 - Achados suspeitos BI-RADS 4/5
 - Lesão já comprovada BI-RADS 6
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_17 = `═══════════════════════════════════════════════════════════════
 17. OBSERVAÇÕES FINAIS E LIMITAÇÕES
 ═══════════════════════════════════════════════════════════════
 
@@ -796,4 +821,31 @@ CORRELAÇÃO CLÍNICA SEMPRE NECESSÁRIA:
 - História familiar
 - Alto risco genético
 
-FIM DO MÓDULO MASTOLOGIA — MAMA E AXILA — VERSÃO FINAL v13.0"`;
+FIM DO MÓDULO MASTOLOGIA — MAMA E AXILA — VERSÃO FINAL v13.0"\`;
+`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  prompt += sec_3;
+  prompt += sec_4;
+  prompt += sec_5;
+  if (fullText.includes('implante') || fullText.includes('prótese') || fullText.includes('silicone')) {
+    prompt += sec_6;
+  }
+  prompt += sec_7;
+  prompt += sec_8;
+  prompt += sec_9;
+  prompt += sec_10;
+  prompt += sec_11;
+  prompt += sec_12;
+  prompt += sec_13;
+  prompt += sec_14;
+  prompt += sec_15;
+  prompt += sec_16;
+  prompt += sec_17;
+
+  return prompt;
+}
+
+export const mastologiaPrompt = getMastologiaPrompt;

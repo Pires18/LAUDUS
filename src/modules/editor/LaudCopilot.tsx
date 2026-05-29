@@ -1111,15 +1111,24 @@ export function LaudCopilot({
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Campos do Exame (Texto Livre)
               </span>
-              {template?.customForm && (
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={handleResetForm}
-                  className="text-[9px] font-black text-slate-400 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors"
+                  onClick={onShowCalculators}
+                  className="flex items-center gap-1.5 text-[9px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-widest transition-all bg-brand-50 hover:bg-brand-100 px-2.5 py-1.5 rounded-lg border border-brand-200/50 shadow-sm active:scale-95"
                 >
-                  <RotateCcw size={10} />
-                  Restaurar Padrão
+                  <Calculator size={12} />
+                  Calculadoras
                 </button>
-              )}
+                {template?.customForm && (
+                  <button
+                    onClick={handleResetForm}
+                    className="text-[9px] font-black text-slate-400 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors"
+                  >
+                    <RotateCcw size={10} />
+                    Restaurar
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Texto Livre — única modalidade de preenchimento */}

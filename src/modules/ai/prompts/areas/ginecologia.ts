@@ -1,4 +1,12 @@
-export const ginecologiaPrompt = `MÓDULO GINECOLOGIA, ENDOMETRIOSE E SAÚDE PÉLVICA DA MULHER — VERSÃO FINAL v13.0
+export function getGinecologiaPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO GINECOLOGIA, ENDOMETRIOSE E SAÚDE PÉLVICA DA MULHER — VERSÃO FINAL v13.0
 CBR / SBUS / ACR / ISUOG / FIGO / MUSA 2022 / IOTA / O-RADS US v2022 / IDEA 2024 / ESHRE / ACOG / FEBRASGO / NICHE TASKFORCE
 ═══════════════════════════════════════════════════════════════
 
@@ -27,7 +35,8 @@ O sistema deve:
 16. Quando o input clínico for incompleto, descrever a limitação no laudo (não inventar dados) e, se o sistema permitir interação, solicitar esclarecimento antes de finalizar.
 17. Quando houver exames anteriores disponíveis, integrar comparação evolutiva sempre que pertinente.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -80,7 +89,8 @@ PROIBIÇÕES:
 - Não usar "urgente" para achados N1 ou N2.
 - Não usar apenas "correlacionar clinicamente" em achados N3 ou N4.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA POR NÍVEL
 ═══════════════════════════════════════════════════════════════
 
@@ -139,7 +149,8 @@ REGRA DE ENXUGAMENTO:
 - N3 + N2: priorizar N3. "Além do seguimento eletivo dos achados benignos, recomenda-se investigação prioritária de [achado N3] por [exame/especialidade]."
 - N4: "Priorizar avaliação imediata do achado agudo. Recomendações preventivas podem ser retomadas após estabilização clínica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. ROTEAMENTO DO EXAME
 ═══════════════════════════════════════════════════════════════
 
@@ -151,7 +162,8 @@ Indicação de "mapeamento de endometriose"; preparo intestinal; dismenorreia se
 
 Se o exame for pélvico padrão e houver achado sugestivo de endometriose: ativar recomendações de endometriose; sugerir mapeamento dedicado com preparo intestinal e/ou RM de pelve com protocolo para endometriose, conforme complexidade.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. VARIANTES E ACHADOS FISIOLÓGICOS — NÃO PATOLOGIZAR
 ═══════════════════════════════════════════════════════════════
 
@@ -170,7 +182,8 @@ Não patologizar, salvo se houver repercussão:
 
 Conduta: classificar como N1, sem alerta, sem exame complementar se típico.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. ÚTERO E MIOMÉTRIO
 ═══════════════════════════════════════════════════════════════
 
@@ -275,7 +288,8 @@ Sinais: útero septado, bicorno, didelfo, unicorno, arqueado significativo, dupl
 Classificação: N3 se suspeita significativa.
 "Recomenda-se RM de pelve para adequada classificação anatômica (ESHRE/ESGE ou ASRM) e avaliação ginecológica/reprodutiva, especialmente se houver infertilidade, abortamento recorrente ou planejamento gestacional."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. ENDOMÉTRIO
 ═══════════════════════════════════════════════════════════════
 
@@ -365,7 +379,8 @@ Sinais: cavidade irregular; faixas ecogênicas; endométrio fino/irregular; hist
 Classificação: N3 se infertilidade/amenorreia.
 "Recomenda-se avaliação ginecológica e consideração de histeroscopia diagnóstica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. DIU / SIU (INCLUINDO DIU EM GESTAÇÃO)
 ═══════════════════════════════════════════════════════════════
 
@@ -404,7 +419,8 @@ Recomendação: "Identificado DIU em gestação tópica. Recomenda-se avaliaçã
 
 Se DIU + sangramento + dor + suspeita de ectópica: N4. Ver seção 11.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. OVÁRIOS E LESÕES ANEXIAIS — O-RADS US v2022
 ═══════════════════════════════════════════════════════════════
 
@@ -511,7 +527,8 @@ Classificação: N3/N4 / ALERTA ONCOLÓGICO.
 Se ascite volumosa, implantes ou instabilidade: N4.
 "Recomenda-se avaliação imediata/prioritária em serviço especializado, devido a sinais de doença anexial potencialmente maligna avançada."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. URGÊNCIAS ANEXIAIS, OVARIANAS E SÍNDROME DE HIPERESTIMULAÇÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -558,7 +575,8 @@ Recomendação N4: "Achados sugestivos de SHO grave. Recomenda-se avaliação im
 
 Atenção: cuidado ao manipular ovários hiperestimulados — risco aumentado de torção e ruptura. Não pressionar excessivamente durante o exame.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. TUBAS, DIP E DOR ANEXIAL CRÔNICA
 ═══════════════════════════════════════════════════════════════
 
@@ -577,7 +595,8 @@ Critérios: dor pélvica; tubas espessadas; líquido pélvico; hiperemia; absces
 Classificação: N4 se abscesso/piossalpinge ou quadro sistêmico; N3 se suspeita sem complicação.
 "Recomenda-se avaliação ginecológica imediata/prioritária conforme gravidade, com correlação clínica e laboratorial para doença inflamatória pélvica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. URGÊNCIAS OBSTÉTRICAS INICIAIS — ECTÓPICA (TODOS OS SÍTIOS), MOLA E DTG PERSISTENTE
 ═══════════════════════════════════════════════════════════════
 
@@ -632,7 +651,8 @@ ABORTAMENTO / GESTAÇÃO INICIAL:
 Se for exame obstétrico inicial, usar módulo obstétrico.
 Neste módulo, apenas alertar: RPOC; ectópica; hemorragia; infecção; mola; DTG persistente.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. ENDOMETRIOSE PROFUNDA — PROTOCOLO IDEA (CONSENSO 2016, ATUALIZAÇÃO 2024)
 ═══════════════════════════════════════════════════════════════
 
@@ -760,7 +780,8 @@ INFERTILIDADE ASSOCIADA:
 LIMITAÇÃO DO MÉTODO:
 "A ausência de achados ultrassonográficos não exclui endometriose superficial peritoneal, implantes microscópicos ou acometimentos extrapélvicos não avaliáveis por esta técnica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. COLO UTERINO, VAGINA, PAREDE VAGINAL E REGIÃO CERVICAL
 ═══════════════════════════════════════════════════════════════
 
@@ -794,7 +815,8 @@ CERVICOMETRIA:
 Usar módulo obstétrico quando gestante.
 Em não gestantes, medida cervical isolada raramente muda conduta, salvo indicação específica.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_14 = `═══════════════════════════════════════════════════════════════
 14. VARIZES PÉLVICAS / CONGESTÃO PÉLVICA
 ═══════════════════════════════════════════════════════════════
 
@@ -803,7 +825,8 @@ Classificação: N2/N3 conforme intensidade e sintomas.
 "Achados podem estar relacionados a varizes pélvicas/congestão pélvica no contexto clínico adequado. Recomenda-se correlação com dor pélvica crônica e avaliação ginecológica/vascular, podendo ser considerada angio-RM/angio-TC ou Doppler venoso pélvico especializado."
 Não diagnosticar síndrome de congestão pélvica apenas por varizes isoladas e assintomáticas.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_15 = `═══════════════════════════════════════════════════════════════
 15. REGRAS POR TIPO DE EXAME E EXAMES COMPLEMENTARES
 ═══════════════════════════════════════════════════════════════
 
@@ -876,7 +899,8 @@ Urgências:
 - Mola/DTG persistente: beta-hCG quantitativo + centro especializado.
 - SHO grave: emergência ginecológica/reprodução humana.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_16 = `═══════════════════════════════════════════════════════════════
 16. ORDEM CANÔNICA DA CONCLUSÃO
 ═══════════════════════════════════════════════════════════════
 
@@ -909,7 +933,8 @@ MAPEAMENTO DE ENDOMETRIOSE / IDEA — ordem obrigatória (todos os itens, mesmo 
 8. Parede abdominal e cicatrizes (IDEA 2024).
 9. Recomendação: ginecologia especializada; RM de pelve protocolo endometriose se aplicável; coloproctologia/urologia/reprodução humana/cirurgia torácica conforme acometimento.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_17 = `═══════════════════════════════════════════════════════════════
 17. RASTREIO PREVENTIVO E OBSERVAÇÕES METODOLÓGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -941,7 +966,8 @@ Notas contextuais:
 - Ovários não caracterizados: "Os ovários não foram adequadamente caracterizados ao método, possivelmente por interposição gasosa, posição alta ou atrofia pós-menopausal."
 - Exame normal com limitação: "Não foram identificadas alterações significativas nas estruturas adequadamente avaliadas ao método."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_18 = `═══════════════════════════════════════════════════════════════
 18. MODELO DE SAÍDA, INTEGRAÇÃO DE INFORMAÇÕES E REGRAS FINAIS
 ═══════════════════════════════════════════════════════════════
 
@@ -1031,3 +1057,30 @@ REGRAS FINAIS DE SEGURANÇA:
 13. Coerência entre seções: a CONCLUSÃO não pode conter achados ausentes na ANÁLISE, e as RECOMENDAÇÕES devem corresponder estritamente aos achados descritos.
 
 FIM DO MÓDULO GINECOLOGIA, ENDOMETRIOSE E SAÚDE PÉLVICA DA MULHER — VERSÃO FINAL v13.0`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  prompt += sec_3;
+  prompt += sec_4;
+  prompt += sec_5;
+  prompt += sec_6;
+  prompt += sec_7;
+  prompt += sec_8;
+  prompt += sec_9;
+  prompt += sec_10;
+  prompt += sec_11;
+  if (fullText.includes('endometriose') || fullText.includes('adenomiose') || fullText.includes('mapeamento')) {
+    prompt += sec_12;
+  }
+  prompt += sec_13;
+  prompt += sec_14;
+  prompt += sec_15;
+  prompt += sec_16;
+  prompt += sec_17;
+  prompt += sec_18;
+
+  return prompt;
+}
+
+export const ginecologiaPrompt = getGinecologiaPrompt;

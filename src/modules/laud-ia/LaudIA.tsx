@@ -313,7 +313,10 @@ export function LaudIA() {
       showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
       return;
     }
-    const currentPrompt = localSettings.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] || '';
+    const defaultPrompt = typeof AREA_SPECIFIC_PROMPTS[selectedArea] === 'function'
+      ? (AREA_SPECIFIC_PROMPTS[selectedArea] as any)('', '', '')
+      : AREA_SPECIFIC_PROMPTS[selectedArea];
+    const currentPrompt = (localSettings.aiAreaPrompts?.[selectedArea] || defaultPrompt || '') as string;
     if (!currentPrompt.trim()) {
       showToast('Não há prompt de área para melhorar. Adicione instruções primeiro.', 'error');
       return;
@@ -404,7 +407,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
   function isAreaInherited(area: ExamArea): boolean {
     const val = localSettings.aiAreaPrompts?.[area];
     const adminVal = adminSettings?.aiAreaPrompts?.[area];
-    return !val || val.trim() === (adminVal || AREA_SPECIFIC_PROMPTS[area] || '').trim();
+    const defaultVal = typeof AREA_SPECIFIC_PROMPTS[area] === 'function'
+      ? (AREA_SPECIFIC_PROMPTS[area] as any)('', '', '')
+      : AREA_SPECIFIC_PROMPTS[area];
+    return !val || val.trim() === (adminVal || defaultVal || '').trim();
   }
 
   function InheritedBadge({ inherited }: { inherited: boolean }) {

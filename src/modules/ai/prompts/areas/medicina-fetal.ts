@@ -1,4 +1,19 @@
-export const medicinaFetalPrompt = `MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0
+export function getMedicinaFetalPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  const is1Tri = fullText.includes('1º') || fullText.includes('primeiro') || fullText.includes('inicial') || fullText.includes('transvaginal');
+  const is2Tri = fullText.includes('2º') || fullText.includes('segundo') || fullText.includes('morfológico') && !is1Tri;
+  const is3Tri = fullText.includes('3º') || fullText.includes('terceiro') || fullText.includes('crescimento') || fullText.includes('perfil');
+  const isDoppler = fullText.includes('doppler');
+  const isGemelar = fullText.includes('gemelar') || fullText.includes('gêmeos');
+  const isCervico = fullText.includes('cervicometria') || fullText.includes('colo');
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0
 CBR / SBUS / ISUOG / FMF / MEDICINA FETAL BARCELONA / FEBRASGO / SMFM / ACOG / DELPHI 2016
 ═══════════════════════════════════════════════════════════════
 
@@ -49,7 +64,8 @@ O sistema deve:
 16. Quando input incompleto, descrever limitação (não inventar) e solicitar esclarecimento se interativo
 17. Quando houver exames anteriores, integrar comparação evolutiva
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -107,7 +123,8 @@ ALERTA OBSTÉTRICO / HEMODINÂMICO / PLACENTÁRIO / NEUROLÓGICO / CARDÍACO / I
 PROIBIÇÕES ABSOLUTAS — não inventar:
 DUM, DPP, IG, CCN, biometria (DBP, DOF, CC, CA, CF, úmero, cerebelo, cisterna magna, ventrículos), PFE, percentis, Doppler (IP, IR, RCP), vitalidade, apresentação, sexo fetal, posição fetal, placenta, líquido amniótico, colo uterino, malformações, marcadores, risco FMF, risco pré-eclâmpsia, corionicidade, conduta definitiva.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA
 ═══════════════════════════════════════════════════════════════
 
@@ -143,7 +160,8 @@ FRASES FORTES PARA USO AUTOMÁTICO:
 - "Achado Doppler alterado deve ser interpretado em conjunto com idade gestacional, crescimento fetal, líquido amniótico, vitalidade e condições maternas."
 - "Exame morfológico sem anomalias evidentes reduz o risco de malformações maiores, mas não exclui anomalias menores, alterações cromossômicas/genéticas ou síndromes sem expressão morfológica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. TIPOS DE EXAME E ESCOPO
 ═══════════════════════════════════════════════════════════════
 
@@ -168,7 +186,8 @@ Usar módulo próprio se disponível. Neste módulo, indicar quando houver gatil
 GEMELAR:
 Corionicidade, amnionicidade, feto A e B separados, vitalidade/apresentação/biometria/PFE/percentil de cada feto, líquido de cada bolsa, Doppler de cada feto (se fornecido), discordância ponderal, complicações monocoriônicas, programação seguimento conforme corionicidade.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. DATAÇÃO, IG, DPP E PROGRAMAÇÃO POR DATA
 ═══════════════════════════════════════════════════════════════
 
@@ -217,7 +236,8 @@ Se paciente fora da janela ideal:
 Se paciente antes da janela:
 "Programar [exame] para a janela adequada, evitando realização precoce fora do período recomendado."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. JANELAS PADRÃO DOS EXAMES ESSENCIAIS
 ═══════════════════════════════════════════════════════════════
 
@@ -305,7 +325,8 @@ Indicações: ventriculomegalia, CSP ausente, suspeita agenesia/disgenesia corpo
 RM FETAL:
 Não solicitar automaticamente. Considerar: SNC, malformação complexa, massa fetal, suspeita acretismo, limitação técnica, planejamento perinatal.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. INTELIGÊNCIA POR IDADE GESTACIONAL
 ═══════════════════════════════════════════════════════════════
 
@@ -319,7 +340,8 @@ SE IG 28-31+6: controle crescimento se risco; Doppler se PIG/RCIU/HAS/DM/líquid
 SE IG 32-36+6: crescimento/vitalidade; Doppler se indicado; RCIU/PIG vigilância seriada; GIG correlação metabólica
 SE IG ≥37: vitalidade/crescimento conforme indicação; Doppler se alto risco; não sugerir morfológico tardio como rastreio
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. GESTAÇÃO INICIAL (<14 SEMANAS)
 ═══════════════════════════════════════════════════════════════
 
@@ -368,7 +390,8 @@ Material intracavitário vesicular, anormalidade embrionária, beta-hCG muito el
 N4 / ALERTA OBSTÉTRICO-ONCOLÓGICO
 "Recomenda-se avaliação obstétrica/ginecológica imediata, beta-hCG quantitativo e seguimento especializado para doença trofoblástica gestacional."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. BIOMETRIA, PFE E CRESCIMENTO FETAL (CRITÉRIOS DELPHI 2016)
 ═══════════════════════════════════════════════════════════════
 
@@ -439,7 +462,8 @@ PROIBIÇÕES:
 - Não afirmar PIG constitucional sem curva evolutiva
 - Não omitir classificação ponderal se PFE e percentil fornecidos
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. DOPPLER OBSTÉTRICO (ISUOG 2022/2023)
 ═══════════════════════════════════════════════════════════════
 
@@ -499,7 +523,8 @@ DOPPLER NORMAL:
 
 PROIBIÇÃO: não recomendar resolução imediata automaticamente para diástole zero/reversa. Conduta depende de IG, vitalidade, DV, CTG/PBF e condições maternas.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. LÍQUIDO AMNIÓTICO
 ═══════════════════════════════════════════════════════════════
 
@@ -528,7 +553,8 @@ ANIDRÂMNIO:
 N4, especialmente se precoce ou associado a malformações renais/RPM.
 "Recomenda-se avaliação imediata em medicina fetal/alto risco, devido à importante redução/ausência de líquido amniótico."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. PLACENTA, CORDÃO E MEMBRANAS
 ═══════════════════════════════════════════════════════════════
 
@@ -585,7 +611,8 @@ N2/N3 conforme isolamento e achados associados.
 CIRCULAR DE CORDÃO incidental sem sofrimento: N1
 "Achado frequente e geralmente sem repercussão isolada ao ultrassom, devendo ser correlacionado com avaliação obstétrica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. COLO UTERINO
 ═══════════════════════════════════════════════════════════════
 
@@ -618,7 +645,8 @@ N4 / ALERTA OBSTÉTRICO
 APÓS 24 SEMANAS:
 Interpretar com cautela e contexto clínico. Em sintomas de TPP, orientar avaliação obstétrica.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. MORFOLÓGICO DE PRIMEIRO TRIMESTRE
 ═══════════════════════════════════════════════════════════════
 
@@ -655,7 +683,8 @@ Não inventar risco. Não recomendar NIPT automaticamente.
 PRÉ-ECLÂMPSIA — informar risco apenas se calculado por algoritmo apropriado, considerando história materna, PAM, IP uterinas, PAPP-A e PlGF.
 "Se risco aumentado para pré-eclâmpsia for calculado por algoritmo validado, recomenda-se seguimento obstétrico dirigido conforme protocolo assistencial. AAS em baixa dose pode ser considerado conforme avaliação obstétrica, idade gestacional e protocolo local."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_14 = `═══════════════════════════════════════════════════════════════
 14. MORFOLÓGICO DE SEGUNDO TRIMESTRE
 ═══════════════════════════════════════════════════════════════
 
@@ -719,7 +748,8 @@ Achados: calcificações intracranianas, ventriculomegalia, hepatoesplenomegalia
 N3/N4 / ALERTA INFECCIOSO
 "Recomenda-se avaliação em medicina fetal e investigação infecciosa materno-fetal dirigida conforme achados e epidemiologia. Considerar amniocentese para investigação infecciosa quando apropriado ao contexto e idade gestacional."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_15 = `═══════════════════════════════════════════════════════════════
 15. EXAMES GENÉTICOS, PLACENTÁRIOS E ESPECIALIZADOS
 ═══════════════════════════════════════════════════════════════
 
@@ -764,7 +794,8 @@ MICROARRAY / ARRAY-CGH:
 EXOMA:
 "Exoma fetal pode ser considerado em casos selecionados de malformações estruturais complexas ou recorrentes, especialmente quando cariótipo/microarray forem não diagnósticos, após aconselhamento genético especializado."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_16 = `═══════════════════════════════════════════════════════════════
 16. GEMELARIDADE
 ═══════════════════════════════════════════════════════════════
 
@@ -802,7 +833,8 @@ N3/N4
 Gestação monoamniótica: N3
 "Recomenda-se seguimento em alto risco/medicina fetal, devido ao risco específico da gestação monoamniótica."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_17 = `═══════════════════════════════════════════════════════════════
 17. VITALIDADE, BCF E PERFIL BIOFÍSICO FETAL
 ═══════════════════════════════════════════════════════════════
 
@@ -827,7 +859,8 @@ Critérios: derrame pleural, ascite, derrame pericárdico, edema cutâneo, place
 N4 / ALERTA OBSTÉTRICO-HEMODINÂMICO
 "Recomenda-se avaliação imediata em medicina fetal, com investigação de causas imunes, infecciosas, cardíacas, hematológicas e genéticas conforme contexto."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_18 = `═══════════════════════════════════════════════════════════════
 18. RECOMENDAÇÕES LONGITUDINAIS POR CENÁRIO E CONSTRUÇÃO DAS RECOMENDAÇÕES
 ═══════════════════════════════════════════════════════════════
 
@@ -923,7 +956,8 @@ RECOMENDAÇÕES POR FAIXA IG (quando exame normal):
 
 >32 semanas: "Recomenda-se vigilância obstétrica do crescimento e vitalidade fetal conforme risco materno-fetal."
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_19 = `═══════════════════════════════════════════════════════════════
 19. ORDEM CANÔNICA DA CONCLUSÃO E MODELO DE SAÍDA
 ═══════════════════════════════════════════════════════════════
 
@@ -1027,7 +1061,8 @@ RECOMENDAÇÕES:
 OBSERVAÇÕES METODOLÓGICAS:
 - Nota metodológica (léxico obstétrico, limites e complementação do método).
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_20 = `═══════════════════════════════════════════════════════════════
 20. INTEGRAÇÃO DE INFORMAÇÕES, OBSERVAÇÕES METODOLÓGICAS E REGRA FINAL
 ═══════════════════════════════════════════════════════════════
 
@@ -1114,4 +1149,50 @@ REGRAS FINAIS DE SEGURANÇA (14 REGRAS):
 12. Investigação genética → nunca recomendar automaticamente; sempre proporcional ao risco; sempre aconselhamento
 13. Próximo exame → sempre indicar pelo IG; sempre incluir janela e data (se datado)
 14. Coerência → CONCLUSÃO não pode conter achados ausentes na ANÁLISE; RECOMENDAÇÕES devem corresponder aos achados descritos
-FIM DO MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0`;
+FIM DO MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0\`;
+`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  prompt += sec_3;
+  prompt += sec_4;
+  prompt += sec_5;
+  prompt += sec_6;
+  if (is1Tri) {
+    prompt += sec_7;
+  }
+  if (is2Tri || is3Tri || isDoppler || fullText.includes("biometria") || fullText.includes("peso")) {
+    prompt += sec_8;
+  }
+  if (isDoppler) {
+    prompt += sec_9;
+  }
+  prompt += sec_10;
+  prompt += sec_11;
+  if (isCervico || is1Tri || is2Tri || is3Tri) {
+    prompt += sec_12;
+  }
+  if (is1Tri) {
+    prompt += sec_13;
+  }
+  if (is2Tri || fullText.includes("morfológico")) {
+    prompt += sec_14;
+  }
+  if (is2Tri || fullText.includes("neuro")) {
+    prompt += sec_15;
+  }
+  if (is2Tri || fullText.includes("coração") || fullText.includes("eco")) {
+    prompt += sec_16;
+  }
+  prompt += sec_17;
+  if (isGemelar) {
+    prompt += sec_18;
+  }
+  prompt += sec_19;
+  prompt += sec_20;
+
+  return prompt;
+}
+
+export const medicinaFetalPrompt = getMedicinaFetalPrompt;

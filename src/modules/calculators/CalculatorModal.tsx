@@ -12,10 +12,11 @@ interface Props {
   area?: ExamArea;
   onClose: () => void;
   onSendToCopilot: (result: string) => void;
+  onAppendToForm?: (text: string) => void;
   examDateMs?: number;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: Props) {
+export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs }: Props) {
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
   const [calcResult, setCalcResult] = useState<any>(null);
   const [showAll, setShowAll] = useState(false);
@@ -65,9 +66,16 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
   };
 
   const handleCopyForm = async () => {
-    await navigator.clipboard.writeText(buildFormMessage());
-    setCopiedForm(true);
-    setTimeout(() => setCopiedForm(false), 2500);
+    const text = buildFormMessage();
+    if (onAppendToForm) {
+      onAppendToForm(text);
+      setCopiedForm(true);
+      setTimeout(() => setCopiedForm(false), 2500);
+    } else {
+      await navigator.clipboard.writeText(text);
+      setCopiedForm(true);
+      setTimeout(() => setCopiedForm(false), 2500);
+    }
   };
 
   const handleCopyTechnical = async () => {
@@ -112,10 +120,10 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
-                  <h2 className="text-base sm:text-2xl font-black text-white tracking-tight uppercase italic">Calculadoras</h2>
-                  <span className="bg-brand-500/20 text-brand-300 text-[8px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-lg border border-brand-500/30 uppercase tracking-widest">v2.1</span>
+                  <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight uppercase">Módulos Clínicos</h2>
+                  <span className="bg-brand-500/20 text-brand-300 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-lg border border-brand-500/30 uppercase tracking-widest">v2.5 LAUD.IA</span>
                 </div>
-                <p className="hidden sm:block text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em]">Módulos de Suporte à Decisão Diagnóstica</p>
+                <p className="hidden sm:block text-[11px] text-slate-300 font-medium tracking-[0.2em] opacity-80">Assistência Computacional e Rastreamento</p>
               </div>
             </div>
 
@@ -374,13 +382,13 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                       >
                         {copiedForm ? (
                           <>
-                            <CheckCircle2 size={13} className="text-emerald-600" />
-                            Copiado!
+                            <CheckCircle2 size={13} className="text-emerald-600 animate-in zoom-in" />
+                            Inserido!
                           </>
                         ) : (
                           <>
-                            <ClipboardPaste size={13} />
-                            Para Formulário
+                            <ClipboardPaste size={13} className="group-hover:scale-110 transition-transform" />
+                            {onAppendToForm ? "Inserir no Form" : "Copiar para Form"}
                           </>
                         )}
                       </button>
@@ -438,8 +446,8 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, examDateMs }: 
                     </button>
 
                     {/* Hint */}
-                    <p className="text-center text-[8px] font-bold text-slate-400 uppercase tracking-wider">
-                      "Para Formulário" copia texto simples · "Técnico" copia com metadados
+                    <p className="text-center text-[9px] font-semibold text-slate-400 opacity-80 uppercase tracking-wider">
+                      O Copiloto ajusta a máscara e o formulário preenche campos textuais
                     </p>
                   </div>
                 </div>

@@ -1,4 +1,12 @@
-export const medicinaInternaPrompt = `MÓDULO ABDOME E MEDICINA INTERNA — VERSÃO FINAL v13.0
+export function getMedicinaInternaPrompt(templateName: string, clinicalIndication: string, anamnesis: string): string {
+  const tName = (templateName || '').toLowerCase();
+  const ind = (clinicalIndication || '').toLowerCase();
+  const ana = (anamnesis || '').toLowerCase();
+  const fullText = tName + ' ' + ind + ' ' + ana;
+
+  let prompt = ``;
+
+  const sec_base = `MÓDULO ABDOME E MEDICINA INTERNA — VERSÃO FINAL v13.0
 CBR / SBUS / ACR / SRU / AASLD / SBH / SBU / AUA / SVS / ESVS / SAR
 ═══════════════════════════════════════════════════════════════
 
@@ -22,7 +30,8 @@ O sistema deve:
 11. Quando o input clínico for incompleto, descrever a limitação no laudo (não inventar dados) e, se o sistema permitir interação, solicitar esclarecimento antes de finalizar.
 12. Quando houver exames anteriores disponíveis, integrar comparação evolutiva (estabilidade, crescimento, redução) sempre que pertinente.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_1 = `═══════════════════════════════════════════════════════════════
 1. POLÍTICAS GLOBAIS DE FORMATAÇÃO E LINGUAGEM
 ═══════════════════════════════════════════════════════════════
 
@@ -63,7 +72,8 @@ PROIBIÇÕES:
 - Não usar apenas “correlacionar clinicamente” em achados N3 ou N4.
 - Não gerar recomendações preventivas extensas quando houver achado N4.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_2 = `═══════════════════════════════════════════════════════════════
 2. NÍVEIS DE IMPORTÂNCIA CLÍNICA E FRASEOLOGIA POR NÍVEL
 ═══════════════════════════════════════════════════════════════
 
@@ -147,7 +157,8 @@ REGRA DE ENXUGAMENTO:
 - N4 presente: não misturar com prevenção.
   “Priorizar avaliação imediata do achado agudo. Recomendações preventivas podem ser retomadas após estabilização clínica.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_3 = `═══════════════════════════════════════════════════════════════
 3. VARIANTES ANATÔMICAS E ACHADOS NÃO PATOLÓGICOS
 ═══════════════════════════════════════════════════════════════
 
@@ -171,7 +182,8 @@ Conduta:
 - Classificar como N1.
 - Não gerar alerta, salvo obstrução, massa associada, sintomas relevantes ou dúvida diagnóstica.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_4 = `═══════════════════════════════════════════════════════════════
 4. FÍGADO
 ═══════════════════════════════════════════════════════════════
 
@@ -278,7 +290,8 @@ Artéria hepática:
 - IR < 0,55 ou alteração importante em transplante hepático: N3.
 Recomendação: “Recomenda-se avaliação especializada e correlação com contexto clínico, especialmente em pacientes transplantados ou com suspeita vascular.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_5 = `═══════════════════════════════════════════════════════════════
 5. VESÍCULA BILIAR E VIAS BILIARES
 ═══════════════════════════════════════════════════════════════
 
@@ -387,7 +400,8 @@ AEROBILIA:
 - N3 se sem história e com sinais infecciosos/obstrutivos.
 Recomendação: “Correlacionar com histórico cirúrgico/endoscópico. Na ausência de causa conhecida ou na presença de febre/dor/icterícia, recomenda-se investigação prioritária.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_6 = `═══════════════════════════════════════════════════════════════
 6. PÂNCREAS
 ═══════════════════════════════════════════════════════════════
 
@@ -423,7 +437,8 @@ Recomendação: “Recomenda-se complementação por colangio-RM ou TC com proto
 LESÃO FOCAL PANCREÁTICA: N3 / ALERTA ONCOLÓGICO.
 Recomendação: “Recomenda-se caracterização prioritária por RM/colangio-RM ou TC com protocolo pancreático, devido à limitação da ultrassonografia na avaliação de lesões pancreáticas focais.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_7 = `═══════════════════════════════════════════════════════════════
 7. BAÇO
 ═══════════════════════════════════════════════════════════════
 
@@ -459,7 +474,8 @@ Recomendação: “Recomenda-se avaliação clínica prioritária, com investiga
 TROMBOSE ESPLÊNICA: N4 se aguda/sintomática.
 Recomendação: “Recomenda-se avaliação imediata e complementação por método seccional contrastado, devido a achado vascular potencialmente significativo.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_8 = `═══════════════════════════════════════════════════════════════
 8. RINS E VIAS URINÁRIAS
 ═══════════════════════════════════════════════════════════════
 
@@ -528,7 +544,8 @@ DOPPLER RENAL (usar apenas quando fornecido):
 - IR > 0,70: N2/N3 conforme contexto. “Recomenda-se correlação com função renal, pressão arterial, proteinúria e avaliação nefrológica.”
 - Ausência de fluxo renal ou suspeita de trombose: N4 / ALERTA VASCULAR. “Recomenda-se avaliação imediata e complementação por método vascular/seccional.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_9 = `═══════════════════════════════════════════════════════════════
 9. BEXIGA
 ═══════════════════════════════════════════════════════════════
 
@@ -564,7 +581,8 @@ Recomendação: “Recomenda-se avaliação urológica prioritária e cistoscopi
 
 CATETER VESICAL: descrever posição. Sem alerta se adequadamente posicionado.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_10 = `═══════════════════════════════════════════════════════════════
 10. PRÓSTATA, HPB E RESÍDUO PÓS-MICCIONAL
 ═══════════════════════════════════════════════════════════════
 
@@ -612,7 +630,8 @@ Recomendação: “Cisto de utrículo prostático, geralmente incidental. Recome
 Nódulo prostático suspeito: N3 / ALERTA ONCOLÓGICO.
 Recomendação: “Recomenda-se avaliação urológica prioritária, com PSA, exame clínico e RM multiparamétrica da próstata para estratificação PI-RADS.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_11 = `═══════════════════════════════════════════════════════════════
 11. AORTA ABDOMINAL E VASOS RETROPERITONEAIS
 ═══════════════════════════════════════════════════════════════
 
@@ -646,7 +665,8 @@ ATEROMATOSE AÓRTICA:
 - N3 se associada a estenose significativa, trombo ou aneurisma.
 Recomendação: “Recomenda-se correlação com fatores de risco cardiovascular, controle clínico de pressão arterial, perfil lipídico, diabetes e tabagismo, conforme médico assistente.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_12 = `═══════════════════════════════════════════════════════════════
 12. ADRENAIS (INCIDENTALOMAS)
 ═══════════════════════════════════════════════════════════════
 
@@ -674,7 +694,8 @@ Hemorragia adrenal aguda (paciente em sepse, anticoagulação, trauma; lesão he
 Classificação: N4 / ALERTA HEMORRÁGICO.
 Recomendação: “Recomenda-se avaliação imediata e complementação por TC com contraste, com correlação clínica/laboratorial.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_13 = `═══════════════════════════════════════════════════════════════
 13. APÊNDICE, ALÇAS E LINFONODOS ABDOMINAIS
 ═══════════════════════════════════════════════════════════════
 
@@ -714,7 +735,8 @@ Linfonodos mesentéricos em adulto com perda ponderal, febre prolongada, sudores
 Classificação: N3.
 Recomendação: “Recomenda-se avaliação clínica prioritária e complementação por TC/RM com contraste para caracterização.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_14 = `═══════════════════════════════════════════════════════════════
 14. PAREDE ABDOMINAL, HÉRNIAS E PARTES MOLES
 ═══════════════════════════════════════════════════════════════
 
@@ -743,7 +765,8 @@ Recomendação: “Recomenda-se avaliação clínica/cirúrgica, com prioridade 
 MASSA DE PARTES MOLES ATÍPICA (profunda à fáscia; > 5,00 cm; crescimento rápido; vascularização interna; margens infiltrativas; heterogênea): N3 / ALERTA ONCOLÓGICO.
 Recomendação: “Recomenda-se caracterização por RM de partes moles.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_15 = `═══════════════════════════════════════════════════════════════
 15. CAVIDADE ABDOMINAL E RETROPERITÔNIO
 ═══════════════════════════════════════════════════════════════
 
@@ -763,7 +786,8 @@ Recomendação: “Recomenda-se avaliação imediata em emergência e complement
 RETROPERITÔNIO LIMITADO:
 Nota: “A avaliação retroperitoneal foi parcialmente limitada por interposição gasosa.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_16 = `═══════════════════════════════════════════════════════════════
 16. REGRAS ESPECÍFICAS POR TIPO DE EXAME E EXAMES COMPLEMENTARES
 ═══════════════════════════════════════════════════════════════
 
@@ -838,7 +862,8 @@ Parede/partes moles:
 - Massa atípica: RM de partes moles.
 - Hérnia complicada: avaliação cirúrgica; TC se dúvida anatômica.
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_17 = `═══════════════════════════════════════════════════════════════
 17. ORDEM CANÔNICA, RASTREIO PREVENTIVO E OBSERVAÇÕES METODOLÓGICAS
 ═══════════════════════════════════════════════════════════════
 
@@ -885,7 +910,8 @@ NOTAS CONTEXTUAIS:
 - Retroperitônio limitado: “A avaliação retroperitoneal foi parcialmente limitada por interposição gasosa.”
 - Exame sem alterações com limitação: “Não foram identificadas alterações significativas nas estruturas adequadamente avaliadas ao método.”
 
-═══════════════════════════════════════════════════════════════
+`;
+  const sec_18 = `═══════════════════════════════════════════════════════════════
 18. MODELO DE SAÍDA, REGRAS DE INTEGRAÇÃO E SEGURANÇA FINAL
 ═══════════════════════════════════════════════════════════════
 
@@ -979,4 +1005,52 @@ REGRAS FINAIS DE SEGURANÇA:
 
 8. Coerência entre seções: a CONCLUSÃO não pode conter achados ausentes na ANÁLISE, e as RECOMENDAÇÕES devem corresponder estritamente aos achados descritos.
 
-FIM DO MÓDULO ABDOME E MEDICINA INTERNA — VERSÃO FINAL v13.0`;
+FIM DO MÓDULO ABDOME E MEDICINA INTERNA — VERSÃO FINAL v13.0\`;
+`;
+
+  prompt += sec_base;
+  prompt += sec_1;
+  prompt += sec_2;
+  prompt += sec_3;
+  if (fullText.includes('fígado') || fullText.includes('vesícula') || fullText.includes('pâncreas') || fullText.includes('baço') || fullText.includes('biliar') || fullText.includes('superior') || fullText.includes('total')) {
+    prompt += sec_4;
+  }
+  if (fullText.includes('fígado') || fullText.includes('vesícula') || fullText.includes('pâncreas') || fullText.includes('baço') || fullText.includes('biliar') || fullText.includes('superior') || fullText.includes('total')) {
+    prompt += sec_5;
+  }
+  if (fullText.includes('fígado') || fullText.includes('vesícula') || fullText.includes('pâncreas') || fullText.includes('baço') || fullText.includes('biliar') || fullText.includes('superior') || fullText.includes('total')) {
+    prompt += sec_6;
+  }
+  if (fullText.includes('fígado') || fullText.includes('vesícula') || fullText.includes('pâncreas') || fullText.includes('baço') || fullText.includes('biliar') || fullText.includes('superior') || fullText.includes('total')) {
+    prompt += sec_7;
+  }
+  if (fullText.includes('urinária') || fullText.includes('bexiga') || fullText.includes('rim') || fullText.includes('rins') || fullText.includes('total') || fullText.includes('aparelho urinário')) {
+    prompt += sec_8;
+  }
+  if (fullText.includes('urinária') || fullText.includes('bexiga') || fullText.includes('rim') || fullText.includes('rins') || fullText.includes('total') || fullText.includes('aparelho urinário')) {
+    prompt += sec_9;
+  }
+  if (fullText.includes('próstata') || fullText.includes('prostática') || fullText.includes('hpb')) {
+    prompt += sec_10;
+  }
+  if (fullText.includes('aorta') || fullText.includes('retroperitônio') || fullText.includes('adrenal') || fullText.includes('total')) {
+    prompt += sec_11;
+  }
+  prompt += sec_12;
+  if (fullText.includes('axila') || fullText.includes('linfonodo') || fullText.includes('mama')) {
+    prompt += sec_13;
+  }
+  if (fullText.includes('parede') || fullText.includes('hérnia') || fullText.includes('inguinal')) {
+    prompt += sec_14;
+  }
+  if (fullText.includes('aorta') || fullText.includes('retroperitônio') || fullText.includes('adrenal') || fullText.includes('total')) {
+    prompt += sec_15;
+  }
+  prompt += sec_16;
+  prompt += sec_17;
+  prompt += sec_18;
+
+  return prompt;
+}
+
+export const medicinaInternaPrompt = getMedicinaInternaPrompt;

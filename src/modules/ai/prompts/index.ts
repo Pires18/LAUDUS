@@ -11,7 +11,9 @@ import { pediatriaPrompt } from './areas/pediatria';
 import { procedimentosPrompt } from './areas/procedimentos';
 import { reumatologicoPrompt } from './areas/reumatologico';
 
-export const AREA_SPECIFIC_PROMPTS: Record<string, string> = {
+export type PromptGenerator = string | ((templateName: string, clinicalIndication: string, anamnesis: string) => string);
+
+export const AREA_SPECIFIC_PROMPTS: Record<string, PromptGenerator> = {
   'medicina-interna': medicinaInternaPrompt,
   'ginecologia': ginecologiaPrompt,
   'mastologia': mastologiaPrompt,

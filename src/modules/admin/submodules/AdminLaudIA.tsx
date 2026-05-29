@@ -288,7 +288,10 @@ export function AdminLaudIA() {
       showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
       return;
     }
-    const currentPrompt = localSettings.aiAreaPrompts?.[selectedArea] || AREA_SPECIFIC_PROMPTS[selectedArea] || '';
+    const defaultPrompt = typeof AREA_SPECIFIC_PROMPTS[selectedArea] === 'function'
+      ? (AREA_SPECIFIC_PROMPTS[selectedArea] as any)('', '', '')
+      : AREA_SPECIFIC_PROMPTS[selectedArea];
+    const currentPrompt = (localSettings.aiAreaPrompts?.[selectedArea] || defaultPrompt || '') as string;
     if (!currentPrompt.trim()) {
       showToast('Não há prompt de área para melhorar. Adicione instruções primeiro.', 'error');
       return;
@@ -781,7 +784,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     glowColor="violet"
                     placeholder={`Digite as diretrizes clínicas para a especialidade ${selectedArea}...`}
                     onRestore={() => {
-                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: AREA_SPECIFIC_PROMPTS[selectedArea] };
+                      const defaultVal = typeof AREA_SPECIFIC_PROMPTS[selectedArea] === 'function'
+                        ? (AREA_SPECIFIC_PROMPTS[selectedArea] as any)('', '', '')
+                        : AREA_SPECIFIC_PROMPTS[selectedArea];
+                      const updated = { ...localSettings.aiAreaPrompts, [selectedArea]: defaultVal as string };
                       setLocalSettings({ ...localSettings, aiAreaPrompts: updated });
                       showToast(`Protocolo de ${selectedArea} restaurado`, 'info');
                     }}

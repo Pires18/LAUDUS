@@ -1496,6 +1496,12 @@ export function ExamEditor({ examId }: Props) {
               setShowCalculators(false);
               if (!showCopilot) setShowCopilot(true);
             }}
+            onAppendToForm={(text) => {
+              const currentForm = exam.customFormValue || '';
+              const newForm = currentForm ? currentForm + '\n\n' + text : text;
+              updateItem('exams', exam.id, { customFormValue: newForm });
+              showToast('Inserido no Formulário com sucesso!', 'success');
+            }}
           />
         )}
       </AnimatePresence>
