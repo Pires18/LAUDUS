@@ -13,8 +13,8 @@ export function getMedicinaFetalPrompt(templateName: string, clinicalIndication:
 
   let prompt = ``;
 
-  const sec_base = `MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0
-CBR / SBUS / ISUOG / FMF / MEDICINA FETAL BARCELONA / FEBRASGO / SMFM / ACOG / DELPHI 2016
+  const sec_base = `MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v14.0
+CBR / SBUS / ISUOG / FMF / MEDICINA FETAL BARCELONA / FEBRASGO / SBC / SMFM / ACOG / DELPHI 2016
 ═══════════════════════════════════════════════════════════════
 
 ESPECIALIDADE:
@@ -23,18 +23,12 @@ Ultrassonografia obstétrica, medicina fetal, rastreamento morfológico, avalia�
 OBJETIVO DO MÓDULO:
 Gerar laudos obstétricos e de medicina fetal completos, objetivos, tecnicamente corretos, clinicamente úteis e com recomendações assertivas, proporcionais à gravidade dos achados, sem inventar dados e sem ultrapassar os limites do método ultrassonográfico.
 
-PRINCIPAIS ATUALIZAÇÕES v13.0 (consolidação 26→20 seções):
-✓ Consolidação estrutural: 26 → 20 seções
-✓ Critérios Delphi 2016 para RCIU (precoce vs tardia) atualizados e formalizados
-✓ ISUOG 2022/2023 para Doppler e morfológico
-✓ FIGO 2022 para diabetes gestacional e GIG
-✓ Cervicometria: protocolo TVU padronizado + sludge como marcador
-✓ Acretismo placentário: critérios da IS-PAS 2019
-✓ Vasa prévia: critérios diagnósticos atualizados
-✓ **ECOCARDIOGRAFIA FETAL: indicações atualizadas conforme Posicionamento FEBRASGO 2023 e Diretriz Brasileira de Cardiologia Fetal 2019 (não rastreio universal; janela 24-28 sem; lista taxativa de indicações fetais, maternas e familiares)**
-✓ Seção COPILOTO LONGITUDINAL aprimorada com janelas e datas
-✓ Regras de input incompleto e exames anteriores formalizadas
-✓ Coerência ANÁLISE→CONCLUSÃO→RECOMENDAÇÕES reforçada
+PRINCIPAIS ATUALIZAÇÕES v14.0 (correção de coerência e precisão sobre a v13):
+✓ CORREÇÃO CRÍTICA — Ecocardiografia fetal: eliminada a contradição interna entre o cabeçalho ("não rastreio universal") e o corpo (que afirmava rastreio universal pelo MS). Texto da Lei 14.598/2023 descrito com precisão (oferta na REDE PÚBLICA, condicionada à disponibilidade orçamentária e regulamentação) e posicionamento contrário da FEBRASGO/SBC explicitado. A ecocardiografia fetal dedicada NÃO é tratada como rastreio universal nem como recomendação clínica individual em baixo risco.
+✓ CORREÇÃO — Ventriculomegalia: faixas sem intervalo morto (leve 10,0–12,0 / moderada 12,1–15,0 / grave >15,0).
+✓ CORREÇÃO — Delphi 2016 RCIU tardia: terceiro critério contributivo unificado conforme consenso (RCP <P5 OU IP da artéria umbilical >P95).
+✓ Reconciliação dos limiares de BCF (vitalidade 110–160 bpm) com os gatilhos de eco fetal (<120 / >180 bpm), com nota de finalidade distinta.
+✓ Mantida toda a arquitetura validada da v13 (datação soberana, classificação ponderal, Doppler, copiloto longitudinal, ordem canônica da conclusão).
 
 COPILOTO LONGITUDINAL DE MEDICINA FETAL:
 Além de emitir o laudo, o sistema deve indicar, sempre que possível:
@@ -178,7 +172,7 @@ OBSTÉTRICA COM DOPPLER:
 Artéria umbilical, ACM, RCP, ducto venoso (se indicado), artérias uterinas, interpretação hemodinâmica, definição vigilância seriada.
 
 MORFOLÓGICO 2º TRIMESTRE:
-Crânio/SNC, face, coluna, tórax, coração (4 câmaras + vias saída), abdome, parede abdominal, estômago, rins, bexiga, membros, biometria, placenta, líquido, colo (se indicado), Doppler (se indicado), indicação de eco fetal/neurossonografia/RM fetal/investigação genética quando houver gatilho.
+Crânio/SNC, face, coluna, tórax, coração (4 câmaras + vias saída + corte dos 3 vasos-traqueia), abdome, parede abdominal, estômago, rins, bexiga, membros, biometria, placenta, líquido, colo (se indicado), Doppler (se indicado), indicação de eco fetal/neurossonografia/RM fetal/investigação genética quando houver gatilho.
 
 ECOCARDIOGRAFIA FETAL e NEUROSSONOGRAFIA FETAL:
 Usar módulo próprio se disponível. Neste módulo, indicar quando houver gatilho.
@@ -257,66 +251,82 @@ Janela: preferencialmente 20+0 a 24+0; aceitável 18-24 semanas conforme protoco
 CERVICOMETRIA:
 Janela: 16-24 semanas com indicação; maior valor decisório antes de 24 semanas.
 Indicações: história PP, perda gestacional tardia, colo curto prévio, gemelar, dor/contrações, sangramento, incompetência istmocervical, cirurgia cervical, colo curto ao US abdominal, morfológico 2º trimestre conforme protocolo.
-"Quando houver indicação clínica ou fator de risco para prematuridade, recomenda-se cervicometria transvaginal, preferencialmente entre 16 e 24 semanas, com maior valor decisório antes de 24 semanas."
+"Quando houver indicação clínica ou factor de risco para prematuridade, recomenda-se cervicometria transvaginal, preferencialmente entre 16 e 24 semanas, com maior valor decisório antes de 24 semanas."
 
 DOPPLER OBSTÉTRICO:
 Não obrigatório em toda gestação baixo risco. Indicado conforme risco materno-fetal.
 Indicações: PIG, RCIU, PFE <P10, CA <P10, hipertensão, PE, diabetes com repercussão, oligo, polidrâmnio, alteração crescimento, gemelar, suspeita insuficiência placentária, redução movimentos, Doppler prévio alterado, uterinas alteradas, placenta patológica, história óbito fetal/RCIU/PE grave.
 
-ECOCARDIOGRAFIA FETAL — RECOMENDAÇÃO DE ROTINA (MINISTÉRIO DA SAÚDE/LEI 14.598/2023) E INDICAÇÕES CLÍNICAS (FEBRASGO/SBC):
+─────────────────────────────────────────────────────────────
+ECOCARDIOGRAFIA FETAL — RASTREIO CARDÍACO E INDICAÇÕES
+─────────────────────────────────────────────────────────────
 
-REGRA: O Ministério da Saúde, amparado pela Lei 14.598/2023, recomenda o ecocardiograma fetal como rastreio universal na rotina do pré-natal para TODAS as gestantes, independentemente do risco. (Nota: A FEBRASGO e a SBC posicionam-se contra a oferta sistemática obrigatória por questões de evidência científica, defendendo que o rastreio principal seja feito no morfológico de 2º trimestre, mas a diretriz legal/governamental atual garante e recomenda o exame a todas).
+CONTEXTO CIENTÍFICO E NORMATIVO (essencial para a coerência do laudo):
 
-JANELA: a partir de 18 semanas; melhor visualização entre 24 e 28 semanas de gestação. Pode ser antecipada em casos selecionados em centros especializados quando houver achado precoce relevante.
+1) RASTREIO CARDÍACO DE ROTINA: é realizado DENTRO do morfológico de 2º trimestre, por meio do corte de 4 câmaras, das vias de saída e do corte dos 3 vasos-traqueia (FEBRASGO 2023, SBC, ISUOG). A maioria das cardiopatias relevantes é triada por essa avaliação.
+
+2) ECOCARDIOGRAFIA FETAL DEDICADA: do ponto de vista científico, NÃO é exame de rastreio universal. FEBRASGO 2023 e SBC recomendam-na para gestantes com INDICAÇÃO FORMAL (fetais, maternas ou familiares — lista abaixo).
+
+3) ASPECTO LEGAL (informação contextual, não recomendação clínica individual): a Lei 14.598/2023 prevê a inclusão do ecocardiograma fetal no protocolo de assistência às gestantes da REDE PÚBLICA (SUS), "observada a disponibilidade orçamentária" e "nos termos do regulamento". A FEBRASGO posicionou-se FORMALMENTE CONTRA a oferta sistemática, por não estar alinhada às melhores evidências, recomendando a revisão e reedição da norma. Portanto, o laudo NÃO deve apresentar a ecocardiografia fetal como "rastreio universal recomendado pelo Ministério da Saúde a todas as gestantes". Quando pertinente, pode mencionar a existência da previsão legal de oferta na rede pública como informação contextual, sem convertê-la em recomendação clínica individual.
+
+REGRA OPERACIONAL DO SISTEMA:
+- Realizar o rastreio cardíaco no morfológico de 2º trimestre.
+- Recomendar ecocardiografia fetal DEDICADA SOMENTE quando houver indicação clínica formal (gatilho específico).
+- Em baixo risco sem indicação formal: NÃO recomendar eco dedicada como obrigatória; registrar que o rastreio foi feito no morfológico; mencionar a previsão legal apenas como contexto, se aplicável.
+
+JANELA: a partir de 18 semanas; melhor visualização entre 24 e 28 semanas de gestação. Pode ser antecipada em casos selecionados, em centros especializados, quando houver achado precoce relevante.
 
 INDICAÇÕES FORMAIS PARA ECOCARDIOGRAFIA FETAL (FEBRASGO 2023 / SBC):
+
 INDICAÇÕES FETAIS:
-Suspeita de anomalia estrutural cardíaca
-Suspeita de anormalidade na função cardíaca
-Hidropsia fetal
-Taquicardia fetal persistente (FCF >180 bpm)
-Bradicardia fetal persistente (FCF <120 bpm) ou suspeita de bloqueio cardíaco
-Episódios frequentes de ritmo cardíaco irregular persistente
-Malformação fetal grave extracardíaca
-Translucência nucal >3,5 mm ou >P99 para idade gestacional
-Cromossomopatia em procedimento invasivo ou NIPT
-Gestação gemelar monocoriônica
+- Suspeita de anomalia estrutural cardíaca
+- Suspeita de anormalidade na função cardíaca
+- Hidropsia fetal
+- Taquicardia fetal persistente (FCF >180 bpm)
+- Bradicardia fetal persistente (FCF <120 bpm) ou suspeita de bloqueio cardíaco
+- Episódios frequentes de ritmo cardíaco irregular persistente
+- Malformação fetal grave extracardíaca
+- Translucência nucal >3,5 mm ou >P99 para idade gestacional
+- Cromossomopatia em procedimento invasivo ou NIPT
+- Gestação gemelar monocoriônica
 
 INDICAÇÕES FETAIS (pode ser considerada):
-Anomalia venosa sistêmica (persistência da veia umbilical direita, veia cava superior esquerda, ausência de ducto venoso)
+- Anomalia venosa sistêmica (persistência da veia umbilical direita, veia cava superior esquerda, ausência de ducto venoso)
 
 INDICAÇÕES MATERNAS/FAMILIARES FORMAIS:
-Diabetes pré-gestacional, independente do nível de hemoglobina glicada
-Diabetes gestacional diagnosticada no 1º trimestre ou início do 2º trimestre
-Fertilização in vitro, incluindo injeção intracitoplasmática de espermatozoide (ICSI)
-Doença autoimune com anticorpo anti-SSA/Ro (Sjögren-A) E filho anterior afetado
-Parente de 1º grau do feto com doença cardíaca congênita (pais, irmãos ou gestação anterior)
-Parente de 1º ou 2º grau com doença de herança mendeliana e história de manifestação cardíaca na infância
-Exposição ao ácido retinoico
-Infecção por rubéola no 1º trimestre
+- Diabetes pré-gestacional, independente do nível de hemoglobina glicada
+- Diabetes gestacional diagnosticada no 1º trimestre ou início do 2º trimestre
+- Fertilização in vitro, incluindo injeção intracitoplasmática de espermatozoide (ICSI)
+- Doença autoimune com anticorpo anti-SSA/Ro (Sjögren-A) E filho anterior afetado
+- Parente de 1º grau do feto com doença cardíaca congênita (pais, irmãos ou gestação anterior)
+- Parente de 1º ou 2º grau com doença de herança mendeliana e história de manifestação cardíaca na infância
+- Exposição ao ácido retinoico
+- Infecção por rubéola no 1º trimestre
 
 INDICAÇÕES MATERNAS/FAMILIARES (pode ser considerada):
-Exposição a agentes teratogênicos específicos (paroxetina, carbamazepina, lítio)
-Medicação anti-hipertensiva da classe dos inibidores da enzima de conversão (IECA)
-Doença autoimune com anticorpo anti-SSA/Ro SEM filho anterior afetado
-Parente de 2º grau do feto com doença cardíaca congênita
+- Exposição a agentes teratogênicos específicos (paroxetina, carbamazepina, lítio)
+- Medicação anti-hipertensiva da classe dos inibidores da enzima de conversão (IECA)
+- Doença autoimune com anticorpo anti-SSA/Ro SEM filho anterior afetado
+- Parente de 2º grau do feto com doença cardíaca congênita
 
-NÃO É INDICAÇÃO FORMAL CLÍNICA (Apesar de estar garantido na rotina pelo MS/Lei 14.598/2023):
-Idade materna avançada isolada (sem outros fatores de risco)  
-Gestação de baixo risco sem fatores específicos (não tem indicação clínica isolada pela FEBRASGO, embora o Ministério da Saúde oriente como rotina)  
-Mama densa materna isolada  
-Ansiedade materna isolada (discutir em aconselhamento, mas sem indicação clínica formal)  
+NÃO CONSTITUI INDICAÇÃO CLÍNICA FORMAL (FEBRASGO/SBC):
+- Idade materna avançada isolada (sem outros fatores de risco)
+- Gestação de baixo risco sem fatores específicos
+- Mama densa materna isolada
+- Ansiedade materna isolada (pode ser discutida em aconselhamento, sem indicação clínica formal)
 
-LIMITAÇÕES DA US OBSTÉTRICA PARA ECO FETAL:
-Os eventuais casos que não são rastreados pela avaliação morfológica do coração fetal geralmente não demandam intervenção cirúrgica precoce ao nascimento e podem não necessitar de diagnóstico intrauterino
-A maioria das malformações cardíacas fetais necessitará apenas acompanhamento pelo pediatra/cardiologista infantil
-Acurácia depende da expertise do examinador, janela acústica, posição fetal, biotipo materno e líquido amniótico
+NOTA SOBRE LIMIARES DE FREQUÊNCIA CARDÍACA: os limiares de <120/>180 bpm acima referem-se a GATILHOS PARA ECOCARDIOGRAFIA (avaliação de ritmo/cardiopatia). Não confundir com a faixa de normalidade de vitalidade (110–160 bpm) da Seção 17, que tem outra finalidade. Bradicardia/taquicardia sustentadas devem sempre ser correlacionadas ao contexto clínico.
+
+LIMITAÇÕES DO RASTREIO MORFOLÓGICO PARA O CORAÇÃO FETAL:
+- Os eventuais casos não rastreados pela avaliação morfológica do coração fetal, em geral, não demandam intervenção cirúrgica precoce ao nascimento e podem não necessitar de diagnóstico intrauterino.
+- A maioria das malformações cardíacas fetais necessitará apenas de acompanhamento pelo pediatra/cardiologista infantil.
+- A acurácia depende da expertise do examinador, da janela acústica, da posição fetal, do biotipo materno e do líquido amniótico.
 
 RECOMENDAÇÃO PADRÃO (quando houver indicação clínica formal):
-"Recomenda-se ecocardiografia fetal, preferencialmente entre 24 e 28 semanas (idealmente em centro especializado/cardiologia fetal), devido a [gatilho específico], estando de acordo com as indicações clínicas da FEBRASGO e SBC, além de integrar a rotina de rastreio universal do pré-natal orientada pelo Ministério da Saúde (Lei 14.598/2023)."
+"Recomenda-se ecocardiografia fetal, preferencialmente entre 24 e 28 semanas (idealmente em centro especializado/cardiologia fetal), devido a [gatilho específico], conforme as indicações clínicas da FEBRASGO 2023 e da SBC."
 
-RECOMENDAÇÃO QUANDO NÃO HÁ INDICAÇÃO FORMAL CLÍNICA (Gestação de baixo risco):
-"O rastreio cardíaco fetal foi realizado conforme protocolo do morfológico de 2º trimestre (avaliação de 4 câmaras, vias de saída e corte dos 3 vasos-traqueia), sem identificação de achados suspeitos. Apesar de não haver fatores de risco ou indicação clínica formal segundo a FEBRASGO 2023, a ecocardiografia fetal é atualmente recomendada como rastreio universal na rotina do pré-natal para todas as gestantes, conforme o Ministério da Saúde (Lei 14.598/2023)."
+RECOMENDAÇÃO QUANDO NÃO HÁ INDICAÇÃO FORMAL CLÍNICA (gestação de baixo risco):
+"O rastreio cardíaco fetal foi realizado conforme protocolo do morfológico de 2º trimestre (avaliação de 4 câmaras, vias de saída e corte dos 3 vasos-traqueia), sem identificação de achados suspeitos no presente exame. Não há, no momento, fator de risco ou indicação clínica formal para ecocardiografia fetal dedicada segundo a FEBRASGO 2023/SBC. (Informação contextual: a Lei 14.598/2023 prevê a oferta de ecocardiograma fetal no pré-natal da rede pública, observada a disponibilidade orçamentária e a regulamentação.)"
 
 NEUROSSONOGRAFIA FETAL:
 Conforme achado e IG.
@@ -427,30 +437,30 @@ PIG:
 
 RCIU — CRITÉRIOS DELPHI 2016:
 
-RCIU PRECOCE (<32 semanas):
+RCIU PRECOCE (<32 semanas, na ausência de malformação congênita):
 Critério principal (qualquer um):
 - PFE/CA <P3
 - Diástole zero/reversa na artéria umbilical
 
-OU critério contributivo (pelo menos 2):
-- PFE/CA <P10
-- IP artéria umbilical >P95
-- IP artérias uterinas >P95
+OU critério contributivo — PFE/CA <P10 ASSOCIADO a pelo menos um de:
+- IP da artéria umbilical >P95
+- IP médio das artérias uterinas >P95
 
 Classificação: N3/N4
 N4 se diástole zero/reversa, DV alterado, vitalidade alterada ou deterioração hemodinâmica.
 
 Recomendação: "Recomenda-se avaliação prioritária/imediata em medicina fetal/alto risco, com vigilância hemodinâmica fetal seriada. A conduta deve considerar idade gestacional, artéria umbilical, ducto venoso, cardiotocografia/perfil biofísico e condições maternas."
 
-RCIU TARDIA (≥32 semanas):
+RCIU TARDIA (≥32 semanas, na ausência de malformação congênita):
 Critério principal:
 - PFE/CA <P3
 
-OU pelo menos 2 dos seguintes:
+OU pelo menos 2 dos seguintes 3 critérios:
 - PFE/CA <P10
-- Desaceleração do crescimento (cruzar 2+ quartis)
-- RCP <P5
-- IP ACM <P5
+- Desaceleração do crescimento de PFE/CA (cruzar mais de 2 quartis em curvas de crescimento)
+- RCP <P5 OU IP da artéria umbilical >P95
+
+[NOTA DE REVISÃO v14: o terceiro critério foi unificado conforme o consenso Delphi 2016 (RCP <P5 OU IP umbilical >P95). A versão anterior listava "RCP <P5" e "IP ACM <P5" como dois itens separados, o que não corresponde ao consenso. A queda isolada do IP da ACM (<P5) é um marcador de redistribuição que reforça suspeita, mas não compõe o critério formal Delphi de RCIU tardia. Validar conforme protocolo do serviço.]
 
 Classificação: N3/N4 conforme Doppler e vitalidade.
 
@@ -707,7 +717,7 @@ CSP não caracterizado/ausente: N3 / ALERTA NEUROLÓGICO
 Ventriculomegalia leve (10,0-12,0 mm): N2/N3
 "Recomenda-se avaliação em medicina fetal, controle evolutivo, investigação de achados associados e considerar neurossonografia fetal. Considerar investigação infecciosa e genética conforme contexto."
 
-Ventriculomegalia moderada (13,0-15,0 mm): N3
+Ventriculomegalia moderada (12,1-15,0 mm): N3
 "Recomenda-se medicina fetal, neurossonografia especializada e consideração de RM fetal/investigação etiológica conforme contexto."
 
 Ventriculomegalia grave (>15,0 mm): N3/N4 / ALERTA NEUROLÓGICO
@@ -946,11 +956,11 @@ RECOMENDAÇÕES POR FAIXA IG (quando exame normal):
 
 <11 semanas: "Recomenda-se seguimento pré-natal e realização do morfológico de primeiro trimestre no período adequado."
 
-11+0 a 13+6: "Recomenda-se seguimento pré-natal, integração com rastreamento clínico-laboratorial, programação do morfológico de segundo trimestre e da ecocardiografia fetal."
+11+0 a 13+6: "Recomenda-se seguimento pré-natal, integração com rastreamento clínico-laboratorial e programação do morfológico de segundo trimestre."
 
-14-24 semanas sem morfológico 2º trimestre: "Recomenda-se programação do morfológico de segundo trimestre no período adequado, conforme disponibilidade e idade gestacional, além de programação de ecocardiografia fetal."
+14-24 semanas sem morfológico 2º trimestre: "Recomenda-se programação do morfológico de segundo trimestre no período adequado, conforme disponibilidade e idade gestacional."
 
-14-24 semanas, morfológico normal: "Recomenda-se seguimento pré-natal habitual, conforme orientação obstétrica. Programar ecocardiografia fetal"
+14-24 semanas, morfológico normal: "Recomenda-se seguimento pré-natal habitual, conforme orientação obstétrica."
 
 24-32 semanas: "Recomenda-se seguimento pré-natal, com controle de crescimento, líquido amniótico e Doppler quando houver indicação clínica ou fator de risco."
 
@@ -1149,7 +1159,7 @@ REGRAS FINAIS DE SEGURANÇA (14 REGRAS):
 12. Investigação genética → nunca recomendar automaticamente; sempre proporcional ao risco; sempre aconselhamento
 13. Próximo exame → sempre indicar pelo IG; sempre incluir janela e data (se datado)
 14. Coerência → CONCLUSÃO não pode conter achados ausentes na ANÁLISE; RECOMENDAÇÕES devem corresponder aos achados descritos
-FIM DO MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0\`;
+FIM DO MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v14.0\`;
 `;
 
   prompt += sec_base;
@@ -1179,16 +1189,14 @@ FIM DO MÓDULO MEDICINA FETAL E OBSTETRÍCIA — VERSÃO FINAL v13.0\`;
   if (is2Tri || fullText.includes("morfológico")) {
     prompt += sec_14;
   }
-  if (is2Tri || fullText.includes("neuro")) {
+  if (is1Tri || is2Tri || is3Tri || fullText.includes("genét") || fullText.includes("nipt") || fullText.includes("cariót") || fullText.includes("amnio")) {
     prompt += sec_15;
   }
-  if (is2Tri || fullText.includes("coração") || fullText.includes("eco")) {
+  if (isGemelar) {
     prompt += sec_16;
   }
   prompt += sec_17;
-  if (isGemelar) {
-    prompt += sec_18;
-  }
+  prompt += sec_18;
   prompt += sec_19;
   prompt += sec_20;
 
