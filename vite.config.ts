@@ -177,26 +177,49 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'icons/*.png', 'logo-icon.png'],
       manifest: {
-        name: 'LAUD.US',
+        id: '/',
+        name: 'LAUD.US — Laudos Inteligentes',
         short_name: 'LAUD.US',
         description: 'Plataforma Inteligente de Laudos Ultrassonográficos com IA',
         theme_color: '#0568c5',
         background_color: '#0a0a0c',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait-primary',
         lang: 'pt-BR',
+        dir: 'ltr',
         start_url: '/',
         scope: '/',
-        categories: ['medical', 'productivity'],
+        categories: ['medical', 'productivity', 'health'],
+        prefer_related_applications: false,
         icons: [
           { src: '/icons/icon-72x72.png', sizes: '72x72', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-96x96.png', sizes: '96x96', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-128x128.png', sizes: '128x128', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-144x144.png', sizes: '144x144', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-384x384.png', sizes: '384x384', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          // Maskable icons — separate entries (combining 'any maskable' causes Android to always crop)
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        screenshots: [
+          {
+            src: '/icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'LAUD.US — Tela inicial'
+          },
+          {
+            src: '/icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'LAUD.US — Dashboard'
+          }
         ],
         shortcuts: [
           {
@@ -218,9 +241,12 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB — handles large main bundle
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
-            // Google Fonts
+            // Google Fonts stylesheets
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
@@ -230,6 +256,7 @@ export default defineConfig({
             }
           },
           {
+            // Google Fonts files (woff2)
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
@@ -248,6 +275,22 @@ export default defineConfig({
             urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
             handler: 'NetworkFirst',
             options: { cacheName: 'firestore-cache', networkTimeoutSeconds: 10 }
+          },
+          {
+            // Firebase Auth token endpoints
+            urlPattern: /^https:\/\/.*\.googleapis\.com\/identitytoolkit\/.*/i,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'firebase-auth-cache', networkTimeoutSeconds: 10 }
+          },
+          {
+            // Firebase Storage (images, signatures, etc)
+            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'firebase-storage-cache',
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] }
+            }
           }
         ],
         navigateFallback: 'index.html',

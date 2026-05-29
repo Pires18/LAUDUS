@@ -14,7 +14,7 @@ export function PageTransition({ children, id }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
-      className="flex-1 flex flex-col min-h-0 min-h-full w-full relative"
+      className="flex-1 flex flex-col min-h-0 w-full relative"
     >
       {children}
     </motion.div>

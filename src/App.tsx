@@ -14,6 +14,8 @@ import { CommandPalette } from './components/CommandPalette';
 import { CreateExamModal } from './components/CreateExamModal';
 import { SupportCenterModal } from './components/SupportCenterModal';
 import { BroadcastBanner } from './components/BroadcastBanner';
+import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
+import { OfflineBanner } from './components/OfflineBanner';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
@@ -68,10 +70,13 @@ function ViewRenderer() {
   const isFullBleed = view.name === 'exam-editor';
 
   return (
-    <main className={classNames(
-      "flex-1 min-w-0 relative flex flex-col min-h-0 h-full",
-      isFullBleed ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
-    )}>
+    <main
+      className={classNames(
+        "flex-1 min-w-0 relative flex flex-col min-h-0 h-full",
+        isFullBleed ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"
+      )}
+      style={{ WebkitOverflowScrolling: 'touch' }}
+    >
       <AnimatePresence mode="wait">
         <PageTransition key={view.name} id={view.name}>
           {views[view.name] ?? null}
@@ -107,6 +112,7 @@ function AuthenticatedApp() {
       className="flex flex-col overflow-hidden bg-ink-50/30"
       style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
+      <OfflineBanner />
       <BroadcastBanner />
       <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
         <Sidebar />
@@ -117,6 +123,7 @@ function AuthenticatedApp() {
       <CommandPalette />
       {showCreateExamModal && <CreateExamModal onClose={() => setShowCreateExamModal(false)} />}
       <SupportCenterModal />
+      <PWAUpdatePrompt />
     </div>
   );
 }

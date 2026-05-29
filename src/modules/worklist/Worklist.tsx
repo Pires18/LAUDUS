@@ -652,8 +652,8 @@ export function Worklist() {
 
       {/* High-Fidelity Metadados Modal Overlay */}
       {editExamId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200 backdrop-blur-md">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden transform animate-in zoom-in-95 duration-200 border border-ink-100">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 p-0 md:p-4 animate-in fade-in duration-200 backdrop-blur-md">
+          <div className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden overflow-y-auto max-h-[90dvh] md:max-h-none transform animate-slide-in-up md:animate-scale-in duration-200 border border-ink-100">
             <div className="px-8 py-6 border-b border-ink-100 bg-ink-50/50 flex items-center justify-between">
               <h3 className="font-black text-ink-900 flex items-center gap-3">
                 <AreaIcon area={exams.find(e => e.id === editExamId)?.area || ''} size={18} className="text-brand-500" />
