@@ -31,6 +31,14 @@ export function Settings() {
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
 
+  const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [pacsTestResults, setPacsTestResults] = useState<{
+    primaryOk: boolean;
+    backupOk: boolean;
+    primaryMsg?: string;
+    backupMsg?: string;
+  } | null>(null);
+
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
@@ -111,6 +119,78 @@ export function Settings() {
       showToast('Erro ao carregar assinatura digitalizada.', 'error');
     } finally {
       setIsUploadingSignature(false);
+    }
+  }
+
+  async function handleTestPacsConnection() {
+    setPacsTestState('testing');
+    setPacsTestResults(null);
+    try {
+      const primaryUrl = draft.dicomViewerUrl || 'http://localhost:8042';
+      const primaryAuth = `&username=${encodeURIComponent(draft.dicomUsername || '')}&password=${encodeURIComponent(draft.dicomPassword || '')}`;
+      
+      const backupUrl = draft.dicomBackupViewerUrl;
+      const backupAuth = backupUrl ? `&username=${encodeURIComponent(draft.dicomBackupUsername || '')}&password=${encodeURIComponent(draft.dicomBackupPassword || '')}` : '';
+
+      // Test Primary
+      const testPrimary = async () => {
+        const pingUrl = `${primaryUrl.replace(/\/$/, '')}/system`;
+        try {
+          const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${primaryAuth}`);
+          if (res.ok) {
+            const data = await res.json();
+            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
+          }
+          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
+        } catch (e: any) {
+          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
+        }
+      };
+
+      // Test Backup
+      const testBackup = async () => {
+        if (!backupUrl) return { ok: false, msg: 'Servidor backup não configurado' };
+        const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
+        try {
+          const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
+          if (res.ok) {
+            const data = await res.json();
+            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
+          }
+          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
+        } catch (e: any) {
+          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
+        }
+      };
+
+      const [primaryRes, backupRes] = await Promise.all([
+        testPrimary(),
+        backupUrl ? testBackup() : Promise.resolve({ ok: false, msg: 'Nenhum backup configurado' })
+      ]);
+
+      setPacsTestResults({
+        primaryOk: primaryRes.ok,
+        backupOk: backupRes.ok,
+        primaryMsg: primaryRes.msg,
+        backupMsg: backupUrl ? backupRes.msg : undefined
+      });
+      
+      const success = primaryRes.ok && (!backupUrl || backupRes.ok);
+      setPacsTestState(success ? 'success' : 'error');
+      
+      if (primaryRes.ok) {
+        showToast('PACS Principal conectado com sucesso!', 'success');
+      } else {
+        showToast('Erro de conexão com o PACS Principal.', 'error');
+      }
+    } catch (err: any) {
+      setPacsTestState('error');
+      setPacsTestResults({
+        primaryOk: false,
+        backupOk: false,
+        primaryMsg: err.message || 'Falha crítica ao testar conexão.'
+      });
+      showToast('Erro crítico ao testar conexões.', 'error');
     }
   }
 
@@ -475,6 +555,66 @@ export function Settings() {
                         draft.dicomSyncEnabled ? "left-6" : "left-1"
                       )} />
                     </button>
+                  </div>
+
+                  {/* Teste de Conectividade PACS */}
+                  <div className="p-5 rounded-2xl bg-ink-50 border border-ink-100 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-ink-900">Validar Conectividade PACS</p>
+                        <p className="text-xs text-ink-500">Testa a comunicação em tempo real com as URLs de rede configuradas.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleTestPacsConnection}
+                        disabled={pacsTestState === 'testing'}
+                        className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        {pacsTestState === 'testing' ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>Testando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Database size={14} />
+                            <span>Testar Conexão</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {pacsTestResults && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-ink-150 animate-fade-in">
+                        {/* Principal results */}
+                        <div className={classNames(
+                          "p-4 rounded-xl border text-xs leading-relaxed",
+                          pacsTestResults.primaryOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800"
+                        )}>
+                          <p className="font-bold flex items-center gap-1.5 mb-1.5">
+                            <span className={classNames("w-2 h-2 rounded-full", pacsTestResults.primaryOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} />
+                            PACS Principal (Porta HTTP)
+                          </p>
+                          <p className="font-mono text-[10px] break-all">{draft.dicomViewerUrl || 'http://localhost:8042'}</p>
+                          <p className="mt-1 text-[11px] font-medium italic">{pacsTestResults.primaryMsg}</p>
+                        </div>
+
+                        {/* Backup results */}
+                        {draft.dicomBackupViewerUrl && (
+                          <div className={classNames(
+                            "p-4 rounded-xl border text-xs leading-relaxed",
+                            pacsTestResults.backupOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800"
+                          )}>
+                            <p className="font-bold flex items-center gap-1.5 mb-1.5">
+                              <span className={classNames("w-2 h-2 rounded-full", pacsTestResults.backupOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} />
+                              PACS Backup (Porta HTTP)
+                            </p>
+                            <p className="font-mono text-[10px] break-all">{draft.dicomBackupViewerUrl}</p>
+                            <p className="mt-1 text-[11px] font-medium italic">{pacsTestResults.backupMsg}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Predefinições Rápidas (Presets) */}
