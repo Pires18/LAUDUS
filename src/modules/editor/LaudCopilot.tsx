@@ -443,6 +443,11 @@ export function LaudCopilot({
     conversation = stripScratchpad(conversation);
     proposal = stripScratchpad(proposal);
 
+    if (!conversation && !proposal && content) {
+      // Fallback extremo: se os marcadores falharem ou a IA omitir tudo
+      conversation = stripScratchpad(content) || content;
+    }
+
     return { conversation, proposal };
   };
 
