@@ -366,13 +366,21 @@ export function LaudCopilot({
     const titleMatch = content.match(/\[DADOS DE FORMULÁRIO COMPILADOS:\s*(.*?)\]/);
     const title = titleMatch ? titleMatch[1] : 'Formulário';
 
-    // Extraí a parte do conteúdo após o cabeçalho
-    const bodyStart = content.indexOf(']\n\n');
-    const body = bodyStart !== -1 ? content.substring(bodyStart + 3) : '';
+    // Extrai a parte do conteúdo após as instruções internas da IA
+    const separator = 'DADOS DO FORMULÁRIO:\n';
+    const bodyStart = content.indexOf(separator);
+    let body = '';
+    
+    if (bodyStart !== -1) {
+      body = content.substring(bodyStart + separator.length);
+    } else {
+      const fallbackStart = content.indexOf(']\n\n');
+      body = fallbackStart !== -1 ? content.substring(fallbackStart + 3) : '';
+    }
 
     const items: Array<{ structure: string; status: 'Normal' | 'Alterado'; details: string }> = [];
 
-    // Tenta parsear linhas no formato "Estrutura: valor" ou "- Estrutura: valor"
+    // Tenta parsear linhas no formato "Estrutura: valor"
     const lines = body.split('\n');
     lines.forEach(line => {
       const trimmed = line.trim();
@@ -380,9 +388,13 @@ export function LaudCopilot({
 
       const cleanLine = trimmed.startsWith('- ') ? trimmed.substring(2).trim() : trimmed;
       const colonIndex = cleanLine.indexOf(':');
-      if (colonIndex !== -1) {
+      if (colonIndex !== -1 && colonIndex < 60) {
         const structure = cleanLine.substring(0, colonIndex).trim();
         let rest = cleanLine.substring(colonIndex + 1).trim();
+        
+        // Pular campos que foram deixados totalmente em branco pelo médico
+        if (!rest) return;
+
         // Remove colchetes se houver (ex: [Normal] -> Normal)
         if (rest.startsWith('[') && rest.endsWith(']')) {
           rest = rest.substring(1, rest.length - 1).trim();
