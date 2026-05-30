@@ -307,7 +307,9 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
+        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
+        const model = genAI.getGenerativeModel({ model: realModel });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -341,7 +343,8 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       }
     } catch (err) {
       console.error(err);
-      showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
+      const msg = err instanceof Error ? err.message : 'Verifique sua API Key';
+      showToast(`Erro ao melhorar prompt: ${msg}`, 'error');
     } finally {
       setIsImprovingTemplate(false);
     }
@@ -430,7 +433,9 @@ ${examplesText}`;
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
+        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
+        const model = genAI.getGenerativeModel({ model: realModel });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
         });
@@ -462,7 +467,8 @@ ${examplesText}`;
       }
     } catch (err) {
       console.error(err);
-      showToast(`Erro ao gerar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
+      const msg = err instanceof Error ? err.message : 'Verifique sua API Key';
+      showToast(`Erro ao gerar prompt: ${msg}`, 'error');
     } finally {
       setIsGeneratingTemplatePrompt(false);
     }
@@ -479,15 +485,18 @@ ${examplesText}`;
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
+        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
+        const model = genAI.getGenerativeModel({ model: realModel });
         const result = await model.generateContent('Responda apenas: OK');
         if (result.response.text()) {
           setTestStatus('success');
           showToast('Conexão validada com o Gemini!', 'success');
         }
-      } catch {
+      } catch (err) {
         setTestStatus('error');
-        showToast('Falha na conexão com o Gemini', 'error');
+        const msg = err instanceof Error ? err.message : 'Verifique sua API Key';
+        showToast(`Falha na conexão: ${msg}`, 'error');
       }
     } else {
       if (!localSettings.anthropicApiKey) {
