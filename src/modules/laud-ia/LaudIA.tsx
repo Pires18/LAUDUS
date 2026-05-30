@@ -12,6 +12,7 @@ import {
   TrendingUp, FlaskConical, BarChart3, Clock, Coins,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
+import { resolveGeminiModel } from '../ai/gemini';
 import { useCollection } from '../../hooks/useFirestore';
 import { EXAM_AREAS, ExamArea, AppSettings, ReportTemplate } from '../../types';
 import { updateItem } from '../../store/db';
@@ -307,7 +308,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -431,7 +432,7 @@ ${examplesText}`;
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
         });
@@ -481,7 +482,7 @@ ${examplesText}`;
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent('Responda apenas: OK');
         if (result.response.text()) {
           setTestStatus('success');

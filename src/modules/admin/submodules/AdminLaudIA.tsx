@@ -11,6 +11,7 @@ import {
   ChevronDown, ChevronUp, Wifi, WifiOff, TrendingUp
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { resolveGeminiModel } from '../../ai/gemini';
 import { EXAM_AREAS, ExamArea, ReportTemplate } from '../../../types';
 import { generateReport, callMetricsHistory, type CallMetrics } from '../../ai/gemini';
 import { 
@@ -361,7 +362,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -491,7 +492,7 @@ ${examplesText}`;
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
         });
@@ -540,7 +541,7 @@ ${examplesText}`;
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent('Responda apenas: OK');
         const text = result.response.text();
         if (text) {
