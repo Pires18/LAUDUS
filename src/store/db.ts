@@ -191,6 +191,8 @@ export async function getSettings(): Promise<AppSettings> {
           aiStructurePrompt: data.aiStructurePrompt || adminSettings.aiStructurePrompt,
           aiRigidRules: data.aiRigidRules || adminSettings.aiRigidRules,
           aiAreaPrompts: { ...adminSettings.aiAreaPrompts, ...data.aiAreaPrompts },
+          geminiApiKey: data.geminiApiKey || adminSettings.geminiApiKey || '',
+          anthropicApiKey: data.anthropicApiKey || adminSettings.anthropicApiKey || '',
         };
       }
     }

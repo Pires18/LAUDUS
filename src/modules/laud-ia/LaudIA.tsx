@@ -395,7 +395,7 @@ Nome do Exame: ${template.name}
 Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
 
 TÉCNICA:
-${template.techniqueTemplate || 'Não definida'}
+${template.technique || 'Não definida'}
 
 ANÁLISE PADRÃO:
 ${template.analysisTemplate || 'Não definida'}

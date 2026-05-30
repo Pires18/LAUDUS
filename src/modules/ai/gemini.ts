@@ -543,15 +543,20 @@ ${contextMessage}`;
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
 export function resolveGeminiModel(rawModel: string | undefined): string {
-  if (!rawModel) return 'gemini-1.5-flash';
+  if (!rawModel) return 'gemini-2.0-flash';
   const raw = rawModel.toLowerCase();
   
   if (raw.includes('flash-thinking')) return 'gemini-2.0-flash-thinking-exp';
+  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.0-flash';
+  if (raw.includes('2.0') && raw.includes('pro')) return 'gemini-2.0-pro-exp';
   
+  if (raw.includes('1.5') && raw.includes('pro')) return 'gemini-1.5-pro';
   if (raw.includes('pro')) return 'gemini-1.5-pro';
-  if (raw.includes('flash')) return 'gemini-1.5-flash';
   
-  return 'gemini-1.5-flash';
+  if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
+  if (raw.includes('flash')) return 'gemini-2.0-flash'; // Upgrade default flash to 2.0
+  
+  return 'gemini-2.0-flash';
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {

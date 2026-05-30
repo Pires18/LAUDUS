@@ -331,8 +331,11 @@ export function AdminLaudIA() {
 
   async function handleImproveTemplatePrompt() {
     const provider = localSettings.aiProvider || 'gemini';
-    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
-    if (!hasKey) {
+    const apiKey = provider === 'anthropic' 
+      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey) 
+      : (localSettings.geminiApiKey || settings?.geminiApiKey);
+      
+    if (!apiKey) {
       showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
       return;
     }
@@ -446,7 +449,7 @@ Nome do Exame: ${template.name}
 Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
 
 TÉCNICA:
-${template.techniqueTemplate || 'Não definida'}
+${template.technique || 'Não definida'}
 
 ANÁLISE PADRÃO:
 ${template.analysisTemplate || 'Não definida'}
