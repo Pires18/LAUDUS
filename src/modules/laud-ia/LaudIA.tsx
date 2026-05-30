@@ -219,6 +219,10 @@ export function LaudIA() {
   const [showImprovePanel, setShowImprovePanel] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isImprovingAll, setIsImprovingAll] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{current: number, total: number} | null>(null);
+
   // Sync selected template prompt when selection changes or templates load
   useEffect(() => {
     if (selectedTemplateId && templates.length > 0) {
@@ -479,6 +483,234 @@ ${examplesText}`;
     } finally {
       setIsGeneratingTemplatePrompt(false);
     }
+  }
+
+  async function handleGenerateAllPrompts() {
+    if (!selectedArea) {
+      showToast('Selecione uma área primeiro para gerar os prompts em lote.', 'error');
+      return;
+    }
+    const templatesToProcess = templates.filter(t => t.area === selectedArea);
+    if (templatesToProcess.length === 0) return;
+
+    if (!window.confirm(`Deseja gerar o prompt de IA para ${templatesToProcess.length} exames da área selecionada? Isso consumirá tokens da sua API.`)) {
+      return;
+    }
+
+    const provider = localSettings.aiProvider || 'gemini';
+    const apiKey = provider === 'anthropic' 
+      ? (localSettings.anthropicApiKey || adminSettings?.anthropicApiKey || settings?.anthropicApiKey) 
+      : (localSettings.geminiApiKey || adminSettings?.geminiApiKey || settings?.geminiApiKey);
+      
+    if (!apiKey) {
+      showToast(`Configure sua API Key antes de gerar.`, 'error');
+      return;
+    }
+
+    setIsGeneratingAll(true);
+    setBatchProgress({ current: 0, total: templatesToProcess.length });
+
+    const masterPrompt = localSettings.aiMasterPrompt || adminSettings?.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+    const globalInstructions = localSettings.aiGlobalInstructions || adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
+    const structurePrompt = localSettings.aiStructurePrompt || adminSettings?.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+    const rigidRules = localSettings.aiRigidRules || adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES;
+
+    let successCount = 0;
+
+    for (let i = 0; i < templatesToProcess.length; i++) {
+      const template = templatesToProcess[i];
+      setBatchProgress({ current: i + 1, total: templatesToProcess.length });
+      
+      const examples = templates
+        .filter(t => t.id !== template.id && t.aiInstructions && t.aiInstructions.trim().length > 50)
+        .slice(0, 2);
+      
+      let examplesText = '';
+      if (examples.length > 0) {
+        examplesText = `\n\nEXEMPLOS DE PROMPTS DE OUTROS EXAMES PARA PADRONIZAÇÃO:\n`;
+        examples.forEach((ex, idx) => {
+          examplesText += `--- Exemplo ${idx + 1}: ${ex.name} ---\n${ex.aiInstructions}\n\n`;
+        });
+      }
+
+      const templateStructure = `
+Nome do Exame: ${template.name}
+Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
+
+TÉCNICA:
+${template.technique || 'Não definida'}
+
+ANÁLISE PADRÃO:
+${template.analysisTemplate || 'Não definida'}
+
+CONCLUSÃO PADRÃO:
+${template.conclusionTemplate || 'Não definida'}
+
+RECOMENDAÇÕES PADRÃO:
+${template.recommendationsTemplate || 'Não definida'}
+`;
+
+      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é GERAR DO ZERO as diretrizes e regras específicas (Prompt de Exame) para a máscara de laudo "${template.name}".
+Gere APENAS as INSTRUÇÕES ESPECÍFICAS (aiInstructions) para este exame. Não inclua saudações, não inclua blocos genéricos que já estão no Prompt Mestre. O seu output deve ser diretamente o texto Markdown do prompt para este exame.
+
+Use o contexto do LAUD.IA abaixo para entender a doutrina, regras rígidas e estrutura que a IA já segue:
+
+=== PROMPT MESTRE ===
+${masterPrompt}
+
+=== INSTRUÇÕES GLOBAIS ===
+${globalInstructions}
+
+=== SKELETON ===
+${structurePrompt}
+
+=== REGRAS RÍGIDAS ===
+${rigidRules}
+
+=== ESTRUTURA DA MÁSCARA ATUAL ===
+${templateStructure}
+${examplesText}`;
+
+      try {
+        let generated = '';
+
+        if (provider === 'gemini') {
+          const { GoogleGenerativeAI } = await import('@google/generative-ai');
+          const genAI = new GoogleGenerativeAI(apiKey!);
+          const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
+          const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
+          });
+          generated = result.response.text().trim();
+        } else {
+          const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey!,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+              max_tokens: 8192,
+              messages: [{ role: 'user', content: systemMsg }],
+              temperature: 0.2,
+            }),
+          });
+          if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+          const result = await response.json();
+          generated = (result.content?.[0]?.text || '').trim();
+        }
+
+        if (generated) {
+          await updateItem('templates', template.id, { aiInstructions: generated });
+          successCount++;
+          if (selectedTemplateId === template.id) {
+            setEditingTemplatePrompt(generated);
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao gerar prompt para ${template.name}:`, err);
+      }
+    }
+    
+    setIsGeneratingAll(false);
+    setBatchProgress(null);
+    showToast(`Geração concluída! ${successCount} de ${templatesToProcess.length} prompts gerados com sucesso.`, 'success');
+  }
+
+  async function handleImproveAllPrompts() {
+    if (!selectedArea) {
+      showToast('Selecione uma área primeiro para melhorar os prompts em lote.', 'error');
+      return;
+    }
+    const templatesToProcess = templates.filter(t => t.area === selectedArea && t.aiInstructions && t.aiInstructions.trim().length > 0);
+    if (templatesToProcess.length === 0) {
+      showToast('Nenhum exame com prompt existente encontrado nesta área.', 'info');
+      return;
+    }
+
+    if (!window.confirm(`Deseja melhorar com IA os prompts de ${templatesToProcess.length} exames da área selecionada? Isso consumirá tokens da sua API.`)) {
+      return;
+    }
+
+    const provider = localSettings.aiProvider || 'gemini';
+    const apiKey = provider === 'anthropic' 
+      ? (localSettings.anthropicApiKey || adminSettings?.anthropicApiKey || settings?.anthropicApiKey) 
+      : (localSettings.geminiApiKey || adminSettings?.geminiApiKey || settings?.geminiApiKey);
+      
+    if (!apiKey) {
+      showToast(`Configure sua API Key antes de continuar.`, 'error');
+      return;
+    }
+
+    setIsImprovingAll(true);
+    setBatchProgress({ current: 0, total: templatesToProcess.length });
+
+    const userRequest = templateImprovePrompt.trim()
+      ? `\n\nInstrução adicional do médico: "${templateImprovePrompt.trim()}"`
+      : '';
+
+    let successCount = 0;
+
+    for (let i = 0; i < templatesToProcess.length; i++) {
+      const template = templatesToProcess[i];
+      setBatchProgress({ current: i + 1, total: templatesToProcess.length });
+
+      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é melhorar o prompt de IA para o exame de "${template.name}" a seguir, tornando-o mais completo,
+claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
+Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+      
+      const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${template.aiInstructions}`;
+
+      try {
+        let improved = '';
+
+        if (provider === 'gemini') {
+          const { GoogleGenerativeAI } = await import('@google/generative-ai');
+          const genAI = new GoogleGenerativeAI(apiKey!);
+          const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
+          const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
+          });
+          improved = result.response.text().trim();
+        } else {
+          const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey!,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+              max_tokens: 8192,
+              messages: [{ role: 'user', content: fullMessage }],
+              temperature: 0.2,
+            }),
+          });
+          if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+          const result = await response.json();
+          improved = (result.content?.[0]?.text || '').trim();
+        }
+
+        if (improved) {
+          await updateItem('templates', template.id, { aiInstructions: improved });
+          successCount++;
+          if (selectedTemplateId === template.id) {
+            setEditingTemplatePrompt(improved);
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao melhorar prompt para ${template.name}:`, err);
+      }
+    }
+    
+    setIsImprovingAll(false);
+    setBatchProgress(null);
+    showToast(`Melhoria concluída! ${successCount} de ${templatesToProcess.length} prompts melhorados com sucesso.`, 'success');
   }
 
   async function testConnection() {
@@ -1008,6 +1240,44 @@ ${examplesText}`;
                     </div>
                   </div>
                 </div>
+
+                {/* Ações em Lote */}
+                {selectedArea && (
+                  <div className="space-y-3">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1">
+                        Ações em lote para a área: {EXAM_AREAS.find(a => a.id === selectedArea)?.label}
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleGenerateAllPrompts}
+                          disabled={isGeneratingAll || isImprovingAll}
+                          className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-black rounded-xl transition-all border uppercase tracking-widest shadow-sm bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+                        >
+                          {isGeneratingAll ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
+                          Gerar Todos ({templates.filter(t => t.area === selectedArea).length})
+                        </button>
+                        <button
+                          onClick={handleImproveAllPrompts}
+                          disabled={isGeneratingAll || isImprovingAll}
+                          className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-black rounded-xl transition-all border uppercase tracking-widest shadow-sm bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 disabled:opacity-50"
+                        >
+                          {isImprovingAll ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                          Melhorar Todos
+                        </button>
+                      </div>
+                    </div>
+                    {batchProgress && (
+                      <div className="flex items-center gap-3 p-3 bg-brand-50 border border-brand-200 rounded-xl animate-fade-in">
+                        <Loader2 size={16} className="animate-spin text-brand-600" />
+                        <span className="text-xs font-bold text-brand-700">Processando: {batchProgress.current} de {batchProgress.total}</span>
+                        <div className="flex-1 bg-brand-200/50 h-2 rounded-full overflow-hidden ml-4">
+                          <div className="bg-brand-500 h-full transition-all duration-300" style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {selectedTemplateId ? (
                   <div className="space-y-6">
