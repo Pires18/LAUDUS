@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../../../components/Modal';
 import { ExamRequest, Patient, ReportTemplate, Clinic, AppSettings } from '../../../types';
 import { updateItem, getItem } from '../../../store/db';
@@ -70,6 +70,21 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const [consentAccepted, setConsentAccepted] = useState(exam.consentAccepted ?? false);
   const [viewMode, setViewMode] = useState<'form' | 'text'>('form');
 
+  const isAnamnesisDirtyRef = useRef(false);
+  const isConsentDirtyRef = useRef(false);
+  const isAnamnesisFocusedRef = useRef(false);
+  const isConsentFocusedRef = useRef(false);
+  const anamnesisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear timers on unmount
+  useEffect(() => {
+    return () => {
+      if (anamnesisTimerRef.current) clearTimeout(anamnesisTimerRef.current);
+      if (consentTimerRef.current) clearTimeout(consentTimerRef.current);
+    };
+  }, []);
+
   // Metadata tab states
   const [patientName, setPatientName] = useState(patient.name);
   const [birthDate, setBirthDate] = useState(patient.birthDate || '');
@@ -95,8 +110,12 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
   // Sync with exam data updates
   useEffect(() => {
-    setAnamnesis(exam.anamnesis ?? '');
-    setConsentTerm(exam.consentTerm ?? '');
+    if (!isAnamnesisDirtyRef.current && !isAnamnesisFocusedRef.current) {
+      setAnamnesis(exam.anamnesis ?? '');
+    }
+    if (!isConsentDirtyRef.current && !isConsentFocusedRef.current) {
+      setConsentTerm(exam.consentTerm ?? '');
+    }
     setConsentAccepted(exam.consentAccepted ?? false);
   }, [exam.anamnesis, exam.consentTerm, exam.consentAccepted]);
 
@@ -127,14 +146,56 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     }
   }, [open, initialTab]);
 
-  const handleSaveAnamnesis = async (val: string) => {
+  const handleSaveAnamnesis = (val: string) => {
     setAnamnesis(val);
-    await updateItem('exams', exam.id, { anamnesis: val });
+    isAnamnesisDirtyRef.current = true;
+    if (anamnesisTimerRef.current) clearTimeout(anamnesisTimerRef.current);
+    
+    anamnesisTimerRef.current = setTimeout(async () => {
+      try {
+        await updateItem('exams', exam.id, { anamnesis: val });
+      } finally {
+        isAnamnesisDirtyRef.current = false;
+      }
+    }, 800);
   };
 
-  const handleSaveConsentTerm = async (val: string) => {
+  const handleBlurAnamnesis = async (val: string) => {
+    isAnamnesisFocusedRef.current = false;
+    if (isAnamnesisDirtyRef.current) {
+      if (anamnesisTimerRef.current) clearTimeout(anamnesisTimerRef.current);
+      try {
+        await updateItem('exams', exam.id, { anamnesis: val });
+      } finally {
+        isAnamnesisDirtyRef.current = false;
+      }
+    }
+  };
+
+  const handleSaveConsentTerm = (val: string) => {
     setConsentTerm(val);
-    await updateItem('exams', exam.id, { consentTerm: val });
+    isConsentDirtyRef.current = true;
+    if (consentTimerRef.current) clearTimeout(consentTimerRef.current);
+    
+    consentTimerRef.current = setTimeout(async () => {
+      try {
+        await updateItem('exams', exam.id, { consentTerm: val });
+      } finally {
+        isConsentDirtyRef.current = false;
+      }
+    }, 800);
+  };
+
+  const handleBlurConsentTerm = async (val: string) => {
+    isConsentFocusedRef.current = false;
+    if (isConsentDirtyRef.current) {
+      if (consentTimerRef.current) clearTimeout(consentTimerRef.current);
+      try {
+        await updateItem('exams', exam.id, { consentTerm: val });
+      } finally {
+        isConsentDirtyRef.current = false;
+      }
+    }
   };
 
   const handleToggleConsent = async (checked: boolean) => {
@@ -496,6 +557,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                             type="text"
                             value={field.value}
                             disabled={!isEditable}
+                            onFocus={() => isAnamnesisFocusedRef.current = true}
+                            onBlur={() => handleBlurAnamnesis(serializeAnamnesis(fields))}
                             onChange={(e) => handleFieldChange(idx, e.target.value)}
                             className="h-10 px-3 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60"
                             placeholder={`Preencher ${field.label.toLowerCase()}...`}
@@ -513,6 +576,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     <textarea
                       value={unstructuredLines}
                       disabled={!isEditable}
+                      onFocus={() => isAnamnesisFocusedRef.current = true}
+                      onBlur={() => handleBlurAnamnesis(anamnesis)}
                       onChange={(e) => handleUnstructuredChange(e.target.value)}
                       placeholder="Outros achados, cirurgias, observações ou queixas clínicas livres..."
                       className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 min-h-[100px] disabled:opacity-60"
@@ -523,6 +588,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 <textarea
                   value={anamnesis}
                   disabled={!isEditable}
+                  onFocus={() => isAnamnesisFocusedRef.current = true}
+                  onBlur={(e) => handleBlurAnamnesis(e.target.value)}
                   onChange={(e) => handleSaveAnamnesis(e.target.value)}
                   placeholder="Descreva o histórico clínico do paciente, sintomas e indicações para este exame..."
                   className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
@@ -564,6 +631,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             <textarea
               value={consentTerm}
               disabled={!isEditable}
+              onFocus={() => isConsentFocusedRef.current = true}
+              onBlur={(e) => handleBlurConsentTerm(e.target.value)}
               onChange={(e) => handleSaveConsentTerm(e.target.value)}
               placeholder="Insira o texto explicativo do termo de consentimento livre e esclarecido..."
               className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"

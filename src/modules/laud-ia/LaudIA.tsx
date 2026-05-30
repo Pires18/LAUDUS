@@ -209,9 +209,11 @@ export function LaudIA() {
   const [adminSettings, setAdminSettings] = useState<AppSettings | null>(null);
 
   const { data: templates } = useCollection<ReportTemplate>('templates');
+  const [selectedArea, setSelectedArea] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [editingTemplatePrompt, setEditingTemplatePrompt] = useState<string>('');
   const [isImprovingTemplate, setIsImprovingTemplate] = useState(false);
+  const [isGeneratingTemplatePrompt, setIsGeneratingTemplatePrompt] = useState(false);
   const [templateImprovePrompt, setTemplateImprovePrompt] = useState('');
   const [showImprovePanel, setShowImprovePanel] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
@@ -342,6 +344,127 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
     } finally {
       setIsImprovingTemplate(false);
+    }
+  }
+
+  async function handleGenerateTemplatePrompt() {
+    const provider = localSettings.aiProvider || 'gemini';
+    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
+    if (!hasKey) {
+      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
+      return;
+    }
+    if (!selectedTemplateId) {
+      showToast('Selecione um exame primeiro.', 'error');
+      return;
+    }
+
+    setIsGeneratingTemplatePrompt(true);
+
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (!template) {
+      setIsGeneratingTemplatePrompt(false);
+      return;
+    }
+    
+    // Pick 1-2 examples of templates with existing aiInstructions
+    const examples = templates
+      .filter(t => t.id !== selectedTemplateId && t.aiInstructions && t.aiInstructions.trim().length > 50)
+      .slice(0, 2);
+    
+    let examplesText = '';
+    if (examples.length > 0) {
+      examplesText = `\n\nEXEMPLOS DE PROMPTS DE OUTROS EXAMES PARA PADRONIZAÇÃO:\n`;
+      examples.forEach((ex, idx) => {
+        examplesText += `--- Exemplo ${idx + 1}: ${ex.name} ---\n${ex.aiInstructions}\n\n`;
+      });
+    }
+
+    const templateStructure = `
+Nome do Exame: ${template.name}
+Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
+
+TÉCNICA:
+${template.techniqueTemplate || 'Não definida'}
+
+ANÁLISE PADRÃO:
+${template.analysisTemplate || 'Não definida'}
+
+CONCLUSÃO PADRÃO:
+${template.conclusionTemplate || 'Não definida'}
+
+RECOMENDAÇÕES PADRÃO:
+${template.recommendationsTemplate || 'Não definida'}
+`;
+
+    const masterPrompt = localSettings.aiMasterPrompt || adminSettings?.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+    const globalInstructions = localSettings.aiGlobalInstructions || adminSettings?.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
+    const structurePrompt = localSettings.aiStructurePrompt || adminSettings?.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+    const rigidRules = localSettings.aiRigidRules || adminSettings?.aiRigidRules || DEFAULT_RIGID_RULES;
+
+    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é GERAR DO ZERO as diretrizes e regras específicas (Prompt de Exame) para a máscara de laudo "${template.name}".
+Gere APENAS as INSTRUÇÕES ESPECÍFICAS (aiInstructions) para este exame. Não inclua saudações, não inclua blocos genéricos que já estão no Prompt Mestre. O seu output deve ser diretamente o texto Markdown do prompt para este exame.
+
+Use o contexto do LAUD.IA abaixo para entender a doutrina, regras rígidas e estrutura que a IA já segue:
+
+=== PROMPT MESTRE ===
+${masterPrompt}
+
+=== INSTRUÇÕES GLOBAIS ===
+${globalInstructions}
+
+=== SKELETON ===
+${structurePrompt}
+
+=== REGRAS RÍGIDAS ===
+${rigidRules}
+
+=== ESTRUTURA DA MÁSCARA ATUAL ===
+${templateStructure}
+${examplesText}`;
+
+    try {
+      let generated = '';
+
+      if (provider === 'gemini') {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
+        });
+        generated = result.response.text().trim();
+      } else {
+        // Anthropic
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': localSettings.anthropicApiKey!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+            max_tokens: 8192,
+            messages: [{ role: 'user', content: systemMsg }],
+            temperature: 0.2,
+          }),
+        });
+        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+        const result = await response.json();
+        generated = (result.content?.[0]?.text || '').trim();
+      }
+
+      if (generated) {
+        setEditingTemplatePrompt(generated);
+        showToast('Prompt do exame gerado com sucesso pela IA!', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(`Erro ao gerar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
+    } finally {
+      setIsGeneratingTemplatePrompt(false);
     }
   }
 
@@ -820,20 +943,47 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                   </div>
 
                   {/* Template Dropdown Selector */}
-                  <div className="pt-2">
-                    <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
-                    <select
-                      value={selectedTemplateId}
-                      onChange={(e) => setSelectedTemplateId(e.target.value)}
-                      className="w-full max-w-md rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
-                    >
-                      <option value="">Selecione um exame...</option>
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} ({EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="pt-2 flex flex-col md:flex-row gap-4">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Filtrar por Área</label>
+                      <select
+                        value={selectedArea}
+                        onChange={(e) => {
+                          const newArea = e.target.value;
+                          setSelectedArea(newArea);
+                          if (newArea && selectedTemplateId) {
+                            const t = templates.find(temp => temp.id === selectedTemplateId);
+                            if (t && t.area !== newArea) {
+                              setSelectedTemplateId('');
+                            }
+                          }
+                        }}
+                        className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
+                      >
+                        <option value="">Todas as Áreas</option>
+                        {EXAM_AREAS.map(a => (
+                          <option key={a.id} value={a.id}>{a.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex-1">
+                      <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
+                      <select
+                        value={selectedTemplateId}
+                        onChange={(e) => setSelectedTemplateId(e.target.value)}
+                        className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
+                      >
+                        <option value="">Selecione um exame...</option>
+                        {templates
+                          .filter(t => !selectedArea || t.area === selectedArea)
+                          .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -849,6 +999,14 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                         </h5>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={handleGenerateTemplatePrompt}
+                          disabled={isGeneratingTemplatePrompt}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+                        >
+                          {isGeneratingTemplatePrompt ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
+                          Gerar Prompt
+                        </button>
                         <button
                           onClick={() => setShowImprovePanel(!showImprovePanel)}
                           className={classNames(

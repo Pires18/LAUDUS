@@ -77,6 +77,7 @@ export function LaudCopilot({
     setAutoRefineEnabled(false);
   }, [exam.id]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isFormFocusedRef = useRef(false);
 
   const cancelActiveRequest = () => {
     if (abortControllerRef.current) {
@@ -106,7 +107,7 @@ export function LaudCopilot({
       isDirtyRef.current = false;
       prevExamIdRef.current = exam.id;
     } else {
-      if (!isDirtyRef.current) {
+      if (!isDirtyRef.current && !isFormFocusedRef.current) {
         const val = exam.customFormValue ?? template?.customForm ?? '';
         setFormText(val);
         latestValueRef.current = val;
@@ -133,6 +134,20 @@ export function LaudCopilot({
         console.error('Erro ao salvar customFormValue:', err);
       }
     }, 800);
+  };
+
+  const handleBlurFormText = async (val: string) => {
+    isFormFocusedRef.current = false;
+    if (isDirtyRef.current) {
+      if (formSaveTimerRef.current) clearTimeout(formSaveTimerRef.current);
+      try {
+        await updateItem('exams', exam.id, { customFormValue: val });
+      } finally {
+        if (latestValueRef.current === val) {
+          isDirtyRef.current = false;
+        }
+      }
+    }
   };
 
   const handleResetForm = async () => {
@@ -1215,6 +1230,8 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
             <div className="flex-1 min-h-0 flex flex-col">
               <textarea
                 value={formText}
+                onFocus={() => isFormFocusedRef.current = true}
+                onBlur={(e) => handleBlurFormText(e.target.value)}
                 onChange={(e) => handleFormTextChange(e.target.value)}
                 placeholder="Preencha os achados clínicos deste exame aqui..."
                 className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
