@@ -543,10 +543,15 @@ ${contextMessage}`;
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
+  let rawModel = settings.geminiModel || 'gemini-3.5-flash';
   if (settings.geminiModelByMode?.[mode as keyof typeof settings.geminiModelByMode]) {
-    return settings.geminiModelByMode[mode as keyof typeof settings.geminiModelByMode]!;
+    rawModel = settings.geminiModelByMode[mode as keyof typeof settings.geminiModelByMode]!;
   }
-  return settings.geminiModel || 'gemini-3.5-flash';
+  
+  if (rawModel.includes('flash')) return 'gemini-1.5-flash-latest';
+  if (rawModel.includes('pro')) return 'gemini-1.5-pro-latest';
+  
+  return rawModel;
 }
 
 async function callGemini(
