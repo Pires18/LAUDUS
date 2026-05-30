@@ -533,15 +533,19 @@ ${examplesText}`;
 
   async function testConnection() {
     const provider = localSettings.aiProvider || 'gemini';
+    const apiKey = provider === 'anthropic' 
+      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey) 
+      : (localSettings.geminiApiKey || settings?.geminiApiKey);
+
     if (provider === 'gemini') {
-      if (!localSettings.geminiApiKey) {
+      if (!apiKey) {
         showToast('Insira a API Key do Gemini primeiro', 'error');
         return;
       }
       setTestStatus('testing');
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
+        const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent('Responda apenas: OK');
         const text = result.response.text();
@@ -554,16 +558,16 @@ ${examplesText}`;
         showToast('Falha na conexão com a API do Gemini', 'error');
       }
     } else {
-      if (!localSettings.anthropicApiKey) {
+      if (!apiKey) {
         showToast('Insira a API Key do Anthropic primeiro', 'error');
         return;
       }
       setTestStatus('testing');
       try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
           method: 'POST',
           headers: {
-            'x-api-key': localSettings.anthropicApiKey || '',
+            'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json'
           },
@@ -586,8 +590,9 @@ ${examplesText}`;
           showToast('Erro ao contatar API da Anthropic', 'error');
         }
       } catch (err: unknown) {
-        setTestStatus('success');
-        showToast('Chave salva! (Validação concluída com bypass de CORS)', 'success');
+        setTestStatus('error');
+        const msg = err instanceof Error ? err.message : 'Erro de rede';
+        showToast(`Falha na conexão: ${msg}`, 'error');
       }
     }
   }
