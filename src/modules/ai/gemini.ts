@@ -620,7 +620,7 @@ async function callGeminiStream(
 // ─── URL da API Anthropic (resolve CORS em desenvolvimento via proxy Vite) ───
 // Em produção, as chamadas vão direto para api.anthropic.com (sem proxy Vite).
 // Em desenvolvimento (localhost), usamos o proxy configurado em vite.config.ts.
-function getAnthropicBaseUrl(): string {
+export function getAnthropicBaseUrl(): string {
   const isLocalDev = typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   return isLocalDev ? '/api/anthropic' : 'https://api.anthropic.com';

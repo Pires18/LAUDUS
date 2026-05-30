@@ -22,7 +22,7 @@ import {
   DEFAULT_GLOBAL_INSTRUCTIONS,
   DEFAULT_RIGID_RULES,
 } from '../ai/prompts';
-import { callMetricsHistory, type CallMetrics } from '../ai/gemini';
+import { callMetricsHistory, type CallMetrics, getAnthropicBaseUrl } from '../ai/gemini';
 
 type TabId = 'prompts' | 'templates' | 'engine' | 'training' | 'status';
 type PromptSubTab = 'master' | 'global' | 'structure' | 'rigid';
@@ -277,8 +277,11 @@ export function LaudIA() {
 
   async function handleImproveTemplatePrompt() {
     const provider = localSettings.aiProvider || 'gemini';
-    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
-    if (!hasKey) {
+    const apiKey = provider === 'anthropic' 
+      ? (localSettings.anthropicApiKey || adminSettings?.anthropicApiKey || settings?.anthropicApiKey) 
+      : (localSettings.geminiApiKey || adminSettings?.geminiApiKey || settings?.geminiApiKey);
+      
+    if (!apiKey) {
       showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
       return;
     }
@@ -307,7 +310,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
 
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const genAI = new GoogleGenerativeAI(apiKey!);
         const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
@@ -315,10 +318,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
         improved = result.response.text().trim();
       } else {
         // Anthropic
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
           method: 'POST',
           headers: {
-            'x-api-key': localSettings.anthropicApiKey!,
+            'x-api-key': apiKey!,
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json',
           },
@@ -339,6 +342,8 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
         showToast('Prompt do exame melhorado com sucesso pela IA!', 'success');
         setShowImprovePanel(false);
         setTemplateImprovePrompt('');
+      } else {
+        throw new Error('A resposta da IA foi vazia.');
       }
     } catch (err) {
       console.error(err);
@@ -351,8 +356,11 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
 
   async function handleGenerateTemplatePrompt() {
     const provider = localSettings.aiProvider || 'gemini';
-    const hasKey = provider === 'anthropic' ? !!localSettings.anthropicApiKey : !!localSettings.geminiApiKey;
-    if (!hasKey) {
+    const apiKey = provider === 'anthropic' 
+      ? (localSettings.anthropicApiKey || adminSettings?.anthropicApiKey || settings?.anthropicApiKey) 
+      : (localSettings.geminiApiKey || adminSettings?.geminiApiKey || settings?.geminiApiKey);
+      
+    if (!apiKey) {
       showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
       return;
     }
@@ -431,7 +439,7 @@ ${examplesText}`;
 
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const genAI = new GoogleGenerativeAI(apiKey!);
         const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
@@ -439,10 +447,10 @@ ${examplesText}`;
         generated = result.response.text().trim();
       } else {
         // Anthropic
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
           method: 'POST',
           headers: {
-            'x-api-key': localSettings.anthropicApiKey!,
+            'x-api-key': apiKey!,
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json',
           },
@@ -461,6 +469,8 @@ ${examplesText}`;
       if (generated) {
         setEditingTemplatePrompt(generated);
         showToast('Prompt do exame gerado com sucesso pela IA!', 'success');
+      } else {
+        throw new Error('A resposta da IA foi vazia.');
       }
     } catch (err) {
       console.error(err);
