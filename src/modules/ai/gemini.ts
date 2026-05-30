@@ -284,26 +284,24 @@ ${maskHtml}`;
 /**
  * Remove raciocínio interno do modelo do output — defesa multicamada.
  */
-export function stripScratchpad(text: string): string {
+export function stripScratchpad(text: string, disableHtmlExtraction = false): string {
   if (!text) return '';
   let cleaned = text;
 
-  // 1. Remove complete scratchpad/thinking blocks
-  cleaned = cleaned.replace(/<(scratchpad|think|thinking|thought)>[\s\S]*?<\/\1>/gi, '');
+  // 1A. Remove complete scratchpad/thinking blocks first. Handles spaces inside tags.
+  cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
   
-  // 2. Remove python/tool_code/code blocks (internal tool calls), but do NOT match html blocks
+  // 1B. For any remaining unclosed scratchpad tags (e.g., streaming or forgotten closing tag),
+  // remove from the opening tag up to the first valid content marker or end of string.
+  cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?(?====\s*CONVERSA|===\s*PROPOSTA|<h[1-6][\s>]|$)/gi, '');
+  
+  // 2. Remove python/tool_code/code blocks (internal tool calls)
   cleaned = cleaned.replace(/```(?:tool_code|python|code|javascript|typescript|bash)[\s\S]*?```/gi, '');
 
-  // 3. If there is an active/incomplete scratchpad tag, truncate at the opening tag
-  const match = cleaned.match(/<(scratchpad|think|thinking|thought)>/i);
-  if (match && match.index !== undefined) {
-    cleaned = cleaned.substring(0, match.index);
-  }
-  
-  // 4. Remove any incomplete closing/opening tags
-  cleaned = cleaned.replace(/<\/?(scratchpad|think|thinking|thought)>/gi, '');
+  // 3. Remove any loose closing/opening tags just in case
+  cleaned = cleaned.replace(/<\s*\/?\s*(scratchpad|think|thinking|thought)\s*>/gi, '');
 
-  // 5. Keep HTML block contents but strip markdown backticks if the HTML is wrapped in them
+  // 5. Keep HTML block contents but strip markdown backticks if wrapped in them
   cleaned = cleaned.replace(/```html\s*([\s\S]*?)\s*```/gi, '$1');
   cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/gi, '$1');
 
@@ -311,15 +309,13 @@ export function stripScratchpad(text: string): string {
   cleaned = cleanMarkdownFromResponse(cleaned);
 
   // 7. Extract HTML content if it doesn't have copilot format
-  const hasCopilotFormat = cleaned.includes('=== CONVERSA ===') || cleaned.includes('=== PROPOSTA ===');
-  if (!hasCopilotFormat) {
-    const h1Index = cleaned.search(/<h1[\s>]/i);
-    if (h1Index !== -1) {
-      cleaned = cleaned.substring(h1Index);
-    } else {
-      const h2Index = cleaned.search(/<h2[\s>]/i);
-      if (h2Index !== -1) {
-        cleaned = cleaned.substring(h2Index);
+  if (!disableHtmlExtraction) {
+    const hasCopilotFormat = cleaned.includes('=== CONVERSA ===') || cleaned.includes('=== PROPOSTA ===');
+    if (!hasCopilotFormat) {
+      // Find the first HTML tag to trim conversational filler like "Claro, aqui está..."
+      const firstTagMatch = cleaned.match(/<\w+[\s>]/);
+      if (firstTagMatch && firstTagMatch.index && firstTagMatch.index > 0) {
+        cleaned = cleaned.substring(firstTagMatch.index);
       }
     }
   }

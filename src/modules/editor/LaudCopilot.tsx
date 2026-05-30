@@ -373,7 +373,6 @@ export function LaudCopilot({
     return { title, items };
   };
 
-  // Parser helper para separar a conversa amigável da proposta de alteração HTML
   const parseMessageContent = (content: string) => {
     let conversation = content;
     let proposal = '';
@@ -385,37 +384,22 @@ export function LaudCopilot({
     const conversaMatch = content.match(conversaRegex);
     const propostaMatch = content.match(propostaRegex);
 
-    if (conversaMatch || propostaMatch) {
-      const conversaIndex = conversaMatch ? conversaMatch.index! : -1;
-      const conversaLength = conversaMatch ? conversaMatch[0].length : 0;
-      const propostaIndex = propostaMatch ? propostaMatch.index! : -1;
-      const propostaLength = propostaMatch ? propostaMatch[0].length : 0;
-
-      if (conversaIndex !== -1) {
-        if (propostaIndex !== -1) {
-          conversation = content.substring(conversaIndex + conversaLength, propostaIndex).trim();
-          let rawProposal = content.substring(propostaIndex + propostaLength).trim();
-          proposal = rawProposal
-            .replace(/^```html\s*/i, '')
-            .replace(/```\s*$/i, '')
-            .replace(/^```\s*/i, '')
-            .replace(/```\s*$/i, '')
-            .trim();
-        } else {
-          conversation = content.substring(conversaIndex + conversaLength).trim();
-        }
+    if (conversaMatch && propostaMatch) {
+      const conversaIndex = conversaMatch.index!;
+      const propostaIndex = propostaMatch.index!;
+      
+      if (conversaIndex < propostaIndex) {
+        conversation = content.substring(conversaIndex + conversaMatch[0].length, propostaIndex).trim();
+        proposal = content.substring(propostaIndex + propostaMatch[0].length).trim();
       } else {
-        if (propostaIndex !== -1) {
-          conversation = content.substring(0, propostaIndex).trim();
-          let rawProposal = content.substring(propostaIndex + propostaLength).trim();
-          proposal = rawProposal
-            .replace(/^```html\s*/i, '')
-            .replace(/```\s*$/i, '')
-            .replace(/^```\s*/i, '')
-            .replace(/```\s*$/i, '')
-            .trim();
-        }
+        proposal = content.substring(propostaIndex + propostaMatch[0].length, conversaIndex).trim();
+        conversation = content.substring(conversaIndex + conversaMatch[0].length).trim();
       }
+    } else if (conversaMatch) {
+      conversation = content.substring(conversaMatch.index! + conversaMatch[0].length).trim();
+    } else if (propostaMatch) {
+      proposal = content.substring(propostaMatch.index! + propostaMatch[0].length).trim();
+      conversation = content.substring(0, propostaMatch.index!).trim();
     } else {
       // ESTRATÉGIA DE FALLBACK: Se não houver marcadores explícitos
       // 1. Tentar encontrar blocos de código HTML
@@ -424,28 +408,33 @@ export function LaudCopilot({
         proposal = htmlBlockMatch[1].trim();
         conversation = content.substring(0, htmlBlockMatch.index).trim();
       } else {
-        // 2. Se não houver bloco de código, mas houver tag h1/h2 estruturando o HTML
-        const h1Index = content.search(/<h1[\s>]/i);
-        if (h1Index !== -1) {
-          conversation = content.substring(0, h1Index).trim();
-          proposal = content.substring(h1Index).trim();
+        // 2. Se não houver bloco de código, procurar primeira tag HTML útil
+        const firstTagMatch = content.match(/<\w+[\s>]/);
+        if (firstTagMatch && firstTagMatch.index !== undefined) {
+          conversation = content.substring(0, firstTagMatch.index).trim();
+          proposal = content.substring(firstTagMatch.index).trim();
         } else {
-          const h2Index = content.search(/<h2[\s>]/i);
-          if (h2Index !== -1) {
-            conversation = content.substring(0, h2Index).trim();
-            proposal = content.substring(h2Index).trim();
-          }
+          conversation = content.trim();
         }
       }
     }
 
-    // Strip scratchpad case-insensitively from both conversation and proposal
+    if (proposal) {
+      proposal = proposal
+        .replace(/^```html\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+    }
+
+    // Strip scratchpad: use disableHtmlExtraction=true for proposal to avoid cutting valid tags
     conversation = stripScratchpad(conversation);
-    proposal = stripScratchpad(proposal);
+    proposal = stripScratchpad(proposal, true);
 
     if (!conversation && !proposal && content) {
       // Fallback extremo: se os marcadores falharem ou a IA omitir tudo
-      conversation = stripScratchpad(content) || content;
+      conversation = stripScratchpad(content, true) || content;
     }
 
     return { conversation, proposal };
@@ -606,55 +595,68 @@ export function LaudCopilot({
 
       // AUTO-APPLY: Se o copiloto gerou uma proposta, aplica ela automaticamente no editor
       const { proposal } = parseMessageContent(finalHtml);
-      if (proposal) {
+      if (proposal && proposal.trim().length > 10) {
         const cleanProposal = sanitizeHtml(proposal);
-        // Salva versão anterior antes de aplicar!
-        await saveVersionSnapshot(exam.id, reportContent, 'copilot');
-        onUpdate(cleanProposal);
-        
-        const assistantMsgIndex = newHistory.length;
-        setAppliedIndices(prev => [...prev, assistantMsgIndex]);
+        if (cleanProposal && cleanProposal.trim().length > 10) {
+          // Salva versão anterior antes de aplicar!
+          await saveVersionSnapshot(exam.id, reportContent, 'copilot');
+          onUpdate(cleanProposal);
+          
+          const assistantMsgIndex = newHistory.length;
+          setAppliedIndices(prev => [...prev, assistantMsgIndex]);
 
-        if (template && autoRefineEnabled) {
-          showToast('Alterações integradas! Refinando...', 'info');
-          // Adiciona balão de status no chat
-          const chatWithRefining = [
-            ...newHistory,
-            { role: 'assistant' as const, content: finalHtml },
-            { role: 'assistant' as const, content: 'Refinando e higienizando laudo para garantir padrões de máscara...' }
-          ];
-          onChatUpdate(chatWithRefining);
+          if (template && autoRefineEnabled) {
+            showToast('Alterações integradas! Refinando...', 'info');
+            // Adiciona balão de status no chat
+            const chatWithRefining = [
+              ...newHistory,
+              { role: 'assistant' as const, content: finalHtml },
+              { role: 'assistant' as const, content: 'Refinando e higienizando laudo para garantir padrões de máscara...' }
+            ];
+            onChatUpdate(chatWithRefining);
 
-          let refinedHtml = '';
-          const finalRefined = await generateReportStream({
-            currentReport: cleanProposal,
-            template,
-            patient,
-            settings,
-            clinicalIndication: exam.clinicalIndication,
-            requestingPhysician: exam.requestingPhysician,
-            anamnesis: exam.anamnesis,
-            previousExams,
-            examDateMs: exam.createdAt,
-            signal: controller.signal
-          }, (chunk) => {
-            refinedHtml = chunk;
-            // Apenas atualiza se houver conteúdo no chunk para evitar apagar o texto antigo
-            if (refinedHtml.trim()) {
-              onUpdate(sanitizeHtml(refinedHtml));
+            let refinedHtml = '';
+            const finalRefined = await generateReportStream({
+              currentReport: cleanProposal,
+              template,
+              patient,
+              settings,
+              clinicalIndication: exam.clinicalIndication,
+              requestingPhysician: exam.requestingPhysician,
+              anamnesis: exam.anamnesis,
+              previousExams,
+              examDateMs: exam.createdAt,
+              signal: controller.signal
+            }, (chunk) => {
+              refinedHtml = chunk;
+              // Apenas atualiza se houver conteúdo no chunk para evitar apagar o texto antigo
+              if (refinedHtml.trim().length > 10) {
+                onUpdate(sanitizeHtml(refinedHtml));
+              }
+            });
+
+            if (finalRefined && finalRefined.trim().length > 10) {
+              const cleanRefined = sanitizeHtml(finalRefined);
+              if (cleanRefined && cleanRefined.trim().length > 10) {
+                onUpdate(cleanRefined);
+                showToast('Laudo integrado e refinado com sucesso! ✓', 'success');
+              } else {
+                showToast('Falha no refinamento: laudo vazio gerado.', 'error');
+                onUpdate(cleanProposal); // Restaura proposta antes do refinamento
+              }
+            } else {
+              showToast('Falha no refinamento: resposta vazia da IA.', 'error');
+              onUpdate(cleanProposal); // Restaura proposta antes do refinamento
             }
-          });
 
-          onUpdate(sanitizeHtml(finalRefined));
-          showToast('Laudo integrado e refinado com sucesso! ✓', 'success');
-
-          // Restaura o histórico de chat normal sem o balão temporário de refinamento
-          onChatUpdate([
-            ...newHistory,
-            { role: 'assistant' as const, content: finalHtml }
-          ]);
-        } else {
-          showToast('Alterações integradas com sucesso! ✓', 'success');
+            // Restaura o histórico de chat normal sem o balão temporário de refinamento
+            onChatUpdate([
+              ...newHistory,
+              { role: 'assistant' as const, content: finalHtml }
+            ]);
+          } else {
+            showToast('Alterações integradas com sucesso! ✓', 'success');
+          }
         }
       }
     } catch (error: any) {

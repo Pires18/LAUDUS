@@ -149,13 +149,21 @@ export function useExamActions({
 
         // Sanitização obrigatória do HTML antes de salvar (prevenção XSS)
         html = sanitizeHtml(html);
+        
+        // Proteção contra laudos em branco
+        if (html && html.trim().length > 10) {
+          onReportChange(html);
+          await updateItem('exams', examId, { reportContent: html });
+        } else {
+          showToast('Falha na geração: resposta vazia da IA. Restaurando anterior...', 'error');
+          onReportChange(currentReport);
+        }
       } else {
         html = generateMockReport({ template, patient, settings });
         showToast('API Key não configurada — modo demonstração ativo', 'info');
+        onReportChange(html);
+        await updateItem('exams', examId, { reportContent: html });
       }
-
-      onReportChange(html);
-      await updateItem('exams', examId, { reportContent: html });
     } catch (e: unknown) {
       console.error('[useExamActions] Erro na geração/refinamento:', e);
       const rawMsg = e instanceof Error ? e.message : String(e) || 'Erro ao processar laudo com IA';
