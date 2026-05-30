@@ -66,7 +66,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   // ── Settings ──
   settings: { 
-    geminiModel: 'gemini-2.0-flash', 
+    geminiModel: 'gemini-2.5-flash', 
     aiProvider: 'gemini', 
     anthropicModel: 'claude-3-5-sonnet-latest' 
   },

@@ -1075,9 +1075,9 @@ ${examplesText}`;
                           onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
                           className="w-full rounded-2xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-14 px-6 font-black text-xs uppercase tracking-wider cursor-pointer bg-white"
                         >
-                          <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
-                          <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
-                          <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                          <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
+                          <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                          <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
                           <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                         </select>
                       </div>
@@ -1105,9 +1105,9 @@ ${examplesText}`;
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
-                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
-                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
                               <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
@@ -1125,9 +1125,9 @@ ${examplesText}`;
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
-                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
-                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
                               <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
@@ -1145,9 +1145,9 @@ ${examplesText}`;
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
-                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
-                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
                               <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
@@ -1165,9 +1165,9 @@ ${examplesText}`;
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
-                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
-                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
+                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
                               <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>

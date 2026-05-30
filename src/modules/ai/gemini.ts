@@ -543,20 +543,23 @@ ${contextMessage}`;
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
 export function resolveGeminiModel(rawModel: string | undefined): string {
-  if (!rawModel) return 'gemini-2.0-flash';
+  if (!rawModel) return 'gemini-2.5-flash';
   const raw = rawModel.toLowerCase();
   
-  if (raw.includes('flash-thinking')) return 'gemini-2.0-flash-thinking-exp';
-  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.0-flash';
-  if (raw.includes('2.0') && raw.includes('pro')) return 'gemini-2.0-pro-exp';
+  if (raw.includes('flash-thinking')) return 'gemini-2.5-flash'; // 2.0-flash-thinking is deprecated
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash';
+  if (raw.includes('2.5') && raw.includes('pro')) return 'gemini-2.5-pro';
+  
+  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.5-flash';
+  if (raw.includes('2.0') && raw.includes('pro')) return 'gemini-2.5-pro';
   
   if (raw.includes('1.5') && raw.includes('pro')) return 'gemini-1.5-pro';
-  if (raw.includes('pro')) return 'gemini-1.5-pro';
+  if (raw.includes('pro')) return 'gemini-2.5-pro'; // Upgrade default pro to 2.5
   
   if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
-  if (raw.includes('flash')) return 'gemini-2.0-flash'; // Upgrade default flash to 2.0
+  if (raw.includes('flash')) return 'gemini-2.5-flash'; // Upgrade default flash to 2.5
   
-  return 'gemini-2.0-flash';
+  return 'gemini-2.5-flash';
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {

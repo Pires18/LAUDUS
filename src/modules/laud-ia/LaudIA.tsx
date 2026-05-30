@@ -1163,15 +1163,15 @@ ${examplesText}`;
                             onChange={(e) => patchLocal({ geminiModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
-                            <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
-                            <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                            <option value="gemini-2.5-flash">GEMINI 2.5 FLASH (Recomendado)</option>
+                            <option value="gemini-2.5-pro">GEMINI 2.5 PRO (Mais Inteligente)</option>
+                            <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
                             <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
-                              { model: 'gemini-2.0-flash', label: '3.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
-                              { model: 'gemini-2.0-pro-exp', label: '3.1 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
+                              { model: 'gemini-2.5-flash', label: '2.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
+                              { model: 'gemini-2.5-pro', label: '2.5 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
                             ].map(m => (
                               <button
                                 key={m.model}
