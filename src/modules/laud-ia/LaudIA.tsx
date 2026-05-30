@@ -307,9 +307,8 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
-        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
-        const model = genAI.getGenerativeModel({ model: realModel });
+        const modelName = localSettings.geminiModel || 'gemini-3.5-flash';
+        const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -433,9 +432,8 @@ ${examplesText}`;
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
-        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
-        const model = genAI.getGenerativeModel({ model: realModel });
+        const modelName = localSettings.geminiModel || 'gemini-3.5-flash';
+        const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
         });
@@ -485,9 +483,8 @@ ${examplesText}`;
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
-        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash' : 'gemini-1.5-pro';
-        const model = genAI.getGenerativeModel({ model: realModel });
+        const modelName = localSettings.geminiModel || 'gemini-3.5-flash';
+        const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent('Responda apenas: OK');
         if (result.response.text()) {
           setTestStatus('success');
