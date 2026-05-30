@@ -282,6 +282,7 @@ export function AdminLaudIA() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [editingTemplatePrompt, setEditingTemplatePrompt] = useState<string>('');
   const [isImprovingTemplate, setIsImprovingTemplate] = useState(false);
+  const [isGeneratingTemplatePrompt, setIsGeneratingTemplatePrompt] = useState(false);
   const [templateImprovePrompt, setTemplateImprovePrompt] = useState('');
   const [showImprovePanel, setShowImprovePanel] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
@@ -360,7 +361,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -400,6 +401,134 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
     }
   }
 
+  async function handleGenerateTemplatePrompt() {
+    const provider = localSettings.aiProvider || 'gemini';
+    if (provider === 'gemini') {
+      if (!localSettings.geminiApiKey) {
+        showToast('Configure sua API Key do Gemini antes de gerar.', 'error');
+        return;
+      }
+    } else {
+      if (!localSettings.anthropicApiKey) {
+        showToast('Configure sua API Key do Anthropic antes de gerar.', 'error');
+        return;
+      }
+    }
+    
+    if (!selectedTemplateId) {
+      showToast('Selecione um exame primeiro.', 'error');
+      return;
+    }
+
+    setIsGeneratingTemplatePrompt(true);
+
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (!template) {
+      setIsGeneratingTemplatePrompt(false);
+      return;
+    }
+    
+    // Pick 1-2 examples of templates with existing aiInstructions
+    const examples = templates
+      .filter(t => t.id !== selectedTemplateId && t.aiInstructions && t.aiInstructions.trim().length > 50)
+      .slice(0, 2);
+    
+    let examplesText = '';
+    if (examples.length > 0) {
+      examplesText = `\n\nEXEMPLOS DE PROMPTS DE OUTROS EXAMES PARA PADRONIZAÇÃO:\n`;
+      examples.forEach((ex, idx) => {
+        examplesText += `--- Exemplo ${idx + 1}: ${ex.name} ---\n${ex.aiInstructions}\n\n`;
+      });
+    }
+
+    const templateStructure = `
+Nome do Exame: ${template.name}
+Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
+
+TÉCNICA:
+${template.techniqueTemplate || 'Não definida'}
+
+ANÁLISE PADRÃO:
+${template.analysisTemplate || 'Não definida'}
+
+CONCLUSÃO PADRÃO:
+${template.conclusionTemplate || 'Não definida'}
+
+RECOMENDAÇÕES PADRÃO:
+${template.recommendationsTemplate || 'Não definida'}
+`;
+
+    const masterPrompt = localSettings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+    const globalInstructions = localSettings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
+    const structurePrompt = localSettings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+    const rigidRules = localSettings.aiRigidRules || DEFAULT_RIGID_RULES;
+
+    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é GERAR DO ZERO as diretrizes e regras específicas (Prompt de Exame) para a máscara de laudo "${template.name}".
+Gere APENAS as INSTRUÇÕES ESPECÍFICAS (aiInstructions) para este exame. Não inclua saudações, não inclua blocos genéricos que já estão no Prompt Mestre. O seu output deve ser diretamente o texto Markdown do prompt para este exame.
+
+Use o contexto do LAUD.IA abaixo para entender a doutrina, regras rígidas e estrutura que a IA já segue:
+
+=== PROMPT MESTRE ===
+${masterPrompt}
+
+=== INSTRUÇÕES GLOBAIS ===
+${globalInstructions}
+
+=== SKELETON ===
+${structurePrompt}
+
+=== REGRAS RÍGIDAS ===
+${rigidRules}
+
+=== ESTRUTURA DA MÁSCARA ATUAL ===
+${templateStructure}
+${examplesText}`;
+
+    try {
+      let generated = '';
+
+      if (provider === 'gemini') {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
+        });
+        generated = result.response.text().trim();
+      } else {
+        // Anthropic
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': localSettings.anthropicApiKey!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
+            max_tokens: 8192,
+            messages: [{ role: 'user', content: systemMsg }],
+            temperature: 0.2,
+          }),
+        });
+        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
+        const result = await response.json();
+        generated = (result.content?.[0]?.text || '').trim();
+      }
+
+      if (generated) {
+        setEditingTemplatePrompt(generated);
+        showToast('Prompt do exame gerado com sucesso pela IA!', 'success');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast(`Erro ao gerar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
+    } finally {
+      setIsGeneratingTemplatePrompt(false);
+    }
+  }
+
   async function testConnection() {
     const provider = localSettings.aiProvider || 'gemini';
     if (provider === 'gemini') {
@@ -411,7 +540,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-3.5-flash' });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
         const result = await model.generateContent('Responda apenas: OK');
         const text = result.response.text();
         if (text) {
@@ -481,7 +610,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
               COGNITIVE HUB: ACTIVE
             </span>
             <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
-              {localSettings.geminiModel || 'gemini-3.5-flash'}
+              {localSettings.geminiModel || 'gemini-2.0-flash'}
             </span>
           </div>
           <h3 className="text-xl font-black text-ink-900">IA Command Center</h3>
@@ -775,6 +904,14 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
+                        onClick={handleGenerateTemplatePrompt}
+                        disabled={isGeneratingTemplatePrompt}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+                      >
+                        {isGeneratingTemplatePrompt ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
+                        Gerar Prompt
+                      </button>
+                      <button
                         onClick={() => setShowImprovePanel(!showImprovePanel)}
                         className={classNames(
                           'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
@@ -928,10 +1065,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                           onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
                           className="w-full rounded-2xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-14 px-6 font-black text-xs uppercase tracking-wider cursor-pointer bg-white"
                         >
-                          <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
-                          <option value="gemini-3-flash">GEMINI 3 FLASH</option>
-                          <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
-                          <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                          <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
+                          <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
+                          <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                          <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                         </select>
                       </div>
 
@@ -958,10 +1095,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
-                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
-                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
-                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
+                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
+                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
                           {/* Refinamento */}
@@ -978,10 +1115,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
-                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
-                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
-                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
+                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
+                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
                           {/* Copiloto */}
@@ -998,10 +1135,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
-                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
-                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
-                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
+                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
+                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
                           {/* Templates */}
@@ -1018,10 +1155,10 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                               className="w-full rounded-xl border-zinc-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 h-11 px-4 font-black text-[10px] uppercase tracking-wider cursor-pointer bg-white"
                             >
                               <option value="">Padrão do System (Flash / Adaptativo)</option>
-                              <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
-                              <option value="gemini-3-flash">GEMINI 3 FLASH</option>
-                              <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
-                              <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                              <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
+                              <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
+                              <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                              <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                             </select>
                           </div>
                         </div>
@@ -1217,7 +1354,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                       icon: Cpu,
                       color: 'brand',
                       hasKey: !!localSettings.geminiApiKey,
-                      model: localSettings.geminiModel || 'gemini-3.5-flash',
+                      model: localSettings.geminiModel || 'gemini-2.0-flash',
                       isActive: (localSettings.aiProvider || 'gemini') === 'gemini',
                     },
                     {
@@ -1316,7 +1453,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { label: 'Motor', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
-                    { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
+                    { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-2.0-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
                     { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
                     { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
                   ].map(item => (

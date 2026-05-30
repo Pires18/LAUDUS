@@ -99,7 +99,7 @@ Gere o JSON da máscara do laudo agora.`;
   if (provider === 'gemini') {
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
     const model = genAI.getGenerativeModel({
-      model: settings.geminiModel || 'gemini-3.1-flash',
+      model: settings.geminiModel || 'gemini-2.0-flash',
       systemInstruction: systemContext,
       generationConfig: {
         temperature: 0.2,
@@ -250,7 +250,7 @@ Regras importantes:
   if (provider === 'gemini') {
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
     const model = genAI.getGenerativeModel({
-      model: settings.geminiModel || 'gemini-3.1-flash',
+      model: settings.geminiModel || 'gemini-2.0-flash',
       systemInstruction: systemContext,
       generationConfig: {
         temperature: 0.3,

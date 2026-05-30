@@ -307,9 +307,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
-        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash-latest' : 'gemini-1.5-pro-latest';
-        const model = genAI.getGenerativeModel({ model: realModel });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
         });
@@ -433,9 +431,7 @@ ${examplesText}`;
       if (provider === 'gemini') {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey!);
-        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
-        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash-latest' : 'gemini-1.5-pro-latest';
-        const model = genAI.getGenerativeModel({ model: realModel });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
         const result = await model.generateContent({
           contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
         });
@@ -485,9 +481,7 @@ ${examplesText}`;
       try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(localSettings.geminiApiKey);
-        const rawModel = localSettings.geminiModel || 'gemini-3.5-flash';
-        const realModel = rawModel.includes('flash') ? 'gemini-1.5-flash-latest' : 'gemini-1.5-pro-latest';
-        const model = genAI.getGenerativeModel({ model: realModel });
+        const model = genAI.getGenerativeModel({ model: localSettings.geminiModel || 'gemini-2.0-flash' });
         const result = await model.generateContent('Responda apenas: OK');
         if (result.response.text()) {
           setTestStatus('success');
@@ -681,7 +675,7 @@ ${examplesText}`;
                 LAUD.IA PERSONAL: ACTIVE
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
-                {localSettings.geminiModel || 'gemini-3.5-flash'}
+                {localSettings.geminiModel || 'gemini-2.0-flash'}
               </span>
             </div>
             <h3 className="text-xl font-black text-ink-900">Personalização LAUD.IA</h3>
@@ -1150,15 +1144,15 @@ ${examplesText}`;
                             onChange={(e) => patchLocal({ geminiModel: e.target.value })}
                             className="input h-14"
                           >
-                            <option value="gemini-3.5-flash">GEMINI 3.5 FLASH</option>
-                            <option value="gemini-3-flash">GEMINI 3 FLASH</option>
-                            <option value="gemini-3.1-pro">GEMIINI 3.1 PRO</option>
-                            <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
+                            <option value="gemini-2.0-flash">GEMINI 2.0 FLASH</option>
+                            <option value="gemini-2.0-flash-thinking-exp">GEMINI 2.0 THINKING</option>
+                            <option value="gemini-2.0-pro-exp">GEMINI 2.0 PRO</option>
+                            <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
-                              { model: 'gemini-3.5-flash', label: '3.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
-                              { model: 'gemini-3.1-pro', label: '3.1 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
+                              { model: 'gemini-2.0-flash', label: '3.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
+                              { model: 'gemini-2.0-pro-exp', label: '3.1 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
                             ].map(m => (
                               <button
                                 key={m.model}
@@ -1421,7 +1415,7 @@ ${examplesText}`;
                         icon: Cpu,
                         color: 'brand',
                         hasKey: !!localSettings.geminiApiKey,
-                        model: localSettings.geminiModel || 'gemini-2.5-flash',
+                        model: localSettings.geminiModel || 'gemini-2.0-flash',
                         isActive: (localSettings.aiProvider || 'gemini') === 'gemini',
                       },
                       {
@@ -1520,7 +1514,7 @@ ${examplesText}`;
                   <div className="grid grid-cols-2 gap-4">
                     {[
                       { label: 'Motor', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
-                      { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-2.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
+                      { label: 'Modelo', value: (localSettings.aiProvider || 'gemini') === 'gemini' ? (localSettings.geminiModel || 'gemini-2.0-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
                       { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
                       { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
                     ].map(item => (

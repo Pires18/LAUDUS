@@ -1,12 +1,4 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-async function run() {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'fake');
-  try {
-    // We can't list models without a valid key, but let's try
-    // We will extract the API key from localSettings if possible
-  } catch(e) {
-    console.log(e);
-  }
-}
-run();
+// We don't have the user's API key directly but let's see if we can parse it from localStorage if it's not a browser env...
+// Actually, I can't run this without the key.
