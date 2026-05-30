@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator,
   Lightbulb, Zap, Command, ChevronRight, ClipboardList, RotateCcw, CheckCircle2
@@ -164,6 +164,37 @@ export function LaudCopilot({
       await updateItem('exams', exam.id, { customFormValue: val });
       showToast('Formulário restaurado!', 'success');
     }
+  };
+
+  // Logica de parsing dinâmico do formulário
+  const parsedFormFields = useMemo(() => {
+    const text = formText || '';
+    const lines = text.split('\n');
+    const fields: { label: string, value: string }[] = [];
+    
+    lines.forEach(line => {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex !== -1 && colonIndex < 40) {
+        fields.push({
+          label: line.substring(0, colonIndex).trim(),
+          value: line.substring(colonIndex + 1).trim()
+        });
+      } else {
+        if (fields.length > 0 && line.trim()) {
+          fields[fields.length - 1].value += (fields[fields.length - 1].value ? '\n' : '') + line;
+        } else if (line.trim()) {
+          fields.push({ label: 'Anotação', value: line });
+        }
+      }
+    });
+    return fields;
+  }, [formText]);
+
+  const updateFieldValue = (index: number, newValue: string) => {
+    const newFields = [...parsedFormFields];
+    newFields[index].value = newValue;
+    const newText = newFields.map(f => `${f.label}: ${f.value}`).join('\n');
+    handleFormTextChange(newText);
   };
 
   const { settings, showToast } = useApp();
@@ -858,21 +889,20 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                           </div>
 
                           <div className="flex flex-col gap-2 max-w-[82%]">
-                            <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl rounded-tr-none p-5 shadow-lg space-y-4 relative overflow-hidden">
-                              <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+                            <div className="bg-white border border-brand-100 rounded-2xl rounded-tr-none p-4 shadow-sm space-y-4 relative overflow-hidden">
                               <div className="flex items-center gap-2.5 relative z-10">
-                                <div className="w-7 h-7 rounded-lg bg-brand-500/25 border border-brand-500/35 flex items-center justify-center shadow-inner">
-                                  <Calculator size={14} className="text-brand-400" />
+                                <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 border border-brand-100 flex items-center justify-center shadow-sm">
+                                  <Calculator size={16} />
                                 </div>
                                 <div>
-                                  <span className="text-[10px] font-black uppercase tracking-wider block text-brand-400">Métricas Coletadas</span>
-                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight block">{calcData.title}</span>
+                                  <span className="text-[9px] font-black uppercase tracking-widest block text-slate-400">Calculadora</span>
+                                  <span className="text-[11px] text-slate-800 font-bold uppercase tracking-tight block">{calcData.title}</span>
                                 </div>
                               </div>
 
                               {calcData.conclusion && (
-                                <div className="p-3 bg-white/5 border border-white/10 rounded-xl relative z-10">
-                                  <p className="text-[11px] font-bold text-slate-200 leading-relaxed">
+                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl relative z-10">
+                                  <p className="text-[11px] font-bold text-slate-700 leading-relaxed">
                                     {calcData.conclusion}
                                   </p>
                                 </div>
@@ -881,9 +911,9 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                               {calcData.metrics.length > 0 && (
                                 <div className="grid grid-cols-2 gap-2 relative z-10">
                                   {calcData.metrics.map((m, i) => (
-                                    <div key={i} className="p-2 bg-white/5 border border-white/10 rounded-lg flex flex-col shadow-inner">
-                                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tight">{m.key}</span>
-                                      <span className="text-[10px] font-bold text-white mt-0.5">{m.value}</span>
+                                    <div key={i} className="p-2.5 bg-white border border-slate-100 rounded-xl flex flex-col shadow-sm">
+                                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{m.key}</span>
+                                      <span className="text-[11px] font-bold text-slate-800 mt-1">{m.value}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -911,34 +941,33 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                           </div>
 
                           <div className="flex flex-col gap-2 max-w-[82%]">
-                            <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl rounded-tr-none p-5 shadow-lg space-y-4 relative overflow-hidden">
-                              <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+                            <div className="bg-white border border-brand-100 rounded-2xl rounded-tr-none p-4 shadow-sm space-y-4 relative overflow-hidden">
                               <div className="flex items-center gap-2.5 relative z-10">
-                                <div className="w-7 h-7 rounded-lg bg-brand-500/25 border border-brand-500/35 flex items-center justify-center shadow-inner">
-                                  <ClipboardList size={14} className="text-brand-400" />
+                                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-sm">
+                                  <ClipboardList size={16} />
                                 </div>
                                 <div>
-                                  <span className="text-[10px] font-black uppercase tracking-wider block text-brand-400">Achados do Formulário</span>
-                                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight block">{formData.title}</span>
+                                  <span className="text-[9px] font-black uppercase tracking-widest block text-slate-400">Achados do Formulário</span>
+                                  <span className="text-[11px] text-slate-800 font-bold uppercase tracking-tight block">{formData.title}</span>
                                 </div>
                               </div>
 
-                              <div className="space-y-2.5 relative z-10 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                              <div className="space-y-2 relative z-10 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
                                 {formData.items.map((item, i) => (
-                                  <div key={i} className="p-3 bg-white/5 border border-white/10 rounded-xl flex flex-col gap-1 hover:bg-white/10 transition-all">
+                                  <div key={i} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-col gap-1.5 hover:bg-white transition-all shadow-sm">
                                     <div className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold text-slate-100">{item.structure}</span>
+                                      <span className="text-[10px] font-bold text-slate-700">{item.structure}</span>
                                       <span className={classNames(
-                                        "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider",
+                                        "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider shadow-sm",
                                         item.status === 'Alterado'
-                                          ? "bg-red-500/25 text-red-400 border border-red-500/30"
-                                          : "bg-emerald-500/25 text-emerald-400 border border-emerald-500/30"
+                                          ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                          : "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                       )}>
                                         {item.status}
                                       </span>
                                     </div>
                                     {item.details && (
-                                      <span className="text-[9px] font-medium text-slate-300 italic pt-0.5 border-t border-white/5 mt-0.5">
+                                      <span className="text-[11px] font-medium text-slate-600 pt-1.5 border-t border-slate-200/50 mt-1">
                                         {item.details}
                                       </span>
                                     )}
@@ -976,8 +1005,8 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                         <div className={classNames(
                           "p-4 rounded-2xl text-xs leading-relaxed shadow-sm border transition-all hover:shadow-md",
                           isUser
-                            ? "bg-gradient-to-br from-slate-800 to-slate-950 text-slate-100 border-slate-900 rounded-tr-none shadow-md shadow-slate-950/10"
-                            : "bg-white border-slate-100 text-slate-850 rounded-tl-none shadow-slate-500/[0.02]"
+                            ? "bg-brand-50 text-brand-900 border-brand-100 rounded-tr-none shadow-md shadow-brand-500/5"
+                            : "bg-white border-slate-200 text-slate-800 rounded-tl-none shadow-sm"
                         )}>
                           {renderRichClinicalContent(conversation, isUser)}
                         </div>
@@ -1233,17 +1262,36 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
               </div>
             </div>
 
-            {/* Texto Livre — única modalidade de preenchimento */}
-            <div className="flex-1 min-h-0 flex flex-col">
-              <textarea
-                value={formText}
-                onFocus={() => isFormFocusedRef.current = true}
-                onBlur={(e) => handleBlurFormText(e.target.value)}
-                onChange={(e) => handleFormTextChange(e.target.value)}
-                placeholder="Preencha os achados clínicos deste exame aqui..."
-                className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
-                style={{ minHeight: 0 }}
-              />
+            {/* Estrutura de Formulário Dinâmica */}
+            <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
+              {parsedFormFields.length > 0 ? (
+                parsedFormFields.map((field: { label: string; value: string }, idx: number) => (
+                  <div key={idx} className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">
+                      {field.label}
+                    </label>
+                    <input
+                      type="text"
+                      value={field.value}
+                      onChange={(e) => updateFieldValue(idx, e.target.value)}
+                      onFocus={() => isFormFocusedRef.current = true}
+                      onBlur={() => isFormFocusedRef.current = false}
+                      placeholder="..."
+                      className="w-full p-3 bg-white border border-slate-200 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-xl outline-none transition-all text-xs font-semibold text-slate-800 shadow-sm"
+                    />
+                  </div>
+                ))
+              ) : (
+                <textarea
+                  value={formText}
+                  onFocus={() => isFormFocusedRef.current = true}
+                  onBlur={(e) => handleBlurFormText(e.target.value)}
+                  onChange={(e) => handleFormTextChange(e.target.value)}
+                  placeholder="Preencha os achados clínicos deste exame aqui..."
+                  className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
+                  style={{ minHeight: 0 }}
+                />
+              )}
             </div>
           </div>
 
