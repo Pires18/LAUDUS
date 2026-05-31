@@ -612,10 +612,11 @@ async function callAnthropic(
       'x-api-key': settings.anthropicApiKey!,
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'prompt-caching-2024-07-31',
+      'anthropic-dangerous-direct-browser-access': 'true',
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+      model: settings.anthropicModel || 'claude-sonnet-4-5',
       max_tokens: getMaxTokens(area),
       system: systemBlocks,
       messages: [{ role: 'user', content: built.userMessage }],
@@ -661,10 +662,11 @@ async function callAnthropicStream(
       'x-api-key': settings.anthropicApiKey!,
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'prompt-caching-2024-07-31',
+      'anthropic-dangerous-direct-browser-access': 'true',
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+      model: settings.anthropicModel || 'claude-sonnet-4-5',
       max_tokens: getMaxTokens(area),
       system: systemBlocks,
       messages: [{ role: 'user', content: built.userMessage }],
@@ -734,7 +736,7 @@ function detectArea(params: GenerateReportParams | CopilotParams | RefineParams)
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
   const { settings, signal } = params as any;
-  const provider = settings.aiProvider || 'gemini';
+  const provider = settings.aiProvider || 'anthropic';
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
@@ -790,7 +792,7 @@ export async function generateReportStream(
   onChunk: (text: string) => void
 ): Promise<string> {
   const { settings, signal } = params as any;
-  const provider = settings.aiProvider || 'gemini';
+  const provider = settings.aiProvider || 'anthropic';
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();

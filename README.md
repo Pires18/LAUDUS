@@ -1,4 +1,4 @@
-# 🩺 LAUD.US — Sistema de Laudos Ultrassonográficos Premium
+# 🩺 LAUD.US — Sistema de Laudos Ultrassonográficos Premium (v3.0.0)
 
 O **LAUD.US** é um ecossistema digital premium de alta performance projetado para médicos radiologistas e ultrassonografistas. Ele oferece um fluxo de trabalho completo que vai do agendamento à geração automatizada de laudos complexos e integrados, com o auxílio de inteligência artificial de ponta (Google Gemini e Anthropic Claude).
 

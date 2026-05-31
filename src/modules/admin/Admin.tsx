@@ -221,7 +221,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
                    </p>
                    <p className="text-[10px] text-brand-600 font-mono">
                      {settings.aiProvider === 'anthropic'
-                       ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                       ? (settings.anthropicModel || 'claude-sonnet-4-5')
                        : (settings.geminiModel || 'gemini-2.0-flash')}
                    </p>
                 </div>

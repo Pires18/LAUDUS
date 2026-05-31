@@ -1,4 +1,4 @@
-# 🗺️ Arquitetura e Padrões de Engenharia — LAUD.US
+# 🗺️ Arquitetura e Padrões de Engenharia — LAUD.US (v3.0.0)
 
 Este documento serve como a especificação técnica oficial da arquitetura do sistema **LAUD.US**, descrevendo os padrões de design, fluxo de dados, lógica do motor de Inteligência Artificial e integrações periféricas.
 

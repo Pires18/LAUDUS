@@ -21,7 +21,7 @@ export async function generateTemplateStructure(
   examName: string,
   settings: AppSettings
 ): Promise<GeneratedTemplate> {
-  const provider = settings.aiProvider || 'gemini';
+  const provider = settings.aiProvider || 'anthropic';
   const hasKey = provider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
   if (!hasKey) {
     throw new Error(`API Key do ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada. Vá em Configurações para adicionar.`);
@@ -117,10 +117,11 @@ Gere o JSON da máscara do laudo agora.`;
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-1-0',
+        'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+        model: settings.anthropicModel || 'claude-sonnet-4-5',
         max_tokens: 8192,
         system: [
           {
@@ -175,7 +176,7 @@ export async function generateTemplateField(
   fieldType: 'customForm' | 'anamnesis' | 'consent',
   settings: AppSettings
 ): Promise<string> {
-  const provider = settings.aiProvider || 'gemini';
+  const provider = settings.aiProvider || 'anthropic';
   const hasKey = provider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
   if (!hasKey) {
     throw new Error(`API Key do ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada. Vá em Configurações para adicionar.`);
@@ -268,10 +269,11 @@ Regras importantes:
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-1-0',
+        'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
+        model: settings.anthropicModel || 'claude-sonnet-4-5',
         max_tokens: 8192,
         system: [
           {

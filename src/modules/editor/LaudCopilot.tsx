@@ -166,37 +166,6 @@ export function LaudCopilot({
     }
   };
 
-  // Logica de parsing dinâmico do formulário
-  const parsedFormFields = useMemo(() => {
-    const text = formText || '';
-    const lines = text.split('\n');
-    const fields: { label: string, value: string }[] = [];
-    
-    lines.forEach(line => {
-      const colonIndex = line.indexOf(':');
-      if (colonIndex !== -1 && colonIndex < 40) {
-        fields.push({
-          label: line.substring(0, colonIndex).trim(),
-          value: line.substring(colonIndex + 1).trim()
-        });
-      } else {
-        if (fields.length > 0 && line.trim()) {
-          fields[fields.length - 1].value += (fields[fields.length - 1].value ? '\n' : '') + line;
-        } else if (line.trim()) {
-          fields.push({ label: 'Anotação', value: line });
-        }
-      }
-    });
-    return fields;
-  }, [formText]);
-
-  const updateFieldValue = (index: number, newValue: string) => {
-    const newFields = [...parsedFormFields];
-    newFields[index].value = newValue;
-    const newText = newFields.map(f => `${f.label}: ${f.value}`).join('\n');
-    handleFormTextChange(newText);
-  };
-
   const { settings, showToast } = useApp();
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1274,36 +1243,17 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
               </div>
             </div>
 
-            {/* Estrutura de Formulário Dinâmica */}
-            <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
-              {parsedFormFields.length > 0 ? (
-                parsedFormFields.map((field: { label: string; value: string }, idx: number) => (
-                  <div key={idx} className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">
-                      {field.label}
-                    </label>
-                    <input
-                      type="text"
-                      value={field.value}
-                      onChange={(e) => updateFieldValue(idx, e.target.value)}
-                      onFocus={() => isFormFocusedRef.current = true}
-                      onBlur={() => isFormFocusedRef.current = false}
-                      placeholder="..."
-                      className="w-full p-3 bg-white border border-slate-200 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 rounded-xl outline-none transition-all text-xs font-semibold text-slate-800 shadow-sm"
-                    />
-                  </div>
-                ))
-              ) : (
-                <textarea
-                  value={formText}
-                  onFocus={() => isFormFocusedRef.current = true}
-                  onBlur={(e) => handleBlurFormText(e.target.value)}
-                  onChange={(e) => handleFormTextChange(e.target.value)}
-                  placeholder="Preencha os achados clínicos deste exame aqui..."
-                  className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
-                  style={{ minHeight: 0 }}
-                />
-              )}
+            {/* Texto Livre — única modalidade de preenchimento */}
+            <div className="flex-1 min-h-0 flex flex-col">
+              <textarea
+                value={formText}
+                onFocus={() => isFormFocusedRef.current = true}
+                onBlur={(e) => handleBlurFormText(e.target.value)}
+                onChange={(e) => handleFormTextChange(e.target.value)}
+                placeholder="Preencha os achados clínicos deste exame aqui..."
+                className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
+                style={{ minHeight: 0 }}
+              />
             </div>
           </div>
 

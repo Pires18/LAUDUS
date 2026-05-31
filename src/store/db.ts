@@ -109,8 +109,8 @@ export async function getSettings(): Promise<AppSettings> {
     
     let defaultSettings: AppSettings = { 
       geminiModel: 'gemini-2.5-flash', 
-      aiProvider: 'gemini', 
-      anthropicModel: 'claude-3-5-sonnet-latest',
+      aiProvider: 'anthropic', 
+      anthropicModel: 'claude-sonnet-4-5',
       dicomSyncEnabled: true,
       dicomWorklistFolder: isWindows 
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
@@ -181,7 +181,7 @@ export async function getSettings(): Promise<AppSettings> {
     if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
       const adminSettings = await getAdminSettings();
       if (adminSettings) {
-        return {
+        const merged = {
           ...defaultSettings,
           ...adminSettings,
           ...data, // Configurações locais do médico (CRM, RQE, nome) prevalecem
@@ -194,17 +194,25 @@ export async function getSettings(): Promise<AppSettings> {
           geminiApiKey: data.geminiApiKey || adminSettings.geminiApiKey || '',
           anthropicApiKey: data.anthropicApiKey || adminSettings.anthropicApiKey || '',
         };
+        if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
+          merged.anthropicModel = 'claude-sonnet-4-5';
+        }
+        return merged;
       }
     }
-    return { ...defaultSettings, ...data };
+    const finalData = { ...defaultSettings, ...data };
+    if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
+      finalData.anthropicModel = 'claude-sonnet-4-5';
+    }
+    return finalData;
   } catch (err) {
     console.warn('[DB] Erro ao carregar settings:', err);
   }
   const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
   return { 
     geminiModel: 'gemini-2.5-flash', 
-    aiProvider: 'gemini', 
-    anthropicModel: 'claude-3-5-sonnet-latest',
+    aiProvider: 'anthropic', 
+    anthropicModel: 'claude-sonnet-4-5',
     dicomSyncEnabled: true,
     dicomWorklistFolder: isWindows 
       ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
@@ -244,7 +252,11 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
       const adminDocRef = doc(firestore, `users/${cachedAdminUid}/settings`, SETTINGS_DOC_ID);
       const adminSnap = await getDoc(adminDocRef);
       if (adminSnap.exists()) {
-        return adminSnap.data() as AppSettings;
+        const adminData = adminSnap.data() as AppSettings;
+        if (adminData.anthropicModel === 'claude-3-5-sonnet-latest' || adminData.anthropicModel === 'claude-3-7-sonnet-latest' || adminData.anthropicModel === 'claude-3-5-haiku-latest') {
+          adminData.anthropicModel = 'claude-sonnet-4-5';
+        }
+        return adminData;
       }
     }
   } catch (e) {

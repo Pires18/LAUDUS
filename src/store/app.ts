@@ -67,12 +67,16 @@ export const useApp = create<AppState>((set, get) => ({
   // ── Settings ──
   settings: { 
     geminiModel: 'gemini-2.5-flash', 
-    aiProvider: 'gemini', 
-    anthropicModel: 'claude-3-5-sonnet-latest' 
+    aiProvider: 'anthropic', 
+    anthropicModel: 'claude-sonnet-4-5' 
   },
   loadSettings: async () => {
     try {
       const s = await getSettings();
+      // Map legacy anthropic models to correct valid model
+      if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
+        s.anthropicModel = 'claude-sonnet-4-5';
+      }
       set({ settings: s });
       // Se tem clínica padrão nas settings, seta como selecionada
       if (s.defaultClinicId) {

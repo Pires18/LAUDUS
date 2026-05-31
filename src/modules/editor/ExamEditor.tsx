@@ -792,8 +792,8 @@ export function ExamEditor({ examId }: Props) {
           />
 
           {/* AVISO API KEY */}
-          {((settings.aiProvider === 'anthropic' && !settings.anthropicApiKey) || 
-            ((settings.aiProvider === 'gemini' || !settings.aiProvider) && !settings.geminiApiKey)) && (
+          {(((settings.aiProvider === 'anthropic' || !settings.aiProvider) && !settings.anthropicApiKey) || 
+            ((settings.aiProvider === 'gemini') && !settings.geminiApiKey)) && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
               <AlertCircle size={12} />
               <span>API Key do {settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada — geração em <strong>modo demo</strong>.</span>
@@ -1118,7 +1118,7 @@ export function ExamEditor({ examId }: Props) {
                 saveState={saveState}
                 geminiModel={
                   settings.aiProvider === 'anthropic'
-                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                    ? (settings.anthropicModel || 'claude-sonnet-4-5')
                     : (settings.geminiModel || 'gemini-2.0-flash')
                 }
               />
@@ -1401,7 +1401,7 @@ export function ExamEditor({ examId }: Props) {
                 <h3 className="font-semibold text-ink-900 flex items-center gap-2"><Eye size={16} className="text-brand-500" /> Prompt Preview</h3>
                 <p className="text-xs text-ink-500 mt-0.5">Prompt exato enviado ao modelo {
                   settings.aiProvider === 'anthropic'
-                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                    ? (settings.anthropicModel || 'claude-sonnet-4-5')
                     : (settings.geminiModel || 'gemini-2.0-flash')
                 }</p>
               </div>
@@ -1427,7 +1427,7 @@ export function ExamEditor({ examId }: Props) {
               <span className="text-[10px] text-ink-400">
                 Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {
                   settings.aiProvider === 'anthropic'
-                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
+                    ? (settings.anthropicModel || 'claude-sonnet-4-5')
                     : (settings.geminiModel || 'gemini-2.0-flash')
                 }
               </span>
