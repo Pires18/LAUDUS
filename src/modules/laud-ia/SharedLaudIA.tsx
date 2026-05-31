@@ -289,6 +289,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   const [isGeneratingTemplatePrompt, setIsGeneratingTemplatePrompt] = useState(false);
   const [templateImprovePrompt, setTemplateImprovePrompt] = useState('');
   const [showImprovePanel, setShowImprovePanel] = useState(false);
+  const [showBatchImprovePanel, setShowBatchImprovePanel] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -1163,15 +1164,63 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
                           Gerar Todos ({templates.filter(t => t.area === selectedAreaFilter).length})
                         </button>
                         <button
-                          onClick={handleImproveAllPrompts}
+                          onClick={() => setShowBatchImprovePanel(!showBatchImprovePanel)}
                           disabled={isGeneratingAll || isImprovingAll}
-                          className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-black rounded-xl transition-all border uppercase tracking-widest shadow-sm bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 disabled:opacity-50"
+                          className={classNames(
+                            'flex items-center gap-1.5 px-4 py-2 text-[10px] font-black rounded-xl transition-all border uppercase tracking-widest shadow-sm',
+                            showBatchImprovePanel
+                              ? 'bg-violet-600 text-white border-violet-700'
+                              : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 disabled:opacity-50'
+                          )}
                         >
                           {isImprovingAll ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                           Melhorar Todos
+                          {showBatchImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                         </button>
                       </div>
                     </div>
+
+                    {/* Batch AI Improve Panel */}
+                    {showBatchImprovePanel && (
+                      <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
+                        <div className="flex items-center gap-2">
+                          <Sparkles size={16} className="text-violet-600" />
+                          <h5 className="font-black text-violet-900 text-sm">Melhoria em Lote com IA</h5>
+                        </div>
+                        <p className="text-[11px] text-violet-700 leading-relaxed">
+                          A IA analisará e reescreverá todos os prompts desta área para torná-los mais completos e clinicamente precisos. Opcionalmente, descreva o que deseja focar.
+                        </p>
+                        <textarea readOnly={readOnly} disabled={readOnly}
+                          value={templateImprovePrompt}
+                          onChange={(e) => setTemplateImprovePrompt(e.target.value)}
+                          rows={3}
+                          className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
+                          placeholder="Opcional: descreva instruções para todos os exames desta área... (ex: focar em critérios de malignidade)"
+                        />
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => {
+                              setShowBatchImprovePanel(false);
+                              handleImproveAllPrompts();
+                            }}
+                            disabled={isImprovingAll || isGeneratingAll}
+                            className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
+                          >
+                            {isImprovingAll ? (
+                              <><Loader2 size={16} className="animate-spin" /> Processando Lote...</>
+                            ) : (
+                              <><Sparkles size={16} /> Iniciar Melhoria em Lote</>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => { setShowBatchImprovePanel(false); setTemplateImprovePrompt(''); }}
+                            className="text-sm text-violet-500 hover:underline font-medium"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {batchProgress && (
                       <div className="flex items-center gap-3 p-3 bg-brand-50 border border-brand-200 rounded-xl animate-fade-in">
                         <Loader2 size={16} className="animate-spin text-brand-600" />
