@@ -229,6 +229,9 @@ export interface AppSettings {
   dicomBackupViewerUrl?: string;
   dicomBackupUsername?: string;
   dicomBackupPassword?: string;
+  dicomBackupSyncEnabled?: boolean;
+  dicomBackupWorklistFolder?: string;
+  dicomBackupLocalAgentUrl?: string;
 
   // Preferências do Sistema
   soundNotifications?: boolean;

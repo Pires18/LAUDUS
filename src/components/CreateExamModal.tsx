@@ -199,6 +199,32 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
             })
           });
         }
+
+        // Backup Sync
+        if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
+          try {
+            await fetch('/api/worklist', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                examId: id,
+                patientName: dicomName,
+                patientId: selectedPatient.id,
+                patientBirthDate: dicomBirthDate,
+                patientSex: selectedPatient.gender || 'F',
+                modality: settings.dicomModalityType || 'US',
+                aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+                stepDate,
+                stepTime,
+                stepDescription,
+                outputDir: settings.dicomBackupWorklistFolder,
+                localAgentUrl: settings.dicomBackupLocalAgentUrl
+              })
+            });
+          } catch (backupSyncError) {
+            console.warn('[Orthanc Backup Sync] Falha ao enviar para o worklist de backup:', backupSyncError);
+          }
+        }
       } catch (syncError) {
         console.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', syncError);
       }

@@ -177,6 +177,23 @@ export function Worklist() {
         }
       }
 
+      // Exclui do Backup, se configurado
+      if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
+        try {
+          await fetch('/api/worklist', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              examId: deleteId,
+              outputDir: settings.dicomBackupWorklistFolder,
+              localAgentUrl: settings.dicomBackupLocalAgentUrl
+            })
+          });
+        } catch (err) {
+          console.warn('[Orthanc Backup Sync] Falha ao remover arquivo da worklist de backup:', err);
+        }
+      }
+
       await addAuditLog({
         action: 'EXCLUIR_EXAME',
         details: `Exame ${examToDelete?.examType} do paciente ID ${examToDelete?.patientId} foi excluído.`,
@@ -223,8 +240,40 @@ export function Worklist() {
         })
       });
       const result = await res.json();
-      if (result.success) {
-        showToast('Enviado para a Worklist do Orthanc!', 'success');
+      let backupSuccess = true;
+
+      if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
+        try {
+          const backupRes = await fetch('/api/worklist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              examId: exam.id,
+              patientName: dicomName,
+              patientId: exam.patientId,
+              patientBirthDate: dicomBirthDate,
+              patientSex: patientSex || 'F',
+              modality: settings.dicomModalityType || 'US',
+              aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+              stepDate,
+              stepTime,
+              stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
+              outputDir: settings.dicomBackupWorklistFolder,
+              localAgentUrl: settings.dicomBackupLocalAgentUrl
+            })
+          });
+          const backupResult = await backupRes.json();
+          if (!backupResult.success) backupSuccess = false;
+        } catch (err) {
+          console.warn('[Orthanc Backup Sync] Erro no envio:', err);
+          backupSuccess = false;
+        }
+      }
+
+      if (result.success && backupSuccess) {
+        showToast('Enviado para a Worklist do Orthanc' + (settings.dicomBackupSyncEnabled ? ' e Backup!' : '!'), 'success');
+      } else if (result.success && !backupSuccess) {
+        showToast('Enviado para o principal, mas falhou no backup.', 'error');
       } else {
         showToast('Erro ao sincronizar: ' + result.error, 'error');
       }

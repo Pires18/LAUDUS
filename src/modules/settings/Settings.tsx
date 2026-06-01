@@ -875,6 +875,55 @@ export function Settings() {
                         <p className="text-[11px] text-ink-400 mt-1">Senha de autenticação básica para o servidor de backup.</p>
                       </div>
                     </div>
+                    </div>
+                    
+                    <div className="mt-6 pt-6 border-t border-ink-50">
+                      <div className="flex items-center justify-between p-5 rounded-2xl bg-ink-50 border border-ink-100 mb-6">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold text-ink-900">Sincronização com Worklist do Backup</p>
+                          <p className="text-xs text-ink-500">Enviar os arquivos .wl simultaneamente para o servidor de redundância.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => u('dicomBackupSyncEnabled', !draft.dicomBackupSyncEnabled)}
+                          className={classNames(
+                            "w-12 h-7 rounded-full transition-all relative",
+                            draft.dicomBackupSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
+                          )}
+                        >
+                          <div className={classNames(
+                            "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                            draft.dicomBackupSyncEnabled ? "left-6" : "left-1"
+                          )} />
+                        </button>
+                      </div>
+
+                      {draft.dicomBackupSyncEnabled && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                          <div className="md:col-span-2">
+                            <label className="label">Diretório da Worklist no Servidor de Backup</label>
+                            <input
+                              className="input h-14"
+                              value={draft.dicomBackupWorklistFolder || ''}
+                              onChange={(e) => u('dicomBackupWorklistFolder', e.target.value)}
+                              placeholder="Ex: C:\OrthancBackup\WorklistsDatabase\"
+                            />
+                            <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc secundário lê os arquivos .wl.</p>
+                          </div>
+                          
+                          <div className="md:col-span-2">
+                            <label className="label">URL do Agente Local do Servidor de Backup</label>
+                            <input
+                              className="input h-14"
+                              value={draft.dicomBackupLocalAgentUrl || ''}
+                              onChange={(e) => u('dicomBackupLocalAgentUrl', e.target.value)}
+                              placeholder="Ex: http://localhost:5173"
+                            />
+                            <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP do agente da aplicação rodando no servidor de backup para recepção do pacote.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
