@@ -7,7 +7,8 @@ import { PageHeader } from '../../components/PageHeader';
 import { 
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
-  RotateCcw, Clock, Database, Info, Upload, Loader2
+  RotateCcw, Clock, Database, Info, Upload, Loader2,
+  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -193,6 +194,17 @@ export function Settings() {
       showToast('Erro crítico ao testar conexões.', 'error');
     }
   }
+
+  const handleAddDevice = () => {
+    const newDevice = { id: Date.now().toString(), name: 'Novo Aparelho', aeTitle: 'AETITLE', modality: 'US' };
+    setDraft(d => ({ ...d, dicomDevices: [...(d.dicomDevices || []), newDevice] }));
+  };
+  const handleRemoveDevice = (id: string) => {
+    setDraft(d => ({ ...d, dicomDevices: (d.dicomDevices || []).filter(x => x.id !== id) }));
+  };
+  const handleUpdateDevice = (id: string, field: string, value: string) => {
+    setDraft(d => ({ ...d, dicomDevices: (d.dicomDevices || []).map(x => x.id === id ? { ...x, [field]: value } : x) }));
+  };
 
   const tabs = [
     { id: 'perfil', label: 'Meu Perfil', icon: User },
@@ -523,527 +535,381 @@ export function Settings() {
 
           {/* TAB: DICOM/PACS */}
           {activeTab === 'dicom' && (
-            <div className="max-w-3xl space-y-6 animate-fade-in">
+            <div className="max-w-4xl space-y-6 animate-fade-in mx-auto">
               <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <Database size={28} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-ink-900">Integração PACS / DICOM Worklist</h3>
-                    <p className="text-sm text-ink-500">Configure como o Laud.us exporta os exames para a sua worklist local do Orthanc.</p>
+                    <h3 className="text-xl font-black text-ink-900">Integração PACS / DICOM</h3>
+                    <p className="text-sm text-ink-500">Gestão de Servidores PACS, Equipamentos Médicos e Envio de Worklist.</p>
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  {/* Habilitar Sincronização */}
-                  <div className="flex items-center justify-between p-5 rounded-2xl bg-ink-50 border border-ink-100">
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-bold text-ink-900">Sincronização com Worklist do Orthanc</p>
-                      <p className="text-xs text-ink-500">Salvar arquivos .wl na pasta de destino na criação/exclusão de exames.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => u('dicomSyncEnabled', !draft.dicomSyncEnabled)}
-                      className={classNames(
-                        "w-12 h-7 rounded-full transition-all relative",
-                        draft.dicomSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
-                      )}
-                    >
-                      <div className={classNames(
-                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                        draft.dicomSyncEnabled ? "left-6" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-
-                  {/* Teste de Conectividade PACS */}
-                  <div className="p-5 rounded-2xl bg-ink-50 border border-ink-100 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-8">
+                  
+                  {/* CARD 1: SERVIDOR PACS PRINCIPAL */}
+                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
+                      <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                        <Server size={20} />
+                      </div>
                       <div>
-                        <p className="text-sm font-bold text-ink-900">Validar Conectividade PACS</p>
-                        <p className="text-xs text-ink-500">Testa a comunicação em tempo real com as URLs de rede configuradas.</p>
+                        <h4 className="text-sm font-bold text-ink-900">Servidor PACS Principal (Matriz)</h4>
+                        <p className="text-xs text-ink-500">Configurações do Orthanc e agente local de Worklist principal.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-5 rounded-xl bg-ink-50 border border-ink-100 mb-6">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold text-ink-900">Sincronização de Worklist Local</p>
+                        <p className="text-xs text-ink-500">Gerar arquivos .wl na pasta de destino sempre que um exame for criado.</p>
                       </div>
                       <button
                         type="button"
-                        onClick={handleTestPacsConnection}
-                        disabled={pacsTestState === 'testing'}
-                        className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold text-xs uppercase tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
-                      >
-                        {pacsTestState === 'testing' ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            <span>Testando...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Database size={14} />
-                            <span>Testar Conexão</span>
-                          </>
+                        onClick={() => u('dicomSyncEnabled', !draft.dicomSyncEnabled)}
+                        className={classNames(
+                          "w-12 h-7 rounded-full transition-all relative",
+                          draft.dicomSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
                         )}
+                      >
+                        <div className={classNames(
+                          "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft.dicomSyncEnabled ? "left-6" : "left-1"
+                        )} />
                       </button>
                     </div>
 
-                    {pacsTestResults && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-ink-150 animate-fade-in">
-                        {/* Principal results */}
-                        <div className={classNames(
-                          "p-4 rounded-xl border text-xs leading-relaxed",
-                          pacsTestResults.primaryOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800"
-                        )}>
-                          <p className="font-bold flex items-center gap-1.5 mb-1.5">
-                            <span className={classNames("w-2 h-2 rounded-full", pacsTestResults.primaryOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} />
-                            PACS Principal (Porta HTTP)
-                          </p>
-                          <p className="font-mono text-[10px] break-all">{draft.dicomViewerUrl || 'http://localhost:8042'}</p>
-                          <p className="mt-1 text-[11px] font-medium italic">{pacsTestResults.primaryMsg}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="md:col-span-2">
+                        <label className="label">URL Base do Servidor Orthanc</label>
+                        <input
+                          className="input h-12 text-sm"
+                          value={draft.dicomViewerUrl || ''}
+                          onChange={(e) => u('dicomViewerUrl', e.target.value)}
+                          placeholder="Ex: https://servidor-mac.tail861dda.ts.net"
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Usuário Orthanc</label>
+                        <input
+                          className="input h-12 text-sm"
+                          value={draft.dicomUsername || ''}
+                          onChange={(e) => u('dicomUsername', e.target.value)}
+                          placeholder="Ex: admin"
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Senha Orthanc</label>
+                        <input
+                          type="password"
+                          className="input h-12 text-sm"
+                          value={draft.dicomPassword || ''}
+                          onChange={(e) => u('dicomPassword', e.target.value)}
+                          placeholder="••••••••"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="label">URL do Agente Local (Vercel para Local)</label>
+                        <input
+                          className="input h-12 text-sm"
+                          value={draft.dicomLocalAgentUrl || ''}
+                          onChange={(e) => u('dicomLocalAgentUrl', e.target.value)}
+                          placeholder="Ex: https://servidor-mac.tail861dda.ts.net"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="label">Diretório da Worklist no Servidor (Caminho Absoluto)</label>
+                        <input
+                          className="input h-12 text-sm"
+                          value={draft.dicomWorklistFolder || ''}
+                          onChange={(e) => u('dicomWorklistFolder', e.target.value)}
+                          placeholder="Ex: C:\OrthancServer\db\WorklistsDatabase\"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="label">Tipo de Visualizador DICOM</label>
+                        <select
+                          className="input h-12 text-sm"
+                          value={draft.dicomViewerType || 'stone'}
+                          onChange={(e) => {
+                            const type = e.target.value as any;
+                            u('dicomViewerType', type);
+                            if (type === 'stone') {
+                              u('dicomViewerUrlPattern', '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}');
+                            } else if (type === 'oe2') {
+                              u('dicomViewerUrlPattern', '{{baseUrl}}/ui/app/retrieve-and-view.html?StudyInstanceUID=1.2.276.0.7230010.3.1.2.{{examId}}');
+                            } else if (type === 'ohif') {
+                              u('dicomViewerUrlPattern', '{{baseUrl}}/viewer?StudyInstanceUIDs=1.2.276.0.7230010.3.1.2.{{examId}}');
+                            }
+                          }}
+                        >
+                          <option value="stone">Stone Web Viewer</option>
+                          <option value="oe2">Orthanc Explorer 2</option>
+                          <option value="ohif">OHIF Viewer</option>
+                          <option value="custom">Personalizado (Padrão de URL)</option>
+                        </select>
+                      </div>
+                      {draft.dicomViewerType === 'custom' && (
+                        <div className="md:col-span-2">
+                          <label className="label">Padrão da URL do Visualizador</label>
+                          <input
+                            className="input h-12 text-sm"
+                            value={draft.dicomViewerUrlPattern || ''}
+                            onChange={(e) => u('dicomViewerUrlPattern', e.target.value)}
+                          />
                         </div>
+                      )}
+                    </div>
+                  </div>
 
-                        {/* Backup results */}
-                        {draft.dicomBackupViewerUrl && (
-                          <div className={classNames(
-                            "p-4 rounded-xl border text-xs leading-relaxed",
-                            pacsTestResults.backupOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800"
-                          )}>
-                            <p className="font-bold flex items-center gap-1.5 mb-1.5">
-                              <span className={classNames("w-2 h-2 rounded-full", pacsTestResults.backupOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} />
-                              PACS Backup (Porta HTTP)
-                            </p>
-                            <p className="font-mono text-[10px] break-all">{draft.dicomBackupViewerUrl}</p>
-                            <p className="mt-1 text-[11px] font-medium italic">{pacsTestResults.backupMsg}</p>
-                          </div>
+                  {/* CARD 2: SERVIDOR PACS DE BACKUP */}
+                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <HardDrive size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-ink-900">Servidor PACS de Backup (Redundância)</h4>
+                        <p className="text-xs text-ink-500">Sincronização em tempo real para um servidor Orthanc secundário (ex: Notebook).</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-5 rounded-xl bg-ink-50 border border-ink-100 mb-6">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold text-ink-900">Habilitar Servidor de Redundância</p>
+                        <p className="text-xs text-ink-500">Enviar worklists paralelamente para o servidor de backup.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => u('dicomBackupSyncEnabled', !draft.dicomBackupSyncEnabled)}
+                        className={classNames(
+                          "w-12 h-7 rounded-full transition-all relative",
+                          draft.dicomBackupSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
                         )}
+                      >
+                        <div className={classNames(
+                          "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft.dicomBackupSyncEnabled ? "left-6" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+
+                    {draft.dicomBackupSyncEnabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fade-in">
+                        <div className="md:col-span-2">
+                          <label className="label">URL Base do Servidor Orthanc Backup</label>
+                          <input
+                            className="input h-12 text-sm"
+                            value={draft.dicomBackupViewerUrl || ''}
+                            onChange={(e) => u('dicomBackupViewerUrl', e.target.value)}
+                            placeholder="Ex: https://servidor-notebook.tail861dda.ts.net:8043"
+                          />
+                        </div>
+                        <div>
+                          <label className="label">Usuário Orthanc Backup</label>
+                          <input
+                            className="input h-12 text-sm"
+                            value={draft.dicomBackupUsername || ''}
+                            onChange={(e) => u('dicomBackupUsername', e.target.value)}
+                            placeholder="Ex: admin"
+                          />
+                        </div>
+                        <div>
+                          <label className="label">Senha Orthanc Backup</label>
+                          <input
+                            type="password"
+                            className="input h-12 text-sm"
+                            value={draft.dicomBackupPassword || ''}
+                            onChange={(e) => u('dicomBackupPassword', e.target.value)}
+                            placeholder="••••••••"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="label">URL do Agente Local do Backup</label>
+                          <input
+                            className="input h-12 text-sm"
+                            value={draft.dicomBackupLocalAgentUrl || ''}
+                            onChange={(e) => u('dicomBackupLocalAgentUrl', e.target.value)}
+                            placeholder="Ex: https://servidor-notebook.tail861dda.ts.net"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="label">Diretório da Worklist do Backup (Caminho Absoluto)</label>
+                          <input
+                            className="input h-12 text-sm"
+                            value={draft.dicomBackupWorklistFolder || ''}
+                            onChange={(e) => u('dicomBackupWorklistFolder', e.target.value)}
+                            placeholder="Ex: C:\OrthancServer\db\WorklistsDatabase\"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Predefinições Rápidas (Presets) */}
-                  <div className="p-5 rounded-2xl bg-brand-50/40 border border-brand-100">
-                    <p className="text-sm font-bold text-ink-900 mb-1">Predefinição de Servidor (Preset)</p>
-                    <p className="text-xs text-ink-500 mb-4">Escolha rapidamente entre as configurações do Servidor Principal ou do Backup do Notebook.</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft((d) => ({
-                            ...d,
-                            dicomPreset: 'macmini',
-                            dicomWorklistFolder: '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
-                            dicomViewerUrl: 'https://servidor-mac.tail861dda.ts.net:8443/',
-                            dicomOrthancAETitle: 'ORTHANCPACS',
-                            dicomViewerType: 'stone',
-                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-                            dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net'
-                          }));
-                        }}
-                        className={classNames(
-                          "p-3.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between h-24",
-                          draft.dicomPreset === 'macmini'
-                            ? "bg-white border-brand-500 shadow-sm"
-                            : "bg-white/50 border-ink-150 hover:bg-white"
-                        )}
-                      >
-                        <span className="text-[10px] font-black uppercase tracking-wider text-brand-600">Servidor Principal</span>
-                        <div>
-                          <p className="text-xs font-black text-ink-900 leading-tight">Mac Mini</p>
-                          <p className="text-[9px] text-ink-400 mt-0.5">Tailscale HTTPS</p>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft((d) => ({
-                            ...d,
-                            dicomPreset: 'notebook',
-                            dicomWorklistFolder: 'C:\\OrthancServer\\db\\WorklistsDatabase\\',
-                            dicomViewerUrl: 'http://localhost:8043',
-                            dicomOrthancAETitle: 'ORTHANCBACKUP',
-                            dicomViewerType: 'stone',
-                            dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-                            dicomLocalAgentUrl: 'http://localhost:5173'
-                          }));
-                        }}
-                        className={classNames(
-                          "p-3.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between h-24",
-                          draft.dicomPreset === 'notebook'
-                            ? "bg-white border-brand-500 shadow-sm"
-                            : "bg-white/50 border-ink-150 hover:bg-white"
-                        )}
-                      >
-                        <span className="text-[10px] font-black uppercase tracking-wider text-brand-600">Servidor Backup</span>
-                        <div>
-                          <p className="text-xs font-black text-ink-900 leading-tight">Notebook Local</p>
-                          <p className="text-[9px] text-ink-400 mt-0.5">Porta 8043 (Docker)</p>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraft((d) => ({
-                            ...d,
-                            dicomPreset: 'custom'
-                          }));
-                        }}
-                        className={classNames(
-                          "p-3.5 rounded-xl border-2 text-left transition-all flex flex-col justify-between h-24",
-                          draft.dicomPreset === 'custom' || (!draft.dicomPreset)
-                            ? "bg-white border-brand-500 shadow-sm"
-                            : "bg-white/50 border-ink-150 hover:bg-white"
-                        )}
-                      >
-                        <span className="text-[10px] font-black uppercase tracking-wider text-ink-400">Personalizado</span>
-                        <div>
-                          <p className="text-xs font-black text-ink-900 leading-tight">Outro Servidor</p>
-                          <p className="text-[9px] text-ink-400 mt-0.5">Definir campos abaixo</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Caminho da Pasta */}
-                  <div>
-                    <label className="label">Diretório da Worklist no Servidor (Caminho Absoluto)</label>
-                    <input
-                      className="input h-14"
-                      value={draft.dicomWorklistFolder || ''}
-                      onChange={(e) => {
-                        u('dicomWorklistFolder', e.target.value);
-                        u('dicomPreset', 'custom');
-                      }}
-                      placeholder="Ex: /Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/"
-                    />
-                    <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc lê os arquivos .wl. A aplicação deve ter permissão de escrita.</p>
-                  </div>
-
-                  {/* URL do Agente Local (Worklist) */}
-                  <div>
-                    <label className="label">URL do Agente Local (Worklist no Vercel)</label>
-                    <input
-                      className="input h-14"
-                      value={draft.dicomLocalAgentUrl || ''}
-                      onChange={(e) => {
-                        u('dicomLocalAgentUrl', e.target.value);
-                        u('dicomPreset', 'custom');
-                      }}
-                      placeholder="Ex: https://servidor-mac.tail861dda.ts.net"
-                    />
-                    <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP da aplicação rodando localmente na clínica para receber requisições de worklist da nuvem (Vercel).</p>
-                  </div>
-
-                  {/* URL do Visualizador Orthanc */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* TESTE DE REDE */}
+                  <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
-                      <label className="label">URL Base do Servidor Orthanc</label>
-                      <input
-                        className="input h-14"
-                        value={draft.dicomViewerUrl || ''}
-                        onChange={(e) => {
-                          u('dicomViewerUrl', e.target.value);
-                          u('dicomPreset', 'custom');
-                        }}
-                        placeholder="Ex: http://localhost:8042"
-                      />
-                      <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP do servidor Orthanc (ex: IP local ou Tailscale).</p>
+                      <p className="text-sm font-bold text-white">Validar Conexões de Rede</p>
+                      <p className="text-xs text-slate-400">Verifique se os servidores Orthanc (Principal e Backup) estão respondendo.</p>
                     </div>
-
-                    <div>
-                      <label className="label">Tipo de Visualizador DICOM</label>
-                      <select
-                        className="input h-14"
-                        value={draft.dicomViewerType || 'stone'}
-                        onChange={(e) => {
-                          const type = e.target.value as any;
-                          u('dicomViewerType', type);
-                          if (type === 'stone') {
-                            u('dicomViewerUrlPattern', '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}');
-                          } else if (type === 'oe2') {
-                            u('dicomViewerUrlPattern', '{{baseUrl}}/ui/app/retrieve-and-view.html?StudyInstanceUID=1.2.276.0.7230010.3.1.2.{{examId}}');
-                          } else if (type === 'ohif') {
-                            u('dicomViewerUrlPattern', '{{baseUrl}}/viewer?StudyInstanceUIDs=1.2.276.0.7230010.3.1.2.{{examId}}');
-                          }
-                        }}
-                      >
-                        <option value="stone">Stone Web Viewer (Orthanc)</option>
-                        <option value="oe2">Orthanc Explorer 2</option>
-                        <option value="ohif">OHIF Viewer</option>
-                        <option value="custom">Personalizado (Padrão de URL)</option>
-                      </select>
-                      <p className="text-[11px] text-ink-400 mt-1">Formato do link gerado para abrir exames diretamente.</p>
-                    </div>
-
-                    <div>
-                      <label className="label">Usuário do Orthanc (PACS)</label>
-                      <input
-                        className="input h-14"
-                        value={draft.dicomUsername || ''}
-                        onChange={(e) => {
-                          u('dicomUsername', e.target.value);
-                          u('dicomPreset', 'custom');
-                        }}
-                        placeholder="Ex: orthanc"
-                      />
-                      <p className="text-[11px] text-ink-400 mt-1">Usuário para autenticação básica no servidor Orthanc local.</p>
-                    </div>
-
-                    <div>
-                      <label className="label">Senha do Orthanc (PACS)</label>
-                      <input
-                        type="password"
-                        className="input h-14"
-                        value={draft.dicomPassword || ''}
-                        onChange={(e) => {
-                          u('dicomPassword', e.target.value);
-                          u('dicomPreset', 'custom');
-                        }}
-                        placeholder="Ex: orthanc"
-                      />
-                      <p className="text-[11px] text-ink-400 mt-1">Senha para autenticação básica no servidor Orthanc local.</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTestPacsConnection}
+                      disabled={pacsTestState === 'testing'}
+                      className="py-2.5 px-6 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 text-white font-bold text-xs tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 shrink-0"
+                    >
+                      {pacsTestState === 'testing' ? <Loader2 size={16} className="animate-spin" /> : <Wifi size={16} />}
+                      {pacsTestState === 'testing' ? 'TESTANDO...' : 'TESTAR PACS'}
+                    </button>
                   </div>
-
-                  {draft.dicomViewerType === 'custom' && (
-                    <div className="animate-fade-in">
-                      <label className="label">Padrão da URL do Visualizador</label>
-                      <input
-                        className="input h-14"
-                        value={draft.dicomViewerUrlPattern || ''}
-                        onChange={(e) => u('dicomViewerUrlPattern', e.target.value)}
-                        placeholder="Ex: {{baseUrl}}/viewer/{{StudyInstanceUID}}"
-                      />
-                      <p className="text-[11px] text-ink-400 mt-1">
-                        Use variáveis para montagem do link: <code className="bg-ink-50 px-1 py-0.5 rounded text-brand-600 font-mono font-bold text-[10px]">{"{{baseUrl}}"}</code>, <code className="bg-ink-50 px-1 py-0.5 rounded text-brand-600 font-mono font-bold text-[10px]">{"{{StudyInstanceUID}}"}</code>, <code className="bg-ink-50 px-1 py-0.5 rounded text-brand-600 font-mono font-bold text-[10px]">{"{{examId}}"}</code>.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Preview da URL Gerada */}
-                  <div className="p-4 rounded-2xl bg-brand-50/50 border border-brand-100/50 text-brand-900">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-brand-700 mb-1">Visualização do Link do Exame</p>
-                    <p className="text-xs font-mono font-bold break-all text-brand-600">
-                      {(() => {
-                        const baseUrl = (draft.dicomViewerUrl || 'http://localhost:8042').replace(/\/$/, '');
-                        const sampleExamId = 'EXEMPLO123';
-                        const sampleStudyUid = `1.2.276.0.7230010.3.1.2.${sampleExamId}`;
-                        const pattern = draft.dicomViewerUrlPattern || '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}';
-                        return pattern
-                          .replace('{{baseUrl}}', baseUrl)
-                          .replace('{{StudyInstanceUID}}', sampleStudyUid)
-                          .replace('{{examId}}', sampleExamId);
-                      })()}
-                    </p>
-                  </div>
-
-                  {/* Servidor PACS de Backup */}
-                  <div className="border-t border-ink-100 pt-6">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-ink-500 mb-4">Servidor PACS de Backup (Redundância em Tempo Real)</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="label">URL Base do Orthanc Backup</label>
-                        <input
-                          className="input h-14"
-                          value={draft.dicomBackupViewerUrl || ''}
-                          onChange={(e) => u('dicomBackupViewerUrl', e.target.value)}
-                          placeholder="Ex: http://localhost:8043"
-                        />
-                        <p className="text-[11px] text-ink-400 mt-1">URL do servidor Orthanc secundário para redundância em tempo real.</p>
+                  {pacsTestResults && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in -mt-4">
+                      <div className={classNames("p-4 rounded-xl border text-xs", pacsTestResults.primaryOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800")}>
+                        <p className="font-bold mb-1 flex items-center gap-1.5"><span className={classNames("w-2 h-2 rounded-full", pacsTestResults.primaryOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} /> PACS Principal</p>
+                        <p className="mt-1 text-[11px] opacity-80">{pacsTestResults.primaryMsg}</p>
                       </div>
-
-                      <div className="hidden md:block" />
-
-                      <div>
-                        <label className="label">Usuário do Orthanc Backup</label>
-                        <input
-                          className="input h-14"
-                          value={draft.dicomBackupUsername || ''}
-                          onChange={(e) => u('dicomBackupUsername', e.target.value)}
-                          placeholder="Ex: admin"
-                        />
-                        <p className="text-[11px] text-ink-400 mt-1">Usuário de autenticação básica para o servidor de backup.</p>
-                      </div>
-
-                      <div>
-                        <label className="label">Senha do Orthanc Backup</label>
-                        <input
-                          type="password"
-                          className="input h-14"
-                          value={draft.dicomBackupPassword || ''}
-                          onChange={(e) => u('dicomBackupPassword', e.target.value)}
-                          placeholder="Ex: 123456789"
-                        />
-                        <p className="text-[11px] text-ink-400 mt-1">Senha de autenticação básica para o servidor de backup.</p>
-                      </div>
-                    </div>
-                    </div>
-                    
-                    <div className="mt-6 pt-6 border-t border-ink-50">
-                      <div className="flex items-center justify-between p-5 rounded-2xl bg-ink-50 border border-ink-100 mb-6">
-                        <div className="space-y-0.5">
-                          <p className="text-sm font-bold text-ink-900">Sincronização com Worklist do Backup</p>
-                          <p className="text-xs text-ink-500">Enviar os arquivos .wl simultaneamente para o servidor de redundância.</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => u('dicomBackupSyncEnabled', !draft.dicomBackupSyncEnabled)}
-                          className={classNames(
-                            "w-12 h-7 rounded-full transition-all relative",
-                            draft.dicomBackupSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
-                          )}
-                        >
-                          <div className={classNames(
-                            "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                            draft.dicomBackupSyncEnabled ? "left-6" : "left-1"
-                          )} />
-                        </button>
-                      </div>
-
-                      {draft.dicomBackupSyncEnabled && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-                          <div className="md:col-span-2">
-                            <label className="label">Diretório da Worklist no Servidor de Backup</label>
-                            <input
-                              className="input h-14"
-                              value={draft.dicomBackupWorklistFolder || ''}
-                              onChange={(e) => u('dicomBackupWorklistFolder', e.target.value)}
-                              placeholder="Ex: C:\OrthancBackup\WorklistsDatabase\"
-                            />
-                            <p className="text-[11px] text-ink-400 mt-1">Diretório onde o Orthanc secundário lê os arquivos .wl.</p>
-                          </div>
-                          
-                          <div className="md:col-span-2">
-                            <label className="label">URL do Agente Local do Servidor de Backup</label>
-                            <input
-                              className="input h-14"
-                              value={draft.dicomBackupLocalAgentUrl || ''}
-                              onChange={(e) => u('dicomBackupLocalAgentUrl', e.target.value)}
-                              placeholder="Ex: http://localhost:5173"
-                            />
-                            <p className="text-[11px] text-ink-400 mt-1">Endereço HTTP do agente da aplicação rodando no servidor de backup para recepção do pacote.</p>
-                          </div>
+                      {draft.dicomBackupViewerUrl && (
+                        <div className={classNames("p-4 rounded-xl border text-xs", pacsTestResults.backupOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800")}>
+                          <p className="font-bold mb-1 flex items-center gap-1.5"><span className={classNames("w-2 h-2 rounded-full", pacsTestResults.backupOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} /> PACS Backup</p>
+                          <p className="mt-1 text-[11px] opacity-80">{pacsTestResults.backupMsg}</p>
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {/* CARD 3: APARELHOS MÉDICOS */}
+                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-ink-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                          <Monitor size={20} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-ink-900">Aparelhos e Equipamentos</h4>
+                          <p className="text-xs text-ink-500">Cadastre seus aparelhos de ultrassom, ressonância, etc.</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleAddDevice} className="btn-ghost bg-brand-50 hover:bg-brand-100 text-brand-700 h-9 px-3 rounded-xl flex items-center gap-1 text-xs font-bold">
+                        <Plus size={14} /> NOVO
+                      </button>
+                    </div>
+
+                    {(!draft.dicomDevices || draft.dicomDevices.length === 0) ? (
+                      <div className="text-center py-8 bg-ink-50 rounded-xl border border-ink-100 border-dashed">
+                        <Monitor size={32} className="mx-auto text-ink-300 mb-3" />
+                        <p className="text-sm font-bold text-ink-900">Nenhum aparelho cadastrado</p>
+                        <p className="text-xs text-ink-500 max-w-sm mx-auto mt-1">Adicione seus aparelhos para poder selecionar o destino correto ao criar um laudo.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {draft.dicomDevices.map((device, index) => (
+                          <div key={device.id} className="p-4 rounded-xl border border-ink-150 bg-ink-50/50 flex flex-col md:flex-row gap-4 items-start md:items-center relative animate-fade-in group">
+                            {index === 0 && (
+                              <span className="absolute -top-2 -left-2 bg-brand-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
+                                Padrão
+                              </span>
+                            )}
+                            
+                            <div className="flex-1 w-full space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">Nome do Aparelho</label>
+                                  <input 
+                                    className="input h-10 text-xs w-full bg-white" 
+                                    value={device.name} 
+                                    onChange={(e) => handleUpdateDevice(device.id, 'name', e.target.value)} 
+                                    placeholder="Ex: GE Voluson S10"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">AE Title</label>
+                                  <input 
+                                    className="input h-10 text-xs w-full bg-white font-mono" 
+                                    value={device.aeTitle} 
+                                    onChange={(e) => handleUpdateDevice(device.id, 'aeTitle', e.target.value.toUpperCase())} 
+                                    placeholder="Ex: GE_VOLUSON"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">Modalidade</label>
+                                  <select 
+                                    className="input h-10 text-xs w-full bg-white" 
+                                    value={device.modality} 
+                                    onChange={(e) => handleUpdateDevice(device.id, 'modality', e.target.value)}
+                                  >
+                                    <option value="US">US (Ultrassom)</option>
+                                    <option value="CR">CR (Raio-X CR)</option>
+                                    <option value="CT">CT (Tomografia)</option>
+                                    <option value="MR">MR (Ressonância)</option>
+                                    <option value="DX">DX (Raio-X DX)</option>
+                                    <option value="MG">MG (Mamografia)</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveDevice(device.id)}
+                              className="md:mt-5 p-2.5 rounded-lg text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors shrink-0"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Modalidade */}
-                    <div>
-                      <label className="label">Modalidade</label>
-                      <select
-                        className="input h-14"
-                        value={draft.dicomModalityType || 'US'}
-                        onChange={(e) => u('dicomModalityType', e.target.value)}
-                      >
-                        <option value="US">US (Ultrassonografia)</option>
-                        <option value="CR">CR (Radiologia Computadorizada)</option>
-                        <option value="CT">CT (Tomografia Computadorizada)</option>
-                        <option value="MR">MR (Ressonância Magnética)</option>
-                        <option value="DX">DX (Radiografia Digital)</option>
-                      </select>
+                  {/* CARD 4: CONFIGURAÇÕES GLOBAIS E MANUAL */}
+                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                        <Shield size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-ink-900">Configurações Globais DICOM</h4>
+                        <p className="text-xs text-ink-500">AE Title do seu servidor Orthanc.</p>
+                      </div>
                     </div>
-
-                    {/* Modality AE Title */}
-                    <div>
-                      <label className="label">AE Title do Equipamento</label>
+                    
+                    <div className="mb-8 max-w-sm">
+                      <label className="label">AE Title do Servidor Orthanc</label>
                       <input
-                        className="input h-14"
-                        value={draft.dicomModalityAETitle || ''}
-                        onChange={(e) => u('dicomModalityAETitle', e.target.value)}
-                        placeholder="Ex: MINDRAYMX7"
-                      />
-                    </div>
-
-                    {/* Orthanc AE Title */}
-                    <div>
-                      <label className="label">AE Title do Orthanc (Remote)</label>
-                      <input
-                        className="input h-14"
+                        className="input h-12 text-sm font-mono"
                         value={draft.dicomOrthancAETitle || ''}
-                        onChange={(e) => {
-                          u('dicomOrthancAETitle', e.target.value);
-                          u('dicomPreset', 'custom');
-                        }}
+                        onChange={(e) => u('dicomOrthancAETitle', e.target.value.toUpperCase())}
                         placeholder="Ex: ORTHANC"
                       />
                     </div>
-                  </div>
-                </div>
 
-                {/* Passo a Passo Configuração no Aparelho */}
-                <div className="mt-6 bg-slate-900 text-slate-100 rounded-3xl p-6 border border-slate-800 shadow-lg space-y-6">
-                  <div className="flex items-center gap-3 border-b border-slate-800/80 pb-4">
-                    <div className="w-10 h-10 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center border border-brand-500/20 shrink-0">
-                      <Info size={20} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black uppercase tracking-wider text-white">Manual de Configuração do Aparelho</h4>
-                      <p className="text-xs text-slate-400">Como vincular seu equipamento de ultrassonografia (Mindray, GE, Samsung, etc.) ao sistema.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs leading-relaxed">
-                    {/* Passo 1 */}
-                    <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-brand-500 text-white text-[10px] font-black flex items-center justify-center select-none shrink-0">1</span>
-                        <h5 className="font-black text-slate-200 uppercase tracking-wide">Dados de Rede</h5>
+                    <div className="bg-slate-900 text-slate-100 rounded-2xl p-6 border border-slate-800 shadow-inner">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Info size={18} className="text-brand-400" />
+                        <h4 className="text-sm font-bold text-white">Manual de Conexão no Aparelho</h4>
                       </div>
-                      <p className="text-slate-400 text-[11px]">Identifique os dados de rede do seu servidor Orthanc local:</p>
-                      <ul className="space-y-1 text-[11px] font-mono bg-slate-900/60 p-2.5 rounded-xl border border-slate-850 mt-2 text-brand-400">
+                      <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                        No seu aparelho de Ultrassom, cadastre o Servidor DICOM Worklist utilizando os dados abaixo para puxar a lista de pacientes gerada pelo Laud.us.
+                      </p>
+                      <ul className="space-y-2 text-xs font-mono bg-slate-950 p-4 rounded-xl border border-slate-800/50 text-brand-400">
                         <li>
-                          <strong>IP:</strong> {(() => {
-                            try {
-                              return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR';
-                            } catch {
-                              return 'IP_DO_SERVIDOR';
-                            }
+                          <span className="text-slate-500">IP do Servidor:</span> {(() => {
+                            try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR'; } catch { return 'IP_DO_SERVIDOR'; }
                           })()}
                         </li>
-                        <li><strong>Porta DICOM:</strong> 4242</li>
-                        <li><strong>AE Title:</strong> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
+                        <li><span className="text-slate-500">Porta DICOM:</span> 4242</li>
+                        <li><span className="text-slate-500">AE Title:</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
                       </ul>
                     </div>
-
-                    {/* Passo 2 */}
-                    <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center select-none shrink-0">2</span>
-                        <h5 className="font-black text-slate-200 uppercase tracking-wide">DICOM Store (Envio)</h5>
-                      </div>
-                      <p className="text-slate-400 text-[11px]">No aparelho de ultrassom (Configurações de Rede / DICOM Storage):</p>
-                      <ol className="list-decimal pl-4 text-slate-400 text-[11px] space-y-1 mt-2">
-                        <li>Adicione um novo servidor de armazenamento (Storage/Store).</li>
-                        <li>Insira o <strong>IP</strong>, a <strong>Porta 4242</strong> e o <strong>AE Title</strong> indicados no Passo 1.</li>
-                        <li>Clique em <strong>Ping/Echo/Verify</strong> para testar a comunicação.</li>
-                      </ol>
-                    </div>
-
-                    {/* Passo 3 */}
-                    <div className="space-y-2 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-black flex items-center justify-center select-none shrink-0">3</span>
-                        <h5 className="font-black text-slate-200 uppercase tracking-wide">DICOM Worklist</h5>
-                      </div>
-                      <p className="text-slate-400 text-[11px]">No aparelho de ultrassom (Configurações de DICOM Worklist):</p>
-                      <ol className="list-decimal pl-4 text-slate-400 text-[11px] space-y-1 mt-2">
-                        <li>Adicione um novo serviço de consulta de Worklist.</li>
-                        <li>Insira o mesmo <strong>IP</strong>, a <strong>Porta 4242</strong> e o <strong>AE Title</strong> do servidor.</li>
-                        <li>Faça uma busca (Query/Search) para puxar os pacientes da fila.</li>
-                      </ol>
-                    </div>
                   </div>
 
-                  <div className="bg-slate-955 border border-slate-800/80 p-4 rounded-2xl text-[11px] text-slate-400 flex items-start gap-2.5">
-                    <span className="text-brand-500 text-sm leading-none shrink-0 mt-0.5">ℹ</span>
-                    <p>
-                      <strong>Dica de Integração:</strong> Certifique-se de que a rede do aparelho e a do servidor Orthanc consigam se comunicar (mesmo Wi-Fi ou roteador). Caso o aparelho não possua suporte a Worklist direta, o preenchimento de ID do Paciente no aparelho deve ser exatamente o mesmo ID numérico do Laudus para que as imagens se vinculem automaticamente.
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       </div>
       </div>

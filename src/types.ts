@@ -161,6 +161,13 @@ export interface ReportTemplate {
 /** Papéis de usuário do sistema (RBAC) */
 export type UserRole = 'admin' | 'medico' | 'recepcao';
 
+export interface DicomDevice {
+  id: string;
+  name: string;
+  aeTitle: string;
+  modality: string;
+}
+
 /** Configurações globais do aplicativo/usuário */
 export interface AppSettings {
   /** Papel atual do usuário no sistema (para fins de simulação/teste) */
@@ -216,6 +223,7 @@ export interface AppSettings {
   dicomWorklistFolder?: string;
   dicomModalityAETitle?: string;
   dicomModalityType?: string;
+  dicomDevices?: DicomDevice[];
   dicomOrthancAETitle?: string;
   dicomViewerUrl?: string;
   dicomViewerType?: 'stone' | 'oe2' | 'ohif' | 'custom';

@@ -37,6 +37,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
 
   const [anamnesis, setAnamnesis] = useState('');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(settings.dicomDevices?.[0]?.id || '');
 
   // Configura clínica inicial
   useEffect(() => {
@@ -179,6 +180,9 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
         const stepDescription = template.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 
+        const targetDevice = settings.dicomDevices?.find(d => d.id === selectedDeviceId) || 
+                             { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
+
         if (settings.dicomSyncEnabled !== false) {
           await fetch('/api/worklist', {
             method: 'POST',
@@ -189,8 +193,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
               patientId: selectedPatient.id,
               patientBirthDate: dicomBirthDate,
               patientSex: selectedPatient.gender || 'F',
-              modality: settings.dicomModalityType || 'US',
-              aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+              modality: targetDevice.modality,
+              aeTitle: targetDevice.aeTitle,
               stepDate,
               stepTime,
               stepDescription,
@@ -212,8 +216,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                 patientId: selectedPatient.id,
                 patientBirthDate: dicomBirthDate,
                 patientSex: selectedPatient.gender || 'F',
-                modality: settings.dicomModalityType || 'US',
-                aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+                modality: targetDevice.modality,
+                aeTitle: targetDevice.aeTitle,
                 stepDate,
                 stepTime,
                 stepDescription,
@@ -638,9 +642,24 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                      value={anamnesis}
                      onChange={(e) => setAnamnesis(e.target.value)}
                      placeholder="Ex: Dor abdominal a esclarecer. Suspeita de litíase vesicular."
-                     className="w-full h-56 p-4 bg-white border border-ink-150 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-semibold text-xs text-ink-900 resize-none custom-scrollbar"
+                     className="w-full h-40 p-4 bg-white border border-ink-150 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-semibold text-xs text-ink-900 resize-none custom-scrollbar"
                    />
                  </div>
+
+                 {settings.dicomDevices && settings.dicomDevices.length > 0 && (
+                   <div className="flex flex-col space-y-2 pt-2">
+                     <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Enviar Worklist Para</label>
+                     <select
+                       value={selectedDeviceId}
+                       onChange={(e) => setSelectedDeviceId(e.target.value)}
+                       className="w-full h-11 px-4 bg-white border border-ink-150 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900 shadow-sm"
+                     >
+                       {settings.dicomDevices.map(device => (
+                         <option key={device.id} value={device.id}>{device.name} ({device.aeTitle})</option>
+                       ))}
+                     </select>
+                   </div>
+                 )}
               </motion.div>
             )}
           </AnimatePresence>

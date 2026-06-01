@@ -221,6 +221,9 @@ export function Worklist() {
         String(now.getMinutes()).padStart(2, '0') + 
         String(now.getSeconds()).padStart(2, '0');
 
+      const targetDevice = settings.dicomDevices?.[0] || 
+                           { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
+
       const res = await fetch('/api/worklist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,8 +233,8 @@ export function Worklist() {
           patientId: exam.patientId,
           patientBirthDate: dicomBirthDate,
           patientSex: patientSex || 'F',
-          modality: settings.dicomModalityType || 'US',
-          aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+          modality: targetDevice.modality,
+          aeTitle: targetDevice.aeTitle,
           stepDate,
           stepTime,
           stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
@@ -253,8 +256,8 @@ export function Worklist() {
               patientId: exam.patientId,
               patientBirthDate: dicomBirthDate,
               patientSex: patientSex || 'F',
-              modality: settings.dicomModalityType || 'US',
-              aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7',
+              modality: targetDevice.modality,
+              aeTitle: targetDevice.aeTitle,
               stepDate,
               stepTime,
               stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
