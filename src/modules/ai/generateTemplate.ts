@@ -116,7 +116,7 @@ Gere o JSON da máscara do laudo agora.`;
       headers: {
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-1-0',
+        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
         'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },
@@ -268,7 +268,7 @@ Regras importantes:
       headers: {
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-1-0',
+        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
         'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },

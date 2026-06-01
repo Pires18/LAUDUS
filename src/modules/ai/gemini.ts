@@ -611,7 +611,7 @@ async function callAnthropic(
     headers: {
       'x-api-key': settings.anthropicApiKey!,
       'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'prompt-caching-2024-07-31',
+        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
       'anthropic-dangerous-direct-browser-access': 'true',
       'content-type': 'application/json'
     },
@@ -661,7 +661,7 @@ async function callAnthropicStream(
     headers: {
       'x-api-key': settings.anthropicApiKey!,
       'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'prompt-caching-2024-07-31',
+        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
       'anthropic-dangerous-direct-browser-access': 'true',
       'content-type': 'application/json'
     },

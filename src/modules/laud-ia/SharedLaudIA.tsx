@@ -364,7 +364,8 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
 Sua tarefa é melhorar o prompt de IA para o exame de "${templateName}" a seguir, tornando-o mais completo,
 claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
-Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.
+IMPORTANTE: NÃO copie nem repita o Prompt Mestre ou regras globais desnecessariamente. Seja direto, NUNCA entre em loop de repetição e NUNCA corte o texto no meio.${userRequest}`;
     const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${editingTemplatePrompt}`;
 
     try {
@@ -386,13 +387,14 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
             'x-api-key': apiKey!,
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true',
+              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
             'content-type': 'application/json',
           },
           body: JSON.stringify({
             model: localSettings.anthropicModel || 'claude-sonnet-4-5',
-            max_tokens: 8192,
+            max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
             messages: [{ role: 'user', content: fullMessage }],
-            temperature: 0.2,
+            temperature: 0.4,
           }),
         });
         if (!response.ok) throw new Error(`Anthropic ${response.status}`);
@@ -516,13 +518,14 @@ ${examplesText}`;
             'x-api-key': apiKey!,
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true',
+              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
             'content-type': 'application/json',
           },
           body: JSON.stringify({
             model: localSettings.anthropicModel || 'claude-sonnet-4-5',
-            max_tokens: 8192,
+            max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
             messages: [{ role: 'user', content: systemMsg }],
-            temperature: 0.2,
+            temperature: 0.4,
           }),
         });
         if (!response.ok) throw new Error(`Anthropic ${response.status}`);
@@ -612,6 +615,7 @@ ${template.recommendationsTemplate || 'Não definida'}
       const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
 Sua tarefa é GERAR DO ZERO as diretrizes e regras específicas (Prompt de Exame) para a máscara de laudo "${template.name}".
 Gere APENAS as INSTRUÇÕES ESPECÍFICAS (aiInstructions) para este exame. Não inclua saudações, não inclua blocos genéricos que já estão no Prompt Mestre. O seu output deve ser diretamente o texto Markdown do prompt para este exame.
+IMPORTANTE: NÃO copie nem repita as Regras Rígidas ou o Prompt Mestre no seu output. Foque estritamente nas regras do órgão/exame em questão. Seja objetivo e não entre em loops de repetição.
 
 Use o contexto do LAUD.IA abaixo para entender a doutrina, regras rígidas e estrutura que a IA já segue:
 
@@ -649,13 +653,14 @@ ${examplesText}`;
               'x-api-key': apiKey!,
               'anthropic-version': '2023-06-01',
               'anthropic-dangerous-direct-browser-access': 'true',
+              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
               'content-type': 'application/json',
             },
             body: JSON.stringify({
               model: localSettings.anthropicModel || 'claude-sonnet-4-5',
-              max_tokens: 8192,
+              max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
               messages: [{ role: 'user', content: systemMsg }],
-              temperature: 0.2,
+              temperature: 0.4,
             }),
           });
           if (!response.ok) throw new Error(`Anthropic ${response.status}`);
@@ -721,7 +726,8 @@ ${examplesText}`;
       const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
 Sua tarefa é melhorar o prompt de IA para o exame de "${template.name}" a seguir, tornando-o mais completo,
 claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
-Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.${userRequest}`;
+Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.
+IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não entre em loops de repetição e não corte o texto no meio.${userRequest}`;
       
       const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${template.aiInstructions}`;
 
@@ -743,13 +749,14 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
               'x-api-key': apiKey!,
               'anthropic-version': '2023-06-01',
               'anthropic-dangerous-direct-browser-access': 'true',
+              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
               'content-type': 'application/json',
             },
             body: JSON.stringify({
               model: localSettings.anthropicModel || 'claude-sonnet-4-5',
-              max_tokens: 8192,
+              max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
               messages: [{ role: 'user', content: fullMessage }],
-              temperature: 0.2,
+              temperature: 0.4,
             }),
           });
           if (!response.ok) throw new Error(`Anthropic ${response.status}`);
@@ -813,6 +820,7 @@ Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melho
             'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true',
+              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
             'content-type': 'application/json'
           },
           body: JSON.stringify({
