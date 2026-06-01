@@ -123,14 +123,14 @@ export async function getSettings(): Promise<AppSettings> {
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
       dicomPreset: 'macmini',
-      dicomUsername: 'ADMIN',
+      dicomUsername: 'admin',
       dicomPassword: '123456789',
       dicomLocalAgentUrl: 'http://100.93.111.95:5173',
       dicomBackupSyncEnabled: true,
-      dicomBackupViewerUrl: 'http://100.124.187.11:8042',
+      dicomBackupViewerUrl: 'http://100.124.187.11:8043',
       dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
       dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
-      dicomBackupUsername: 'ADMIN',
+      dicomBackupUsername: 'admin',
       dicomBackupPassword: '123456789',
       dicomBackupLocalAgentUrl: 'http://100.124.187.11:5173',
       dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
@@ -165,19 +165,19 @@ export async function getSettings(): Promise<AppSettings> {
     }
 
     // Forçar migração para o novo padrão Tailscale solicitado pelo usuário
-    if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8042') {
+    if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8043') {
       data.dicomViewerUrl = 'http://100.93.111.95:8042';
       data.dicomLocalAgentUrl = 'http://100.93.111.95:5173';
       data.dicomOrthancAETitle = 'ORTHANCPACS';
       data.dicomWorklistFolder = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
       data.dicomBackupSyncEnabled = true;
-      data.dicomBackupViewerUrl = 'http://100.124.187.11:8042';
+      data.dicomBackupViewerUrl = 'http://100.124.187.11:8043';
       data.dicomBackupLocalAgentUrl = 'http://100.124.187.11:5173';
       data.dicomBackupOrthancAETitle = 'ORTHANCBACKUP';
       data.dicomBackupWorklistFolder = 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\';
-      data.dicomUsername = 'ADMIN';
+      data.dicomUsername = 'admin';
       data.dicomPassword = '123456789';
-      data.dicomBackupUsername = 'ADMIN';
+      data.dicomBackupUsername = 'admin';
       data.dicomBackupPassword = '123456789';
       migrated = true;
     }
@@ -236,14 +236,14 @@ export async function getSettings(): Promise<AppSettings> {
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
     dicomPreset: 'macmini',
-    dicomUsername: 'ADMIN',
+    dicomUsername: 'admin',
     dicomPassword: '123456789',
     dicomLocalAgentUrl: 'http://100.93.111.95:5173',
     dicomBackupSyncEnabled: true,
-    dicomBackupViewerUrl: 'http://100.124.187.11:8042',
+    dicomBackupViewerUrl: 'http://100.124.187.11:8043',
     dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
     dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
-    dicomBackupUsername: 'ADMIN',
+    dicomBackupUsername: 'admin',
     dicomBackupPassword: '123456789',
     dicomBackupLocalAgentUrl: 'http://100.124.187.11:5173',
     dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
@@ -787,7 +787,7 @@ export function getActivePacsUrl(settings: AppSettings, isBackup = false): strin
   if (isBackup) {
     return (isVercel && settings.dicomBackupTailscalePublicUrl) 
       ? settings.dicomBackupTailscalePublicUrl 
-      : (settings.dicomBackupViewerUrl || 'http://100.124.187.11:8042');
+      : (settings.dicomBackupViewerUrl || 'http://100.124.187.11:8043');
   }
   
   return (isVercel && settings.dicomTailscalePublicUrl) 

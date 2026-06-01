@@ -16,7 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
-import { addAuditLog } from '../../store/db';
+import { addAuditLog, getActivePacsUrl } from '../../store/db';
 
 type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit';
 
@@ -127,10 +127,10 @@ export function Settings() {
     setPacsTestState('testing');
     setPacsTestResults(null);
     try {
-      const primaryUrl = draft.dicomTailscalePublicUrl || draft.dicomViewerUrl || '';
+      const primaryUrl = getActivePacsUrl(draft, false);
       const primaryAuth = `&username=${encodeURIComponent(draft.dicomUsername || '')}&password=${encodeURIComponent(draft.dicomPassword || '')}`;
       
-      const backupUrl = draft.dicomBackupViewerUrl ? (draft.dicomBackupTailscalePublicUrl || draft.dicomBackupViewerUrl) : null;
+      const backupUrl = draft.dicomBackupViewerUrl ? getActivePacsUrl(draft, true) : null;
       const backupAuth = backupUrl ? `&username=${encodeURIComponent(draft.dicomBackupUsername || '')}&password=${encodeURIComponent(draft.dicomBackupPassword || '')}` : '';
 
       // Test Primary
