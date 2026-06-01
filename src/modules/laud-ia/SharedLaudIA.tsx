@@ -411,7 +411,7 @@ IMPORTANTE: NÃO copie nem repita o Prompt Mestre ou regras globais desnecessari
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
             max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
             messages: [{ role: 'user', content: fullMessage }],
             temperature: 0.4,
@@ -542,7 +542,7 @@ ${examplesText}`;
             'content-type': 'application/json',
           },
           body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
             max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
             messages: [{ role: 'user', content: systemMsg }],
             temperature: 0.4,
@@ -677,7 +677,7 @@ ${examplesText}`;
               'content-type': 'application/json',
             },
             body: JSON.stringify({
-              model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+              model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
               max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
               messages: [{ role: 'user', content: systemMsg }],
               temperature: 0.4,
@@ -773,7 +773,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
               'content-type': 'application/json',
             },
             body: JSON.stringify({
-              model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+              model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
               max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
               messages: [{ role: 'user', content: fullMessage }],
               temperature: 0.4,
@@ -825,7 +825,25 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
         }
       } catch (err: unknown) {
         setTestStatus('error');
-        showToast('Falha na conexão com a API do Gemini', 'error');
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast('Falha na conexão: ' + msg, 'error');
+        
+        // Diagnóstico: listar modelos disponíveis
+        try {
+          const { GoogleGenerativeAI } = await import('@google/generative-ai');
+          const genAI = new GoogleGenerativeAI(apiKey);
+          // O SDK do JS não tem listModels() direto na instância em versões mais antigas,
+          // mas vamos tentar usar a REST API via fetch para listar modelos e mostrar no console
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+          const data = await response.json();
+          if (data && data.models) {
+            const modelNames = data.models.map((m: any) => m.name.replace('models/', '')).filter((n: string) => n.includes('gemini'));
+            console.log('Modelos Gemini disponíveis para esta chave:', modelNames);
+            showToast('Modelos suportados pela sua chave: ' + modelNames.slice(0, 5).join(', ') + '...', 'info');
+          }
+        } catch (diagErr) {
+          console.error('Erro no diagnóstico:', diagErr);
+        }
       }
     } else {
       if (!apiKey) {
@@ -844,7 +862,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
             'content-type': 'application/json'
           },
           body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
             messages: [{ role: 'user', content: 'Say OK' }],
             max_tokens: 1
           })
@@ -890,7 +908,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
             </span>
             <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
               {(localSettings.aiProvider === 'anthropic') 
-                ? (localSettings.anthropicModel || 'claude-sonnet-4-5') 
+                ? (localSettings.anthropicModel || 'claude-3-5-sonnet-latest') 
                 : (localSettings.geminiModel || 'gemini-3.5-flash')}
             </span>
           </div>
@@ -1412,14 +1430,12 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                         <div>
                           <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Gemini Principal</label>
                           <select disabled={readOnly}
-                            value={localSettings.geminiModel}
+                            value={localSettings.geminiModel || 'gemini-3.5-flash'}
                             onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value  })}
                             className="input h-14"
                           >
                             <option value="gemini-3.5-flash">GEMINI 3.5 FLASH (Recomendado)</option>
                             <option value="gemini-3.1-pro">GEMINI 3.1 PRO (Mais Inteligente)</option>
-                            <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
-                            <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
@@ -1431,7 +1447,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                                 onClick={() => setLocalSettings({ ...localSettings, geminiModel: m.model  })}
                                 className={classNames(
                                   'p-3 rounded-2xl border text-left transition-all',
-                                  localSettings.geminiModel === m.model
+                                  (localSettings.geminiModel || 'gemini-3.5-flash') === m.model
                                     ? 'bg-brand-50 border-brand-300 text-brand-800'
                                     : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
                                 )}
@@ -1474,14 +1490,10 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                         <div>
                           <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Claude Principal</label>
                           <select disabled={readOnly}
-                            value={localSettings.anthropicModel || 'claude-sonnet-4-5'}
+                            value={localSettings.anthropicModel || 'claude-3-5-sonnet-latest'}
                             onChange={(e) => setLocalSettings({ ...localSettings, anthropicModel: e.target.value  })}
                             className="input h-14"
                           >
-                            <optgroup label="Claude 4 (Última Geração)">
-                              <option value="claude-opus-4-5">Claude Opus 4 — Máxima Inteligência Clínica</option>
-                              <option value="claude-sonnet-4-5">Claude Sonnet 4 — Equilíbrio Premium (Recomendado)</option>
-                            </optgroup>
                             <optgroup label="Claude 3.7">
                               <option value="claude-3-7-sonnet-latest">Claude 3.7 Sonnet — Thinking Mode</option>
                             </optgroup>
@@ -1490,10 +1502,9 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                               <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku — Mais Rápido</option>
                             </optgroup>
                           </select>
-                          <div className="mt-3 grid grid-cols-3 gap-2">
+                          <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
-                              { model: 'claude-sonnet-4-5', label: 'Sonnet 4', desc: 'Recomendado', color: 'brand' },
-                              { model: 'claude-opus-4-5', label: 'Opus 4', desc: 'Mais Poderoso', color: 'violet' },
+                              { model: 'claude-3-5-sonnet-latest', label: '3.5 Sonnet', desc: 'Recomendado', color: 'brand' },
                               { model: 'claude-3-7-sonnet-latest', label: '3.7 Sonnet', desc: 'Raciocínio', color: 'amber' },
                             ].map(m => (
                               <button disabled={readOnly}
@@ -1501,7 +1512,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                                 onClick={() => setLocalSettings({ ...localSettings, anthropicModel: m.model  })}
                                 className={classNames(
                                   'p-3 rounded-2xl border text-left transition-all',
-                                  (localSettings.anthropicModel || 'claude-sonnet-4-5') === m.model
+                                  (localSettings.anthropicModel || 'claude-3-5-sonnet-latest') === m.model
                                     ? 'bg-brand-50 border-brand-300 text-brand-800'
                                     : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
                                 )}
@@ -1718,7 +1729,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                       icon: BrainCircuit,
                       color: 'violet',
                       hasKey: !!localSettings.anthropicApiKey,
-                      model: localSettings.anthropicModel || 'claude-sonnet-4-5',
+                      model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
                       isActive: localSettings.aiProvider === 'anthropic',
                     },
                   ].map((prov) => (
@@ -1812,7 +1823,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { label: 'Motor', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
-                    { label: 'Modelo', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
+                    { label: 'Modelo', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-3-5-sonnet-latest'), icon: BrainCircuit },
                     { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
                     { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
                   ].map(item => (

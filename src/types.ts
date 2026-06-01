@@ -240,6 +240,7 @@ export interface AppSettings {
   dicomBackupSyncEnabled?: boolean;
   dicomBackupWorklistFolder?: string;
   dicomBackupLocalAgentUrl?: string;
+  dicomBackupOrthancAETitle?: string;
 
   // Preferências do Sistema
   soundNotifications?: boolean;

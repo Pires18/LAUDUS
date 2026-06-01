@@ -479,28 +479,17 @@ export function resolveGeminiModel(rawModel: string | undefined): string {
   if (!rawModel) return 'gemini-3.5-flash';
   const raw = rawModel.toLowerCase();
   
-  // Novas versões de ponta
+  // O Google exige o sufixo -preview para o 3.1 Pro atualmente
+  if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro-preview';
   if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro';
-
-  if (raw.includes('flash-thinking')) return 'gemini-2.5-flash'; // 2.0-flash-thinking is deprecated
-  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash';
-  if (raw.includes('2.5') && raw.includes('pro')) return 'gemini-2.5-pro';
+  if (raw.includes('pro')) return 'gemini-3.1-pro-preview';
   
-  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.5-flash';
-  if (raw.includes('2.0') && raw.includes('pro')) return 'gemini-2.5-pro';
-  
-  if (raw.includes('1.5') && raw.includes('pro')) return 'gemini-1.5-pro';
-  if (raw.includes('pro')) return 'gemini-3.1-pro'; // Upgrade default pro to 3.1
-  
-  if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
-  if (raw.includes('flash')) return 'gemini-3.5-flash'; // Upgrade default flash to 3.5
-  
+  // Default de máxima segurança
   return 'gemini-3.5-flash';
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
-  let modelToUse = settings.geminiModel || 'gemini-1.5-flash';
+  let modelToUse = settings.geminiModel || 'gemini-3.5-flash';
   if (settings.geminiModelByMode?.[mode as keyof typeof settings.geminiModelByMode]) {
     modelToUse = settings.geminiModelByMode[mode as keyof typeof settings.geminiModelByMode]!;
   }
@@ -610,7 +599,7 @@ async function callAnthropic(
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: settings.anthropicModel || 'claude-sonnet-4-5',
+      model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
       max_tokens: getMaxTokens(area),
       system: systemBlocks,
       messages: [{ role: 'user', content: built.userMessage }],
@@ -663,7 +652,7 @@ async function callAnthropicStream(
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: settings.anthropicModel || 'claude-sonnet-4-5',
+      model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
       max_tokens: getMaxTokens(area),
       system: systemBlocks,
       messages: [{ role: 'user', content: built.userMessage }],

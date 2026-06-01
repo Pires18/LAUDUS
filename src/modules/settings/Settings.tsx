@@ -583,7 +583,7 @@ export function Settings() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="md:col-span-2">
-                        <label className="label">URL Base do Servidor Orthanc</label>
+                        <label className="label">URL/IP do Servidor Orthanc (via Tailscale ou Local)</label>
                         <input
                           className="input h-12 text-sm"
                           value={draft.dicomViewerUrl || ''}
@@ -611,7 +611,7 @@ export function Settings() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="label">URL do Agente Local (Vercel para Local)</label>
+                        <label className="label">URL do Agente Local (Proxy Vercel/Tailscale)</label>
                         <input
                           className="input h-12 text-sm"
                           value={draft.dicomLocalAgentUrl || ''}
@@ -699,7 +699,7 @@ export function Settings() {
                     {draft.dicomBackupSyncEnabled && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fade-in">
                         <div className="md:col-span-2">
-                          <label className="label">URL Base do Servidor Orthanc Backup</label>
+                          <label className="label">URL/IP do Servidor Orthanc de Backup (via Tailscale ou Local)</label>
                           <input
                             className="input h-12 text-sm"
                             value={draft.dicomBackupViewerUrl || ''}
@@ -727,7 +727,16 @@ export function Settings() {
                           />
                         </div>
                         <div className="md:col-span-2">
-                          <label className="label">URL do Agente Local do Backup</label>
+                          <label className="label">AE Title do Servidor Backup</label>
+                          <input
+                            className="input h-12 text-sm font-mono"
+                            value={draft.dicomBackupOrthancAETitle || ''}
+                            onChange={(e) => u('dicomBackupOrthancAETitle', e.target.value.toUpperCase())}
+                            placeholder="Ex: ORTHANC"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="label">URL do Agente Local do Backup (Proxy Vercel/Tailscale)</label>
                           <input
                             className="input h-12 text-sm"
                             value={draft.dicomBackupLocalAgentUrl || ''}
@@ -895,12 +904,22 @@ export function Settings() {
                       </p>
                       <ul className="space-y-2 text-xs font-mono bg-slate-950 p-4 rounded-xl border border-slate-800/50 text-brand-400">
                         <li>
-                          <span className="text-slate-500">IP do Servidor:</span> {(() => {
-                            try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR'; } catch { return 'IP_DO_SERVIDOR'; }
+                          <span className="text-slate-500">IP do Servidor (Principal):</span> {(() => {
+                            try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR_PRINCIPAL'; } catch { return 'IP_DO_SERVIDOR_PRINCIPAL'; }
                           })()}
                         </li>
+                        {draft.dicomBackupSyncEnabled && (
+                          <li>
+                            <span className="text-slate-500">IP do Servidor (Backup):</span> {(() => {
+                              try { return draft.dicomBackupViewerUrl ? new URL(draft.dicomBackupViewerUrl).hostname : 'IP_DO_SERVIDOR_BACKUP'; } catch { return 'IP_DO_SERVIDOR_BACKUP'; }
+                            })()}
+                          </li>
+                        )}
                         <li><span className="text-slate-500">Porta DICOM:</span> 4242</li>
-                        <li><span className="text-slate-500">AE Title:</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
+                        <li><span className="text-slate-500">AE Title (Principal):</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
+                        {draft.dicomBackupSyncEnabled && (
+                          <li><span className="text-slate-500">AE Title (Backup):</span> {draft.dicomBackupOrthancAETitle || 'ORTHANC'}</li>
+                        )}
                       </ul>
                     </div>
                   </div>

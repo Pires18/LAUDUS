@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings, ExamArea } from '../../types';
 import { getRecentFinalizedReports } from '../../store/db';
+import { resolveGeminiModel } from './gemini';
 
 interface GeneratedTemplate {
   title: string;
@@ -99,7 +100,7 @@ Gere o JSON da máscara do laudo agora.`;
   if (provider === 'gemini') {
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
     const model = genAI.getGenerativeModel({
-      model: settings.geminiModel || 'gemini-2.0-flash',
+      model: resolveGeminiModel(settings.geminiModel),
       systemInstruction: systemContext,
       generationConfig: {
         temperature: 0.2,
@@ -121,7 +122,7 @@ Gere o JSON da máscara do laudo agora.`;
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: settings.anthropicModel || 'claude-sonnet-4-5',
+        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
         max_tokens: 8192,
         system: [
           {
@@ -251,7 +252,7 @@ Regras importantes:
   if (provider === 'gemini') {
     const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
     const model = genAI.getGenerativeModel({
-      model: settings.geminiModel || 'gemini-2.0-flash',
+      model: resolveGeminiModel(settings.geminiModel),
       systemInstruction: systemContext,
       generationConfig: {
         temperature: 0.3,
@@ -273,7 +274,7 @@ Regras importantes:
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: settings.anthropicModel || 'claude-sonnet-4-5',
+        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
         max_tokens: 8192,
         system: [
           {

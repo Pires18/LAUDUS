@@ -108,28 +108,30 @@ export async function getSettings(): Promise<AppSettings> {
     const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
     
     let defaultSettings: AppSettings = { 
-      geminiModel: 'gemini-2.5-flash', 
+      geminiModel: 'gemini-3.5-flash',
       aiProvider: 'anthropic', 
-      anthropicModel: 'claude-sonnet-4-5',
+      anthropicModel: 'claude-3-5-sonnet-latest',
       dicomSyncEnabled: true,
       dicomWorklistFolder: isWindows 
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
         : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
-      dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
-      dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net:8443/',
+      dicomOrthancAETitle: 'ORTHANCPACS',
+      dicomViewerUrl: 'http://100.93.111.95:8042',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-      dicomPreset: isWindows ? 'notebook' : 'macmini',
-      dicomUsername: 'admin',
+      dicomPreset: 'custom',
+      dicomUsername: 'ADMIN',
       dicomPassword: '123456789',
-      dicomLocalAgentUrl: isWindows 
-        ? 'http://localhost:5173' 
-        : 'https://servidor-mac.tail861dda.ts.net',
-      dicomBackupViewerUrl: '',
-      dicomBackupUsername: '',
-      dicomBackupPassword: '',
+      dicomLocalAgentUrl: 'http://100.93.111.95:5173',
+      dicomBackupSyncEnabled: true,
+      dicomBackupViewerUrl: 'http://100.124.187.11:8042',
+      dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
+      dicomBackupUsername: 'ADMIN',
+      dicomBackupPassword: '123456789',
+      dicomBackupLocalAgentUrl: 'http://100.124.187.11:5173',
+      dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
       soundNotifications: true,
       autoSave: true,
       signatureImageUrl: ''
@@ -160,22 +162,29 @@ export async function getSettings(): Promise<AppSettings> {
       migrated = true;
     }
 
+    // Forçar migração para o novo padrão Tailscale solicitado pelo usuário
+    if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8042') {
+      data.dicomViewerUrl = 'http://100.93.111.95:8042';
+      data.dicomLocalAgentUrl = 'http://100.93.111.95:5173';
+      data.dicomOrthancAETitle = 'ORTHANCPACS';
+      data.dicomWorklistFolder = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
+      data.dicomBackupSyncEnabled = true;
+      data.dicomBackupViewerUrl = 'http://100.124.187.11:8042';
+      data.dicomBackupLocalAgentUrl = 'http://100.124.187.11:5173';
+      data.dicomBackupOrthancAETitle = 'ORTHANCBACKUP';
+      data.dicomBackupWorklistFolder = 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\';
+      data.dicomUsername = 'ADMIN';
+      data.dicomPassword = '123456789';
+      data.dicomBackupUsername = 'ADMIN';
+      data.dicomBackupPassword = '123456789';
+      migrated = true;
+    }
+
     if (migrated && snap.exists()) {
       saveSettings(data).catch(err => console.warn('[DB] Falha ao persistir migração de settings:', err));
     }
 
-    // Se o preset não for customizado (notebook, macmini ou não definido), resolve dinamicamente com base no OS
-    if (data.dicomPreset !== 'custom') {
-      data.dicomPreset = isWindows ? 'notebook' : 'macmini';
-      data.dicomWorklistFolder = isWindows 
-        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-        : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-      data.dicomViewerUrl = isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net:8443/';
-      data.dicomOrthancAETitle = isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS';
-      data.dicomLocalAgentUrl = isWindows 
-        ? 'http://localhost:5173' 
-        : 'https://servidor-mac.tail861dda.ts.net';
-    }
+    // Se o preset for modificado localmente, a configuração persistirá sem ser sobrescrita.
     
     // Fallback de segurança para buscar prompts oficiais do administrador
     if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
@@ -195,14 +204,14 @@ export async function getSettings(): Promise<AppSettings> {
           anthropicApiKey: data.anthropicApiKey || adminSettings.anthropicApiKey || '',
         };
         if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
-          merged.anthropicModel = 'claude-sonnet-4-5';
+          merged.anthropicModel = 'claude-3-5-sonnet-latest';
         }
         return merged;
       }
     }
     const finalData = { ...defaultSettings, ...data };
     if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
-      finalData.anthropicModel = 'claude-sonnet-4-5';
+      finalData.anthropicModel = 'claude-3-5-sonnet-latest';
     }
     return finalData;
   } catch (err) {
@@ -210,28 +219,30 @@ export async function getSettings(): Promise<AppSettings> {
   }
   const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
   return { 
-    geminiModel: 'gemini-2.5-flash', 
+    geminiModel: 'gemini-3.5-flash',
     aiProvider: 'anthropic', 
-    anthropicModel: 'claude-sonnet-4-5',
+    anthropicModel: 'claude-3-5-sonnet-latest',
     dicomSyncEnabled: true,
     dicomWorklistFolder: isWindows 
       ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
       : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
-    dicomOrthancAETitle: isWindows ? 'ORTHANCBACKUP' : 'ORTHANCPACS',
-    dicomViewerUrl: isWindows ? 'http://localhost:8043' : 'https://servidor-mac.tail861dda.ts.net:8443/',
+    dicomOrthancAETitle: 'ORTHANCPACS',
+    dicomViewerUrl: 'http://100.93.111.95:8042',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-    dicomPreset: isWindows ? 'notebook' : 'macmini',
-    dicomUsername: 'admin',
+    dicomPreset: 'custom',
+    dicomUsername: 'ADMIN',
     dicomPassword: '123456789',
-    dicomLocalAgentUrl: isWindows 
-      ? 'http://localhost:5173' 
-      : 'https://servidor-mac.tail861dda.ts.net',
-    dicomBackupViewerUrl: '',
-    dicomBackupUsername: '',
-    dicomBackupPassword: '',
+    dicomLocalAgentUrl: 'http://100.93.111.95:5173',
+    dicomBackupSyncEnabled: true,
+    dicomBackupViewerUrl: 'http://100.124.187.11:8042',
+    dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
+    dicomBackupUsername: 'ADMIN',
+    dicomBackupPassword: '123456789',
+    dicomBackupLocalAgentUrl: 'http://100.124.187.11:5173',
+    dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
     soundNotifications: true,
     autoSave: true,
     signatureImageUrl: ''
@@ -254,7 +265,7 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AppSettings;
         if (adminData.anthropicModel === 'claude-3-5-sonnet-latest' || adminData.anthropicModel === 'claude-3-7-sonnet-latest' || adminData.anthropicModel === 'claude-3-5-haiku-latest') {
-          adminData.anthropicModel = 'claude-sonnet-4-5';
+          adminData.anthropicModel = 'claude-3-5-sonnet-latest';
         }
         return adminData;
       }
