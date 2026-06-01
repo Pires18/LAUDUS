@@ -163,7 +163,10 @@ export function Worklist() {
       // Exclui o arquivo correspondente da Worklist do Orthanc
       if (settings.dicomSyncEnabled !== false) {
         try {
-          await fetch('/api/worklist', {
+          const url = settings.dicomLocalAgentUrl 
+            ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
+            : '/api/worklist';
+          await fetch(url, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -180,7 +183,10 @@ export function Worklist() {
       // Exclui do Backup, se configurado
       if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
         try {
-          await fetch('/api/worklist', {
+          const urlBackup = settings.dicomBackupLocalAgentUrl 
+            ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
+            : '/api/worklist';
+          await fetch(urlBackup, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 

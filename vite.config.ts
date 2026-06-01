@@ -11,6 +11,19 @@ function localOrthancWorklistPlugin() {
     name: 'local-orthanc-worklist',
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
+        // Allow CORS for all local API routes
+        if (req.url && req.url.startsWith('/api/')) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 200;
+            res.end();
+            return;
+          }
+        }
+
         if (req.url && req.url.startsWith('/api/orthanc-proxy')) {
           const parsedUrl = new URL(req.url, 'http://localhost');
           const targetUrl = parsedUrl.searchParams.get('url');
