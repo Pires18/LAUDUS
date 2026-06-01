@@ -26,7 +26,7 @@ export function CategorySelector({ label, options, current, onSelect, columns = 
       </div>
       <div className={classNames(
         "grid gap-2",
-        columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        columns === 1 ? "grid-cols-1" : "grid-cols-2"
       )}>
         {options.map((o) => {
           const isSelected = current === (o.points !== undefined ? o.points : o.value);

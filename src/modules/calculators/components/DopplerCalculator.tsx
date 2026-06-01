@@ -18,6 +18,11 @@ const UTA_REF: Record<number,[number,number]> = {
   20:[1.20,0.32],22:[1.12,0.30],24:[1.04,0.28],26:[0.98,0.26],28:[0.92,0.25],30:[0.87,0.24],
   32:[0.83,0.23],34:[0.79,0.22],36:[0.76,0.21],38:[0.73,0.20],40:[0.71,0.20]
 };
+// DV PIV reference (Hecher 1994)
+const DV_REF: Record<number,[number,number]> = {
+  20:[0.65,0.18],22:[0.60,0.17],24:[0.56,0.16],26:[0.53,0.15],28:[0.50,0.14],30:[0.48,0.14],
+  32:[0.45,0.13],34:[0.43,0.13],36:[0.41,0.12],38:[0.39,0.12],40:[0.38,0.11]
+};
 
 function erf(x: number) {
   const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
@@ -27,6 +32,7 @@ function erf(x: number) {
 }
 function zToP(z: number) { return Math.max(1,Math.min(99,Math.round(50*(1+erf(z/Math.sqrt(2)))))); }
 function getRef(table: Record<number,[number,number]>, ga: number): [number,number] {
+  if (table[ga]) return table[ga];
   const keys = Object.keys(table).map(Number).sort((a,b)=>a-b);
   if (ga<=keys[0]) return table[keys[0]];
   if (ga>=keys[keys.length-1]) return table[keys[keys.length-1]];
@@ -34,6 +40,14 @@ function getRef(table: Record<number,[number,number]>, ga: number): [number,numb
   const hi=keys.filter(k=>k>ga).shift()!;
   const f=(ga-lo)/(hi-lo);
   return [table[lo][0]+(table[hi][0]-table[lo][0])*f, table[lo][1]+(table[hi][1]-table[lo][1])*f];
+}
+
+function getCprRef(ga: number): [number, number] {
+  const [mcaM] = getRef(MCA_REF, ga);
+  const [uaM] = getRef(UA_REF, ga);
+  const mean = mcaM / uaM;
+  const sd = mean * 0.18; // ~18% CV approximation based on literature
+  return [mean, sd];
 }
 
 export function DopplerCalculator({ value, onChange }: CalculatorProps) {
@@ -47,40 +61,50 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   const [dvWave, setDvWave] = useState<'not_evaluated'|'normal'|'rav'>(value?.dvWave || 'not_evaluated');
   const [efwPercentile, setEfwPercentile] = useState(value?.efwPercentile || '');
 
-  const ga = Math.round(Number(gaWeeks||0)+(Number(gaDays||0)/7));
+  const gaDecimal = Number(gaWeeks||0)+(Number(gaDays||0)/7);
+  const ga = Math.round(gaDecimal); // kept for any potential integer fallback, though gaDecimal is preferred
 
   const calc = useMemo(() => {
     let rcp: number|null = null;
-    let auP: number|null = null, acmP: number|null = null, utaP: number|null = null;
+    let rcpP: number|null = null;
+    let auP: number|null = null, acmP: number|null = null, utaP: number|null = null, dvP: number|null = null;
 
-    if (auPi && ga>=20 && ga<=40) { const [m,s]=getRef(UA_REF,ga); auP=zToP((Number(auPi)-m)/s); }
-    if (acmPi && ga>=20 && ga<=40) { const [m,s]=getRef(MCA_REF,ga); acmP=zToP((Number(acmPi)-m)/s); }
-    if (utaPi && ga>=20 && ga<=40) { const [m,s]=getRef(UTA_REF,ga); utaP=zToP((Number(utaPi)-m)/s); }
-    if (auPi && acmPi) rcp = Number(acmPi)/Number(auPi);
+    if (auPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(UA_REF,gaDecimal); auP=zToP((Number(auPi)-m)/s); }
+    if (acmPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(MCA_REF,gaDecimal); acmP=zToP((Number(acmPi)-m)/s); }
+    if (utaPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(UTA_REF,gaDecimal); utaP=zToP((Number(utaPi)-m)/s); }
+    if (dvPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(DV_REF,gaDecimal); dvP=zToP((Number(dvPi)-m)/s); }
+    
+    if (auPi && acmPi && gaDecimal>=20 && gaDecimal<=40) { 
+      rcp = Number(acmPi)/Number(auPi);
+      const [m,s] = getCprRef(gaDecimal);
+      rcpP = zToP((rcp-m)/s);
+    } else if (auPi && acmPi) {
+      rcp = Number(acmPi)/Number(auPi);
+    }
 
     // Estadiamento Gratacós (Barcelona 2014) — pode ser determinado SEM RCP
     let stage=0, stageDesc='Normal', rec='Seguimento habitual conforme protocolo.';
     if (dvWave==='rav') {
       stage=4; stageDesc='ESTÁGIO IV';
       rec='Onda "a" reversa no DV. Morte fetal iminente — parto imediato se viabilidade.';
-    } else if (auFlow==='redf') {
+    } else if (auFlow==='redf' || (dvP !== null && dvP > 95)) {
       stage=3; stageDesc='ESTÁGIO III';
-      rec='Diástole reversa na AU (REDF). Risco de acidose. Internação. Parto em 24-48h.';
+      rec='Diástole reversa na AU (REDF) ou DV > p95. Risco de acidose. Internação. Parto em 24-48h.';
     } else if (auFlow==='aedf') {
       stage=2; stageDesc='ESTÁGIO II';
       rec='Diástole zero na AU (AEDF). Insuf. placentária grave. Monitoramento 2-3×/semana.';
     } else if (
       (efwPercentile && Number(efwPercentile)<3) ||
       (auP!==null && auP>95) ||
-      (rcp!==null && rcp<1.0) ||
+      (rcpP!==null && rcpP<5) ||
       (acmP!==null && acmP<5)
     ) {
       stage=1; stageDesc='ESTÁGIO I';
-      rec='Insuf. placentária leve (AU p>95, RCP<1,0 ou PFE<p3). Monitoramento semanal. Parto ≥ 37s.';
+      rec='Insuf. placentária leve (AU >p95, RCP <p5, ACM <p5 ou PFE <p3). Monitoramento semanal. Parto ≥ 37s.';
     }
 
-    return { rcp, auP, acmP, utaP, stage, stageDesc, rec };
-  }, [auPi,acmPi,utaPi,dvPi,auFlow,dvWave,efwPercentile,ga]);
+    return { rcp, rcpP, auP, acmP, utaP, dvP, stage, stageDesc, rec };
+  }, [auPi,acmPi,utaPi,dvPi,auFlow,dvWave,efwPercentile,gaDecimal]);
 
   // Determina se há dados suficientes para exibir resultado
   const hasData = !!(auPi || acmPi || utaPi || efwPercentile || auFlow !== 'normal' || dvWave !== 'not_evaluated');
@@ -91,7 +115,8 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
     if (calc.auP !== null) parts.push(`AU PI: ${auPi} (p${calc.auP})`);
     if (calc.acmP !== null) parts.push(`ACM PI: ${acmPi} (p${calc.acmP})`);
     if (calc.utaP !== null) parts.push(`UtA PI: ${utaPi} (p${calc.utaP})`);
-    if (calc.rcp !== null) parts.push(`RCP: ${calc.rcp.toFixed(2)}${calc.rcp<1.0?' (ALTERADA)':' (normal)'}`);
+    if (calc.dvP !== null) parts.push(`DV PIV: ${dvPi} (p${calc.dvP})`);
+    if (calc.rcp !== null) parts.push(`RCP: ${calc.rcp.toFixed(2)}${calc.rcpP !== null ? ` (p${calc.rcpP})` : ''}${calc.rcpP !== null && calc.rcpP < 5 ? ' (ALTERADA)' : ' (normal)'}`);
     if (auFlow !== 'normal') parts.push(`Diástole AU: ${auFlow === 'aedf' ? 'Zero (AEDF)' : 'Reversa (REDF)'}`);
     if (dvWave === 'rav') parts.push("DV: Onda 'a' Reversa");
 
@@ -133,16 +158,16 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
           <DI label="AU PI" value={auPi} onChange={setAuPi} p={calc.auP} abnormal={calc.auP !== null && calc.auP > 95}/>
           <DI label="ACM PI" value={acmPi} onChange={setAcmPi} p={calc.acmP} abnormal={calc.acmP !== null && calc.acmP < 5}/>
           <DI label="UtA PI (médio)" value={utaPi} onChange={setUtaPi} p={calc.utaP} abnormal={calc.utaP !== null && calc.utaP > 95}/>
-          <DI label="DV PIV" value={dvPi} onChange={setDvPi} p={null} abnormal={false}/>
+          <DI label="DV PIV" value={dvPi} onChange={setDvPi} p={calc.dvP} abnormal={calc.dvP !== null && calc.dvP > 95}/>
         </div>
 
         {calc.rcp !== null && (
           <div className={classNames(
             "flex items-center justify-between px-3 py-2 rounded-lg border text-sm font-black",
-            calc.rcp < 1.0 ? "bg-red-50 border-red-200 text-red-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"
+            (calc.rcpP !== null && calc.rcpP < 5) || (calc.rcpP === null && calc.rcp < 1.0) ? "bg-red-50 border-red-200 text-red-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"
           )}>
             <span className="text-[9px] font-bold uppercase">RCP (ACM/AU)</span>
-            <span>{calc.rcp.toFixed(2)} — {calc.rcp < 1.0 ? '⚠ ALTERADA' : 'Normal'}</span>
+            <span>{calc.rcp.toFixed(2)} — {(calc.rcpP !== null && calc.rcpP < 5) || (calc.rcpP === null && calc.rcp < 1.0) ? '⚠ ALTERADA' : 'Normal'}</span>
           </div>
         )}
 

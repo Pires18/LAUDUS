@@ -192,7 +192,7 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
 
     onChange({
       lesions: updatedLesions,
-      _summary: summaries.length > 0 ? `Achados BI-RADS (Mama):\n${summaries.join('\n')}` : null
+      _summary: summaries.length > 0 ? `[BI-RADS Calculado]\n${summaries.join('\n')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);
@@ -288,7 +288,7 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
             {/* CONTENT */}
             {expandedId === lesion.id && (
               <div className="p-8 pt-0 border-t border-ink-50 space-y-8 animate-in slide-in-from-top-2 duration-300">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6">
+                <div className="flex flex-col gap-4 pt-6">
                   <CalculatorInput
                     label="Localização da Lesão"
                     placeholder="Ex: QSE D, QID E..."

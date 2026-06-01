@@ -45,7 +45,7 @@ export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
       ri: calculatedRi,
       pi: calculatedPi,
       sd: calculatedSd,
-      _summary: summaryParts.length > 0 ? `Índices Doppler:\n${summaryParts.join(' | ')}` : null
+      _summary: summaryParts.length > 0 ? `[Índices Hemodinâmicos / Doppler Calculados]\n${summaryParts.join(' | ')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [psv, edv, tamv]);
@@ -94,7 +94,7 @@ export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <ResultCard label="IR (S-D)/S" value={ri?.toFixed(2)} sub="Índice de Resistência" color="emerald" />
           <ResultCard label="IP (S-D)/Vm" value={pi?.toFixed(2)} sub="Índice de Pulsatilidade" color="blue" />
           <ResultCard label="S/D" value={sd?.toFixed(2)} sub="Relação Sist/Diast" color="amber" />

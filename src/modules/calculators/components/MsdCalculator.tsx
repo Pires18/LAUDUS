@@ -21,7 +21,7 @@ export function MsdCalculator({ value, onChange }: CalculatorProps) {
     }
 
     const summary = msd 
-      ? `DMSG: ${msd.toFixed(1)}mm. IG estimada pelo DMSG: ${ga}.`
+      ? `[DMSG / IG Calculada]\nDMSG (Média): ${msd.toFixed(1)}mm\nIG estimada: ${ga}`
       : null;
 
     onChange({

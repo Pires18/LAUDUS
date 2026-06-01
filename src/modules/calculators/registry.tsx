@@ -6,7 +6,7 @@ import { FigoCalculator } from './components/FigoCalculator';
 import { GestationalAgeCalculator } from './components/GestationalAgeCalculator';
 import { MsdCalculator } from './components/MsdCalculator';
 import { CrlCalculator } from './components/CrlCalculator';
-import { FetalBiometryCalculator } from './components/FetalBiometryCalculator';
+import { WhoFetalBiometryCalculator } from './components/WhoFetalBiometryCalculator';
 import { DopplerCalculator } from './components/DopplerCalculator';
 import { BarcelonaFetalGrowthCalculator } from './components/BarcelonaFetalGrowthCalculator';
 import { ProstateWeightCalculator } from './components/ProstateWeightCalculator';
@@ -148,12 +148,12 @@ export const CALCULATORS: CalculatorDef[] = [
   // --- MEDICINA FETAL ---
   { 
     id: 'barcelona-fetal-growth', 
-    name: 'Barcelona Fetal Growth & Doppler', 
-    description: 'Calculadora completa passo-a-passo: peso, Doppler e estadiamento RCF.', 
+    name: 'Crescimento Fetal (OMS + Doppler)', 
+    description: 'Calculadora completa passo-a-passo: biometria (OMS), peso e Doppler (Barcelona).', 
     component: BarcelonaFetalGrowthCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Gratacós E, et al. Fetal Medicine Barcelona Clinical Consensus for Fetal Growth Restriction (FGR): Classification, doppler staging and clinical management.',
+      text: 'Biometria pela OMS (Kiserud, 2017) e Doppler/Estadiamento pelo Consenso de Barcelona Fetal Medicine (Gratacós, 2014).',
       link: 'https://www.medicinafetalbarcelona.org/'
     }
   },
@@ -169,14 +169,14 @@ export const CALCULATORS: CalculatorDef[] = [
     }
   },
   { 
-    id: 'fetal-biometry', 
+    id: 'who-fetal-biometry', 
     name: 'Biometria Fetal (Peso/Percentil)', 
-    description: 'Peso fetal estimado (Hadlock IV) e percentil de crescimento.', 
-    component: FetalBiometryCalculator,
+    description: 'Peso fetal estimado (Hadlock IV) com percentil da OMS (WHO Fetal Growth).', 
+    component: WhoFetalBiometryCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Hadlock FP, et al. Estimation of fetal weight with the use of head, body, and femur measurements. American Journal of Obstetrics and Gynecology 1985.',
-      link: 'https://pubmed.ncbi.nlm.nih.gov/3890522/'
+      text: 'Kiserud T, et al. The World Health Organization Fetal Growth Charts: A Multinational Longitudinal Study of Ultrasound Biometric Measurements and Estimated Fetal Weight.',
+      link: 'https://www.who.int/tools/fetal-growth-charts'
     }
   },
   { 

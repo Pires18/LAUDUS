@@ -25,7 +25,7 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
       structureName, d1, d2, d3, unit,
       volume: displayVol ? parseFloat(displayVol) : null,
       _summary: displayVol
-        ? `${name}: ${d1} × ${d2} × ${d3} ${unit}. Volume estimado: ${displayVol} cm³ (${displayVol} mL).`
+        ? `[Volume Calculado] ${name}: ${d1} × ${d2} × ${d3} ${unit} (Vol. Aprox.: ${displayVol} cm³ / mL).`
         : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,7 +45,7 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-6">
         <CalculatorInput
           label="Identificação da Estrutura"
           placeholder="Ex: Próstata, Nódulo, Tireoide..."

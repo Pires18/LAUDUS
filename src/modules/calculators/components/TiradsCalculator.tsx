@@ -103,7 +103,7 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
 
     onChange({
       lesions: updatedLesions,
-      _summary: summaries.length > 0 ? `Achados TI-RADS:\n${summaries.join('\n')}` : null
+      _summary: summaries.length > 0 ? `[TI-RADS Calculado]\n${summaries.join('\n')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);
@@ -230,7 +230,7 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
             {/* CONTENT */}
             {expandedId === lesion.id && (
               <div className="p-8 pt-0 border-t border-ink-50 space-y-8 animate-in slide-in-from-top-2 duration-300">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6">
+                <div className="flex flex-col gap-4 pt-6">
                   <CalculatorInput
                     label="Localização / Nome"
                     placeholder="Ex: Lobo Direito, Istmo..."
@@ -262,7 +262,7 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
                     <p className="text-[9px] text-ink-400 font-semibold ml-3 -mt-1">
                       Selecione <strong>todos</strong> os tipos presentes — pontos são somados (ACR 2017).
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-2">
                       {ECHOGENIC_FOCI.map((o) => {
                         const isSelected = lesion.echogenicFoci.includes(o.points);
                         return (

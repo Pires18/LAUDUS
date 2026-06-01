@@ -6,6 +6,14 @@ import { classNames } from '../../../utils/format';
 
 export function GestationalAgeCalculator({ value, onChange, examDateMs }: CalculatorProps) {
   const [method, setMethod] = useState<'dum' | 'usg'>(value?.method || 'dum');
+  const [referenceDate, setReferenceDate] = useState<string>(() => {
+    if (value?.referenceDate) return value.referenceDate;
+    const d = examDateMs ? new Date(examDateMs) : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [dumDate, setDumDate] = useState(value?.dumDate || '');
   const [prevUsgDate, setPrevUsgDate] = useState(value?.prevUsgDate || '');
   const [prevUsgWeeks, setPrevUsgWeeks] = useState(value?.prevUsgWeeks || '');
@@ -21,8 +29,8 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
   useEffect(() => {
     let currentGa = null;
     let eddStr = null; 
-    const today = examDateMs ? new Date(examDateMs) : new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = new Date(referenceDate + 'T00:00:00');
+    if (isNaN(today.getTime())) return;
 
     if (method === 'dum' && dumDate) {
       const d = new Date(dumDate + 'T00:00:00');
@@ -35,7 +43,8 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
           const days = diffDays % 7;
           currentGa = `${weeks}s ${days}d`;
           
-          const eddDate = new Date(d.getTime() + 280 * 24 * 60 * 60 * 1000);
+          const eddDate = new Date(d);
+          eddDate.setDate(eddDate.getDate() + 280);
           eddStr = formatDate(eddDate);
         }
       }
@@ -52,24 +61,25 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
           const days = totalDays % 7;
           currentGa = `${weeks}s ${days}d`;
           
-          const conceptionDate = new Date(d.getTime() - initialDays * 24 * 60 * 60 * 1000);
-          const eddDate = new Date(conceptionDate.getTime() + 280 * 24 * 60 * 60 * 1000);
+          const eddDate = new Date(d);
+          eddDate.setDate(eddDate.getDate() - initialDays + 280);
           eddStr = formatDate(eddDate);
         }
       }
     }
 
     const summary = currentGa 
-      ? `Idade Gestacional: ${currentGa} (Base: ${method === 'dum' ? 'DUM' : 'USG Anterior'}). DDP: ${eddStr || '---'}.`
+      ? `[Idade Gestacional Calculada]\nIG: ${currentGa} (Base: ${method === 'dum' ? 'DUM' : 'USG Anterior'})\nDDP: ${eddStr || '---'}`
       : null;
 
     onChange({
-      method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays,
+      referenceDate, method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays,
       currentGa,
       edd: eddStr,
       _summary: summary
     });
-  }, [method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays, examDateMs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, referenceDate, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays]);
 
   return (
     <div className="space-y-8">
@@ -83,8 +93,15 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
         </div>
       </div>
 
+      <CalculatorInput 
+        type="date" 
+        label="Data do Exame Atual (Base para Cálculo)" 
+        value={referenceDate} 
+        onChange={setReferenceDate} 
+      />
+      
       <div className="space-y-4">
-        <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Método de Referência</label>
+          <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Método de Referência</label>
         <div className="flex gap-3">
           {[
             { id: 'dum', label: 'Pela DUM', desc: 'Data da Última Menstruação' },
@@ -107,7 +124,7 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-6">
         {method === 'dum' ? (
           <div className="col-span-full">
             <CalculatorInput 
@@ -137,7 +154,7 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
       </div>
 
       {value?.currentGa ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-4">
           <ResultCard 
             label="Idade Gestacional Atual" 
             value={value.currentGa} 
