@@ -119,14 +119,16 @@ export async function getSettings(): Promise<AppSettings> {
       dicomModalityType: 'US',
       dicomOrthancAETitle: 'ORTHANCPACS',
       dicomViewerUrl: 'http://100.93.111.95:8042',
+      dicomTailscalePublicUrl: 'https://servidor-mac.tail861dda.ts.net:8443',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-      dicomPreset: 'custom',
+      dicomPreset: 'macmini',
       dicomUsername: 'ADMIN',
       dicomPassword: '123456789',
       dicomLocalAgentUrl: 'http://100.93.111.95:5173',
       dicomBackupSyncEnabled: true,
       dicomBackupViewerUrl: 'http://100.124.187.11:8042',
+      dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
       dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
       dicomBackupUsername: 'ADMIN',
       dicomBackupPassword: '123456789',
@@ -230,14 +232,16 @@ export async function getSettings(): Promise<AppSettings> {
     dicomModalityType: 'US',
     dicomOrthancAETitle: 'ORTHANCPACS',
     dicomViewerUrl: 'http://100.93.111.95:8042',
+    dicomTailscalePublicUrl: 'https://servidor-mac.tail861dda.ts.net:8443',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
-    dicomPreset: 'custom',
+    dicomPreset: 'macmini',
     dicomUsername: 'ADMIN',
     dicomPassword: '123456789',
     dicomLocalAgentUrl: 'http://100.93.111.95:5173',
     dicomBackupSyncEnabled: true,
     dicomBackupViewerUrl: 'http://100.124.187.11:8042',
+    dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
     dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
     dicomBackupUsername: 'ADMIN',
     dicomBackupPassword: '123456789',
@@ -772,5 +776,22 @@ export async function clearAllSupportTickets(): Promise<void> {
     batch.delete(docSnap.ref);
   });
   await batch.commit();
+}
+
+/**
+ * Retorna a URL correta do PACS baseada no ambiente atual (Vercel vs Local)
+ */
+export function getActivePacsUrl(settings: AppSettings, isBackup = false): string {
+  const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+  
+  if (isBackup) {
+    return (isVercel && settings.dicomBackupTailscalePublicUrl) 
+      ? settings.dicomBackupTailscalePublicUrl 
+      : (settings.dicomBackupViewerUrl || 'http://100.124.187.11:8042');
+  }
+  
+  return (isVercel && settings.dicomTailscalePublicUrl) 
+    ? settings.dicomTailscalePublicUrl 
+    : (settings.dicomViewerUrl || 'http://100.93.111.95:8042');
 }
 

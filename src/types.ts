@@ -226,6 +226,7 @@ export interface AppSettings {
   dicomDevices?: DicomDevice[];
   dicomOrthancAETitle?: string;
   dicomViewerUrl?: string;
+  dicomTailscalePublicUrl?: string;
   dicomViewerType?: 'stone' | 'oe2' | 'ohif' | 'custom';
   dicomViewerUrlPattern?: string;
   dicomPreset?: 'macmini' | 'notebook' | 'custom';
@@ -235,6 +236,7 @@ export interface AppSettings {
   
   // Configurações do PACS de Backup (Redundância)
   dicomBackupViewerUrl?: string;
+  dicomBackupTailscalePublicUrl?: string;
   dicomBackupUsername?: string;
   dicomBackupPassword?: string;
   dicomBackupSyncEnabled?: boolean;

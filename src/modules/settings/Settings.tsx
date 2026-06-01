@@ -8,7 +8,7 @@ import {
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Database, Info, Upload, Loader2,
-  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield
+  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield, Cloud
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -127,10 +127,10 @@ export function Settings() {
     setPacsTestState('testing');
     setPacsTestResults(null);
     try {
-      const primaryUrl = draft.dicomViewerUrl || 'http://localhost:8042';
+      const primaryUrl = draft.dicomTailscalePublicUrl || draft.dicomViewerUrl || '';
       const primaryAuth = `&username=${encodeURIComponent(draft.dicomUsername || '')}&password=${encodeURIComponent(draft.dicomPassword || '')}`;
       
-      const backupUrl = draft.dicomBackupViewerUrl;
+      const backupUrl = draft.dicomBackupViewerUrl ? (draft.dicomBackupTailscalePublicUrl || draft.dicomBackupViewerUrl) : null;
       const backupAuth = backupUrl ? `&username=${encodeURIComponent(draft.dicomBackupUsername || '')}&password=${encodeURIComponent(draft.dicomBackupPassword || '')}` : '';
 
       // Test Primary
@@ -583,13 +583,27 @@ export function Settings() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="md:col-span-2">
-                        <label className="label">URL/IP do Servidor Orthanc (via Tailscale ou Local)</label>
+                        <label className="label text-ink-600">URL do Servidor PACS (IP do Tailscale)</label>
                         <input
-                          className="input h-12 text-sm"
+                          className="input h-11 text-sm bg-white"
                           value={draft.dicomViewerUrl || ''}
                           onChange={(e) => u('dicomViewerUrl', e.target.value)}
-                          placeholder="Ex: https://servidor-mac.tail861dda.ts.net"
+                          placeholder="Ex: http://100.93.111.95:8042"
                         />
+                        <p className="text-[10px] text-ink-400 mt-1">Usado localmente para carregar imagens.</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="label text-ink-600">URL Pública Tailscale (Nuvem Vercel)</label>
+                        <div className="relative">
+                          <Cloud size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
+                          <input
+                            className="input h-11 text-sm bg-white pl-9"
+                            value={draft.dicomTailscalePublicUrl || ''}
+                            onChange={(e) => u('dicomTailscalePublicUrl', e.target.value)}
+                            placeholder="Ex: https://servidor-mac.tail861dda.ts.net:8443"
+                          />
+                        </div>
+                        <p className="text-[10px] text-ink-400 mt-1">Obrigatório para que a nuvem consiga acessar o PACS.</p>
                       </div>
                       <div>
                         <label className="label">Usuário Orthanc</label>
@@ -699,13 +713,27 @@ export function Settings() {
                     {draft.dicomBackupSyncEnabled && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fade-in">
                         <div className="md:col-span-2">
-                          <label className="label">URL/IP do Servidor Orthanc de Backup (via Tailscale ou Local)</label>
+                          <label className="label text-ink-600">URL do Servidor de Backup (IP do Tailscale)</label>
                           <input
-                            className="input h-12 text-sm"
+                            className="input h-11 text-sm bg-white"
                             value={draft.dicomBackupViewerUrl || ''}
                             onChange={(e) => u('dicomBackupViewerUrl', e.target.value)}
-                            placeholder="Ex: https://servidor-notebook.tail861dda.ts.net:8043"
+                            placeholder="Ex: http://100.124.187.11:8042"
                           />
+                          <p className="text-[10px] text-ink-400 mt-1">Usado localmente para fallback de imagens.</p>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="label text-ink-600">URL Pública Backup (Nuvem Vercel)</label>
+                          <div className="relative">
+                            <Cloud size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
+                            <input
+                              className="input h-11 text-sm bg-white pl-9"
+                              value={draft.dicomBackupTailscalePublicUrl || ''}
+                              onChange={(e) => u('dicomBackupTailscalePublicUrl', e.target.value)}
+                              placeholder="Ex: https://servidor-notebook.tail861dda.ts.net:8443"
+                            />
+                          </div>
+                          <p className="text-[10px] text-ink-400 mt-1">Obrigatório para que a nuvem consiga acessar o PACS Backup.</p>
                         </div>
                         <div>
                           <label className="label">Usuário Orthanc Backup</label>

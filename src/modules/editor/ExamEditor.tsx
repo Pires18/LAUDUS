@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
-import { updateItem, getItem } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, EXAM_AREAS, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
@@ -228,25 +228,25 @@ export function ExamEditor({ examId }: Props) {
     if (!activeStudy) return null;
 
     const isBackup = activeStudy.serverSource === 'backup';
-    const baseUrl = isBackup 
-      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042') 
-      : (settings.dicomViewerUrl || 'http://localhost:8042');
+    const currentBaseUrl = isBackup 
+      ? getActivePacsUrl(settings, true)
+      : getActivePacsUrl(settings, false);
     const studyUid = activeStudy.MainDicomTags?.StudyInstanceUID || `1.2.276.0.7230010.3.1.2.${exam?.id}`;
 
     const viewerType = settings.dicomViewerType || 'stone';
     if (viewerType === 'stone') {
-      return `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
+      return `${currentBaseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
     } else if (viewerType === 'oe2') {
-      return `${baseUrl.replace(/\/$/, '')}/ui/app/retrieve-and-view.html?StudyInstanceUID=${studyUid}`;
+      return `${currentBaseUrl.replace(/\/$/, '')}/ui/app/retrieve-and-view.html?StudyInstanceUID=${studyUid}`;
     } else if (viewerType === 'ohif') {
-      return `${baseUrl.replace(/\/$/, '')}/viewer?StudyInstanceUIDs=${studyUid}`;
+      return `${currentBaseUrl.replace(/\/$/, '')}/viewer?StudyInstanceUIDs=${studyUid}`;
     } else if (viewerType === 'custom' && settings.dicomViewerUrlPattern) {
       return settings.dicomViewerUrlPattern
-        .replace('{{baseUrl}}', baseUrl.replace(/\/$/, ''))
+        .replace('{{baseUrl}}', currentBaseUrl.replace(/\/$/, ''))
         .replace('{{StudyInstanceUID}}', studyUid)
         .replace('{{examId}}', exam?.id || '');
     }
-    return `${baseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
+    return `${currentBaseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
   }, [candidateStudies, selectedStudyId, settings, exam?.id]);
   const dicomLoadingRef = useRef(false);
   // Refs para showIntegratedViewer e showDicomImages — permite que o polling
@@ -318,7 +318,7 @@ export function ExamEditor({ examId }: Props) {
         setDicomError(null);
       }
       try {
-        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+        const baseUrl = getActivePacsUrl(settings, false);
         const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
         
         const backupUrl = settings.dicomBackupViewerUrl;
@@ -646,7 +646,7 @@ export function ExamEditor({ examId }: Props) {
     showToast('Preparando imagens para a impressão...', 'info');
 
     try {
-      const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+      const baseUrl = getActivePacsUrl(settings, false);
       const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
       const urls = instances.map(instance => 
         `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${authParams}`
@@ -956,6 +956,8 @@ export function ExamEditor({ examId }: Props) {
                 <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-slate-800 bg-slate-900/50">
                   {(() => {
                     const activeInstance = dicomInstances[activeImageIndex];
+                    const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
+                    const activeServerSource = activeStudy?.serverSource || 'primary';
                     if (!activeInstance) {
                       return (
                         <div className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex flex-col items-center justify-center text-slate-650 p-6 text-center">
@@ -964,10 +966,10 @@ export function ExamEditor({ examId }: Props) {
                         </div>
                       );
                     }
-                    const isBackup = activeInstance.serverSource === 'backup';
+                    const isBackup = activeServerSource === 'backup';
                     const currentBaseUrl = isBackup
-                      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                      : (settings.dicomViewerUrl || 'http://localhost:8042');
+                      ? getActivePacsUrl(settings, true)
+                      : getActivePacsUrl(settings, false);
                     const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                     const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
                     const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
@@ -1043,8 +1045,8 @@ export function ExamEditor({ examId }: Props) {
                         const isActive = idx === activeImageIndex;
                         const isBackup = instance.serverSource === 'backup';
                         const currentBaseUrl = isBackup
-                          ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                          : (settings.dicomViewerUrl || 'http://localhost:8042');
+                          ? getActivePacsUrl(settings, true)
+                          : getActivePacsUrl(settings, false);
                         const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                         const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
                         const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
@@ -1593,10 +1595,12 @@ export function ExamEditor({ examId }: Props) {
 
           {(() => {
             const activeInstance = dicomInstances[activeImageIndex];
-            const isBackup = activeInstance.serverSource === 'backup';
+            const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
+            const activeServerSource = activeStudy?.serverSource || 'primary';
+            const isBackup = activeServerSource === 'backup';
             const currentBaseUrl = isBackup
-              ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-              : (settings.dicomViewerUrl || 'http://localhost:8042');
+              ? getActivePacsUrl(settings, true)
+              : getActivePacsUrl(settings, false);
             const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
             const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
             const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
