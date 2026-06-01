@@ -173,6 +173,7 @@ function CognitiveCodeEditor({
 // ==========================================
 function TelemetryDashboard() {
   const [metrics, setMetrics] = useState<CallMetrics[]>([]);
+  const [expandedMetricIndex, setExpandedMetricIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setMetrics([...callMetricsHistory]);
@@ -241,25 +242,44 @@ function TelemetryDashboard() {
       {/* Log das últimas chamadas */}
       <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
         {metrics.slice(0, 10).map((m, i) => (
-          <div key={i} className={classNames(
-            'flex items-center gap-3 p-3 rounded-2xl border text-xs',
-            m.success ? 'bg-ink-50/60 border-ink-100' : 'bg-rose-50 border-rose-100'
-          )}>
-            <div className={classNames('px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0', modeColors[m.mode] || 'bg-ink-100 text-ink-600')}>
-              {modeLabels[m.mode] || m.mode}
+          <div key={i} className="flex flex-col gap-2">
+            <div className={classNames(
+              'flex items-center gap-3 p-3 rounded-2xl border text-xs',
+              m.success ? 'bg-ink-50/60 border-ink-100' : 'bg-rose-50 border-rose-100'
+            )}>
+              <div className={classNames('px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0', modeColors[m.mode] || 'bg-ink-100 text-ink-600')}>
+                {modeLabels[m.mode] || m.mode}
+              </div>
+              <span className="text-[10px] font-mono text-ink-600 shrink-0">{m.area || '—'}</span>
+              <div className="flex-1 flex items-center gap-3 min-w-0">
+                <span className="text-ink-500 shrink-0">↑ {m.estimatedInputTokens.toLocaleString('pt-BR')} tok</span>
+                <span className="text-ink-500 shrink-0">↓ {m.estimatedOutputTokens.toLocaleString('pt-BR')} tok</span>
+                <span className="text-ink-500 shrink-0">{(m.latencyMs / 1000).toFixed(1)}s</span>
+              </div>
+              <span className={classNames('text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-lg',
+                m.provider === 'gemini' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
+              )}>{m.provider}</span>
+              {m.scratchpad && (
+                <button
+                  onClick={() => setExpandedMetricIndex(expandedMetricIndex === i ? null : i)}
+                  className="px-2 py-1 bg-white border border-ink-200 rounded text-ink-600 text-[10px] font-bold hover:bg-ink-50 transition-all shrink-0"
+                >
+                  {expandedMetricIndex === i ? 'Ocultar Raciocínio' : 'Auditar Raciocínio'}
+                </button>
+              )}
+              {m.success
+                ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                : <AlertCircle size={14} className="text-rose-500 shrink-0" />}
             </div>
-            <span className="text-[10px] font-mono text-ink-600 shrink-0">{m.area || '—'}</span>
-            <div className="flex-1 flex items-center gap-3 min-w-0">
-              <span className="text-ink-500 shrink-0">↑ {m.estimatedInputTokens.toLocaleString('pt-BR')} tok</span>
-              <span className="text-ink-500 shrink-0">↓ {m.estimatedOutputTokens.toLocaleString('pt-BR')} tok</span>
-              <span className="text-ink-500 shrink-0">{(m.latencyMs / 1000).toFixed(1)}s</span>
-            </div>
-            <span className={classNames('text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-lg',
-              m.provider === 'gemini' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
-            )}>{m.provider}</span>
-            {m.success
-              ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-              : <AlertCircle size={14} className="text-rose-500 shrink-0" />}
+            {expandedMetricIndex === i && m.scratchpad && (
+              <div className="p-4 bg-slate-900 text-slate-300 font-mono text-[10px] rounded-xl overflow-x-auto shadow-inner animate-fade-in border border-slate-800">
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800">
+                  <BrainCircuit size={14} className="text-brand-500" />
+                  <span className="font-black text-slate-400 uppercase tracking-widest">Memória Transitória (<span className="text-brand-500">Scratchpad</span>)</span>
+                </div>
+                <pre className="whitespace-pre-wrap leading-relaxed">{m.scratchpad}</pre>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -871,7 +891,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
             <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
               {(localSettings.aiProvider === 'anthropic') 
                 ? (localSettings.anthropicModel || 'claude-sonnet-4-5') 
-                : (localSettings.geminiModel || 'gemini-2.5-flash')}
+                : (localSettings.geminiModel || 'gemini-3.5-flash')}
             </span>
           </div>
           <h3 className="text-xl font-black text-ink-900">IA Command Center</h3>
@@ -1396,15 +1416,15 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                             onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value  })}
                             className="input h-14"
                           >
-                            <option value="gemini-2.5-flash">GEMINI 2.5 FLASH (Recomendado)</option>
-                            <option value="gemini-2.5-pro">GEMINI 2.5 PRO (Mais Inteligente)</option>
-                            <option value="gemini-1.5-flash">GEMINI 1.5 FLASH</option>
-                            <option value="gemini-1.5-pro">GEMINI 1.5 PRO</option>
+                            <option value="gemini-3.5-flash">GEMINI 3.5 FLASH (Recomendado)</option>
+                            <option value="gemini-3.1-pro">GEMINI 3.1 PRO (Mais Inteligente)</option>
+                            <option value="gemini-2.5-flash">GEMINI 2.5 FLASH</option>
+                            <option value="gemini-2.5-pro">GEMINI 2.5 PRO</option>
                           </select>
                           <div className="mt-3 grid grid-cols-2 gap-2">
                             {[
-                              { model: 'gemini-2.5-flash', label: '2.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
-                              { model: 'gemini-2.5-pro', label: '2.5 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
+                              { model: 'gemini-3.5-flash', label: '3.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
+                              { model: 'gemini-3.1-pro', label: '3.1 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
                             ].map(m => (
                               <button disabled={readOnly}
                                 key={m.model}
@@ -1536,6 +1556,30 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                         ))}
                       </div>
                     </div>
+
+                    <div className="pt-6 border-t border-ink-100 flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-bold text-ink-700 mb-1">
+                          Refinador Automático (Copiloto)
+                        </label>
+                        <p className="text-[11px] text-ink-500 max-w-md leading-relaxed">
+                          Se ativado, o LAUD.IA executará um ciclo extra de higienização cirúrgica no laudo logo após integrar propostas do Copiloto, garantindo conformidade com a máscara.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setLocalSettings({ ...localSettings, aiAutoRefineEnabled: !localSettings.aiAutoRefineEnabled })}
+                        disabled={readOnly}
+                        className={classNames(
+                          'relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50',
+                          localSettings.aiAutoRefineEnabled ? 'bg-brand-600' : 'bg-ink-200'
+                        )}
+                      >
+                        <span className={classNames(
+                          'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                          localSettings.aiAutoRefineEnabled ? 'translate-x-5' : 'translate-x-0'
+                        )} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1665,7 +1709,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                       icon: Cpu,
                       color: 'brand',
                       hasKey: !!localSettings.geminiApiKey,
-                      model: localSettings.geminiModel || 'gemini-2.0-flash',
+                      model: localSettings.geminiModel || 'gemini-3.5-flash',
                       isActive: (localSettings.aiProvider || 'anthropic') === 'gemini',
                     },
                     {
@@ -1768,7 +1812,7 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     { label: 'Motor', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
-                    { label: 'Modelo', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? (localSettings.geminiModel || 'gemini-2.0-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
+                    { label: 'Modelo', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-sonnet-4-5'), icon: BrainCircuit },
                     { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
                     { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
                   ].map(item => (

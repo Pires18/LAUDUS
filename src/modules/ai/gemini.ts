@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
-import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES } from './prompts';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
@@ -58,6 +58,7 @@ export interface CallMetrics {
   latencyMs: number;
   timestamp: number;
   success: boolean;
+  scratchpad?: string;
 }
 
 let lastCallMetrics: CallMetrics | null = null;
@@ -331,6 +332,16 @@ function cleanMarkdownFromResponse(text: string): string {
     .trim();
 }
 
+export function extractScratchpad(text: string): string | undefined {
+  const match = text.match(/<\s*(scratchpad|think|thinking|thought)\s*>([\s\S]*?)<\s*\/\s*\1\s*>/i);
+  if (match) return match[2].trim();
+  
+  const unclosedMatch = text.match(/<\s*(scratchpad|think|thinking|thought)\s*>([\s\S]*?)(?====\s*CONVERSA|===\s*PROPOSTA|<h[1-6][\s>]|$)/i);
+  if (unclosedMatch) return unclosedMatch[2].trim();
+  
+  return undefined;
+}
+
 // ─── Builders de prompt ──────────────────────────────────────────────────────
 
 export function buildPrompt({
@@ -370,17 +381,7 @@ Gere agora o laudo completo em HTML puro. O output deve começar diretamente com
   return { universalContext, areaContext, userMessage };
 }
 
-const REFINEMENT_GOLDEN_RULES = `[REGRAS DE OURO DO REFINAMENTO E COPILOTO — EXECUÇÃO OBRIGATÓRIA:
-• LAUDO COMPLETO E PERFEITO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
-• ADEQUAÇÃO INTEGRAL AO EXAME: Adapte, formate e alinhe todo o laudo de acordo com as diretrizes e regras específicas do exame ativo (indicadas nas INSTRUÇÕES ESPECÍFICAS DO EXAME). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme as diretrizes do exame.
-• PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
-  - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
-  - RECOMENDAÇÕES: A ÚNICA fonte de verdade para condutas são as INSTRUÇÕES ESPECÍFICAS DO EXAME (aiInstructions). É estritamente proibido inventar recomendações baseadas no seu próprio conhecimento médico ou em padrões gerais da área, a menos que expressamente solicitado pelo médico. Limite-se a aplicar a fraseologia que está nas instruções do exame.
-• PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL (por você ou pelo usuário), sendo proibido reverter ou alterar achados reais de volta para a normalidade ou inventar novos valores não fornecidos.
-• ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Remova ou resolva todos os placeholders restantes na forma de "(...)", "[___]" ou unidades órfãs (ex: "____ cm") do LAUDO ATUAL. É terminantemente proibido inventar valores numéricos arbitrários se não fornecidos pelo usuário. Substitua-os exclusivamente por descrições qualitativas de normalidade (ex: "de dimensões preservadas") ou remova a menção. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos].
-• INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
-• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
-• COMPLIANCE DA MÁSCARA: O laudo deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME.]`;
+
 
 function buildRefinePrompt({
   currentReport,
@@ -421,7 +422,7 @@ INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
 ═══════════════════════════════════════════════════════════════
 ${contextMessage}
 
-${REFINEMENT_GOLDEN_RULES}
+${DEFAULT_REFINEMENT_GOLDEN_RULES}
 
 Gere agora o laudo REFINADO completo em HTML puro. 
 NOVA REGRA ABSOLUTA DE FORMATO:
@@ -441,26 +442,7 @@ function buildCopilotPrompt({
   previousExams = [],
   template,
 }: CopilotParams): BuiltPrompt {
-  const copilotModeOverride = `\n\n═══════════════════════════════════════════════════════════════
-OVERRIDE — MODO COPILOTO ATIVO (PRIORIDADE MÁXIMA)
-═══════════════════════════════════════════════════════════════
-⚠ REGRAS DOS BLOCOS 2 E 3 SUSPENSAS NESTE MODO:
-  • "Output começa diretamente com <h1>" — SUSPENSA
-  • "Zero texto antes do HTML" — SUSPENSA
-  • "ZERO caractere fora das tags HTML" — SUSPENSA
-
-NOVA REGRA ABSOLUTA DE FORMATO (substitui as acima):
-1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
-2. APÓS fechar a tag </scratchpad>, você DEVE gerar exatamente a estrutura:
-=== CONVERSA ===
-[UMA única frase (máx. 15 palavras) descrevendo a alteração clínica feita.
-Exemplo: "Vesícula biliar alterada para ausente por cirurgia prévia."
-SEM saudações. SEM explicações prolixas. Puramente clínica.]
-
-=== PROPOSTA ===
-[HTML COMPLETO do laudo com a alteração integrada.
-Violar este formato invalida completamente a resposta.]
-═══════════════════════════════════════════════════════════════`;
+  const copilotModeOverride = DEFAULT_COPILOT_OVERRIDE;
 
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template) + copilotModeOverride;
@@ -481,7 +463,7 @@ Violar este formato invalida completamente a resposta.]
     examDateMs: exam.dateMs,
   });
 
-  const userMessage = `${REFINEMENT_GOLDEN_RULES}
+  const userMessage = `${DEFAULT_REFINEMENT_GOLDEN_RULES}
 
 ═══════════════════════════════════════════════════════════════
 INPUT CLÍNICO:
@@ -494,9 +476,13 @@ ${contextMessage}`;
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
 export function resolveGeminiModel(rawModel: string | undefined): string {
-  if (!rawModel) return 'gemini-2.5-flash';
+  if (!rawModel) return 'gemini-3.5-flash';
   const raw = rawModel.toLowerCase();
   
+  // Novas versões de ponta
+  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
+  if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro';
+
   if (raw.includes('flash-thinking')) return 'gemini-2.5-flash'; // 2.0-flash-thinking is deprecated
   if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash';
   if (raw.includes('2.5') && raw.includes('pro')) return 'gemini-2.5-pro';
@@ -505,12 +491,12 @@ export function resolveGeminiModel(rawModel: string | undefined): string {
   if (raw.includes('2.0') && raw.includes('pro')) return 'gemini-2.5-pro';
   
   if (raw.includes('1.5') && raw.includes('pro')) return 'gemini-1.5-pro';
-  if (raw.includes('pro')) return 'gemini-2.5-pro'; // Upgrade default pro to 2.5
+  if (raw.includes('pro')) return 'gemini-3.1-pro'; // Upgrade default pro to 3.1
   
   if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
-  if (raw.includes('flash')) return 'gemini-2.5-flash'; // Upgrade default flash to 2.5
+  if (raw.includes('flash')) return 'gemini-3.5-flash'; // Upgrade default flash to 3.5
   
-  return 'gemini-2.5-flash';
+  return 'gemini-3.5-flash';
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
@@ -526,22 +512,26 @@ async function callGemini(
   settings: AppSettings,
   area: string,
   mode: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onComplete?: (scratchpad?: string) => void
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
   const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
   const modelName = getModelForMode(settings, mode, area);
+  const maxTokens = Math.min(getMaxTokens(area), 8192);
   const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction,
     generationConfig: {
       temperature: getModeTemperature(mode, settings.aiTemperature),
       topP: 0.9,
-      maxOutputTokens: getMaxTokens(area),
+      maxOutputTokens: maxTokens,
     }
   });
   const result = await withRetry(() => model.generateContent(built.userMessage, { signal }));
-  return cleanMarkdownFromResponse(result.response.text());
+  const fullText = result.response.text();
+  if (onComplete) onComplete(extractScratchpad(fullText));
+  return cleanMarkdownFromResponse(fullText);
 }
 
 async function callGeminiStream(
@@ -550,18 +540,20 @@ async function callGeminiStream(
   area: string,
   mode: string,
   onChunk: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onComplete?: (scratchpad?: string) => void
 ): Promise<string> {
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
   const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
   const modelName = getModelForMode(settings, mode, area);
+  const maxTokens = Math.min(getMaxTokens(area), 8192);
   const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction,
     generationConfig: {
       temperature: getModeTemperature(mode, settings.aiTemperature),
       topP: 0.9,
-      maxOutputTokens: getMaxTokens(area),
+      maxOutputTokens: maxTokens,
     }
   });
 
@@ -573,6 +565,7 @@ async function callGeminiStream(
     onChunk(stripScratchpad(cleanMarkdownFromResponse(fullText)));
   }
 
+  if (onComplete) onComplete(extractScratchpad(fullText));
   return stripScratchpad(cleanMarkdownFromResponse(fullText));
 }
 
@@ -590,7 +583,8 @@ async function callAnthropic(
   settings: AppSettings,
   area: string,
   mode: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onComplete?: (scratchpad?: string) => void
 ): Promise<string> {
   const systemBlocks: Array<{ type: string; text: string; cache_control?: { type: string } }> = [
     {
@@ -631,7 +625,9 @@ async function callAnthropic(
   }
 
   const result = await response.json();
-  return cleanMarkdownFromResponse(result.content?.[0]?.text || '');
+  const fullText = result.content?.[0]?.text || '';
+  if (onComplete) onComplete(extractScratchpad(fullText));
+  return stripScratchpad(cleanMarkdownFromResponse(fullText));
 }
 
 async function callAnthropicStream(
@@ -640,7 +636,8 @@ async function callAnthropicStream(
   area: string,
   mode: string,
   onChunk: (text: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onComplete?: (scratchpad?: string) => void
 ): Promise<string> {
   const systemBlocks: Array<{ type: string; text: string; cache_control?: { type: string } }> = [
     {
@@ -753,12 +750,13 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
 
   try {
     let text: string;
+    let scratchpad: string | undefined;
     if (provider === 'gemini') {
       if (!settings.geminiApiKey) throw new Error('API Key do Gemini não configurada.');
-      text = await callGemini(built, settings, area, mode, signal);
+      text = await callGemini(built, settings, area, mode, signal, (sp) => scratchpad = sp);
     } else {
       if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
-      text = await callAnthropic(built, settings, area, mode, signal);
+      text = await callAnthropic(built, settings, area, mode, signal, (sp) => scratchpad = sp);
     }
     success = true;
     recordMetrics({
@@ -770,6 +768,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: true,
+      scratchpad
     });
     return text;
   } catch (err) {
@@ -808,12 +807,13 @@ export async function generateReportStream(
 
   try {
     let text: string;
+    let scratchpad: string | undefined;
     if (provider === 'gemini') {
       if (!settings.geminiApiKey) throw new Error('API Key do Gemini não configurada.');
-      text = await callGeminiStream(built, settings, area, mode, onChunk, signal);
+      text = await callGeminiStream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp);
     } else {
       if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
-      text = await callAnthropicStream(built, settings, area, mode, onChunk, signal);
+      text = await callAnthropicStream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp);
     }
     recordMetrics({
       mode: mode as CallMetrics['mode'],
@@ -824,6 +824,7 @@ export async function generateReportStream(
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: true,
+      scratchpad
     });
     return text;
   } catch (err) {

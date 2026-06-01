@@ -57,13 +57,15 @@ export function LaudCopilot({
   onChangePrompt,
   isDocked
 }: LaudCopilotProps) {
+  const { settings, updateSettings, showToast } = useApp();
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
-  // Refino Auto: SEMPRE inicia desativado. O usuário ativa manualmente por exame.
-  const [autoRefineEnabled, setAutoRefineEnabled] = useState(false);
+  
+  // Refino Auto: agora controlado globalmente pelas configurações
+  const autoRefineEnabled = settings.aiAutoRefineEnabled ?? false;
   const handleToggleAutoRefine = (val: boolean) => {
-    setAutoRefineEnabled(val);
+    updateSettings({ ...settings, aiAutoRefineEnabled: val });
   };
 
   // Referências para controle de sincronização e digitação no formulário
@@ -71,11 +73,6 @@ export function LaudCopilot({
   const prevExamIdRef = useRef(exam.id);
   const formSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestValueRef = useRef(formText);
-
-  // Garante reset ao trocar de exame
-  useEffect(() => {
-    setAutoRefineEnabled(false);
-  }, [exam.id]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isFormFocusedRef = useRef(false);
 
@@ -166,7 +163,6 @@ export function LaudCopilot({
     }
   };
 
-  const { settings, showToast } = useApp();
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -420,8 +416,8 @@ export function LaudCopilot({
         proposal = htmlBlockMatch[1].trim();
         conversation = content.substring(0, htmlBlockMatch.index).trim();
       } else {
-        // 2. Se não houver bloco de código, procurar primeira tag HTML útil
-        const firstTagMatch = content.match(/<\w+[\s>]/);
+        // 2. Se não houver bloco de código, procurar primeira tag HTML útil de título ou parágrafo
+        const firstTagMatch = content.match(/<h[1-6][\s>]|<p[\s>]/i);
         if (firstTagMatch && firstTagMatch.index !== undefined) {
           conversation = content.substring(0, firstTagMatch.index).trim();
           proposal = content.substring(firstTagMatch.index).trim();
@@ -1207,7 +1203,7 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
               </div>
               <div className="flex items-center gap-2 px-2.5 py-1.5 bg-brand-50 rounded-xl border border-brand-100/50">
                 <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
-                <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider">Laud.IA Core v10.1</span>
+                <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider">Laud.IA Core v13.0</span>
               </div>
             </div>
           </div>

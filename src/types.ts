@@ -204,6 +204,8 @@ export interface AppSettings {
   aiTrainingEnabled?: boolean;
   /** Quantidade de laudos anteriores a serem enviados como contexto (1 a 10) */
   aiTrainingContextSize?: number;
+  /** Se o Refinador Automático deve ser ativado por padrão em todo laudo após as alterações do Copiloto */
+  aiAutoRefineEnabled?: boolean;
   /** Banco de frases prontas do usuário */
   snippets?: { id: string; title: string; content: string; area?: string }[];
   

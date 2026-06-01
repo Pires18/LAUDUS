@@ -160,3 +160,39 @@ R8 — PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
 - TÉCNICA: Deve ser reproduzida de forma idêntica ao texto padrão da MÁSCARA MODELO ORIGINAL do exame. É terminantemente proibido reescrevê-la, alterá-la ou inventar variações, exceto se houver uma instrução explícita do médico solicitando alteração na técnica.
 - RECOMENDAÇÕES: Devem utilizar rigorosamente as condutas e a fraseologia padronizadas definidas nas INSTRUÇÕES ESPECÍFICAS DO EXAME. É proibido inventar condutas personalizadas, prolixas ou fora das padronizações indicadas, a menos que expressamente solicitado pelo médico.`;
 
+export const DEFAULT_REFINEMENT_GOLDEN_RULES = `BLOCO 5 — REGRAS DE OURO DO REFINAMENTO E COPILOTO — VERSÃO v13.0
+ARQUIVO: laud_refinement.txt
+═══════════════════════════════════════════════════════════════
+
+[EXECUÇÃO OBRIGATÓRIA:
+• LAUDO COMPLETO E PERFEITO: Gerar o HTML do laudo COMPLETO do início ao fim. NÃO omita, corte ou abrevie seções (sem "..." ou "resto do laudo").
+• ADEQUAÇÃO INTEGRAL AO EXAME: Adapte, formate e alinhe todo o laudo de acordo com as diretrizes e regras específicas do exame ativo (indicadas nas INSTRUÇÕES ESPECÍFICAS DO EXAME). Aplique as classificações clínicas obrigatórias (ex: O-RADS, MUSA, BI-RADS) e padronize as unidades de medida e formatação decimal de toda a ANÁLISE conforme as diretrizes do exame.
+• PADRONIZAÇÃO RÍGIDA DE TÉCNICA E RECOMENDAÇÕES:
+  - TÉCNICA: Deve ser reproduzida exatamente como no texto original do template/laudo atual, sendo proibido reescrevê-la, alterá-la ou inventar variações, exceto sob pedido expresso e explícito do médico solicitando alteração na técnica.
+  - RECOMENDAÇÕES: A ÚNICA fonte de verdade para condutas são as INSTRUÇÕES ESPECÍFICAS DO EXAME (aiInstructions). É estritamente proibido inventar recomendações baseadas no seu próprio conhecimento médico ou em padrões gerais da área, a menos que expressamente solicitado pelo médico. Limite-se a aplicar a fraseologia que está nas instruções do exame.
+• PRESERVAÇÃO DE DADOS CLÍNICOS: Mantenha intactos todos os achados patológicos, medidas e descrições clínicas reais que já foram preenchidos ou editados no LAUDO ATUAL (por você ou pelo usuário), sendo proibido reverter ou alterar achados reais de volta para a normalidade ou inventar novos valores não fornecidos.
+• ELIMINAÇÃO DE PLACEHOLDERS (NÃO INVENÇÃO): Remova ou resolva todos os placeholders restantes na forma de "(...)", "[___]" ou unidades órfãs (ex: "____ cm") do LAUDO ATUAL. É terminantemente proibido inventar valores numéricos arbitrários se não fornecidos pelo usuário. Substitua-os exclusivamente por descrições qualitativas de normalidade (ex: "de dimensões preservadas") ou remova a menção. [EXCEÇÃO MEDICINA FETAL E VASCULAR: Para exames de medicina fetal e vascular, mantenha obrigatoriamente os placeholders '(...)' ou '[___]' nos campos numéricos ou Doppler que não foram preenchidos].
+• INTEGRIDADE DA CASCATA TRIPARTITE: Garanta a cascata tripartite completa (Análise → Conclusão → Recomendação) para todos os achados do laudo. Cada achado patológico deve ter um bullet correspondente na Conclusão e uma conduta proporcional nas Recomendações.
+• ESPAÇAMENTO E PARÁGRAFOS: Cada estrutura anatômica ou órgão na ANÁLISE deve obrigatoriamente estar em seu próprio parágrafo individual usando a tag <p>. Nunca junte múltiplas estruturas em um único parágrafo ou use <br> para separá-las.
+• COMPLIANCE DA MÁSCARA: O laudo deve seguir rigorosamente a nomenclatura, ordem e estrutura de seções/títulos (tags <h1>, <h2> e parágrafos correspondentes, incluindo os estilos inline e tags internas originais como <strong>) e textos padrão definidos na MÁSCARA MODELO ORIGINAL DO EXAME.]`;
+
+export const DEFAULT_COPILOT_OVERRIDE = `\n\n═══════════════════════════════════════════════════════════════
+OVERRIDE — MODO COPILOTO ATIVO (PRIORIDADE MÁXIMA) — VERSÃO v13.0
+═══════════════════════════════════════════════════════════════
+⚠ REGRAS DOS BLOCOS 2 E 3 SUSPENSAS NESTE MODO:
+  • "Output começa diretamente com <h1>" — SUSPENSA
+  • "Zero texto antes do HTML" — SUSPENSA
+  • "ZERO caractere fora das tags HTML" — SUSPENSA
+
+NOVA REGRA ABSOLUTA DE FORMATO (substitui as acima):
+1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
+2. APÓS fechar a tag </scratchpad>, você DEVE gerar exatamente a estrutura:
+=== CONVERSA ===
+[UMA única frase (máx. 15 palavras) descrevendo a alteração clínica feita.
+Exemplo: "Vesícula biliar alterada para ausente por cirurgia prévia."
+SEM saudações. SEM explicações prolixas. Puramente clínica.]
+
+=== PROPOSTA ===
+[HTML COMPLETO do laudo com a alteração integrada.
+Violar este formato invalida completamente a resposta.]
+═══════════════════════════════════════════════════════════════`;
