@@ -400,7 +400,7 @@ function buildRefinePrompt({
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"`
-    : `INSTRUÇÃO: Sanitizar, higienizar e alinhar o laudo completo.`;
+    : `INSTRUÇÃO DE REFINAMENTO ESTRUTURAL (CRÍTICA): Você deve cruzar o LAUDO ATUAL com a MÁSCARA MODELO ORIGINAL. Sua função primária é GARANTIR que nenhuma seção, título, parágrafo de órgão normal ou estrutura da máscara tenha sido apagado ou corrompido no laudo atual. Restaure RIGOROSAMENTE a exata ordem, a formatação em <p> e a estruturação original da máscara, mesclando apenas os dados clínicos patológicos ou medidas inseridos no laudo atual. É proibido suprimir estruturas da máscara.`;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const contextMessage = buildContextMessage({

@@ -1491,10 +1491,15 @@ export function ExamEditor({ examId }: Props) {
             area={exam.area} 
             examDateMs={exam.createdAt}
             onClose={() => setShowCalculators(false)} 
-            onSendToCopilot={(res) => {
-              setCopilotPrompt(res);
+            onSendToCopilot={(text) => {
+              setCopilotPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
               setShowCalculators(false);
               if (!showCopilot) setShowCopilot(true);
+            }}
+            calculatorData={exam.calculatorData}
+            onSaveCalculatorData={async (data) => {
+              await updateItem('exams', exam.id, { calculatorData: data });
+              exam.calculatorData = data;
             }}
             onAppendToForm={(text) => {
               const currentForm = exam.customFormValue || '';

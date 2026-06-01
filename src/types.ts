@@ -121,6 +121,8 @@ export interface ExamRequest {
     content: string;
     trigger: 'generation' | 'refine' | 'copilot' | 'manual';
   }>;
+  /** Dados salvos das calculadoras para este exame */
+  calculatorData?: Record<string, any>;
 }
 
 /** Estrutura de uma máscara (template) de laudo */

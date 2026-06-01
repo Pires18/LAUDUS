@@ -14,11 +14,17 @@ interface Props {
   onSendToCopilot: (result: string) => void;
   onAppendToForm?: (text: string) => void;
   examDateMs?: number;
+  calculatorData?: Record<string, any>;
+  onSaveCalculatorData?: (data: Record<string, any>) => void;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs }: Props) {
+  export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, calculatorData = {}, onSaveCalculatorData }: Props) {
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
+  
+  // O result atual da calculadora selecionada. 
+  // Na montagem inicial, já carregamos do calculatorData.
   const [calcResult, setCalcResult] = useState<any>(null);
+  
   const [showAll, setShowAll] = useState(false);
   const [copiedTechnical, setCopiedTechnical] = useState(false);
   const [copiedForm, setCopiedForm] = useState(false);
@@ -33,11 +39,18 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
 
   const handleSelectCalc = (id: string | null) => {
     setSelectedCalcId(id);
-    setCalcResult(null);
+    setCalcResult(id ? (calculatorData[id] || null) : null);
     setActiveTab('params');
     setCopiedTechnical(false);
     setCopiedForm(false);
     setSentCopilot(false);
+  };
+
+  const handleCalcChange = (val: any) => {
+    setCalcResult(val);
+    if (selectedCalcId && onSaveCalculatorData) {
+      onSaveCalculatorData({ ...calculatorData, [selectedCalcId]: val });
+    }
   };
 
   const hasResult = !!calcResult?._summary;
@@ -85,13 +98,13 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/65 backdrop-blur-md lg:bg-transparent lg:backdrop-blur-none z-[125]"
+        className="fixed inset-0 bg-slate-900/65 backdrop-blur-md lg:hidden z-[125]"
       />
 
       <motion.div
-        initial={{ scale: 0.94, opacity: 0, y: 30 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.94, opacity: 0, y: 30 }}
+        initial={{ opacity: 0, scale: 0.94, y: 30 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 30 }}
         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
         className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[130] overflow-hidden"
       >
@@ -233,7 +246,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
                       <>
                         <selectedCalc.component
                           value={calcResult || {}}
-                          onChange={(val: any) => setCalcResult(val)}
+                          onChange={handleCalcChange}
                           examDateMs={examDateMs}
                         />
                         {selectedCalc.reference && (
