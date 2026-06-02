@@ -16,6 +16,7 @@ import { VascularRatiosCalculator } from './components/VascularRatiosCalculator'
 import { PleuralEffusionCalculator } from './components/PleuralEffusionCalculator';
 import { OrganReferenceCalculator } from './components/OrganReferenceCalculator';
 import { IvcIndexCalculator } from './components/IvcIndexCalculator';
+import { VenousCartographyCalculator } from './components/VenousCartographyCalculator';
 
 import { ExamArea } from '../../types';
 
@@ -225,6 +226,16 @@ export const CALCULATORS: CalculatorDef[] = [
   },
 
   // --- VASCULAR ---
+  { 
+    id: 'venous-cartography', 
+    name: 'Cartografia Venosa (Membros Inf.)', 
+    description: 'Mapeamento venoso de safenas, sistema profundo e perfurantes.', 
+    component: VenousCartographyCalculator,
+    areas: ['vascular'],
+    reference: {
+      text: 'Protocolo de Mapeamento Venoso para Varizes (Cartografia). Diretrizes de Ultrassonografia Vascular.',
+    }
+  },
   { 
     id: 'vascular-ratios', 
     name: 'Índices Hemodinâmicos', 
