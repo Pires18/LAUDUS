@@ -170,7 +170,10 @@ export function ExamEditor({ examId }: Props) {
 
   // Firestore realtime listeners
   const { data: exam } = useDocument<ExamRequest>('exams', examId);
-  const { data: patient } = useDocument<Patient>('patients', exam?.patientId || '');
+  const { data: dbPatient } = useDocument<Patient>('patients', exam?.patientId === 'ANONIMO' ? '' : (exam?.patientId || ''));
+  const patient = exam?.patientId === 'ANONIMO' 
+    ? ({ id: 'ANONIMO', name: 'Laudo Avulso / Sem Identificação', gender: 'O', createdAt: Date.now(), updatedAt: Date.now() } as Patient)
+    : dbPatient;
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -1102,6 +1105,8 @@ export function ExamEditor({ examId }: Props) {
                     : true
                 }
                 status={exam.status}
+                hasGoogleDoc={!!exam.googleDocId}
+                onCopy={handleCopy}
                 onRefine={() => {
                   if (currentRole === 'recepcao') {
                     showToast('Acesso restrito: Secretárias não utilizam Laud.IA.', 'error');

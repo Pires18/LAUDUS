@@ -5,6 +5,7 @@ import { updateItem, getItem } from '../../../store/db';
 import { ClipboardList, ShieldCheck, Printer, RotateCcw, Check, FileText, UserCog, Loader2 } from 'lucide-react';
 import { useCollection } from '../../../hooks/useFirestore';
 import { useApp } from '../../../store/app';
+import { getInitialReportContent } from '../../templates/utils';
 
 export interface AnamnesisField {
   label: string;
@@ -61,6 +62,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
   const { showToast } = useApp();
   const { data: clinics } = useCollection<Clinic>('clinics');
+  const { data: allTemplates } = useCollection<ReportTemplate>('templates');
   const currentRole = settings?.currentRole || 'medico';
   const isEditable = exam.status !== 'finalizado' && currentRole !== 'recepcao';
 
@@ -90,6 +92,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const [birthDate, setBirthDate] = useState(patient.birthDate || '');
   const [requestingPhysician, setRequestingPhysician] = useState(exam.requestingPhysician || '');
   const [clinicId, setClinicId] = useState(exam.clinicId || '');
+  const [examTemplateId, setExamTemplateId] = useState(exam.templateId || '');
   const [loadingMetadata, setLoadingMetadata] = useState(false);
 
   useEffect(() => {
@@ -97,6 +100,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     setBirthDate(patient.birthDate || '');
     setRequestingPhysician(exam.requestingPhysician || '');
     setClinicId(exam.clinicId || '');
+    setExamTemplateId(exam.templateId || '');
   }, [patient, exam]);
 
   // Set default view mode based on structured fields
@@ -442,6 +446,54 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 </select>
                 <p className="text-[9px] text-slate-400 mt-1 ml-1 italic">
                   * Alterar a clínica afeta o template e a pasta de exportação do Google Docs.
+                </p>
+              </div>
+
+              <div className="flex flex-col space-y-1.5 pt-2 border-t border-slate-100">
+                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Tipo de Exame (Máscara)</label>
+                <select 
+                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  value={examTemplateId} 
+                  onChange={async (e) => {
+                    const newTemplateId = e.target.value;
+                    const newTemplate = allTemplates.find(t => t.id === newTemplateId);
+                    if (newTemplateId !== exam.templateId && newTemplate) {
+                      const confirm = window.confirm(
+                        'CUIDADO: Alterar o exame reiniciará o laudo para o padrão da nova máscara e apagará as informações atuais e o histórico do copiloto. Deseja prosseguir?'
+                      );
+                      if (confirm) {
+                        try {
+                          setLoadingMetadata(true);
+                          await updateItem('exams', exam.id, {
+                            templateId: newTemplate.id,
+                            examType: newTemplate.name,
+                            area: newTemplate.area,
+                            reportContent: getInitialReportContent(newTemplate),
+                            chatHistory: [],
+                            anamnesis: newTemplate.anamnesisTemplate || '',
+                            consentTerm: newTemplate.consentTemplate || ''
+                          });
+                          showToast('Exame alterado e reiniciado com sucesso!', 'success');
+                          onClose();
+                        } catch (err) {
+                          showToast('Erro ao alterar exame.', 'error');
+                        } finally {
+                          setLoadingMetadata(false);
+                        }
+                      } else {
+                        setExamTemplateId(exam.templateId || '');
+                      }
+                    }
+                  }}
+                  disabled={!isEditable}
+                >
+                  <option value="">Selecione um exame</option>
+                  {allTemplates.slice().sort((a,b) => a.name.localeCompare(b.name)).map(t => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.area})</option>
+                  ))}
+                </select>
+                <p className="text-[9px] text-amber-600 mt-1 ml-1 font-bold">
+                  * A troca de exame apaga o texto atual do laudo e o histórico do copiloto.
                 </p>
               </div>
             </div>

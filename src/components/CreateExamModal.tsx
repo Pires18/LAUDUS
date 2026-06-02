@@ -145,7 +145,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       const examData: Partial<ExamRequest> = {
         friendlyId: generateNumericId(),
         patientId: selectedPatient.id,
-        clinicId: selectedClinic?.id || clinics[0]?.id,
+        clinicId: selectedPatient.id === 'ANONIMO' ? '' : (selectedClinic?.id || clinics[0]?.id),
         area: template.area,
         examType: template.name,
         templateId: template.id,
@@ -183,9 +183,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         const targetDevice = settings.dicomDevices?.find(d => d.id === selectedDeviceId) || 
                              { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
-        if (settings.dicomSyncEnabled !== false) {
+        if (settings.dicomSyncEnabled !== false && selectedPatient.id !== 'ANONIMO') {
           try {
-            const url = settings.dicomLocalAgentUrl 
+            const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+            const url = (isVercel && settings.dicomLocalAgentUrl)
               ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
               : '/api/worklist';
             await fetch(url, {
@@ -214,7 +215,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         // Backup Sync
         if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
           try {
-            const urlBackup = settings.dicomBackupLocalAgentUrl 
+            const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+            const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
               ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
               : '/api/worklist';
             await fetch(urlBackup, {
@@ -448,14 +450,33 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !hasExactMatch && search.trim()) {
-                                e.preventDefault();
-                                setNewPatientName(search.trim());
-                                setShowQuickPatient(true);
+                              if (e.key === 'Enter' && patients.length > 0) {
+                                setSelectedPatient(patients.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.id.includes(search))[0]);
+                                setStep(2);
                               }
                             }}
-                            autoFocus
                           />
+                        </div>
+
+                        <div className="flex items-center justify-end mt-2">
+                           <button
+                             type="button"
+                             onClick={() => {
+                               setSelectedPatient({
+                                 id: 'ANONIMO',
+                                 name: 'Laudo Avulso / Sem Identificação',
+                                 gender: 'O',
+                                 createdAt: Date.now(),
+                                 updatedAt: Date.now()
+                               });
+                               setSelectedClinic(null);
+                               setStep(2);
+                             }}
+                             className="text-[10px] font-black text-ink-400 hover:text-brand-600 uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                           >
+                             Pular Identificação (Laudo Avulso)
+                             <ArrowRight size={12} />
+                           </button>
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-1.5 custom-scrollbar">

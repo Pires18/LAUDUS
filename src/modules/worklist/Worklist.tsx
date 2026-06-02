@@ -102,18 +102,13 @@ export function Worklist() {
     prevExamIdsRef.current = currentIds;
   }, [exams, examsLoading, settings.soundNotifications]);
 
-  // Apply filters and sort
-  const filtered = useMemo(() => {
+  // Apply filters (excluding status) to get base counts
+  const filteredWithoutStatus = useMemo(() => {
     let result = [...exams];
 
     // Clinic filter
     if (selectedClinicId) {
       result = result.filter(e => e.clinicId === selectedClinicId);
-    }
-
-    // Status filter
-    if (statusFilter !== 'todos') {
-      result = result.filter(e => e.status === statusFilter);
     }
 
     // Area filter
@@ -143,15 +138,26 @@ export function Worklist() {
       });
     }
 
+    return result;
+  }, [exams, areaFilter, dateFilter, search, selectedClinicId, patientMap]);
+
+  // Final filtered list including status and sorted
+  const filtered = useMemo(() => {
+    let result = filteredWithoutStatus;
+
+    if (statusFilter !== 'todos') {
+      result = result.filter(e => e.status === statusFilter);
+    }
+
     // Sort by createdAt descending (most recent first)
     return result.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [exams, statusFilter, areaFilter, dateFilter, search, selectedClinicId, patientMap]);
+  }, [filteredWithoutStatus, statusFilter]);
 
   const counts = {
-    todos: exams.filter((e) => !selectedClinicId || e.clinicId === selectedClinicId).length,
-    pendente: exams.filter((e) => e.status === 'pendente' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
-    'em-andamento': exams.filter((e) => e.status === 'em-andamento' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
-    finalizado: exams.filter((e) => e.status === 'finalizado' && (!selectedClinicId || e.clinicId === selectedClinicId)).length,
+    todos: filteredWithoutStatus.length,
+    pendente: filteredWithoutStatus.filter((e) => e.status === 'pendente').length,
+    'em-andamento': filteredWithoutStatus.filter((e) => e.status === 'em-andamento').length,
+    finalizado: filteredWithoutStatus.filter((e) => e.status === 'finalizado').length,
   };
 
   async function handleDelete() {
@@ -476,7 +482,9 @@ export function Worklist() {
                 </tr>
               ) : (
                 filtered.map(exam => {
-                  const patient = patientMap.get(exam.patientId);
+                  const patient = exam.patientId === 'ANONIMO'
+                    ? { id: 'ANONIMO', name: 'Laudo Avulso / Sem Identificação', gender: 'O' } as Patient
+                    : patientMap.get(exam.patientId);
                   const clinic = clinicMap.get(exam.clinicId || '');
                   const area = EXAM_AREAS.find(a => a.id === exam.area);
                   const status = STATUS_META[exam.status];
@@ -608,7 +616,9 @@ export function Worklist() {
               </div>
             ) : (
               filtered.map(exam => {
-                const patient = patientMap.get(exam.patientId);
+                const patient = exam.patientId === 'ANONIMO'
+                  ? { id: 'ANONIMO', name: 'Laudo Avulso / Sem Identificação', gender: 'O' } as Patient
+                  : patientMap.get(exam.patientId);
                 const clinic = clinicMap.get(exam.clinicId || '');
                 const area = EXAM_AREAS.find(a => a.id === exam.area);
                 const status = STATUS_META[exam.status];

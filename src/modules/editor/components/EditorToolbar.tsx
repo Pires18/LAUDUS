@@ -1,4 +1,4 @@
-import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock } from 'lucide-react';
+import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock, Copy } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 interface EditorToolbarProps {
@@ -17,6 +17,8 @@ interface EditorToolbarProps {
   snippetCount: number;
   saveState: 'idle' | 'saving' | 'saved';
   geminiModel: string;
+  hasGoogleDoc?: boolean;
+  onCopy?: () => void;
 }
 
 export function EditorToolbar({
@@ -33,7 +35,9 @@ export function EditorToolbar({
   snippetsOpen,
   snippetCount,
   saveState,
-  geminiModel
+  geminiModel,
+  hasGoogleDoc,
+  onCopy
 }: EditorToolbarProps) {
   const refineLabel = isTemplateMask ? 'Gerar com Laud.IA' : 'Refinar com Laud.IA';
 
@@ -41,7 +45,8 @@ export function EditorToolbar({
     <div className="px-4 py-2.5 border-b border-ink-100 bg-white flex items-center gap-3 shrink-0 flex-wrap">
       <button
         onClick={onRefine}
-        disabled={isGenerating || status === 'finalizado'}
+        disabled={isGenerating || status === 'finalizado' || hasGoogleDoc}
+        title={hasGoogleDoc ? 'Refinamento desativado para laudos gerados no Google Docs' : ''}
         className={classNames(
           "h-10 px-6 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-lg transition-all flex items-center justify-center relative overflow-hidden border border-brand-500/20",
           isGenerating
@@ -63,6 +68,14 @@ export function EditorToolbar({
         title="Ver prompt enviado à IA"
       >
         <Eye size={14} /> Prompt
+      </button>
+
+      <button
+        onClick={onCopy}
+        className="btn-secondary text-xs py-1.5 px-2.5 border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300"
+        title="Copiar texto do laudo (Ctrl+Shift+C)"
+      >
+        <Copy size={14} /> Copiar Laudo
       </button>
 
       <button
