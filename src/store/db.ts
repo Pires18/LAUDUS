@@ -125,14 +125,14 @@ export async function getSettings(): Promise<AppSettings> {
       dicomPreset: 'macmini',
       dicomUsername: 'admin',
       dicomPassword: '123456789',
-      dicomLocalAgentUrl: 'http://100.93.111.95:5173',
+      dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10443',
       dicomBackupSyncEnabled: true,
       dicomBackupViewerUrl: 'http://100.124.187.11:8043',
       dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
       dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
       dicomBackupUsername: 'admin',
       dicomBackupPassword: '123456789',
-      dicomBackupLocalAgentUrl: 'http://100.124.187.11:5173',
+      dicomBackupLocalAgentUrl: 'https://sservidor-notebook.tail861dda.ts.net:10443',
       dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
       soundNotifications: true,
       autoSave: true,
@@ -167,12 +167,12 @@ export async function getSettings(): Promise<AppSettings> {
     // Forçar migração para o novo padrão Tailscale solicitado pelo usuário
     if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8043') {
       data.dicomViewerUrl = 'http://100.93.111.95:8042';
-      data.dicomLocalAgentUrl = 'http://100.93.111.95:5173';
+      data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net:10443';
       data.dicomOrthancAETitle = 'ORTHANCPACS';
       data.dicomWorklistFolder = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
       data.dicomBackupSyncEnabled = true;
       data.dicomBackupViewerUrl = 'http://100.124.187.11:8043';
-      data.dicomBackupLocalAgentUrl = 'http://100.124.187.11:5173';
+      data.dicomBackupLocalAgentUrl = 'https://sservidor-notebook.tail861dda.ts.net:10443';
       data.dicomBackupOrthancAETitle = 'ORTHANCBACKUP';
       data.dicomBackupWorklistFolder = 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\';
       data.dicomUsername = 'admin';
@@ -238,14 +238,14 @@ export async function getSettings(): Promise<AppSettings> {
     dicomPreset: 'macmini',
     dicomUsername: 'admin',
     dicomPassword: '123456789',
-    dicomLocalAgentUrl: 'http://100.93.111.95:5173',
+    dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10443',
     dicomBackupSyncEnabled: true,
     dicomBackupViewerUrl: 'http://100.124.187.11:8043',
     dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
     dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
     dicomBackupUsername: 'admin',
     dicomBackupPassword: '123456789',
-    dicomBackupLocalAgentUrl: 'http://100.124.187.11:5173',
+    dicomBackupLocalAgentUrl: 'https://sservidor-notebook.tail861dda.ts.net:10443',
     dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
     soundNotifications: true,
     autoSave: true,
