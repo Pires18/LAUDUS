@@ -323,7 +323,7 @@ export function ExamEditor({ examId }: Props) {
         setDicomError(null);
       }
       try {
-        const baseUrl = getActivePacsUrl(settings, false);
+        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
         const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
         
         const backupUrl = settings.dicomBackupViewerUrl;
@@ -651,7 +651,7 @@ export function ExamEditor({ examId }: Props) {
     showToast('Preparando imagens para a impressão...', 'info');
 
     try {
-      const baseUrl = getActivePacsUrl(settings, false);
+      const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
       const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
       const proxyPath = getProxyEndpoint(settings, false);
       const urls = instances.map(instance => 
@@ -974,8 +974,8 @@ export function ExamEditor({ examId }: Props) {
                     }
                     const isBackup = activeServerSource === 'backup';
                     const currentBaseUrl = isBackup
-                      ? getActivePacsUrl(settings, true)
-                      : getActivePacsUrl(settings, false);
+                      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                      : (settings.dicomViewerUrl || 'http://localhost:8042');
                     const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                     const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
                     const proxyPath = getProxyEndpoint(settings, isBackup);
@@ -1052,8 +1052,8 @@ export function ExamEditor({ examId }: Props) {
                         const isActive = idx === activeImageIndex;
                         const isBackup = instance.serverSource === 'backup';
                         const currentBaseUrl = isBackup
-                          ? getActivePacsUrl(settings, true)
-                          : getActivePacsUrl(settings, false);
+                          ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                          : (settings.dicomViewerUrl || 'http://localhost:8042');
                         const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                         const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
                         const proxyPath = getProxyEndpoint(settings, isBackup);
@@ -1609,8 +1609,8 @@ export function ExamEditor({ examId }: Props) {
             const activeServerSource = activeStudy?.serverSource || 'primary';
             const isBackup = activeServerSource === 'backup';
             const currentBaseUrl = isBackup
-              ? getActivePacsUrl(settings, true)
-              : getActivePacsUrl(settings, false);
+              ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+              : (settings.dicomViewerUrl || 'http://localhost:8042');
             const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
             const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
             const proxyPath = getProxyEndpoint(settings, isBackup);

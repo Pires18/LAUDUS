@@ -136,51 +136,57 @@ VITE_FIREBASE_APP_ID=seu_app_id
 
 ---
 
-## 🔌 Detalhes de Integração e Arquitetura PACS/Orthanc
+## 🔌 Arquitetura Oficial de Integração PACS/Orthanc (Nuvem + Local)
 
-Para que a Worklist e a visualização de imagens DICOM funcionem de forma integrada em ambiente de consultório ou hospital, o LAUD.US utiliza uma arquitetura híbrida descrita abaixo:
+Para que a Plataforma LAUD.US, hospedada na nuvem (Vercel), possa se comunicar com segurança com os equipamentos físicos e servidores DICOM (Orthanc) dentro das clínicas de forma transparente, o sistema adota uma arquitetura híbrida distribuída utilizando a VPN Tailscale.
 
-### 1. Servidor de Desenvolvimento Vite com Proxy reverso
-Como o navegador do médico está rodando sob HTTPS ou em porta de host diferente (`http://localhost:5173`) do PACS local (`http://localhost:8042`), chamadas diretas seriam bloqueadas por CORS, e o navegador exigiria autenticação básica contínua. 
+### 1. A Arquitetura Híbrida (Vercel + Tailscale + Agentes Locais)
 
-O arquivo [vite.config.ts](file:///Users/matheuskistenmackerpires/Desktop/laudos-us/vite.config.ts) define um plugin de middleware chamado `localOrthancWorklistPlugin` que intercepta requisições locais e faz o tratamento necessário:
-- **`/api/orthanc-proxy`**: Encaminha as requisições para o Orthanc local, injeta as credenciais de autenticação básica (armazenadas nas configurações do médico no banco de dados) e remove os cabeçalhos `WWW-Authenticate` da resposta para que o navegador nunca exiba pop-ups invasivos de login.
-- **`/api/worklist` (POST)**: Recebe os dados de agendamento criados na recepção e executa o script [generate_wl.py](file:///Users/matheuskistenmackerpires/Desktop/laudos-us/scripts/generate_wl.py) via subprocesso, escrevendo o arquivo de worklist diretamente na pasta do servidor local.
-- **`/api/worklist` (DELETE)**: Remove o arquivo `.wl` do disco quando o exame é concluído ou excluído da Worklist do dia.
+O LAUD.US opera dividindo as responsabilidades de rede:
+- **Frontend Vercel (Nuvem):** Todo o painel, relatórios de IA e o banco de dados Firebase estão na nuvem, garantindo alta disponibilidade e acessibilidade global.
+- **Agentes Locais (Vite Plugin via Node.js):** Pequenos servidores locais executando `npm run dev` rodam diretamente nos servidores da clínica (Servidor Principal Mac e Servidor de Backup Windows).
+- **Tailscale (VPN Zero-Config):** Os Agentes Locais expõem endpoints seguros HTTPS via VPN Tailscale (`https://servidor-mac.tail861dda.ts.net:10443`, etc.).
+- **Comunicação Direta (Bypass da Nuvem):** Para garantir que as integrações locais funcionem mesmo a Vercel não tendo acesso direto à rede interna da clínica, o frontend roda uma lógica de inteligência de roteamento (`isVercel`). Ele instrui o **navegador do médico** a se comunicar **diretamente** com o IP/URL do Agente Local através da rede Tailscale à qual o médico já está conectado. Isso evita gargalos, problemas de CORS, e elimina completamente a dependência de middlewares complexos ou liberação de portas em roteadores.
+
+### 2. O Funcionamento do Agente Local
+O arquivo `vite.config.ts` conta com o plugin `localOrthancWorklistPlugin` que transforma o ambiente de desenvolvimento Vite em um verdadeiro servidor middleware para receber os payloads (dados) do Vercel e executar rotinas de baixo-nível na máquina do Windows ou Mac:
+
+- **`/api/worklist` (POST)**: Recebe os dados de agendamento via JSON. O Node.js executa o script Python `generate_wl.py` recebendo esses dados nativamente via entrada padrão (`stdin`), eliminando o uso de argumentos de terminal.
+- **Geração Segura de Worklist:** O script Python (usando a biblioteca `pydicom`) cria arquivos `.wl` com cabeçalhos DICOM compatíveis com qualquer equipamento e deposita na pasta física configurada no `.env`.
+- **Tratamento Seguro de Erros:** Qualquer falta de biblioteca (como pydicom) ou falha de Python é repassada como erro tratável para o frontend, e exibe as instruções de correção amigavelmente no navegador do usuário.
+
+### 3. Configurações Dinâmicas Oficiais (`.env`)
+O antigo modelo de caminhos físicos engessados no código foi completamente descontinuado. Toda a configuração das pastas de destino das Worklists e caminhos de execução dos agentes locais (Windows e Mac) são configurados estritamente pelo arquivo `.env` nativo de cada máquina:
+
+```env
+# Exemplo de Configuração de Agente Local (Mac Mini)
+VITE_ORTHANC_WORKLIST_DIR=/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/
+VITE_PYTHON_PATH=python3
+
+# Exemplo de Configuração de Agente de Backup (Windows)
+VITE_ORTHANC_WORKLIST_DIR=C:\OrthancServer\db\WorklistsDatabase\
+VITE_PYTHON_PATH=python
+```
+
+> [!IMPORTANT]
+> **Fluxo Dual de Segurança:** O sistema frontend é programado para tentar sincronizar automaticamente com o Servidor Principal. Caso configurado, o mesmo fará simultaneamente um espelhamento assíncrono enviando o payload diretamente ao Agente do Servidor de Backup de forma paralela.
 
 ```mermaid
 sequenceDiagram
-    participant UI as Interface Laud.us (Navegador)
-    participant Vite as Servidor Vite (Proxy API)
-    participant Py as Script generate_wl.py (Python)
-    participant Orthanc as Servidor PACS Orthanc Local
-    participant USG as Equipamento de Ultrassom
+    participant Médico (Navegador + Tailscale)
+    participant Vercel as Frontend (Nuvem Vercel)
+    participant Mac as Agente Local (Mac Principal)
+    participant Win as Agente Backup (Windows)
+    participant Orthanc as Servidor PACS Local
 
-    Note over UI,USG: Fluxo 1: Geração de Worklist DICOM
-    UI->>Vite: POST /api/worklist {examId, paciente, modalidade}
-    Vite->>Py: Executa scripts/generate_wl.py via stdin
-    Py->>Py: Cria cabeçalho DICOM e salva em arquivo .wl
-    Py-->>Vite: Retorna caminho do arquivo criado
-    Vite-->>UI: Resposta de sucesso {"success": true}
-    USG->>Orthanc: Consulta agendamentos (MWL C-FIND)
-    Orthanc-->>USG: Retorna dados do paciente físico na tela do USG
-
-    Note over UI,USG: Fluxo 2: Visualização de Imagens no Laudo
-    UI->>Vite: GET /api/orthanc-proxy?url=studies?lookup={studyUid}
-    Vite->>Orthanc: Repassa chamada com cabeçalho Auth e contorna CORS
-    Orthanc-->>Vite: Retorna IDs do estudo
-    Vite-->>UI: Retorna JSON
-    UI->>Vite: GET /api/orthanc-proxy?url=instances/{instanceId}/preview
-    Vite->>Orthanc: Busca miniatura da imagem DICOM
-    Orthanc-->>Vite: Envia JPEG
-    Vite-->>UI: Exibe imagem no painel lateral do editor
+    Médico->>Vercel: 1. Acessa laud.us, clica em "Iniciar Exame"
+    Vercel-->>Médico: Retorna as URLs do Agente via Banco de Dados
+    Médico->>Mac: 2. POST (via URL Tailscale direta) para /api/worklist
+    Mac->>Mac: Executa Python, gera arquivo .wl no HD Local
+    Médico->>Win: 3. POST Simultâneo (Backup) para /api/worklist
+    Win->>Win: Executa Python, gera .wl na pasta configurada no .env
+    Orthanc->>Mac: Lê o disco local de forma independente
 ```
-
-### 2. Configurações de Presets do Servidor PACS
-Nas configurações do sistema, o médico pode selecionar o tipo de servidor PACS local:
-- **Mac Mini (Padrão macOS)**: Aponta a pasta de destino para `/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/` e o servidor para `http://100.93.111.95:8042`.
-- **Notebook (Padrão Windows)**: Aponta a pasta de destino para `C:\OrthancServer\db\WorklistsDatabase\` e o servidor para `http://localhost:8043`.
-- **Customizado**: Permite configurar caminhos de rede e endereços IP arbitrários.
 
 ---
 
