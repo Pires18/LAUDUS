@@ -12,7 +12,7 @@ function localOrthancWorklistPlugin() {
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
         // Allow CORS for all local API routes
-        if (req.url && req.url.startsWith('/api/')) {
+        if (req.url && req.url.includes('/api/')) {
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
           res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -24,7 +24,7 @@ function localOrthancWorklistPlugin() {
           }
         }
 
-        if (req.url && req.url.startsWith('/api/orthanc-proxy')) {
+        if (req.url && req.url.includes('/api/orthanc-proxy')) {
           const parsedUrl = new URL(req.url, 'http://localhost');
           const targetUrl = parsedUrl.searchParams.get('url');
           if (!targetUrl) {
@@ -97,7 +97,7 @@ function localOrthancWorklistPlugin() {
           return;
         }
 
-        if (req.url && req.url.startsWith('/api/worklist')) {
+        if (req.url && req.url.includes('/api/worklist')) {
           res.setHeader('Content-Type', 'application/json');
           
           if (req.method === 'POST') {
