@@ -236,7 +236,12 @@ export function Worklist() {
       const targetDevice = settings.dicomDevices?.[0] || 
                            { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
-      const res = await fetch('/api/worklist', {
+      const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+      const url = (isVercel && settings.dicomLocalAgentUrl)
+        ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
+        : '/api/worklist';
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +264,12 @@ export function Worklist() {
 
       if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
         try {
-          const backupRes = await fetch('/api/worklist', {
+          const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+          const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
+            ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
+            : '/api/worklist';
+          
+          const backupRes = await fetch(urlBackup, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

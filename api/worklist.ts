@@ -44,7 +44,7 @@ export default async function handler(req: any, res: any) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         success: false,
-        error: `Não foi possível conectar ao Agente Local no Mac Mini via Tailscale. Certifique-se de que o Mac Mini está ativo e com a aplicação em execução. (Detalhes: ${err.message})`
+        error: `Não foi possível conectar ao Agente Local via Vercel. Certifique-se de que o Agente está ativo e acessível (Detalhes: ${err.message})`
       }));
       return;
     }
