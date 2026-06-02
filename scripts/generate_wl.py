@@ -1,9 +1,16 @@
 import sys
 import json
 import os
-import pydicom
-from pydicom.dataset import Dataset, FileMetaDataset
-from pydicom.sequence import Sequence
+try:
+    import pydicom
+    from pydicom.dataset import Dataset, FileMetaDataset
+    from pydicom.sequence import Sequence
+except ImportError:
+    print(json.dumps({
+        "success": False, 
+        "error": "A biblioteca 'pydicom' nao esta instalada. Execute 'pip install pydicom' no terminal do Windows."
+    }), file=sys.stderr)
+    sys.exit(1)
 
 def main():
     try:

@@ -107,13 +107,20 @@ function localOrthancWorklistPlugin() {
               try {
                 const payload = JSON.parse(body);
                 // Se rodando no Docker, força o diretório da worklist para a montagem de volume
+                // Determine output directory based on environment variables or OS fallback
+                const defaultOutputDir = process.platform === 'win32'
+                  ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+                  : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
+                
+                payload.outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
+                
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
                   payload.outputDir = '/app/pacs-worklist/';
                 }
                 
-                // Resolve python executable path dynamically (cross-platform compatibility)
-                let pythonExecutable = 'python3';
-                if (process.platform === 'win32') {
+                // Resolve python executable path from env or defaults
+                let pythonExecutable = process.env.VITE_PYTHON_PATH || 'python3';
+                if (!process.env.VITE_PYTHON_PATH && process.platform === 'win32') {
                   const defaultWinPath = path.join(process.env.USERPROFILE || '', 'AppData/Local/Programs/Python/Python312/python.exe');
                   if (fs.existsSync(defaultWinPath)) {
                     pythonExecutable = `"${defaultWinPath}"`;
@@ -153,7 +160,7 @@ function localOrthancWorklistPlugin() {
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
                   : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-                let outputDir = payload.outputDir || defaultOutputDir;
+                let outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
                   outputDir = '/app/pacs-worklist/';
                 }
