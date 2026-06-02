@@ -329,12 +329,25 @@ export function ExamEditor({ examId }: Props) {
         const backupUrl = settings.dicomBackupViewerUrl;
         const backupAuth = backupUrl ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
 
+        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 6000) => {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            const res = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(id);
+            return res;
+          } catch (err) {
+            clearTimeout(id);
+            throw err;
+          }
+        };
+
         // Check primary health
         const pingPrimary = async () => {
           const proxyPath = getProxyEndpoint(settings, false);
           const pingUrl = `${baseUrl.replace(/\/$/, '')}/system`;
           try {
-            const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${authParams}`);
+            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${authParams}`);
             return res.ok;
           } catch {
             return false;
@@ -347,7 +360,7 @@ export function ExamEditor({ examId }: Props) {
           const proxyPath = getProxyEndpoint(settings, true);
           const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
           try {
-            const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
+            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
             return res.ok;
           } catch {
             return false;

@@ -78,7 +78,13 @@ function localOrthancWorklistPlugin() {
               fetchOptions.body = body;
               fetchOptions.headers['Content-Type'] = 'application/json';
             }
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 seconds timeout for PACS connections
+            fetchOptions.signal = controller.signal;
+
             const response = await fetch(resolvedTargetUrl, fetchOptions);
+            clearTimeout(timeoutId);
+
             console.log(`[Orthanc Proxy] Response status: ${response.status} from ${resolvedTargetUrl}`);
             res.statusCode = response.status;
             response.headers.forEach((value, key) => {
