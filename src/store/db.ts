@@ -128,11 +128,11 @@ export async function getSettings(): Promise<AppSettings> {
       dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10443',
       dicomBackupSyncEnabled: true,
       dicomBackupViewerUrl: 'http://100.124.187.11:8043',
-      dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
+      dicomBackupTailscalePublicUrl: 'https://servidor-notebook.tail861dda.ts.net:8443',
       dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
       dicomBackupUsername: 'admin',
       dicomBackupPassword: '123456789',
-      dicomBackupLocalAgentUrl: 'https://sservidor-notebook.tail861dda.ts.net:10443',
+      dicomBackupLocalAgentUrl: 'https://servidor-notebook.tail861dda.ts.net:10443',
       dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
       soundNotifications: true,
       autoSave: true,
@@ -172,7 +172,7 @@ export async function getSettings(): Promise<AppSettings> {
       data.dicomWorklistFolder = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
       data.dicomBackupSyncEnabled = true;
       data.dicomBackupViewerUrl = 'http://100.124.187.11:8043';
-      data.dicomBackupLocalAgentUrl = 'https://sservidor-notebook.tail861dda.ts.net:10443';
+      data.dicomBackupLocalAgentUrl = 'https://servidor-notebook.tail861dda.ts.net:10443';
       data.dicomBackupOrthancAETitle = 'ORTHANCBACKUP';
       data.dicomBackupWorklistFolder = 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\';
       data.dicomUsername = 'admin';
@@ -241,11 +241,11 @@ export async function getSettings(): Promise<AppSettings> {
     dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10443',
     dicomBackupSyncEnabled: true,
     dicomBackupViewerUrl: 'http://100.124.187.11:8043',
-    dicomBackupTailscalePublicUrl: 'https://sservidor-notebook.tail861dda.ts.net:8443',
+    dicomBackupTailscalePublicUrl: 'https://servidor-notebook.tail861dda.ts.net:8443',
     dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
     dicomBackupUsername: 'admin',
     dicomBackupPassword: '123456789',
-    dicomBackupLocalAgentUrl: 'https://sservidor-notebook.tail861dda.ts.net:10443',
+    dicomBackupLocalAgentUrl: 'https://servidor-notebook.tail861dda.ts.net:10443',
     dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
     soundNotifications: true,
     autoSave: true,
