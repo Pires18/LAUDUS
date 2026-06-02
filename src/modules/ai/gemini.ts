@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
+import { logAiUsage } from '../../store/db';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
@@ -59,15 +60,38 @@ export interface CallMetrics {
   timestamp: number;
   success: boolean;
   scratchpad?: string;
+  modelName?: string;
 }
 
 let lastCallMetrics: CallMetrics | null = null;
 export const callMetricsHistory: CallMetrics[] = [];
 
+const PRICING: Record<string, { input: number, output: number }> = {
+  'claude-3-5-sonnet-latest': { input: 3.0, output: 15.0 },
+  'claude-3-7-sonnet-latest': { input: 3.0, output: 15.0 },
+  'gemini-3.5-flash': { input: 0.075, output: 0.30 },
+  'gemini-3.1-pro-preview': { input: 1.25, output: 5.0 },
+};
+
 function recordMetrics(m: CallMetrics) {
   lastCallMetrics = m;
   callMetricsHistory.unshift(m);
   if (callMetricsHistory.length > 20) callMetricsHistory.pop();
+
+  if (m.success && m.modelName) {
+    const prices = PRICING[m.modelName] || { input: 0, output: 0 };
+    const costUsd = ((m.estimatedInputTokens / 1000000) * prices.input) + ((m.estimatedOutputTokens / 1000000) * prices.output);
+    
+    // Log asynchronously
+    logAiUsage({
+      model: m.modelName,
+      provider: m.provider,
+      inputTokens: m.estimatedInputTokens,
+      outputTokens: m.estimatedOutputTokens,
+      costUsd,
+      area: m.area
+    }).catch(() => {});
+  }
 }
 
 // ─── Temperatura adaptativa por modo ────────────────────────────────────────
@@ -748,6 +772,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       text = await callAnthropic(built, settings, area, mode, signal, (sp) => scratchpad = sp);
     }
     success = true;
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       mode: mode as CallMetrics['mode'],
       provider,
@@ -757,10 +782,12 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: true,
-      scratchpad
+      scratchpad,
+      modelName: resolvedModelName
     });
     return text;
   } catch (err) {
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       mode: mode as CallMetrics['mode'],
       provider,
@@ -770,6 +797,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: false,
+      modelName: resolvedModelName
     });
     throw err;
   }
@@ -804,6 +832,7 @@ export async function generateReportStream(
       if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
       text = await callAnthropicStream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp);
     }
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       mode: mode as CallMetrics['mode'],
       provider,
@@ -813,10 +842,12 @@ export async function generateReportStream(
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: true,
-      scratchpad
+      scratchpad,
+      modelName: resolvedModelName
     });
     return text;
   } catch (err) {
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       mode: mode as CallMetrics['mode'],
       provider,
@@ -826,6 +857,7 @@ export async function generateReportStream(
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: false,
+      modelName: resolvedModelName
     });
     throw err;
   }

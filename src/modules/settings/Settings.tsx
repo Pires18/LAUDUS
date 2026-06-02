@@ -8,17 +8,18 @@ import {
   Save, User, LogOut, Sliders, ShieldCheck, 
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Database, Info, Upload, Loader2,
-  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield, Cloud
+  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield, Cloud, Coins
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
+import { FinancialControl } from './FinancialControl';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
-type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit';
+type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit' | 'financeiro';
 
 export function Settings() {
   const { settings, updateSettings, showToast } = useApp();
@@ -214,6 +215,7 @@ export function Settings() {
     { id: 'sistema', label: 'Preferências', icon: Sliders },
     { id: 'dicom', label: 'Integração PACS', icon: Database },
     { id: 'audit', label: 'Auditoria & Saúde', icon: ShieldCheck },
+    { id: 'financeiro', label: 'Financeiro IA', icon: Coins },
   ] as const;
 
   return (
@@ -956,6 +958,13 @@ export function Settings() {
 
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: FINANCEIRO */}
+          {activeTab === 'financeiro' && (
+            <div className="animate-fade-in -mt-8">
+              <FinancialControl />
             </div>
           )}
 

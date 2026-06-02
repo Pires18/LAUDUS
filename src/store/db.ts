@@ -811,3 +811,44 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
   }
   return '/api/orthanc-proxy';
 }
+
+// ─── AI Token Usage Tracking ───
+
+export interface AiUsageLog {
+  id?: string;
+  timestamp: number;
+  model: string;
+  provider: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  area: string;
+}
+
+export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Promise<void> {
+  try {
+    const colRef = getCollectionRef('ai_usage');
+    await addDoc(colRef, sanitize({
+      ...data,
+      timestamp: Date.now()
+    }));
+  } catch (err) {
+    console.error('[DB] Erro ao gravar uso de IA:', err);
+  }
+}
+
+export async function getAiUsageStats(startDateMs: number, endDateMs: number): Promise<AiUsageLog[]> {
+  try {
+    const colRef = getCollectionRef('ai_usage');
+    const q = query(
+      colRef,
+      where('timestamp', '>=', startDateMs),
+      where('timestamp', '<=', endDateMs)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AiUsageLog));
+  } catch (err) {
+    console.error('[DB] Erro ao buscar estatísticas de IA:', err);
+    return [];
+  }
+}
