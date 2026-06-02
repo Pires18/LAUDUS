@@ -16,7 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
-import { addAuditLog, getActivePacsUrl } from '../../store/db';
+import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
 type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit';
 
@@ -136,8 +136,9 @@ export function Settings() {
       // Test Primary
       const testPrimary = async () => {
         const pingUrl = `${primaryUrl.replace(/\/$/, '')}/system`;
+        const proxyPath = getProxyEndpoint(draft, false);
         try {
-          const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${primaryAuth}`);
+          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${primaryAuth}`);
           if (res.ok) {
             const data = await res.json();
             return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
@@ -152,8 +153,9 @@ export function Settings() {
       const testBackup = async () => {
         if (!backupUrl) return { ok: false, msg: 'Servidor backup não configurado' };
         const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
+        const proxyPath = getProxyEndpoint(draft, true);
         try {
-          const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
+          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
           if (res.ok) {
             const data = await res.json();
             return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };

@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 import { Patient, Clinic, AppSettings } from '../../types';
 import { calculateAge, formatDate } from '../../utils/format';
 
@@ -97,7 +98,8 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
                 : (settings.dicomViewerUrl || 'http://localhost:8042');
               const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
               const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-              const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+              const proxyPath = getProxyEndpoint(settings, isBackup);
+              const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
               
               return (
                 <div key={instance.ID} className="print-image-card">

@@ -795,3 +795,19 @@ export function getActivePacsUrl(settings: AppSettings, isBackup = false): strin
     : (settings.dicomViewerUrl || 'http://100.93.111.95:8042');
 }
 
+
+/**
+ * Retorna a URL base do proxy a ser utilizada.
+ * No Vercel, tenta usar o Agente Local (se for HTTPS) para contornar bloqueios de rede.
+ */
+export function getProxyEndpoint(settings: AppSettings, isBackup = false): string {
+  const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+  if (isVercel) {
+    const agent = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
+    // Só usa o agente local se for HTTPS para evitar Mixed Content Block no navegador
+    if (agent && agent.startsWith('https')) {
+      return `${agent.replace(/\/$/, '')}/api/orthanc-proxy`;
+    }
+  }
+  return '/api/orthanc-proxy';
+}

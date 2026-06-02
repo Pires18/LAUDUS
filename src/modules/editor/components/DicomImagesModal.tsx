@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../../../components/Modal';
 import { AppSettings, ExamRequest } from '../../../types';
 import { Loader2, Camera, Printer, CheckSquare, Square, AlertTriangle, RefreshCw } from 'lucide-react';
+import { getActivePacsUrl, getProxyEndpoint } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { DicomThumbnail } from './DicomThumbnail';
 
@@ -172,7 +173,8 @@ export function DicomImagesModal({
                   : (settings.dicomViewerUrl || 'http://localhost:8042');
                 const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                 const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-                const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+                const proxyPath = getProxyEndpoint(settings, isBackup);
+                const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
                 const instNum = instance.MainDicomTags?.InstanceNumber || (idx + 1);
 
                 return (

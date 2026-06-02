@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
-import { updateItem, getItem, getActivePacsUrl } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, EXAM_AREAS, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
@@ -34,14 +34,16 @@ const locateStudies = async (
   authParams: string,
   exam: ExamRequest,
   patient: Patient | null,
-  serverSource: 'primary' | 'backup'
+  serverSource: 'primary' | 'backup',
+  settings: any
 ): Promise<any[]> => {
   const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
   
   const queryOrthanc = async (query: any) => {
     try {
+      const proxyPath = getProxyEndpoint(settings, serverSource === 'backup');
       const res = await fetch(
-        `/api/orthanc-proxy?url=${encodeURIComponent(findUrl)}${authParams}`,
+        `${proxyPath}?url=${encodeURIComponent(findUrl)}${authParams}`,
         {
           method: 'POST',
           headers: {
@@ -326,9 +328,10 @@ export function ExamEditor({ examId }: Props) {
 
         // Check primary health
         const pingPrimary = async () => {
+          const proxyPath = getProxyEndpoint(settings, false);
           const pingUrl = `${baseUrl.replace(/\/$/, '')}/system`;
           try {
-            const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${authParams}`);
+            const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${authParams}`);
             return res.ok;
           } catch {
             return false;
@@ -338,9 +341,10 @@ export function ExamEditor({ examId }: Props) {
         // Check backup health
         const pingBackup = async () => {
           if (!backupUrl) return false;
+          const proxyPath = getProxyEndpoint(settings, true);
           const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
           try {
-            const res = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
+            const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
             return res.ok;
           } catch {
             return false;
@@ -362,16 +366,13 @@ export function ExamEditor({ examId }: Props) {
         }
 
         // Fetch candidates from both servers in parallel
-        const fetchPrimary = primaryOk 
-          ? locateStudies(baseUrl, authParams, exam, patient, 'primary') 
-          : Promise.resolve([]);
-        const fetchBackup = (backupUrl && backupOk)
-          ? locateStudies(backupUrl, backupAuth, exam, patient, 'backup')
-          : Promise.resolve([]);
-
         const [primaryCandidates, backupCandidates] = await Promise.all([
-          fetchPrimary,
-          fetchBackup
+          primaryOk 
+          ? locateStudies(baseUrl, authParams, exam, patient, 'primary', settings) 
+          : Promise.resolve([]),
+          backupOk && backupUrl
+          ? locateStudies(backupUrl, backupAuth, exam, patient, 'backup', settings) 
+          : Promise.resolve([])
         ]);
 
         // Merge candidates. Deduplicate by study ID / StudyInstanceUID.
@@ -419,7 +420,8 @@ export function ExamEditor({ examId }: Props) {
 
         const studyId = activeStudy.ID;
         const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-        const instancesRes = await fetch(`/api/orthanc-proxy?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
+        const proxyPath = getProxyEndpoint(settings, activeStudy.serverSource === 'backup');
+        const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
         
         if (!instancesRes.ok) {
           throw new Error(`Erro ao obter imagens do estudo do Orthanc.`);
@@ -648,8 +650,9 @@ export function ExamEditor({ examId }: Props) {
     try {
       const baseUrl = getActivePacsUrl(settings, false);
       const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+      const proxyPath = getProxyEndpoint(settings, false);
       const urls = instances.map(instance => 
-        `/api/orthanc-proxy?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${authParams}`
+        `${proxyPath}?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${authParams}`
       );
 
       // Preload all image URLs into browser cache
@@ -972,7 +975,8 @@ export function ExamEditor({ examId }: Props) {
                       : getActivePacsUrl(settings, false);
                     const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                     const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-                    const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+                    const proxyPath = getProxyEndpoint(settings, isBackup);
+                    const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
                     const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
                     return (
@@ -1049,7 +1053,8 @@ export function ExamEditor({ examId }: Props) {
                           : getActivePacsUrl(settings, false);
                         const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                         const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-                        const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+                        const proxyPath = getProxyEndpoint(settings, isBackup);
+                        const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
                         
                         return (
                           <button
@@ -1603,7 +1608,8 @@ export function ExamEditor({ examId }: Props) {
               : getActivePacsUrl(settings, false);
             const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
             const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-            const previewUrl = `/api/orthanc-proxy?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            const proxyPath = getProxyEndpoint(settings, isBackup);
+            const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
             const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
             return (
