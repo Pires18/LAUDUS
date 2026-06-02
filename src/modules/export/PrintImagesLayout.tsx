@@ -13,24 +13,16 @@ interface Props {
   gridType?: string;
 }
 
-export function PrintImagesLayout({ patient, clinic, settings, examType, examDate, selectedInstances, gridType = '2x3' }: Props) {
+export function PrintImagesLayout({ patient, clinic, settings, examType, examDate, selectedInstances, gridType = '2x4' }: Props) {
   // Determine grid dimensions based on gridType
   let cols = 2;
-  let rows = 3;
-  let chunkSize = 6;
+  let rows = 4;
+  let chunkSize = 8;
 
   if (gridType === '1x2') {
     cols = 1;
     rows = 2;
     chunkSize = 2;
-  } else if (gridType === '2x2') {
-    cols = 2;
-    rows = 2;
-    chunkSize = 4;
-  } else if (gridType === '2x3') {
-    cols = 2;
-    rows = 3;
-    chunkSize = 6;
   } else if (gridType === '2x4') {
     cols = 2;
     rows = 4;

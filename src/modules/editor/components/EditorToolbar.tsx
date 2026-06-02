@@ -96,7 +96,7 @@ export function EditorToolbar({
 
       <button
         onClick={onShowHistory}
-        className="btn-secondary text-xs py-1.5 px-2.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-indigo-500/20 bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-500 hover:text-white hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/25 transition-all active:scale-95"
         title="Ver histórico de laudos anteriores do paciente"
       >
         <History size={14} /> Histórico Clínico
@@ -104,7 +104,7 @@ export function EditorToolbar({
 
       <button
         onClick={onShowVersions}
-        className="btn-secondary text-xs py-1.5 px-2.5 border-teal-200 text-teal-700 hover:bg-teal-50"
+        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-teal-500/20 bg-teal-50 text-teal-700 font-bold hover:bg-teal-500 hover:text-white hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/25 transition-all active:scale-95"
         title="Ver histórico de versões/alterações do laudo"
       >
         <Clock size={14} /> Versões do Laudo

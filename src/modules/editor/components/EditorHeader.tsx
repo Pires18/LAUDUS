@@ -70,6 +70,11 @@ export function EditorHeader({
               <h1 className="text-sm font-black text-white uppercase tracking-tight truncate max-w-[120px] xs:max-w-[180px] sm:max-w-[280px]">
                 {patient.name}
               </h1>
+              {patient.birthDate && (
+                <span className="text-[9px] font-bold text-ink-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded-md shrink-0">
+                  Data de Nasc: {formatDate(patient.birthDate)}
+                </span>
+              )}
               {age && (
                 <span className="text-[9px] font-bold text-ink-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded-md shrink-0">
                   {age}

@@ -30,7 +30,7 @@ export function DicomImagesModal({
   onPrint 
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [gridType, setGridType] = useState<string>('2x3');
+  const [gridType, setGridType] = useState<string>('2x4');
 
   const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
 
@@ -232,8 +232,6 @@ export function DicomImagesModal({
               className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
             >
               <option value="1x2">1 Coluna x 2 Linhas (2 fotos/pág)</option>
-              <option value="2x2">2 Colunas x 2 Linhas (4 fotos/pág)</option>
-              <option value="2x3">2 Colunas x 3 Linhas (6 fotos/pág)</option>
               <option value="2x4">2 Colunas x 4 Linhas (8 fotos/pág)</option>
             </select>
           </div>

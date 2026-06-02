@@ -64,43 +64,61 @@ const locateStudies = async (
     }
   };
 
-  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
-  
-  const queries = [
-    queryOrthanc({ StudyInstanceUID: studyUid }),
-    queryOrthanc({ AccessionNumber: exam.id })
-  ];
-
-  if (exam.friendlyId) {
-    queries.push(queryOrthanc({ AccessionNumber: exam.friendlyId }));
-  }
-
-  const patientIds = new Set<string>();
-  if (exam.patientId) patientIds.add(exam.patientId);
-  if (patient?.id) patientIds.add(patient.id);
-
-  for (const pid of patientIds) {
-    queries.push(queryOrthanc({ PatientID: pid }));
-  }
-
-  queries.push(queryOrthanc({ PatientID: exam.id }));
-
-  const results = await Promise.all(queries);
-
   const candidatesMap = new Map<string, any>();
-  for (const list of results) {
+
+  const processResults = (list: any[]) => {
+    let found = false;
     for (const item of (list || [])) {
       if (item) {
         if (typeof item === 'string') {
           candidatesMap.set(item, { ID: item, MainDicomTags: {}, serverSource });
+          found = true;
         } else {
           const id = item.ID || item.id;
           if (id) {
             candidatesMap.set(id, { ...item, ID: id, serverSource });
+            found = true;
           }
         }
       }
     }
+    return found;
+  };
+
+  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+  
+  // Phase 1: Exact unique matches (StudyInstanceUID & AccessionNumber)
+  const exactQueries = [
+    queryOrthanc({ StudyInstanceUID: studyUid }),
+    queryOrthanc({ AccessionNumber: exam.id })
+  ];
+  if (exam.friendlyId) {
+    exactQueries.push(queryOrthanc({ AccessionNumber: exam.friendlyId }));
+  }
+
+  const exactResults = await Promise.all(exactQueries);
+  let hasExact = false;
+  for (const list of exactResults) {
+    if (processResults(list)) hasExact = true;
+  }
+
+  // Se já encontrou um estudo pelos identificadores exatos,
+  // aborta as buscas por PatientID para evitar lentidão excessiva no servidor Orthanc.
+  if (hasExact) {
+    return Array.from(candidatesMap.values());
+  }
+
+  // Phase 2: Patient ID Fallback
+  const patientIds = new Set<string>();
+  if (exam.patientId) patientIds.add(exam.patientId);
+  if (patient?.id) patientIds.add(patient.id);
+  patientIds.add(exam.id);
+
+  const patientQueries = Array.from(patientIds).map(pid => queryOrthanc({ PatientID: pid }));
+  const patientResults = await Promise.all(patientQueries);
+  
+  for (const list of patientResults) {
+    processResults(list);
   }
 
   return Array.from(candidatesMap.values());
