@@ -115,7 +115,7 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'ACR BI-RADS (Mama)', 
     description: 'Léxico e classificação BI-RADS para ultrassonografia mamária.', 
     component: BiradsCalculator,
-    areas: ['pequenas-partes', 'ginecologia'],
+    areas: ['pequenas-partes', 'ginecologia', 'mastologia'],
     reference: {
       text: 'American College of Radiology (ACR) Breast Imaging Reporting and Data System (BI-RADS) US Atlas 2013. Léxico oficial de lesões mamárias.',
       link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Bi-Rads'
