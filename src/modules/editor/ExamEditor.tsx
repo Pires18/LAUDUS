@@ -347,7 +347,7 @@ export function ExamEditor({ examId }: Props) {
         const backupUrl = settings.dicomBackupViewerUrl;
         const backupAuth = backupUrl ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
 
-        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 6000) => {
+        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 2500) => {
           const controller = new AbortController();
           const id = setTimeout(() => controller.abort(), timeoutMs);
           try {
@@ -360,134 +360,115 @@ export function ExamEditor({ examId }: Props) {
           }
         };
 
-        // Check primary health
-        const pingPrimary = async () => {
-          const proxyPath = getProxyEndpoint(settings, false);
-          const pingUrl = `${baseUrl.replace(/\/$/, '')}/system`;
+        if (active && !backupUrl) {
+          setPacsBackupConnected('disabled');
+        }
+
+        const processServer = async (source: 'primary' | 'backup', serverBaseUrl: string, serverAuth: string) => {
+          const proxyPath = getProxyEndpoint(settings, source === 'backup');
+          const pingUrl = `${serverBaseUrl.replace(/\/$/, '')}/system`;
+          let pingOk = false;
           try {
-            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${authParams}`);
-            return res.ok;
+            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${serverAuth}`);
+            pingOk = res.ok;
           } catch {
-            return false;
+            pingOk = false;
           }
-        };
 
-        // Check backup health
-        const pingBackup = async () => {
-          if (!backupUrl) return false;
-          const proxyPath = getProxyEndpoint(settings, true);
-          const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
-          try {
-            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
-            return res.ok;
-          } catch {
-            return false;
-          }
-        };
-
-        const [primaryOk, backupOk] = await Promise.all([
-          pingPrimary(),
-          backupUrl ? pingBackup() : Promise.resolve(false)
-        ]);
-
-        if (active) {
-          setPacsConnected(primaryOk ? 'connected' : 'disconnected');
-          if (backupUrl) {
-            setPacsBackupConnected(backupOk ? 'connected' : 'disconnected');
-          } else {
-            setPacsBackupConnected('disabled');
-          }
-        }
-
-        // Fetch candidates from both servers in parallel
-        const [primaryCandidates, backupCandidates] = await Promise.all([
-          primaryOk 
-          ? locateStudies(baseUrl, authParams, exam, patient, 'primary', settings) 
-          : Promise.resolve([]),
-          backupOk && backupUrl
-          ? locateStudies(backupUrl, backupAuth, exam, patient, 'backup', settings) 
-          : Promise.resolve([])
-        ]);
-
-        // Merge candidates. Deduplicate by study ID / StudyInstanceUID.
-        // If present in both, keep the primary one (which defaults to primaryOk).
-        const mergedMap = new Map<string, any>();
-        
-        // Merge backup candidates first so primary candidates (if any) override them
-        for (const c of backupCandidates) {
-          mergedMap.set(c.ID, c);
-        }
-        for (const c of primaryCandidates) {
-          mergedMap.set(c.ID, c);
-        }
-
-        const candidates = Array.from(mergedMap.values());
-
-        if (active) {
-          setCandidateStudies(candidates);
-        }
-
-        if (candidates.length === 0) {
           if (active) {
+            if (source === 'primary') setPacsConnected(pingOk ? 'connected' : 'disconnected');
+            if (source === 'backup') setPacsBackupConnected(pingOk ? 'connected' : 'disconnected');
+          }
+
+          if (!pingOk) return { source, candidates: [], serverBaseUrl, serverAuth, proxyPath };
+
+          const candidates = await locateStudies(serverBaseUrl, serverAuth, exam, patient, source, settings);
+          return { source, candidates, serverBaseUrl, serverAuth, proxyPath };
+        };
+
+        const primaryPromise = processServer('primary', baseUrl, authParams);
+        const backupPromise = backupUrl ? processServer('backup', backupUrl, backupAuth) : Promise.resolve({ source: 'backup', candidates: [], serverBaseUrl: '', serverAuth: '', proxyPath: '' });
+
+        let currentCandidates: any[] = [];
+        
+        const updateUI = async (result: any) => {
+          if (!active || !result) return;
+          
+          if (result.candidates.length > 0) {
+            const mergedMap = new Map<string, any>();
+            for (const c of currentCandidates) mergedMap.set(c.ID, c);
+            for (const c of result.candidates) {
+              if (c.serverSource === 'primary') {
+                mergedMap.set(c.ID, c);
+              } else {
+                if (!mergedMap.has(c.ID) || mergedMap.get(c.ID).serverSource === 'backup') {
+                  mergedMap.set(c.ID, c);
+                }
+              }
+            }
+            currentCandidates = Array.from(mergedMap.values());
+            setCandidateStudies(currentCandidates);
+          }
+
+          if (currentCandidates.length === 0) {
             setDicomInstances([]);
             setHasDicomImages(false);
-            setDicomError(`Estudo não localizado no Orthanc. Certifique-se de que o exame foi realizado na máquina de ultrassom com o ID de Paciente ${exam.patientId} ou ID de Exame ${exam.id}.`);
+            setDicomError(`Estudo não localizado nos servidores ativos.`);
+            return;
           }
-          return;
-        }
 
-        let activeStudy = null;
-        if (selectedStudyId) {
-          activeStudy = candidates.find(c => c.ID === selectedStudyId);
-        }
-        if (!activeStudy) {
-          const sorted = scoreStudies(candidates, exam.createdAt);
-          activeStudy = sorted[0];
-          if (active) {
+          let activeStudy = null;
+          if (selectedStudyId) {
+            activeStudy = currentCandidates.find(c => c.ID === selectedStudyId);
+          }
+          if (!activeStudy && currentCandidates.length > 0) {
+            const sorted = scoreStudies(currentCandidates, exam.createdAt);
+            activeStudy = sorted[0];
             setSelectedStudyId(activeStudy.ID);
           }
-        }
 
-        const isBackupStudy = activeStudy.serverSource === 'backup';
-        const currentUrl = isBackupStudy ? (backupUrl || 'http://localhost:8042') : baseUrl;
-        const currentAuth = isBackupStudy ? backupAuth : authParams;
+          if (!activeStudy) return;
 
-        const studyId = activeStudy.ID;
-        const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-        const proxyPath = getProxyEndpoint(settings, activeStudy.serverSource === 'backup');
-        const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
-        
-        if (!instancesRes.ok) {
-          throw new Error(`Erro ao obter imagens do estudo do Orthanc.`);
-        }
-        
-        const instances = await instancesRes.json();
-        const sorted = (instances || []).sort((a: any, b: any) => {
-          const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
-          const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
-          return numA - numB;
-        });
+          const isBackupStudy = activeStudy.serverSource === 'backup';
+          const currentUrl = isBackupStudy ? (backupUrl || 'http://localhost:8042') : baseUrl;
+          const currentAuth = isBackupStudy ? backupAuth : authParams;
+          const studyId = activeStudy.ID;
+          const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+          const proxyPath = getProxyEndpoint(settings, isBackupStudy);
+          
+          try {
+            const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
+            if (!instancesRes.ok) throw new Error();
+            const instances = await instancesRes.json();
+            
+            const sorted = (instances || []).sort((a: any, b: any) => {
+              const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
+              const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
+              return numA - numB;
+            });
 
-        if (active) {
-          // Tag instances with the serverSource
-          const taggedInstances = sorted.map((inst: any) => ({
-            ...inst,
-            serverSource: activeStudy.serverSource
-          }));
-          // Compara IDs antes de atualizar — evita re-renders e reset de índice
-          // quando o polling retorna as mesmas instâncias (conteúdo idêntico).
-          setDicomInstances(prev => {
-            if (
-              prev.length === taggedInstances.length &&
-              prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)
-            ) {
-              return prev; // mesmo conteúdo: não gera novo array, não dispara effects
-            }
-            return taggedInstances;
-          });
-          setHasDicomImages(taggedInstances.length > 0);
-          setDicomError(null);
-        }
+            const taggedInstances = sorted.map((inst: any) => ({
+              ...inst,
+              serverSource: activeStudy.serverSource
+            }));
+
+            setDicomInstances(prev => {
+              if (prev.length === taggedInstances.length && prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)) {
+                return prev;
+              }
+              return taggedInstances;
+            });
+            setHasDicomImages(taggedInstances.length > 0);
+            setDicomError(null);
+          } catch (e) {
+            console.warn('[PACS Instances] Falha ao obter instâncias', e);
+          }
+        };
+
+        primaryPromise.then(updateUI).catch(() => {});
+        backupPromise.then(updateUI).catch(() => {});
+
+        await Promise.allSettled([primaryPromise, backupPromise]);
       } catch (e: any) {
         console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
         if (active && isManual) {

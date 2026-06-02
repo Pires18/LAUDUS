@@ -260,23 +260,37 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink-950/80 backdrop-blur-md animate-in fade-in duration-300">
       <motion.div 
-        initial={{ scale: 0.95, opacity: 0, y: 15 }}
+        initial={{ scale: 0.96, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh] border border-ink-100 relative"
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="bg-white rounded-[2rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh] border border-white/40 relative ring-1 ring-black/5"
       >
-        {/* Abstract Background Decoration */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-brand-50 rounded-full blur-3xl -mr-24 -mt-24 opacity-40 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-50 rounded-full blur-3xl -ml-24 -mb-24 opacity-30 pointer-events-none" />
-
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-ink-100 flex items-center justify-between bg-white/50 backdrop-blur-sm z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-md shadow-brand-100">
-              <Sparkles size={16} className="animate-pulse" />
+        {/* Abstract Animated Background Decoration */}
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute top-0 right-0 w-64 h-64 bg-brand-400/20 rounded-full blur-[60px] -mr-32 -mt-32 pointer-events-none" 
+        />
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+          className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-400/20 rounded-full blur-[60px] -ml-32 -mb-32 pointer-events-none" 
+        />
+        
+        {/* Premium Header */}
+        <div className="px-6 py-5 border-b border-ink-100 flex items-center justify-between bg-white/70 backdrop-blur-md z-10 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-50/30 to-transparent pointer-events-none" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-brand-500/30">
+              <div className="absolute inset-0 rounded-2xl bg-white/20 blur-sm mix-blend-overlay"></div>
+              <Sparkles size={18} className="animate-pulse relative z-10" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-ink-900 leading-tight">Novo Laudo LAUD.IA</h2>
-              <p className="text-[8px] text-ink-400 font-black uppercase tracking-wider mt-0.5">Fluxo de Alta Performance</p>
+              <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ink-900 to-ink-700 leading-tight">Novo Laudo LAUD.IA</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
+                <p className="text-[9px] text-brand-600 font-black uppercase tracking-[0.2em]">Fluxo de Alta Performance</p>
+              </div>
             </div>
           </div>
           <button 
@@ -284,40 +298,67 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
               setCreateExamDefaultPatient(null);
               onClose();
             }} 
-            className="p-2 hover:bg-ink-100 rounded-xl text-ink-400 transition-all active:scale-95"
+            className="p-2 hover:bg-ink-100/80 rounded-xl text-ink-400 hover:text-ink-700 transition-all active:scale-95 relative z-10"
           >
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
         {/* Progress Bar with Steps */}
-        <div className="bg-ink-50/50 px-6 py-2 flex items-center justify-between border-b border-ink-100 z-10 shrink-0">
-           <div className="flex items-center gap-2">
+        <div className="bg-ink-50/80 backdrop-blur-sm px-6 py-3 flex items-center justify-between border-b border-ink-150 z-10 shrink-0 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.02)]">
+           <div className="flex items-center gap-2.5">
              {[
                { step: 1, label: 'Identificação' },
                { step: 2, label: 'Máscara' },
                { step: 3, label: 'Anamnese' }
-             ].map((s, idx) => (
-               <div key={s.step} className="flex items-center gap-2">
-                  <div className={classNames(
-                    "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black transition-all",
-                    step >= s.step ? "bg-brand-600 text-white shadow-sm" : "bg-ink-200 text-ink-500"
-                  )}>
-                    {s.step}
-                  </div>
-                  <span className={classNames(
-                    "text-[9px] font-black uppercase tracking-wider",
-                    step >= s.step ? "text-ink-900" : "text-ink-300"
-                  )}>{s.label}</span>
-                  {idx < 2 && <div className="w-4 h-px bg-ink-200 ml-1 shrink-0" />}
-               </div>
-             ))}
+             ].map((s, idx) => {
+               const isActive = step === s.step;
+               const isPast = step > s.step;
+               return (
+                 <div key={s.step} className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 relative">
+                      <motion.div 
+                        initial={false}
+                        animate={{ 
+                          backgroundColor: isActive || isPast ? 'rgb(79, 70, 229)' : 'rgb(241, 245, 249)',
+                          color: isActive || isPast ? 'white' : 'rgb(148, 163, 184)',
+                          scale: isActive ? 1.1 : 1
+                        }}
+                        className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black shadow-sm z-10"
+                      >
+                        {s.step}
+                      </motion.div>
+                      <span className={classNames(
+                        "text-[9px] font-black uppercase tracking-wider transition-colors duration-300",
+                        isActive ? "text-brand-700" : isPast ? "text-ink-900" : "text-ink-400"
+                      )}>{s.label}</span>
+                    </div>
+                    {idx < 2 && (
+                      <div className="w-6 h-1 rounded-full bg-ink-100 overflow-hidden shrink-0">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: isPast ? '100%' : '0%' }}
+                          transition={{ duration: 0.3 }}
+                          className="h-full bg-brand-500"
+                        />
+                      </div>
+                    )}
+                 </div>
+               );
+             })}
            </div>
-           {selectedPatient && (
-             <div className="hidden xs:flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-brand-50 border border-brand-100 text-[8px] font-black text-brand-700 uppercase tracking-wider truncate max-w-[150px]">
-               {selectedPatient.name}
-             </div>
-           )}
+           <AnimatePresence>
+             {selectedPatient && (
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.9 }}
+                 animate={{ opacity: 1, scale: 1 }}
+                 exit={{ opacity: 0, scale: 0.9 }}
+                 className="hidden xs:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-brand-50 to-indigo-50 border border-brand-200/50 text-[9px] font-black text-brand-700 uppercase tracking-widest truncate max-w-[160px] shadow-sm"
+               >
+                 {selectedPatient.name}
+               </motion.div>
+             )}
+           </AnimatePresence>
         </div>
 
         {/* Body */}
@@ -334,16 +375,18 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                 {selectedPatient ? (
                   /* Patient Selected: Show Card & Clinical Indication Form */
                   <div className="space-y-4 animate-in fade-in duration-200">
-                    <div className="flex items-center gap-3 bg-brand-50/50 p-4 rounded-2xl border border-brand-100/60 shadow-sm relative overflow-hidden">
-                       <div className="absolute top-0 right-0 w-24 h-24 bg-brand-100/30 rounded-full blur-xl pointer-events-none" />
-                       <div className="w-10 h-10 rounded-xl bg-brand-600 text-white flex items-center justify-center font-black text-lg shadow-md shrink-0">
+                    <div className="flex items-center gap-4 bg-gradient-to-br from-brand-50 to-white p-4 sm:p-5 rounded-2xl border border-brand-100 shadow-[0_8px_16px_-6px_rgba(79,70,229,0.1)] relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 w-32 h-32 bg-brand-400/10 rounded-full blur-2xl pointer-events-none group-hover:bg-brand-400/20 transition-all duration-500" />
+                       <div className="w-12 h-12 rounded-[1rem] bg-gradient-to-br from-brand-600 to-indigo-700 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-brand-500/30 shrink-0 relative z-10">
                           {selectedPatient.name.charAt(0)}
                        </div>
-                       <div className="flex-1 min-w-0">
-                          <p className="text-[8px] font-black text-brand-600 uppercase tracking-widest leading-none mb-1">Paciente Confirmado</p>
-                          <h4 className="text-sm font-black text-ink-900 truncate leading-tight">{selectedPatient.name}</h4>
-                          <p className="text-[9px] text-ink-400 font-bold uppercase tracking-wider mt-0.5">
-                            ID: {selectedPatient.id} {selectedPatient.birthDate && `• ${selectedPatient.birthDate}`}
+                       <div className="flex-1 min-w-0 relative z-10">
+                          <p className="text-[9px] font-black text-brand-600 uppercase tracking-widest leading-none mb-1.5 flex items-center gap-1">
+                            <Sparkles size={10} /> Paciente Confirmado
+                          </p>
+                          <h4 className="text-base font-black text-ink-900 truncate leading-tight">{selectedPatient.name}</h4>
+                          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-wider mt-1">
+                            ID: {selectedPatient.id} {selectedPatient.birthDate && <span className="text-brand-500 font-black px-1">• {selectedPatient.birthDate}</span>}
                           </p>
                        </div>
                        <button 
@@ -351,10 +394,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                            setSelectedPatient(null);
                            setCreateExamDefaultPatient(null);
                          }}
-                         className="p-2 bg-white text-ink-400 hover:text-red-500 rounded-xl transition-all border border-ink-150 hover:border-red-100 hover:bg-red-50/30 shadow-sm shrink-0"
+                         className="p-3 bg-white text-ink-400 hover:text-red-500 rounded-xl transition-all border border-ink-150 hover:border-red-200 hover:bg-red-50 shadow-sm shrink-0 relative z-10 hover:rotate-180 duration-500"
                          title="Trocar Paciente"
                        >
-                         <RotateCcw size={14} />
+                         <RotateCcw size={16} />
                        </button>
                     </div>
 
@@ -396,32 +439,32 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                     </div>
                     
                     {showQuickPatient ? (
-                      <div className="space-y-4 p-5 rounded-2xl bg-brand-50/40 border border-brand-100/60 border-dashed animate-in zoom-in-95 duration-200">
+                      <div className="space-y-4 p-5 rounded-[1.5rem] bg-gradient-to-br from-brand-50/50 to-white border border-brand-100 shadow-sm animate-in zoom-in-95 duration-200">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="sm:col-span-2">
-                            <label className="text-[8px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Nome do Paciente *</label>
+                            <label className="text-[9px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Nome do Paciente *</label>
                             <input
                               type="text"
-                              placeholder="Maria Oliveira Santos"
-                              className="w-full h-11 px-3.5 bg-white border border-brand-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900"
+                              placeholder="Ex: Maria Oliveira Santos"
+                              className="w-full h-12 px-4 bg-white border border-ink-200 rounded-xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]"
                               value={newPatientName}
                               onChange={(e) => setNewPatientName(e.target.value)}
                               autoFocus
                             />
                           </div>
                           <div>
-                            <label className="text-[8px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Nascimento (Opcional)</label>
+                            <label className="text-[9px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Nascimento (Opcional)</label>
                             <input
                               type="date"
-                              className="w-full h-11 px-3.5 bg-white border border-brand-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900"
+                              className="w-full h-12 px-4 bg-white border border-ink-200 rounded-xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]"
                               value={newPatientBirthDate}
                               onChange={(e) => setNewPatientBirthDate(e.target.value)}
                             />
                           </div>
                           <div>
-                            <label className="text-[8px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Sexo</label>
+                            <label className="text-[9px] font-black text-brand-700 uppercase tracking-widest ml-1 mb-1.5 block">Sexo</label>
                             <select
-                              className="w-full h-11 px-3.5 bg-white border border-brand-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900"
+                              className="w-full h-12 px-4 bg-white border border-ink-200 rounded-xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] appearance-none cursor-pointer"
                               value={newPatientGender}
                               onChange={(e) => setNewPatientGender(e.target.value as 'M' | 'F' | 'O')}
                             >
@@ -434,19 +477,19 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                         <button
                           onClick={handleQuickPatient}
                           disabled={!newPatientName.trim() || loading}
-                          className="w-full h-11 bg-brand-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-500/10 active:scale-95"
+                          className="w-full h-12 bg-gradient-to-r from-brand-600 to-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:shadow-lg hover:shadow-brand-500/25 disabled:opacity-50 transition-all flex items-center justify-center gap-2 active:scale-95 group"
                         >
-                          {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="group-hover:scale-110 transition-transform" />}
                           Registrar e Continuar
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-4">
                         <div className="relative group">
-                          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 group-focus-within:text-brand-500 transition-colors" />
+                          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 group-focus-within:text-brand-500 transition-colors" />
                           <input
                             placeholder="Buscar paciente por nome, ID ou nascimento..."
-                            className="w-full h-12 pl-11 pr-4 bg-ink-50 border-2 border-ink-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white outline-none transition-all font-bold text-xs text-ink-900 shadow-sm"
+                            className="w-full h-14 pl-12 pr-4 bg-ink-50/50 border-2 border-ink-150 rounded-2xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 focus:bg-white outline-none transition-all font-bold text-sm text-ink-900 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             onKeyDown={(e) => {
@@ -572,14 +615,14 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                  {/* Specialty Pills (Horizontal Compact Row) */}
                  <div className="space-y-2 shrink-0">
                    <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Filtrar Especialidade</label>
-                   <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none shrink-0 -mx-1 px-1">
+                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none shrink-0 -mx-1 px-1">
                      <button
                        onClick={() => setSelectedArea('todas')}
                        className={classNames(
-                         "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap border shrink-0",
+                         "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border shrink-0 active:scale-95",
                          selectedArea === 'todas'
-                           ? "bg-brand-600 border-brand-600 text-white shadow-sm"
-                           : "bg-ink-50 border-ink-100 text-ink-500 hover:bg-ink-100"
+                           ? "bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20"
+                           : "bg-ink-50/80 border-ink-200 text-ink-500 hover:bg-ink-100 hover:text-ink-700"
                        )}
                      >
                        Todas
@@ -589,13 +632,16 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                          key={area.id}
                          onClick={() => setSelectedArea(area.id)}
                          className={classNames(
-                           "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap border flex items-center gap-1.5 shrink-0",
+                           "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap border flex items-center gap-2 shrink-0 active:scale-95 group",
                            selectedArea === area.id
-                             ? "bg-brand-600 border-brand-600 text-white shadow-sm"
-                             : "bg-ink-50 border-ink-100 hover:bg-ink-100 text-ink-500"
+                             ? "bg-brand-600 border-brand-600 text-white shadow-md shadow-brand-500/20"
+                             : "bg-ink-50/80 border-ink-200 hover:bg-ink-100 text-ink-500 hover:text-ink-700"
                          )}
                        >
-                         <AreaIcon area={area.id} size={10} className={classNames(selectedArea === area.id ? "text-white" : "text-ink-400")} />
+                         <AreaIcon area={area.id} size={12} className={classNames(
+                           "transition-transform group-hover:scale-110",
+                           selectedArea === area.id ? "text-white" : "text-ink-400"
+                         )} />
                          {area.label}
                        </button>
                      ))}
@@ -605,17 +651,17 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                  {/* Template Search & List */}
                  <div className="space-y-3">
                     <div className="relative group">
-                      <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-300 group-focus-within:text-brand-500 transition-colors" />
+                      <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 group-focus-within:text-brand-500 transition-colors" />
                       <input
                         placeholder="Pesquisar por nome da máscara técnica..."
-                        className="w-full h-11 pl-11 pr-4 bg-white border-2 border-ink-100 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-ink-900 text-xs shadow-sm"
+                        className="w-full h-14 pl-12 pr-4 bg-ink-50/50 border-2 border-ink-150 rounded-2xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-ink-900 text-sm shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)] bg-white"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         autoFocus
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 max-h-[260px] overflow-y-auto pr-1.5 custom-scrollbar py-0.5">
+                    <div className="grid grid-cols-1 gap-2.5 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar py-1">
                       {filteredTemplates.map(t => (
                         <button
                           key={t.id}
@@ -626,25 +672,26 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                             setSearch('');
                           }}
                           disabled={loading}
-                          className="w-full flex items-center justify-between p-3 rounded-xl bg-white border border-ink-100 hover:border-brand-500 hover:bg-brand-50/50 transition-all group shadow-sm"
+                          className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white border border-ink-200 hover:border-brand-500 hover:bg-brand-50/30 transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5"
                         >
-                          <div className="text-left flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-ink-50 text-ink-400 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all shrink-0">
-                              <AreaIcon area={t.area} size={14} />
+                          <div className="text-left flex items-center gap-4 min-w-0">
+                            <div className="w-10 h-10 rounded-[0.8rem] bg-ink-50 text-ink-400 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all duration-300 shrink-0 group-hover:scale-110">
+                              <AreaIcon area={t.area} size={16} />
                             </div>
                             <div className="min-w-0">
-                              <p className="font-black text-ink-900 text-xs truncate group-hover:text-brand-700 transition-colors">{t.name}</p>
-                              <p className="text-[8px] text-ink-400 font-black uppercase tracking-wider mt-0.5 leading-none">{t.area}</p>
+                              <p className="font-black text-ink-900 text-sm truncate group-hover:text-brand-700 transition-colors">{t.name}</p>
+                              <p className="text-[9px] text-ink-400 font-black uppercase tracking-wider mt-1 leading-none">{t.area}</p>
                             </div>
                           </div>
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-200 group-hover:text-brand-600 transition-all shrink-0">
-                             <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                          <div className="w-8 h-8 rounded-xl bg-transparent flex items-center justify-center text-ink-300 group-hover:text-brand-600 group-hover:bg-brand-100/50 transition-all shrink-0">
+                             <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                           </div>
                         </button>
                       ))}
                       {filteredTemplates.length === 0 && (
-                        <div className="text-center py-6 opacity-60">
-                          <p className="text-xs font-bold text-ink-400">Nenhuma máscara encontrada.</p>
+                        <div className="flex flex-col items-center justify-center py-8 opacity-60">
+                          <Search size={32} className="text-ink-300 mb-3" />
+                          <p className="text-sm font-bold text-ink-500">Nenhuma máscara encontrada.</p>
                         </div>
                       )}
                     </div>
@@ -660,35 +707,40 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                 exit={{ opacity: 0, x: -15 }}
                 className="space-y-4 animate-in fade-in duration-200"
               >
-                <div className="space-y-1 bg-brand-50/40 p-4 rounded-2xl border border-brand-100/60 shadow-sm relative overflow-hidden shrink-0">
-                  <p className="text-[8px] font-black text-brand-600 uppercase tracking-widest leading-none mb-1">Procedimento Selecionado</p>
-                  <h4 className="text-xs font-black text-ink-900 truncate leading-tight">{selectedTemplate.name}</h4>
-                  <p className="text-[8px] text-ink-400 font-black uppercase tracking-wider leading-none mt-0.5">{selectedTemplate.area}</p>
+                <div className="space-y-1 bg-gradient-to-br from-brand-50/80 to-white p-5 rounded-[1.5rem] border border-brand-100 shadow-[0_8px_16px_-6px_rgba(79,70,229,0.1)] relative overflow-hidden shrink-0">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-400/10 rounded-full blur-2xl pointer-events-none" />
+                  <p className="text-[9px] font-black text-brand-600 uppercase tracking-widest leading-none mb-2 flex items-center gap-1.5 relative z-10">
+                    <Sparkles size={12} /> Procedimento Selecionado
+                  </p>
+                  <h4 className="text-sm font-black text-ink-900 truncate leading-tight relative z-10">{selectedTemplate.name}</h4>
+                  <p className="text-[9px] text-ink-400 font-black uppercase tracking-wider mt-1 relative z-10">{selectedTemplate.area}</p>
                 </div>
 
-                 <div className="flex flex-col space-y-2">
+                 <div className="flex flex-col space-y-2.5">
                    {/* Anamnese / Indicação Clínica */}
                    <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Anamnese / Indicação Clínica</label>
                    <textarea
                      value={anamnesis}
                      onChange={(e) => setAnamnesis(e.target.value)}
                      placeholder="Ex: Dor abdominal a esclarecer. Suspeita de litíase vesicular."
-                     className="w-full h-40 p-4 bg-white border border-ink-150 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-semibold text-xs text-ink-900 resize-none custom-scrollbar"
+                     className="w-full h-36 p-4 bg-white border-2 border-ink-200 rounded-[1rem] focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-semibold text-sm text-ink-900 resize-none custom-scrollbar shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]"
                    />
                  </div>
 
                  {settings.dicomDevices && settings.dicomDevices.length > 0 && (
-                   <div className="flex flex-col space-y-2 pt-2">
+                   <div className="flex flex-col space-y-2.5 pt-1">
                      <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Enviar Worklist Para</label>
-                     <select
-                       value={selectedDeviceId}
-                       onChange={(e) => setSelectedDeviceId(e.target.value)}
-                       className="w-full h-11 px-4 bg-white border border-ink-150 rounded-xl focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 outline-none transition-all font-bold text-xs text-ink-900 shadow-sm"
-                     >
-                       {settings.dicomDevices.map(device => (
-                         <option key={device.id} value={device.id}>{device.name} ({device.aeTitle})</option>
-                       ))}
-                     </select>
+                     <div className="relative">
+                       <select
+                         value={selectedDeviceId}
+                         onChange={(e) => setSelectedDeviceId(e.target.value)}
+                         className="w-full h-14 px-4 bg-white border-2 border-ink-200 rounded-2xl focus:ring-4 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-sm text-ink-900 shadow-sm appearance-none cursor-pointer"
+                       >
+                         {settings.dicomDevices.map(device => (
+                           <option key={device.id} value={device.id}>{device.name} ({device.aeTitle})</option>
+                         ))}
+                       </select>
+                     </div>
                    </div>
                  )}
               </motion.div>
@@ -696,8 +748,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
           </AnimatePresence>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-ink-100 bg-white/50 backdrop-blur-sm flex items-center justify-between z-10 shrink-0">
+        <div className="px-6 py-5 border-t border-ink-100 bg-white/70 backdrop-blur-md flex items-center justify-between z-10 shrink-0 relative">
            {step > 1 ? (
              <button 
                onClick={() => {
@@ -708,20 +759,20 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                    setSearch('');
                  }
                }}
-               className="flex items-center gap-1 text-[10px] font-black text-ink-400 hover:text-ink-900 uppercase tracking-widest transition-all active:scale-95"
+               className="flex items-center gap-1.5 text-[10px] font-black text-ink-400 hover:text-ink-900 uppercase tracking-widest transition-all active:scale-95 group px-2 py-1 rounded-lg hover:bg-ink-100"
              >
-               <ArrowRight size={14} className="rotate-180" />
+               <ArrowRight size={14} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
                Voltar
              </button>
            ) : (
-             <div className="w-10" />
+             <div className="w-16" />
            )}
            
-           <div className="flex gap-2">
+           <div className="flex gap-2.5">
              {[1, 2, 3].map(i => (
                <div key={i} className={classNames(
-                 "w-2 h-2 rounded-full transition-all duration-300",
-                 step === i ? "bg-brand-600 w-6 shadow-md shadow-brand-100" : "bg-ink-200"
+                 "h-1.5 rounded-full transition-all duration-500",
+                 step === i ? "bg-brand-600 w-8 shadow-[0_0_8px_rgba(79,70,229,0.5)]" : step > i ? "bg-brand-400 w-4 opacity-50" : "bg-ink-200 w-2"
                )} />
              ))}
            </div>
@@ -730,22 +781,22 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
              <button 
                onClick={() => { setStep(2); setSearch(''); }}
                disabled={!selectedPatient || loading}
-               className="flex items-center gap-1.5 px-4 h-9 rounded-xl bg-brand-600 text-white font-black text-[9px] uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all shadow-md shadow-brand-100 active:scale-95"
+               className="flex items-center gap-2 px-5 h-11 rounded-xl bg-ink-900 text-white font-black text-[10px] uppercase tracking-widest hover:bg-black disabled:opacity-50 transition-all shadow-md active:scale-95 group"
              >
                Prosseguir
-               <ArrowRight size={12} />
+               <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
              </button>
            ) : step === 3 ? (
              <button 
                onClick={() => handleCreateDirect(selectedTemplate!)}
                disabled={loading}
-               className="flex items-center gap-1.5 px-4 h-9 rounded-xl bg-brand-600 text-white font-black text-[9px] uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all shadow-md shadow-brand-100 active:scale-95"
+               className="flex items-center gap-2 px-6 h-12 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 text-white font-black text-[10px] uppercase tracking-widest hover:shadow-lg hover:shadow-brand-500/25 disabled:opacity-50 transition-all active:scale-95 group"
              >
-               {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+               {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="group-hover:scale-110 transition-transform" />}
                Iniciar Laudo
              </button>
            ) : (
-             <div className="w-16" />
+             <div className="w-24" />
            )}
         </div>
       </motion.div>

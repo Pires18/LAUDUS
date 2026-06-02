@@ -79,7 +79,7 @@ function localOrthancWorklistPlugin() {
               fetchOptions.headers['Content-Type'] = 'application/json';
             }
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 seconds timeout for PACS connections
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout for PACS connections
             fetchOptions.signal = controller.signal;
 
             const response = await fetch(resolvedTargetUrl, fetchOptions);
