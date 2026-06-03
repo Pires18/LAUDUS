@@ -411,9 +411,11 @@ export function ExamEditor({ examId }: Props) {
           }
 
           if (currentCandidates.length === 0) {
-            setDicomInstances([]);
-            setHasDicomImages(false);
-            setDicomError(`Estudo não localizado nos servidores ativos.`);
+            if (isManual) {
+              setDicomInstances([]);
+              setHasDicomImages(false);
+              setDicomError(`Estudo não localizado nos servidores ativos.`);
+            }
             return;
           }
 
@@ -485,8 +487,13 @@ export function ExamEditor({ examId }: Props) {
     // Initial check (manual to show initial loaders/errors if any)
     checkImages(true);
 
+    const intervalId = setInterval(() => {
+      checkImages(false);
+    }, 10000);
+
     return () => {
       active = false;
+      clearInterval(intervalId);
     };
   }, [
     exam?.id,

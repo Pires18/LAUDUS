@@ -139,7 +139,7 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
     try {
       return await fn();
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
+      if ((err instanceof Error && err.name === 'AbortError') || String(err).toLowerCase().includes('abort')) {
         throw err;
       }
       lastError = err;

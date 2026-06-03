@@ -80,8 +80,8 @@ function localOrthancWorklistPlugin() {
             }
             const controller = new AbortController();
             
-            // Define timeout: fast for metadata/search (2s), slow for heavy images (30s)
-            let timeoutDuration = 2000; // 2 seconds default
+            // Define timeout: generous for metadata/search (10s), very slow for heavy images (30s)
+            let timeoutDuration = 10000; // 10 seconds default
             if (req.method === 'GET' && (
                 resolvedTargetUrl.includes('/instances') || 
                 resolvedTargetUrl.includes('preview') || 

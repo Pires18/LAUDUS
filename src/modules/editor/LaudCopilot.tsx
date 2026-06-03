@@ -668,7 +668,7 @@ export function LaudCopilot({
         }
       }
     } catch (error: any) {
-      if (error && error.name === 'AbortError') {
+      if (error && (error.name === 'AbortError' || String(error).toLowerCase().includes('abort'))) {
         console.log('[LaudCopilot] Requisição cancelada pelo usuário.');
         setIsGenerating(false);
         return;

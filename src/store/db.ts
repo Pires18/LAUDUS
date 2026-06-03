@@ -833,7 +833,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
     (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
 
   // ── Primário ──
-  const primaryAgentUrl = settings.dicomLocalAgentUrl
+  const primaryAgentUrl = (isVercel && settings.dicomLocalAgentUrl)
     ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
     : '/api/worklist';
 
@@ -851,8 +851,8 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
 
   // ── Backup (se configurado) ──
   let backupPromise: Promise<void | Response> = Promise.resolve();
-  if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
-    const backupAgentUrl = settings.dicomBackupLocalAgentUrl
+  if (settings.dicomBackupSyncEnabled) {
+    const backupAgentUrl = (isVercel && settings.dicomBackupLocalAgentUrl)
       ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
       : '/api/worklist';
 
