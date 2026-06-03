@@ -794,56 +794,36 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
               {chatHistory.length === 0 ? (
                 <motion.div
                   key="empty"
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="h-full flex flex-col items-center justify-center space-y-8 py-12"
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  className="h-full flex flex-col items-center justify-center py-10"
                 >
-                  <div className="text-center space-y-4">
-                    <div className="w-20 h-20 rounded-[2.5rem] bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center mx-auto shadow-2xl shadow-brand-500/25 relative border border-white/20">
-                      <Bot size={40} />
-                      <motion.div
-                        animate={{ scale: [1, 1.4, 1], opacity: [0.2, 0, 0.2] }}
-                        transition={{ duration: 3, repeat: Infinity }}
-                        className="absolute inset-0 bg-brand-400 rounded-[2.5rem]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-sm text-slate-800 uppercase tracking-widest">Inteligência Laud.IA</h4>
-                      <p className="text-[10px] text-slate-400 max-w-[240px] mx-auto leading-relaxed font-bold uppercase tracking-tight">
-                        Assistente cognitivo para refino diagnóstico e automação de laudos.
-                      </p>
-                    </div>
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100/80 text-brand-600 flex items-center justify-center mx-auto mb-6 shadow-inner border border-white">
+                    <Sparkles size={24} />
                   </div>
+                  <h4 className="font-semibold text-lg text-slate-800 tracking-tight mb-2">Como posso ajudar?</h4>
+                  <p className="text-xs text-slate-500 max-w-[260px] text-center mb-8">
+                    Descreva alterações, solicite refinos ou clique nas sugestões abaixo.
+                  </p>
 
-                  <div className="w-full max-w-[320px] space-y-3 px-4">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block text-center mb-1">
-                      Sugestões de Comandos Clínicos
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { label: 'Cisto Renal', text: 'Adicionar cisto renal simples de 15 mm no rim direito.' },
-                        { label: 'Histerectomia', text: 'Alterar o status do útero para ausente por cirurgia prévia.' },
-                        { label: 'Colelitíase', text: 'Descrever vesícula biliar contendo cálculo móvel de 12 mm, sem inflamação.' },
-                        { label: 'Refino de Estilo', text: 'Refinar o tom deste laudo inteiro para um padrão acadêmico sênior.' },
-                      ].map((sug, i) => (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            onChangePrompt(sug.text);
-                            handleSend(sug.text);
-                          }}
-                          className="p-3 bg-white hover:bg-brand-50 border border-slate-100 hover:border-brand-200 rounded-xl text-left transition-all active:scale-95 group shadow-sm flex flex-col justify-between min-h-[72px]"
-                        >
-                          <span className="text-[9px] font-black text-slate-800 uppercase tracking-tight group-hover:text-brand-700 transition-colors">
-                            {sug.label}
-                          </span>
-                          <span className="text-[8px] text-slate-400 font-bold leading-normal mt-1 line-clamp-2">
-                            {sug.text}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap justify-center gap-2 max-w-[320px]">
+                    {[
+                      { label: 'Adicionar Cisto', text: 'Adicionar cisto simples de 15 mm' },
+                      { label: 'Refinar Texto', text: 'Refinar o tom deste laudo' },
+                      { label: 'Normalidade', text: 'Marcar todas as estruturas como normais' }
+                    ].map((sug, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          onChangePrompt(sug.text);
+                          handleSend(sug.text);
+                        }}
+                        className="px-3 py-2 bg-white border border-slate-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 rounded-full text-[11px] font-medium text-slate-600 transition-colors shadow-sm active:scale-95"
+                      >
+                        {sug.label}
+                      </button>
+                    ))}
                   </div>
                 </motion.div>
               ) : (
@@ -991,33 +971,17 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                         {/* Proposta de laudo interativa e elegante (Apenas para respostas do Assistente com proposta gerada) */}
                         {!isUser && proposal && (
                           <motion.div
-                            initial={{ opacity: 0, scale: 0.96 }}
+                            initial={{ opacity: 0, scale: 0.98 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="bg-gradient-to-br from-brand-50/50 to-brand-100/20 border border-brand-100/50 rounded-2xl p-4 flex flex-col gap-3 shadow-sm relative overflow-hidden"
+                            className="bg-brand-50 border border-brand-200/60 rounded-2xl p-3 flex flex-col gap-2 shadow-sm relative mt-1"
                           >
-                            <div className="absolute inset-0 bg-grid-pattern opacity-5" />
-                            <div className="flex items-center justify-between relative z-10">
-                              <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <Sparkles size={11} className="text-brand-500 animate-pulse" />
-                                Alteração Proposta da Laud.IA
-                              </span>
-                              <span className={classNames(
-                                "text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider border transition-all duration-300",
-                                appliedIndices.includes(idx)
-                                  ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-800"
-                                  : "bg-brand-500/20 border-brand-500/30 text-brand-800"
-                              )}>
-                                {appliedIndices.includes(idx) ? "Aplicado Automaticamente" : "Revisão Disponível"}
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-brand-800 flex items-center gap-1.5">
+                                <Sparkles size={12} className="text-brand-500" />
+                                {appliedIndices.includes(idx) ? 'Laudo Modificado' : 'Sugestão Pronta'}
                               </span>
                             </div>
-
-                            <p className="text-[10px] text-slate-500 font-semibold leading-relaxed relative z-10">
-                              {appliedIndices.includes(idx)
-                                ? "Estas alterações já foram integradas ao laudo. Você pode reaplicar se tiver feito edições adicionais no chat."
-                                : "A IA estruturou e refinou as novas informações diagnósticas. Clique no botão abaixo para consolidar essas alterações no editor de laudo principal."
-                              }
-                            </p>
-
+                            
                             <button
                               disabled={isGenerating}
                               onClick={async () => {
@@ -1028,34 +992,31 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                                 if (!appliedIndices.includes(idx)) {
                                   setAppliedIndices(prev => [...prev, idx]);
                                 }
-                                showToast('Alterações do Copiloto consolidadas no laudo!', 'success');
+                                showToast('Alterações aplicadas com sucesso.', 'success');
                               }}
                               className={classNames(
-                                "h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2 group relative z-10",
+                                "h-8 px-3 rounded-xl text-[11px] font-semibold transition-all flex items-center justify-center gap-2 group",
                                 isGenerating
-                                  ? "bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed shadow-none active:scale-100"
-                                  : "active:scale-95",
-                                !isGenerating && appliedIndices.includes(idx)
-                                  ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/10"
-                                  : !isGenerating
-                                    ? "bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white shadow-brand-500/25"
-                                    : ""
+                                  ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                                  : appliedIndices.includes(idx)
+                                    ? "bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                    : "bg-brand-600 hover:bg-brand-700 text-white shadow-sm hover:shadow active:scale-95"
                               )}
                             >
                               {isGenerating ? (
                                 <>
-                                  <Loader2 size={13} className="animate-spin text-slate-400" />
-                                  Processando Alterações...
+                                  <Loader2 size={14} className="animate-spin" />
+                                  Processando...
                                 </>
                               ) : appliedIndices.includes(idx) ? (
                                 <>
-                                  <CheckCircle2 size={13} className="text-white" />
-                                  Reaplicar Alterações
+                                  <CheckCircle2 size={14} />
+                                  Aplicado (Clique para reaplicar)
                                 </>
                               ) : (
                                 <>
-                                  <Zap size={13} className="fill-white group-hover:scale-115 transition-transform" />
-                                  Aplicar Alterações ao Laudo
+                                  <Zap size={14} />
+                                  Aplicar ao Laudo
                                 </>
                               )}
                             </button>
@@ -1096,115 +1057,97 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
           </div>
 
           {/* Input Section */}
-          <div className="p-6 bg-white border-t border-slate-100 space-y-4 shadow-[0_-15px_40px_rgba(0,0,0,0.03)] shrink-0 relative">
+          <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] shrink-0 flex flex-col gap-3">
             <AnimatePresence>
               {isListening && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="flex flex-col items-center gap-4 py-2"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center gap-2 px-2 text-brand-600"
                 >
-                  <div className="flex items-center gap-1.5 h-12 justify-center">
-                    {[...Array(16)].map((_, i) => (
+                  <div className="flex gap-1">
+                    {[...Array(4)].map((_, i) => (
                       <motion.div
                         key={i}
-                        animate={{
-                          height: [12, Math.random() * 40 + 10, 12],
-                        }}
-                        transition={{
-                          duration: 0.35,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                          delay: i * 0.05
-                        }}
-                        className="w-1.5 bg-brand-500 rounded-full"
+                        animate={{ height: [8, 16, 8] }}
+                        transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
+                        className="w-1 bg-current rounded-full"
                       />
                     ))}
                   </div>
-                  <p className="text-[10px] font-black text-brand-600 uppercase tracking-widest animate-pulse">Escutando Ditado Clínico...</p>
+                  <span className="text-xs font-semibold">Ouvindo...</span>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Quick Action Pills removidos para interface limpa */}
-
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/10 rounded-2xl p-1.5 transition-all">
               <button
-                onClick={toggleListening}
-                className={classNames(
-                  "w-14 h-14 rounded-2xl flex items-center justify-center transition-all shrink-0 border-2 relative overflow-hidden",
-                  isListening
-                    ? "bg-red-500 text-white border-red-400 shadow-xl shadow-red-500/25"
-                    : "bg-slate-50 text-slate-400 border-slate-100 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-100 active:scale-95"
-                )}
+                onClick={onShowCalculators}
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 transition-colors shrink-0"
+                title="Calculadoras Clínicas"
               >
-                {isListening ? (
-                  <>
-                    <span className="absolute inset-0 rounded-2xl bg-red-400/30 animate-ping" />
-                    <MicOff size={24} className="relative z-10" />
-                  </>
-                ) : (
-                  <Mic size={24} />
-                )}
+                <Calculator size={18} />
               </button>
 
-              <div className="flex-1 relative group">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => onChangePrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder="Digite um comando (ex: cisto de 15 mm no rim direito) ou clique no microfone para ditar..."
-                  className="w-full p-4 pr-14 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-[1.8rem] outline-none transition-all text-xs font-bold leading-relaxed resize-none max-h-40 min-h-[56px] shadow-inner text-slate-800"
-                />
+              <textarea
+                value={prompt}
+                onChange={(e) => onChangePrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Ex: cisto de 15 mm no rim direito..."
+                className="flex-1 w-full bg-transparent outline-none text-sm font-medium text-slate-800 placeholder-slate-400 resize-none max-h-32 min-h-[36px] py-2 px-1"
+                rows={prompt.split('\n').length > 1 ? Math.min(prompt.split('\n').length, 4) : 1}
+              />
+              
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={toggleListening}
+                  className={classNames(
+                    "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                    isListening
+                      ? "bg-red-50 text-red-600"
+                      : "text-slate-400 hover:bg-slate-200/50 hover:text-slate-700"
+                  )}
+                >
+                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                </button>
+                
                 <button
                   onClick={() => handleSend()}
                   disabled={!prompt.trim() || isGenerating}
-                  className="absolute right-3 bottom-3 w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center hover:bg-brand-700 disabled:opacity-20 disabled:scale-100 transition-all shadow-lg shadow-brand-600/10 active:scale-95"
+                  className="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center hover:bg-brand-700 disabled:opacity-50 transition-all shadow-sm active:scale-95"
                 >
-                  {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                 </button>
               </div>
             </div>
-
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={onShowCalculators}
-                  className="flex items-center gap-2 text-[10px] font-black text-slate-400 hover:text-brand-600 uppercase tracking-widest transition-colors group"
-                >
-                  <Calculator size={14} className="group-hover:rotate-12 transition-transform" />
-                  Calculadoras
-                </button>
-                <div className="h-3 w-px bg-slate-200" />
-                <button
-                  type="button"
-                  onClick={() => handleToggleAutoRefine(!autoRefineEnabled)}
-                  className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest transition-colors"
-                  style={{ color: autoRefineEnabled ? '#6366f1' : '#94a3b8' }}
-                  title="Refinamento pós-copiloto automático com regras de máscara"
-                >
+            
+            <div className="flex items-center justify-between px-2">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  className="sr-only" 
+                  checked={autoRefineEnabled} 
+                  onChange={(e) => handleToggleAutoRefine(e.target.checked)} 
+                />
+                <div className={classNames(
+                  "w-6 h-3.5 rounded-full p-0.5 transition-colors",
+                  autoRefineEnabled ? "bg-brand-500" : "bg-slate-300"
+                )}>
                   <div className={classNames(
-                    "w-6 h-3.5 rounded-full p-0.5 transition-colors duration-200 relative",
-                    autoRefineEnabled ? "bg-brand-500" : "bg-slate-300"
-                  )}>
-                    <div className={classNames(
-                      "w-2.5 h-2.5 rounded-full bg-white transition-transform duration-200 shadow-sm",
-                      autoRefineEnabled && "translate-x-2.5"
-                    )} />
-                  </div>
-                  <span>Refino Auto</span>
-                </button>
-              </div>
-              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-brand-50 rounded-xl border border-brand-100/50">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
-                <span className="text-[9px] font-black text-brand-700 uppercase tracking-wider">Laud.IA Core v13.0</span>
-              </div>
+                    "w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm",
+                    autoRefineEnabled && "translate-x-2.5"
+                  )} />
+                </div>
+                <span className="text-[10px] text-slate-500 font-medium group-hover:text-slate-800 transition-colors">
+                  Refino Automático
+                </span>
+              </label>
             </div>
           </div>
 
@@ -1214,52 +1157,49 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
       {/* Formulário Clínico Rápido */}
       {activeTab === 'form' && (
         <div className="flex-1 flex flex-col min-h-0 bg-white animate-fade-in">
-          <div className="flex-1 flex flex-col p-5 space-y-4 min-h-0">
+          <div className="flex-1 flex flex-col p-4 space-y-3 min-h-0">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                Campos do Exame (Texto Livre)
+              <span className="text-xs font-semibold text-slate-600">
+                Anotações Livres
               </span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={onShowCalculators}
-                  className="flex items-center gap-1.5 text-[9px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-widest transition-all bg-brand-50 hover:bg-brand-100 px-2.5 py-1.5 rounded-lg border border-brand-200/50 shadow-sm active:scale-95"
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-2.5 py-1.5 rounded-md transition-colors"
                 >
-                  <Calculator size={12} />
+                  <Calculator size={14} />
                   Calculadoras
                 </button>
                 {template?.customForm && (
                   <button
                     onClick={handleResetForm}
-                    className="text-[9px] font-black text-slate-400 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors"
+                    className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-md transition-colors"
                   >
-                    <RotateCcw size={10} />
+                    <RotateCcw size={14} />
                     Restaurar
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Texto Livre — única modalidade de preenchimento */}
-            <div className="flex-1 min-h-0 flex flex-col">
-              <textarea
-                value={formText}
-                onFocus={() => isFormFocusedRef.current = true}
-                onBlur={(e) => handleBlurFormText(e.target.value)}
-                onChange={(e) => handleFormTextChange(e.target.value)}
-                placeholder="Preencha os achados clínicos deste exame aqui..."
-                className="flex-1 w-full p-4 bg-slate-50 border border-slate-100 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 focus:bg-white rounded-2xl outline-none transition-all text-xs font-mono leading-relaxed resize-none shadow-inner text-slate-800"
-                style={{ minHeight: 0 }}
-              />
-            </div>
+            <textarea
+              value={formText}
+              onFocus={() => isFormFocusedRef.current = true}
+              onBlur={(e) => handleBlurFormText(e.target.value)}
+              onChange={(e) => handleFormTextChange(e.target.value)}
+              placeholder="Digite de forma livre ou cole os achados para que a IA os organize e integre ao laudo..."
+              className="flex-1 w-full p-4 bg-slate-50 border border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-all text-sm font-mono text-slate-700 resize-none shadow-inner"
+              style={{ minHeight: 0 }}
+            />
           </div>
 
-          <div className="p-5 bg-slate-50 border-t border-slate-100 shrink-0">
+          <div className="p-4 bg-white border-t border-slate-100 shrink-0">
             <button
               onClick={handleCompileForm}
-              className="w-full py-4 rounded-[1.8rem] bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-slate-900/10 flex items-center justify-center gap-2"
+              className="w-full h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
             >
-              <Sparkles size={16} className="text-brand-400 fill-brand-400/25 animate-pulse" />
-              Compilar com Laud.IA
+              <Sparkles size={16} />
+              Processar e Atualizar Laudo
             </button>
           </div>
         </div>
