@@ -17,7 +17,7 @@ export async function syncGoogleDoc(
     throw new Error('Configurações de clínica ou template do Google Docs ausentes.');
   }
 
-  const docDate = formatDate(Date.now());
+  const docDate = formatDate(exam.createdAt || Date.now());
   const docName = `${docDate} | ${patient.name} | ${exam.examType} | ${clinic.name}`;
 
   const templateId = clinic.googleDocsTemplateId;
