@@ -185,8 +185,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
         if (settings.dicomSyncEnabled !== false && selectedPatient.id !== 'ANONIMO') {
           try {
-            const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-            const url = (isVercel && settings.dicomLocalAgentUrl)
+            const url = settings.dicomLocalAgentUrl
               ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
               : '/api/worklist';
             await fetch(url, {
@@ -215,8 +214,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         // Backup Sync
         if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
           try {
-            const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-            const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
+            const urlBackup = settings.dicomBackupLocalAgentUrl
               ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
               : '/api/worklist';
             await fetch(urlBackup, {

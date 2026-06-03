@@ -485,30 +485,8 @@ export function ExamEditor({ examId }: Props) {
     // Initial check (manual to show initial loaders/errors if any)
     checkImages(true);
 
-    // Setup polling: dynamic interval based on whether the viewer/modal is open
-    let intervalId: ReturnType<typeof setInterval>;
-
-    const startPolling = () => {
-      // Tick base de 5s. Quando o viewer está fechado, só executa a cada 6 ticks (30s).
-      // Quando o viewer/modal estiver aberto, executa todo tick (5s).
-      // Isso evita recriar o intervalo ao abrir/fechar o viewer.
-      let tickCount = 0;
-      intervalId = setInterval(() => {
-        if (!active) return;
-        tickCount++;
-        const isViewerOpen = showIntegratedViewerRef.current || showDicomImagesRef.current;
-        // Viewer aberto: a cada 5s. Background: a cada 30s (6 ticks de 5s).
-        if (isViewerOpen || tickCount % 6 === 0) {
-          checkImages(false);
-        }
-      }, 5000);
-    };
-
-    startPolling();
-
     return () => {
       active = false;
-      clearInterval(intervalId);
     };
   }, [
     exam?.id,

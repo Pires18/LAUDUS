@@ -201,8 +201,7 @@ export function Worklist() {
       const targetDevice = settings.dicomDevices?.[0] || 
                            { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
-      const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-      const url = (isVercel && settings.dicomLocalAgentUrl)
+      const url = settings.dicomLocalAgentUrl
         ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
         : '/api/worklist';
 
@@ -229,8 +228,7 @@ export function Worklist() {
 
       if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
         try {
-          const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-          const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
+          const urlBackup = settings.dicomBackupLocalAgentUrl
             ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
             : '/api/worklist';
           
