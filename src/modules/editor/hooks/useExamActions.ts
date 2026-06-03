@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { updateItem, getRecentFinalizedReports, saveVersionSnapshot } from '../../../store/db';
+import { updateItem, getRecentFinalizedReports, saveVersionSnapshot, deleteWorklistEntry } from '../../../store/db';
 import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types';
 import { generateReportStream, generateMockReport } from '../../ai/gemini';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
@@ -189,10 +189,18 @@ export function useExamActions({
         finalizedAt: status === 'finalizado' ? Date.now() : undefined,
       });
       showToast(`Status atualizado para: ${status}`, 'success');
+
+      // Ao finalizar, remove automaticamente o arquivo .wl da Worklist do Orthanc.
+      // Isso garante que o aparelho de imagem (US) não liste mais o exame como pendente.
+      if (status === 'finalizado') {
+        deleteWorklistEntry(examId, settings).catch((err) => {
+          console.warn('[useExamActions] Falha silenciosa ao remover worklist do PACS:', err);
+        });
+      }
     } catch (err) {
       showToast('Erro ao atualizar status', 'error');
     }
-  }, [examId, showToast]);
+  }, [examId, settings, showToast]);
 
   return {
     isGenerating,

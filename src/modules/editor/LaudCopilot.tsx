@@ -1000,7 +1000,7 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                                   ? "bg-slate-200 text-slate-500 cursor-not-allowed"
                                   : appliedIndices.includes(idx)
                                     ? "bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                    : "bg-brand-600 hover:bg-brand-700 text-white shadow-sm hover:shadow active:scale-95"
+                                    : "bg-slate-900 hover:bg-slate-800 text-white shadow-sm hover:shadow active:scale-95"
                               )}
                             >
                               {isGenerating ? (
@@ -1196,7 +1196,7 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
           <div className="p-4 bg-white border-t border-slate-100 shrink-0">
             <button
               onClick={handleCompileForm}
-              className="w-full h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+              className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
             >
               <Sparkles size={16} />
               Processar e Atualizar Laudo

@@ -79,7 +79,20 @@ function localOrthancWorklistPlugin() {
               fetchOptions.headers['Content-Type'] = 'application/json';
             }
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 seconds timeout for PACS connections
+            
+            // Define timeout: fast for metadata/search (2s), slow for heavy images (30s)
+            let timeoutDuration = 2000; // 2 seconds default
+            if (req.method === 'GET' && (
+                resolvedTargetUrl.includes('/instances') || 
+                resolvedTargetUrl.includes('preview') || 
+                resolvedTargetUrl.includes('rendered') || 
+                resolvedTargetUrl.includes('wado') ||
+                resolvedTargetUrl.includes('file')
+            )) {
+                timeoutDuration = 30000; // 30 seconds for images
+            }
+            
+            const timeoutId = setTimeout(() => controller.abort(), timeoutDuration);
             fetchOptions.signal = controller.signal;
 
             const response = await fetch(resolvedTargetUrl, fetchOptions);

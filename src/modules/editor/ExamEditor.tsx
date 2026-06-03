@@ -654,10 +654,11 @@ export function ExamEditor({ examId }: Props) {
 
 
 
-  const [selectedGridType, setSelectedGridType] = useState<string>('2x3');
+  // Grid types: '1x2' = 1 coluna × 2 linhas (2 imagens), '2x4' = 2 colunas × 4 linhas (8 imagens)
+  const [selectedGridType, setSelectedGridType] = useState<string>('2x4');
   const [isPrintingImages, setIsPrintingImages] = useState(false);
 
-  const handlePrintImages = async (instances: any[], gridType: string = '2x3') => {
+  const handlePrintImages = async (instances: any[], gridType: string = '2x4') => {
     if (instances.length === 0) return;
     setIsPrintingImages(true);
     showToast('Preparando imagens para a impressão...', 'info');

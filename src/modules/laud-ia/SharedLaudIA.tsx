@@ -962,8 +962,9 @@ IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não e
       </div>
 
       {/* Sub-Tab Navigation */}
-      <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200/60 shadow-sm w-fit overflow-x-auto scrollbar-hide">
+      <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200/60 shadow-sm w-full sm:w-fit overflow-x-auto scrollbar-hide">
         {sidebarItems.map((item) => {
+
           const isActive = activeTab === item.id;
           return (
             <button

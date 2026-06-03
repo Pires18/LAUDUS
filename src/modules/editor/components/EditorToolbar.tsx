@@ -42,29 +42,29 @@ export function EditorToolbar({
   const refineLabel = isTemplateMask ? 'Gerar com Laud.IA' : 'Refinar com Laud.IA';
 
   return (
-    <div className="px-4 py-2.5 border-b border-ink-100 bg-white flex items-center gap-3 shrink-0 flex-wrap">
+    <div className="px-4 py-2.5 border-b border-slate-200 bg-white flex items-center gap-3 shrink-0 flex-wrap">
       <button
         onClick={onRefine}
         disabled={isGenerating || status === 'finalizado' || hasGoogleDoc}
         title={hasGoogleDoc ? 'Refinamento desativado para laudos gerados no Google Docs' : ''}
         className={classNames(
-          "h-10 px-6 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-lg transition-all flex items-center justify-center relative overflow-hidden border border-brand-500/20",
+          "h-10 px-6 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-sm transition-all flex items-center justify-center relative overflow-hidden border",
           isGenerating
             ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-            : "bg-gradient-to-r from-brand-600 via-brand-700 to-indigo-700 text-white hover:shadow-xl hover:shadow-brand-500/25 active:scale-95"
+            : "bg-slate-900 text-white border-slate-800 hover:bg-slate-800 hover:shadow-md active:scale-95"
         )}
       >
         {isGenerating ? (
-          <Loader2 size={16} className="animate-spin text-brand-400" />
+          <Loader2 size={16} className="animate-spin text-slate-400" />
         ) : (
-          <Sparkles size={16} className="text-amber-300 fill-amber-300 animate-pulse" />
+          <Sparkles size={16} className="text-brand-300 fill-brand-300 animate-pulse" />
         )}
         {refineLabel}
       </button>
 
       <button
         onClick={onShowPrompt}
-        className="btn-secondary text-xs py-1.5 px-2.5"
+        className="btn-secondary text-xs py-1.5 px-2.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 rounded-lg border shadow-sm transition-all"
         title="Ver prompt enviado à IA"
       >
         <Eye size={14} /> Prompt
@@ -72,7 +72,7 @@ export function EditorToolbar({
 
       <button
         onClick={onCopy}
-        className="btn-secondary text-xs py-1.5 px-2.5 border-ink-200 text-ink-700 hover:bg-ink-50 hover:border-ink-300"
+        className="btn-secondary text-xs py-1.5 px-2.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 rounded-lg border shadow-sm transition-all"
         title="Copiar texto do laudo (Ctrl+Shift+C)"
       >
         <Copy size={14} /> Copiar Laudo
@@ -82,10 +82,10 @@ export function EditorToolbar({
         onClick={onReset}
         disabled={status === 'finalizado'}
         className={classNames(
-          "btn-secondary text-xs py-1.5 px-2.5 transition-all",
+          "btn-secondary text-xs py-1.5 px-2.5 rounded-lg border shadow-sm transition-all",
           status === 'finalizado' 
-            ? "opacity-50 grayscale cursor-not-allowed border-ink-100 text-ink-400" 
-            : "text-red-600 hover:bg-red-50 hover:border-red-200"
+            ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400" 
+            : "bg-white border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300"
         )}
         title="Reiniciar laudo para o padrão da máscara (Ctrl+Shift+R)"
       >
@@ -96,7 +96,7 @@ export function EditorToolbar({
 
       <button
         onClick={onShowHistory}
-        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-indigo-500/20 bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-500 hover:text-white hover:border-indigo-500 hover:shadow-lg hover:shadow-indigo-500/25 transition-all active:scale-95"
+        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100 transition-all shadow-sm active:scale-95"
         title="Ver histórico de laudos anteriores do paciente"
       >
         <History size={14} /> Histórico Clínico
@@ -104,7 +104,7 @@ export function EditorToolbar({
 
       <button
         onClick={onShowVersions}
-        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-teal-500/20 bg-teal-50 text-teal-700 font-bold hover:bg-teal-500 hover:text-white hover:border-teal-500 hover:shadow-lg hover:shadow-teal-500/25 transition-all active:scale-95"
+        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 font-bold hover:bg-teal-100 transition-all shadow-sm active:scale-95"
         title="Ver histórico de versões/alterações do laudo"
       >
         <Clock size={14} /> Versões do Laudo
@@ -130,7 +130,7 @@ export function EditorToolbar({
         </button>
       )}
 
-      <div className="text-[11px] text-ink-500 flex items-center gap-1.5 ml-auto">
+      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 ml-auto font-medium">
         {saveState === 'saving' && (
           <>
             <Loader2 size={11} className="animate-spin-slow text-brand-500" />
@@ -145,13 +145,13 @@ export function EditorToolbar({
         )}
         {saveState === 'idle' && (
           <>
-            <Cloud size={11} className="text-ink-400" />
+            <Cloud size={11} className="text-slate-400" />
             <span>Auto-save</span>
           </>
         )}
       </div>
 
-      <span className="text-[11px] text-ink-400">{geminiModel}</span>
+      <span className="text-[11px] font-medium text-slate-400">{geminiModel}</span>
     </div>
   );
 }

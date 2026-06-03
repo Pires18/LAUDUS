@@ -155,7 +155,7 @@ export function Sidebar() {
         <button
           onClick={() => setShowCreateExamModal(true)}
           className={classNames(
-            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]',
+            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-slate-900 text-white hover:bg-slate-800 active:scale-95 shadow-sm',
             collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
           )}
           title="Novo Laudo"
@@ -234,22 +234,19 @@ export function Sidebar() {
             onClick={() => setView({ name: 'admin' })}
             title={collapsed ? 'Administração' : undefined}
             className={classNames(
-              'sidebar-nav-item w-full flex items-center rounded-[1.5rem] transition-all duration-500 relative overflow-hidden group shadow-premium',
-              collapsed ? 'justify-center p-3.5' : 'gap-3 px-5 py-4',
+              'sidebar-nav-item w-full flex items-center rounded-2xl transition-all duration-300 relative overflow-hidden group',
+              collapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3',
               view.name === 'admin'
-                ? 'bg-ink-900 text-white ring-4 ring-brand-500/20'
-                : 'bg-white text-brand-700 border-2 border-brand-100 hover:border-brand-500 hover:shadow-xl'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
             )}
           >
-            <ShieldCheck size={collapsed ? 24 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-brand-400" : "text-brand-600")} />
+            <ShieldCheck size={collapsed ? 20 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-slate-300" : "text-slate-500")} />
             {!collapsed && (
               <div className="flex flex-col items-start leading-none">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] animate-fade-in">Administração</span>
-                <span className="text-[8px] text-ink-400 font-bold mt-1 group-hover:text-brand-500 transition-colors uppercase tracking-widest">Master Panel</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] animate-fade-in">Administração</span>
+                <span className="text-[9px] text-slate-400 font-semibold mt-1 transition-colors uppercase tracking-widest">Master Panel</span>
               </div>
-            )}
-            {view.name !== 'admin' && !collapsed && (
-              <div className="ml-auto w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(17,134,231,0.5)] animate-pulse" />
             )}
             {collapsed && (
               <span className="sidebar-tooltip">Administração</span>
@@ -331,13 +328,13 @@ export function Sidebar() {
         {!collapsed && (
           <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-2 text-[9px] bg-white text-ink-600 px-3 py-1.5 rounded-full font-black border border-ink-100 shadow-sm uppercase tracking-widest">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]" />
+              <span className="inline-flex items-center gap-2 text-[9px] bg-slate-50 text-slate-600 px-3 py-1.5 rounded-full font-bold border border-slate-200 uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Online
               </span>
               <button
                 onClick={() => setShowSupportModal(true)}
-                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-brand-50 text-brand-700 px-3 py-1.5 rounded-full font-black border border-brand-100 shadow-sm uppercase tracking-widest hover:bg-brand-600 hover:text-white transition-all active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full font-bold border border-slate-200 uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95"
               >
                 <LifeBuoy size={12} />
                 Suporte
@@ -352,9 +349,17 @@ export function Sidebar() {
               <LogOut size={13} />
               <span>Sair da Conta</span>
             </button>
+
+            {/* Version badge */}
+            <div className="text-center pt-1">
+              <span className="text-[8px] font-black text-ink-300 uppercase tracking-[0.2em]">
+                LAUD.US v3.0.1 · LAUD.IA
+              </span>
+            </div>
           </div>
         )}
       </div>
     </aside>
   );
 }
+

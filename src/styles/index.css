@@ -37,10 +37,8 @@ html, body, #root {
    PWA STANDALONE MODE ADJUSTMENTS
    ═══════════════════════════════════════════ */
 
-/* When running as installed PWA (standalone), adjust for system status bar */
 @media (display-mode: standalone) {
   html {
-    /* Prevent overscroll "bounce" that reveals background in standalone */
     overscroll-behavior: none;
   }
 }
@@ -99,6 +97,11 @@ html, body, #root {
   to { opacity: 1; transform: scaleX(1); }
 }
 
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* ═══════════════════════════════════════════
    BASE STYLES
    ═══════════════════════════════════════════ */
@@ -108,20 +111,15 @@ html, body, #root {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-size: 14.5px;
-    /* iOS momentum scroll fix */
     -webkit-overflow-scrolling: touch;
-    /* Prevent text size adjustment on orientation change */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
 
   body {
     @apply bg-white text-ink-800 font-sans antialiased;
-    overscroll-behavior-y: none;
-    overscroll-behavior-x: none;
-    line-height: 1.5;
-    /* Prevent pull-to-refresh on mobile browsers */
     overscroll-behavior: none;
+    line-height: 1.5;
   }
 
   ::selection {
@@ -171,6 +169,18 @@ html, body, #root {
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
     background-size: 200% 100%;
   }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.3s ease-out both;
+  }
+
+  /* ── Scrollbar hide (for clean overflow-x areas like tab bars) ── */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 
   /* Safe area padding utilities */
   .pb-safe {
@@ -186,7 +196,6 @@ html, body, #root {
     padding-right: env(safe-area-inset-right, 0px);
   }
   .pb-nav {
-    /* padding to not be hidden below bottom nav on mobile */
     padding-bottom: var(--bottom-nav-height);
   }
 
@@ -208,7 +217,7 @@ html, body, #root {
     margin: 5mm;
     size: A4;
   }
-  
+
   html, body {
     height: auto !important;
     min-height: 100% !important;
@@ -231,7 +240,7 @@ html, body, #root {
     position: relative !important;
     visibility: visible !important;
   }
-  
+
   body.print-mode-images #print-images-area {
     display: block !important;
     position: relative !important;
@@ -241,7 +250,7 @@ html, body, #root {
   body:not(.print-mode-images) #print-images-area {
     display: none !important;
   }
-  
+
   body.print-mode-images #print-area {
     display: none !important;
   }
@@ -262,13 +271,36 @@ html, body, #root {
     page-break-after: avoid;
   }
 
-  .print-images-grid {
+  /* Layout 1 coluna × 2 linhas (2 imagens por página) */
+  .print-images-grid-1x2 {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, 1fr);
     gap: 4mm;
     margin-top: 4mm;
     margin-bottom: 4mm;
+    flex-grow: 1;
+  }
+
+  /* Layout 2 colunas × 4 linhas (8 imagens por página) */
+  .print-images-grid-2x4 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 3mm;
+    margin-top: 3mm;
+    margin-bottom: 3mm;
+    flex-grow: 1;
+  }
+
+  /* Legado — manter compatibilidade */
+  .print-images-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 3mm;
+    margin-top: 3mm;
+    margin-bottom: 3mm;
     flex-grow: 1;
   }
 
@@ -298,7 +330,6 @@ html, body, #root {
   /* ── Buttons ── */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer select-none;
-    /* Minimum touch target 44px for accessibility (WCAG 2.5.5) */
     min-height: 44px;
   }
   .btn-primary {
@@ -320,7 +351,6 @@ html, body, #root {
   /* ── Form elements ── */
   .input {
     @apply w-full px-4 py-2.5 rounded-xl border-2 border-ink-100 bg-white text-ink-900 placeholder-ink-400 focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all text-sm font-medium hover:border-ink-200;
-    /* Minimum touch target */
     min-height: 44px;
   }
   .label {
@@ -381,15 +411,19 @@ html, body, #root {
 
   /* ── Segmented Tab Group (unified pattern) ── */
   .tab-group {
-    @apply flex gap-1 p-1.5 bg-ink-100/80 backdrop-blur-sm rounded-2xl overflow-x-auto w-fit border border-ink-200/50;
-    /* Scroll snap for swipeable tabs on mobile */
+    @apply flex gap-1 p-1.5 bg-ink-100/80 backdrop-blur-sm rounded-2xl w-fit border border-ink-200/50;
+    overflow-x: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+  }
+  .tab-group::-webkit-scrollbar {
+    display: none;
   }
   .tab-item {
     @apply px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 text-ink-500 hover:text-ink-800 cursor-pointer select-none;
     scroll-snap-align: start;
-    /* Minimum touch target */
     min-height: 40px;
   }
   .tab-item-active {
@@ -416,8 +450,12 @@ html, body, #root {
   .module-container {
     @apply flex-1 flex flex-col w-full max-w-7xl mx-auto animate-fade-in;
     padding: 1rem 1rem var(--bottom-nav-height) 1rem;
-    /* Enable iOS momentum scrolling */
     -webkit-overflow-scrolling: touch;
+  }
+  @media (min-width: 475px) {
+    .module-container {
+      padding: 1.25rem 1.25rem var(--bottom-nav-height) 1.25rem;
+    }
   }
   @media (min-width: 768px) {
     .module-container {
@@ -437,6 +475,22 @@ html, body, #root {
   .sidebar-nav-item:hover .sidebar-tooltip {
     @apply opacity-100;
   }
+
+  /* ── PACS Status Indicator ── */
+  .pacs-status-dot {
+    @apply w-2 h-2 rounded-full shrink-0;
+  }
+  .pacs-status-dot-online {
+    @apply bg-emerald-500;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  }
+  .pacs-status-dot-offline {
+    @apply bg-red-500;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+  }
+  .pacs-status-dot-loading {
+    @apply bg-amber-400 animate-pulse;
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -449,13 +503,11 @@ html, body, #root {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Sidebar width transition */
 aside {
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 
-/* Avoid scrollbar layout shift — desktop only */
 @media (hover: hover) and (pointer: fine) {
   html, body {
     scrollbar-gutter: stable;
@@ -504,7 +556,6 @@ aside {
    CUSTOM SCROLLBAR — elegant & subtle
    ═══════════════════════════════════════════ */
 
-/* Desktop — subtle thin scrollbar */
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -512,7 +563,6 @@ aside {
   ::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
 }
 
-/* Mobile — hide scrollbar but keep scrolling functional */
 @media (hover: none) and (pointer: coarse) {
   ::-webkit-scrollbar { display: none; }
   * { scrollbar-width: none; }
@@ -531,7 +581,6 @@ aside {
   animation: fadeIn 0.15s ease-out, slideUp 0.2s ease-out;
 }
 
-/* Overlay backdrop for modals/dialogs */
 .overlay-backdrop {
   @apply fixed inset-0 z-40 bg-ink-900/40 backdrop-blur-sm;
   animation: fadeIn 0.15s ease-out both;
@@ -549,7 +598,6 @@ aside {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
 }
 
-/* Active pill indicator in bottom nav */
 .bottom-nav-pill {
   animation: pill-slide 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
@@ -558,19 +606,8 @@ aside {
    RESPONSIVE UTILITIES
    ═══════════════════════════════════════════ */
 
-/* Fluid container for main content with sidebar offset */
-@media (max-width: 767px) {
-  /* Mobile: content takes full width, bottom nav provides clearance */
-  .app-main-content {
-    padding-bottom: var(--bottom-nav-height);
-  }
-
-  /* Prevent horizontal overflow on mobile */
-  .module-container {
-    overflow-x: hidden;
-  }
-
-  /* Make modals slide up as bottom sheets on mobile */
+@media (max-width: 474px) {
+  /* XS only: full-width modals bottom sheet */
   .modal-mobile-sheet {
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;
@@ -585,7 +622,34 @@ aside {
     animation: slideInUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 
-  /* Ensure scrollable areas have momentum scrolling on iOS */
+  .module-container {
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-main-content {
+    padding-bottom: var(--bottom-nav-height);
+  }
+
+  .modal-mobile-sheet {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 90dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: slideInUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+
+  .module-container {
+    overflow-x: hidden;
+  }
+
   .module-container,
   [class*="overflow-y-auto"],
   [class*="overflow-auto"] {
@@ -600,13 +664,12 @@ aside {
   }
 }
 
-/* Ensure tap highlights are disabled on interactive elements */
 button, a, [role="button"] {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
-/* iOS input zoom prevention — keep font >= 16px in inputs */
+/* iOS input zoom prevention */
 @media (max-width: 767px) {
   input, select, textarea {
     font-size: 16px !important;

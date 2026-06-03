@@ -1,107 +1,205 @@
-# 🗺️ Arquitetura e Padrões de Engenharia — LAUD.US (v3.0.0)
+# Arquitetura do Sistema — LAUD.US v3.0.1
 
-Este documento serve como a especificação técnica oficial da arquitetura do sistema **LAUD.US**, descrevendo os padrões de design, fluxo de dados, lógica do motor de Inteligência Artificial e integrações periféricas.
-
----
-
-## 1. Organização do Código (Feature-Scoping)
-
-O projeto é estruturado seguindo o padrão de **Feature-Scoping (Módulos de Negócio)**. Todo o código específico de uma funcionalidade — incluindo visualizações (Views), modais de formulário, hooks específicos e estilos locais — reside no diretório do seu respectivo módulo em `src/modules/`. Isso garante o isolamento, a facilidade de manutenção e evita acoplamento desnecessário.
-
-### Estrutura Global:
-- **`src/components/`**: Componentes puramente apresentacionais ou utilitários globais de UI (ex: `Modal.tsx`, `Button.tsx`, `PageHeader.tsx`, `Toast.tsx`).
-- **`src/hooks/`**: Hooks globais para gerenciar estados transversais à aplicação (ex: controle de autenticação e listeners genéricos do Firestore).
-- **`src/lib/`**: Inicialização de bibliotecas externas de infraestrutura. Ex: [firebase.ts](file:///Users/matheuskistenmackerpires/Desktop/laudos-us/src/lib/firebase.ts).
-- **`src/store/`**: Estado global da aplicação com **Zustand** e a camada de banco de dados [db.ts](file:///Users/matheuskistenmackerpires/Desktop/laudos-us/src/store/db.ts).
-- **`src/modules/`**: Módulos de negócio isolados.
-- **`src/types.ts`**: Repositório central de tipos e contratos TypeScript.
-
----
-
-## 2. Fluxo de Dados e Persistência Multi-Tenant
-
-Para atender à conformidade regulatória de segurança de dados de saúde (LGPD/HIPAA), o LAUD.US implementa isolamento de dados a nível de usuário físico autenticado (Multi-tenant isolado por UID).
+## Visão Geral
 
 ```
-Banco de Dados Firestore (Estrutura NoSQL)
-├── Coleção Global: users/ (Cadastro e licenciamento dos médicos)
-│   └── {uid}/
-│       ├── Coleção scoped: exams/ (Laudos do médico)
-│       ├── Coleção scoped: patients/ (Pacientes do médico)
-│       ├── Coleção scoped: templates/ (Máscaras de laudo customizadas do médico)
-│       └── Documento único: settings/app (Configurações locais do médico)
-├── Coleção Global: audit_logs/ (Auditoria e segurança do sistema)
-├── Coleção Global: support_tickets/ (Mensagens de suporte integradas)
-└── Coleção Global: plans/ (Definições de planos e licenças de acesso)
+src/
+├── App.tsx                    # Roteamento central (ViewRenderer + Suspense)
+├── main.tsx                   # Entry point React + Firebase init
+├── types.ts                   # Tipos TypeScript globais (Patient, ExamRequest, etc.)
+│
+├── components/                # Componentes UI globais e reutilizáveis
+│   ├── Sidebar.tsx            # Nav desktop (colapsável, tooltips, RBAC)
+│   ├── BottomNav.tsx          # Nav mobile PWA
+│   ├── Modal.tsx              # Modal acessível com AnimatePresence
+│   ├── Toast.tsx              # Sistema de notificações toast
+│   ├── CreateExamModal.tsx    # Modal de criação de exame
+│   ├── SupportModal.tsx       # Modal de suporte (chat interno)
+│   ├── LogoIcon.tsx           # SVG do logo LAUD.US
+│   └── AreaIcon.tsx           # Ícone dinâmico por especialidade médica
+│
+├── store/                     # Estado global e persistência
+│   ├── app.ts                 # Zustand store principal (view, settings, modais)
+│   └── db.ts                  # Helpers Firestore CRUD + lógica PACS/proxy
+│
+├── hooks/                     # Custom hooks reutilizáveis
+│   ├── useAuth.ts             # Firebase Auth listener
+│   ├── useAdmin.ts            # Verificação de role admin
+│   └── useFirestore.ts        # useDocument<T> e useCollection<T> com realtime
+│
+├── styles/
+│   └── index.css              # Design System: tokens, animações, print, responsividade
+│
+├── utils/
+│   ├── format.ts              # formatDate, calculateAge, classNames, etc.
+│   └── ...
+│
+└── modules/                   # Módulos de negócio por feature
+    ├── dashboard/             # KPIs e gráficos
+    ├── worklist/              # Fila de exames + integração Orthanc Worklist
+    ├── editor/                # Editor de laudos (maior módulo)
+    │   ├── ExamEditor.tsx     # Orquestrador central — PACS, print, status
+    │   ├── LaudCopilot.tsx    # Chat IA por exame (streaming)
+    │   ├── RichEditor.tsx     # Editor Tiptap com toolbar
+    │   ├── components/        # Subcomponentes do editor
+    │   │   ├── EditorHeader.tsx
+    │   │   ├── EditorToolbar.tsx
+    │   │   ├── DicomImagesModal.tsx
+    │   │   ├── DicomThumbnail.tsx
+    │   │   ├── ExamHistoryModal.tsx
+    │   │   ├── AnamnesisConsentModal.tsx
+    │   │   └── ReportVersionsModal.tsx
+    │   └── hooks/
+    │       ├── useExamActions.ts    # Geração IA, refinamento, save debounced
+    │       └── useGoogleDocs.ts     # Criação/deleção Google Docs
+    ├── laud-ia/               # Command Center LAUD.IA
+    │   └── SharedLaudIA.tsx
+    ├── ai/                    # Integração com LLMs
+    │   ├── gemini.ts          # Google Gemini API (streaming, multi-modal)
+    │   ├── generateTemplate.ts # Geração de templates via IA
+    │   └── prompts/           # Construção hierárquica de prompts
+    ├── patients/              # Módulo de pacientes
+    ├── templates/             # Máscaras de laudo
+    ├── clinics/               # Gestão de clínicas
+    ├── calculators/           # Calculadoras clínicas
+    ├── settings/              # Configurações do usuário
+    ├── admin/                 # Painel admin
+    └── export/                # Impressão e exportação
+        ├── PrintLayout.tsx    # Layout de laudo para impressão
+        ├── PrintImagesLayout.tsx  # Layout de imagens DICOM para impressão
+        └── docxExport.ts      # Exportação para clipboard/DOCX
 ```
-
-### Regras de Acesso à Dados em `src/store/db.ts`:
-- **`getUserPath(collectionName)`**: Garante que o caminho de escrita ou leitura seja sempre prefixado com `users/{uid}/{collectionName}`. Qualquer operação em exames ou pacientes sem usuário autenticado lança uma exceção imediata.
-- **Auditoria de Escrita (`addItem`, `updateItem`)**: Centraliza as alterações injetando de maneira automática os timestamps Unix (`createdAt`, `updatedAt`) de precisão em milissegundos.
-- **Herança de Configurações de Sistema**: A função `getSettings()` implementa um fallback hierárquico. Ao ler as configurações locais do médico autenticado, ela mescla as customizações locais do profissional (CRM, RQE, nome) com os prompts mestres publicados globalmente pelo e-mail do administrador do sistema (`matheuskpires@gmail.com`). Isso permite atualizações em tempo real das diretrizes da IA sem a necessidade de novos deploys.
 
 ---
 
-## 3. A Engine LAUD.IA e Copiloto (Inteligência Artificial)
-
-O motor de inteligência artificial reside em [gemini.ts](file:///Users/matheuskistenmackerpires/Desktop/laudos-us/src/modules/ai/gemini.ts) e opera com suporte duplo (Gemini/Claude). A construção do prompt é altamente estruturada e dividida em duas grandes camadas para tirar proveito do cache de tokens do provedor de nuvem (System Instruction Cache):
+## Fluxo de Dados
 
 ```
-                        ╔══════════════════════════════════════════════╗
-                        ║           SYSTEM INSTRUCTION (Estático)      ║
-                        ║ 1. Prompt Mestre                             ║
-                        ║ 2. Doutrina de Normalidade do Médico         ║
-                        ║ 3. Protocolo da Especialidade (Área Médica)  ║
-                        ║ 4. Instruções Globais e Regras Rígidas       ║
-                        ╚══════════════════════════════════════════════╝
-                                               │
-                                               ▼
-  ╔══════════════════════════════════════════════════════════════════════════════════╗
-  ║                               USER MESSAGE (Dinâmico)                            ║
-  ║ 1. Contexto do Paciente (Nome, Sexo, Idade calculada com base na data do exame)  ║
-  ║ 2. Dados Clínicos (Indicação, Anamnese detalhada)                                ║
-  ║ 3. Histórico de Estilo (Até 15KB de laudos anteriores como base de estilo)       ║
-  ║ 4. Notas Adicionais / Comando do Médico                                          ║
-  ║ 5. Máscara HTML de Referência (Estrutura física do laudo)                         ║
-  ╚══════════════════════════════════════════════════════════════════════════════════╝
+Firebase Auth
+    ↓
+useAuth() hook
+    ↓
+App.tsx (viewRenderer)
+    ↓ Zustand store (useApp)
+Módulos ←→ useFirestore() hooks ←→ Firestore Realtime
+                                         ↓
+                               Zustand app state
+                                         ↓
+                               Componentes React
 ```
 
-### Otimizações do Ciclo de Geração:
-1. **Separação de Contexto Estático (Prompt Caching)**:
-   - No Gemini 2.5, o `systemInstruction` é passado como parâmetro específico do modelo, ativando o cache automático.
-   - No Claude, a estrutura de array `system` recebe a flag `cache_control: { type: 'ephemeral' }`.
-   - Isso reduz drasticamente o tempo de resposta e o custo de tokens em prompts grandes (que contêm múltiplos exemplos clínicos).
-2. **Ciclo de Refinamento e Cascata Tripartite (N1 a N4)**:
-   - Regido por regras de consistência clínica rígidas: qualquer achado patológico incluído na **Análise** deve obrigatoriamente repercutir em um bullet na **Conclusão** e em uma conduta correlata nas **Recomendações**.
-   - As recomendações seguem os níveis de risco clínico: `N1` (Rotina), `N2` (Acompanhamento em curto prazo), `N3` (Especialista urgente) e `N4` (Emergência imediata).
-3. **Modo Copiloto (Redação Incremental)**:
-   - Quando o médico envia instruções incrementais por voz ou texto ("exclua vesícula", "coloque nódulo de 2cm no fígado"), a IA entra no modo Copiloto.
-   - O output é restrito estruturalmente através de marcadores rígidos:
-     - `=== CONVERSA ===`: Frase clínica resumindo a ação (máx. 15 palavras).
-     - `=== PROPOSTA ===`: O código HTML do laudo integral com a alteração mesclada cirurgicamente no parágrafo do órgão correspondente.
-4. **Higienização do Output (`stripScratchpad`)**:
-   - Defesa multicamadas contra vazamentos de raciocínio da IA (Chain of Thought / XML tags). Remove seções `<scratchpad>`, caixas de código markdown (fences ` ```html `) e qualquer resíduo textual que preceda a primeira tag de cabeçalho (`<h1>` ou `<h2>`).
+### Estado Global (Zustand — `store/app.ts`)
+```typescript
+{
+  view: ViewState                 // Módulo ativo e parâmetros
+  settings: AppSettings           // Configurações salvas
+  selectedClinicId: string|null   // Filtro de clínica ativo
+  showCreateExamModal: boolean
+  showSupportModal: boolean
+  toast: ToastMessage | null
+  // Actions: setView, setSettings, showToast, setSelectedClinic, ...
+}
+```
 
 ---
 
-## 4. Biblioteca e Registro de Calculadoras Clínicas
+## Integração PACS/DICOM
 
-Todas as calculadoras médicas residem em `src/modules/calculators/components/` e são catalogadas no arquivo de registro central [registry.tsx](file:///Users/matheuskistenmackerpires/Desktop/laudos-us/src/modules/calculators/registry.tsx).
+### Conexão
+```
+Browser
+  → AgentProxy (http://localhost:PORT)
+    → Orthanc Primário (localhost:8042 ou Tailscale URL)
+    → Orthanc Backup (URL configurável)
+```
 
-- **Padrão de Interface Comum**: Cada calculadora deve exportar um formulário interativo estruturado, disparando um evento de retorno contendo o resultado textual (HTML/Texto plano) e os valores numéricos brutos.
-- **Inserção no Editor**: Ao finalizar o cálculo dentro da modal no editor de laudo, o resultado gerado é inserido de forma automática no cursor do TipTap, populando a análise física do laudo com as medições corretas (ex: volume prostático de 45g, idade gestacional de 12 semanas e 3 dias com DDP corrigida).
+### Busca de Estudos (ExamEditor.tsx: `locateStudies`)
+```
+Fase 1 — Identificadores exatos (paralelo):
+  - /tools/find { StudyInstanceUID: "1.2.276.0.7230010.3.1.2.{examId}" }
+  - /tools/find { AccessionNumber: examId }
+  - /tools/find { AccessionNumber: friendlyId } (se existir)
+  → Se encontrado: retornar imediatamente
+
+Fase 2 — Fallback por PatientID (se fase 1 vazia):
+  - /tools/find { PatientID: patientId }
+  - /tools/find { PatientID: examId }
+```
+
+### Polling de Imagens
+```
+Timer base: 5s
+- Viewer/modal aberto → executa a cada 5s
+- Viewer fechado (background) → executa a cada 30s (6 ticks)
+Refs usadas em vez de deps do useEffect para evitar recriar o intervalo
+```
+
+### Impressão de Imagens
+```
+Grids disponíveis:
+  1x2 → 1 coluna × 2 linhas = 2 imagens por página
+  2x4 → 2 colunas × 4 linhas = 8 imagens por página
+
+Fluxo:
+1. Preload das imagens via fetch (URL do proxy)
+2. Renderização em PrintImagesLayout.tsx (portal no document.body)
+3. document.body.classList.add('print-mode-images')
+4. window.print()
+5. Limpeza após impressão
+```
 
 ---
 
-## 5. Fluxo de Exportação e Layouts de Impressão
+## Hierarquia de Prompts LAUD.IA
 
-### Exportador de Arquivos Word (`docxExport.ts`):
-- O módulo de exportação analisa o código HTML gerado pelo editor de texto rico TipTap e converte os nós da árvore DOM em estruturas nativas da biblioteca `docx` de maneira sequencial:
-  - Tags `<h2>` e `<h3>` viram elementos `Paragraph` com estilo de cabeçalho `HeadingLevel.HEADING_2` / `HeadingLevel.HEADING_3`.
-  - Tags `<strong>`, `<em>` e `<u>` viram objetos `TextRun` com propriedades de formatação (bold, italic, underline).
-  - Tags `<ul>` e `<ol>` viram elementos estruturados com numeração e marcadores do Office Open XML (OOXML).
-- Insere cabeçalhos e rodapés específicos da clínica, bloco de dados do paciente e carimbo de assinatura médica com CRM/RQE ao final do arquivo.
+```
+1. aiMasterPrompt        ← Instrução mestra global
+2. normalDoctrine        ← Doutrina de Normalidade Habitual
+3. aiGlobalInstructions  ← Regras gerais
+4. aiRigidRules          ← Regras nunca quebradas
+5. aiStructurePrompt     ← Estrutura obrigatória do laudo
+6. aiAreaPrompts[area]   ← Prompt específico da especialidade
+7. template.aiInstructions ← Instruções do template
+8. aiTraining            ← Exemplos de laudos anteriores do médico
+```
 
-### Layout de Impressão de Imagens (`PrintImagesLayout.tsx`):
-- Gerencia o layout físico de impressão de imagens DICOM capturadas diretamente do PACS.
-- Organiza a folha de impressão em uma grade fotográfica otimizada para laudos radiológicos (grade de 2 colunas com 3 linhas por página, totalizando até 6 fotos por folha) com alto contraste e margens corretas de corte de impressora.
+---
+
+## RBAC (Controle de Acesso)
+
+| Role | Dashboard | Worklist | Editor | Templates | LAUD.IA | Clínicas | Admin |
+|---|---|---|---|---|---|---|---|
+| `admin` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `medico` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `recepcao` | ✅ | ✅ | view-only | ❌ | ❌ | ❌ | ❌ |
+
+> Recepção não pode finalizar laudos nem acessar LAUD.IA ou Templates.
+
+---
+
+## Design System — Convenções
+
+### Tokens de Cor (ink-* obrigatório)
+```css
+ink-50  → backgrounds extremamente leves
+ink-100 → bordas e dividers
+ink-200 → bordas mais visíveis
+ink-400 → texto terciário / ícones inativos
+ink-500 → texto secundário
+ink-700 → texto primário médio
+ink-900 → texto primário escuro (títulos)
+```
+
+### Regra de Design
+- ✅ `text-ink-900 border-ink-100 bg-ink-50` — correto
+- ❌ `text-slate-900 border-slate-200 bg-slate-50` — usar apenas em componentes herdados
+
+### Classes de Layout
+```css
+.module-container   /* wrapper responsivo de cada módulo */
+.card               /* cartão padrão com border e shadow */
+.tab-group          /* container de tabs segmentadas */
+.scrollbar-hide     /* esconder scrollbar (mobile/tablets) */
+.btn-primary        /* botão de ação principal */
+.input              /* campo de formulário padronizado */
+```

@@ -72,13 +72,9 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
             </div>
           </div>
 
-          {/* Grid Layout */}
+          {/* Grid Layout — classes definidas em index.css para impressão */}
           <div 
-            className="print-images-grid flex-grow"
-            style={{
-              gridTemplateColumns: `repeat(${cols}, 1fr)`,
-              gridTemplateRows: `repeat(${rows}, 1fr)`
-            }}
+            className={gridType === '1x2' ? 'print-images-grid-1x2 flex-grow' : 'print-images-grid-2x4 flex-grow'}
           >
             {pageInstances.map((instance, instIdx) => {
               const globalIndex = pageIdx * chunkSize + instIdx + 1;

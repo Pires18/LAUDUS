@@ -147,7 +147,7 @@ export function DicomImagesModal({
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleSelectAll}
-                  className="text-[9px] font-black text-brand-700 hover:text-brand-850 uppercase tracking-wider flex items-center gap-1"
+                  className="text-[9px] font-bold text-slate-900 hover:text-slate-700 uppercase tracking-wider flex items-center gap-1"
                 >
                   <CheckSquare size={12} />
                   Selecionar Tudo
@@ -155,7 +155,7 @@ export function DicomImagesModal({
                 <div className="h-3 w-px bg-slate-200" />
                 <button
                   onClick={handleClearSelection}
-                  className="text-[9px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-wider flex items-center gap-1"
+                  className="text-[9px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider flex items-center gap-1"
                 >
                   <Square size={12} />
                   Limpar
@@ -184,14 +184,14 @@ export function DicomImagesModal({
                     className={classNames(
                       "group relative aspect-square rounded-xl border overflow-hidden flex flex-col justify-between bg-black transition-all",
                       isSelected 
-                        ? "border-brand-500 ring-2 ring-brand-500/20 scale-[0.98] shadow-sm" 
+                        ? "border-slate-900 ring-2 ring-slate-900/20 scale-[0.98] shadow-sm" 
                         : "border-slate-200 hover:border-slate-400"
                     )}
                   >
                     {/* Checkbox Overlay */}
                     <div className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-black/40 backdrop-blur-sm border border-white/20 text-white transition-all">
                       {isSelected ? (
-                        <div className="w-3.5 h-3.5 bg-brand-500 rounded flex items-center justify-center">
+                        <div className="w-3.5 h-3.5 bg-slate-900 rounded flex items-center justify-center">
                           <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
@@ -237,14 +237,14 @@ export function DicomImagesModal({
           </div>
 
           <div className="flex items-center gap-3 justify-end">
-            <button type="button" onClick={onClose} className="btn-secondary h-11 px-5 rounded-2xl">
+            <button type="button" onClick={onClose} className="h-11 px-5 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all font-semibold text-xs">
               Cancelar
             </button>
             <button
               type="button"
               disabled={selectedIds.size === 0 || loading || !!error}
               onClick={handleGeneratePdf}
-              className="btn-primary h-11 px-6 rounded-2xl shadow-brand flex items-center gap-2"
+              className="h-11 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white shadow-sm flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
             >
               <Printer size={16} />
               <span className="font-bold text-xs uppercase tracking-widest">

@@ -812,6 +812,68 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
   return '/api/orthanc-proxy';
 }
 
+/**
+ * Remove o arquivo `.wl` de uma entrada da Worklist DICOM do Orthanc.
+ *
+ * Chamado em dois cenários:
+ *   1. Exame **finalizado** no editor ou na worklist — remove do PACS para que o
+ *      aparelho de ultrassom não liste mais o exame como pendente.
+ *   2. Exame **excluído** — limpeza completa do registro.
+ *
+ * Suporta servidor primário e de backup em paralelo (fire-and-forget).
+ * Erros de rede são silenciados via console.warn para não bloquear o fluxo principal.
+ *
+ * @param examId   ID do exame no Firestore (usado como nome do arquivo .wl)
+ * @param settings Configurações do app (URLs, pastas, agent URLs)
+ */
+export async function deleteWorklistEntry(examId: string, settings: AppSettings): Promise<void> {
+  if (settings.dicomSyncEnabled === false) return;
+
+  const isVercel = typeof window !== 'undefined' &&
+    (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+
+  // ── Primário ──
+  const primaryAgentUrl = (isVercel && settings.dicomLocalAgentUrl)
+    ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
+    : '/api/worklist';
+
+  const primaryPromise = fetch(primaryAgentUrl, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      examId,
+      outputDir: settings.dicomWorklistFolder,
+      localAgentUrl: settings.dicomLocalAgentUrl
+    })
+  }).catch((err) => {
+    console.warn('[Orthanc Worklist] Falha ao remover entrada primária:', err);
+  });
+
+  // ── Backup (se configurado) ──
+  let backupPromise: Promise<void | Response> = Promise.resolve();
+  if (settings.dicomBackupSyncEnabled && settings.dicomBackupWorklistFolder) {
+    const backupAgentUrl = (isVercel && settings.dicomBackupLocalAgentUrl)
+      ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
+      : '/api/worklist';
+
+    backupPromise = fetch(backupAgentUrl, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        examId,
+        outputDir: settings.dicomBackupWorklistFolder,
+        localAgentUrl: settings.dicomBackupLocalAgentUrl
+      })
+    }).catch((err) => {
+      console.warn('[Orthanc Worklist Backup] Falha ao remover entrada de backup:', err);
+    });
+  }
+
+  // Aguarda ambos para que a função possa ser corretamente awaited pelo chamador
+  await Promise.allSettled([primaryPromise, backupPromise]);
+}
+
+
 // ─── AI Token Usage Tracking ───
 
 export interface AiUsageLog {
