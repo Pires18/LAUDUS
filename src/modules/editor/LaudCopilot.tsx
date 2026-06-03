@@ -85,7 +85,8 @@ export function LaudCopilot({
 
   useEffect(() => {
     return () => {
-      cancelActiveRequest();
+      // NÃO cancelar a requisição ativa ao desmontar o componente
+      // Isso permite que o Copiloto continue gerando o laudo em background mesmo se minimizado
       if (formSaveTimerRef.current) {
         clearTimeout(formSaveTimerRef.current);
       }
