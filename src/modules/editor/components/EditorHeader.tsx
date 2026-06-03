@@ -1,5 +1,5 @@
 import { 
-  ChevronLeft, CheckCircle2, Settings, Play, ScanSearch
+  ChevronLeft, CheckCircle2, Settings, Play, ScanSearch, Edit2
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDate, classNames } from '../../../utils/format';
@@ -17,6 +17,7 @@ interface EditorHeaderProps {
   hasDicomImages?: boolean;
   onToggleViewer?: () => void;
   viewerOpen?: boolean;
+  onEditPatient?: () => void;
 }
 
 export function EditorHeader({
@@ -29,7 +30,8 @@ export function EditorHeader({
   onOpenAnamnesisConsent,
   hasDicomImages = false,
   onToggleViewer,
-  viewerOpen = false
+  viewerOpen = false,
+  onEditPatient
 }: EditorHeaderProps) {
   const { settings } = useApp();
   const area = EXAM_AREAS.find(a => a.id === exam.area);
@@ -70,6 +72,15 @@ export function EditorHeader({
               <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate max-w-[110px] xs:max-w-[160px] sm:max-w-[220px] md:max-w-[320px] lg:max-w-none">
                 {patient.name}
               </h1>
+              {onEditPatient && (
+                <button
+                  onClick={onEditPatient}
+                  className="p-1 rounded-md text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                  title="Editar dados do paciente"
+                >
+                  <Edit2 size={12} />
+                </button>
+              )}
               {patient.birthDate && (
                 <span className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded-md shrink-0 hidden xs:inline">
                   Data de Nasc: {formatDate(patient.birthDate)}

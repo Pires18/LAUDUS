@@ -87,6 +87,8 @@ export interface ExamRequest {
   scheduledAt?: number;
   /** Nome do médico que solicitou o exame */
   requestingPhysician?: string;
+  /** Data real do exame (pode diferir da data de criação no sistema) */
+  examDate?: number;
   /** Motivo ou indicação clínica do exame */
   clinicalIndication?: string;
   /** Status atual na worklist */

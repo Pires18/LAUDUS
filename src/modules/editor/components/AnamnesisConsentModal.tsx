@@ -88,16 +88,12 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   }, []);
 
   // Metadata tab states
-  const [patientName, setPatientName] = useState(patient.name);
-  const [birthDate, setBirthDate] = useState(patient.birthDate || '');
   const [requestingPhysician, setRequestingPhysician] = useState(exam.requestingPhysician || '');
   const [clinicId, setClinicId] = useState(exam.clinicId || '');
   const [examTemplateId, setExamTemplateId] = useState(exam.templateId || '');
   const [loadingMetadata, setLoadingMetadata] = useState(false);
 
   useEffect(() => {
-    setPatientName(patient.name);
-    setBirthDate(patient.birthDate || '');
     setRequestingPhysician(exam.requestingPhysician || '');
     setClinicId(exam.clinicId || '');
     setExamTemplateId(exam.templateId || '');
@@ -229,10 +225,6 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const handleSaveMetadata = async () => {
     try {
       setLoadingMetadata(true);
-      await updateItem('patients', exam.patientId, {
-        name: patientName,
-        birthDate: birthDate || null
-      });
       await updateItem('exams', exam.id, {
         requestingPhysician: requestingPhysician,
         clinicId: clinicId
@@ -398,28 +390,6 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
             <div className="space-y-4">
               <div className="flex flex-col space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Nome do Paciente</label>
-                <input 
-                  type="text"
-                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
-                  value={patientName} 
-                  onChange={e => setPatientName(e.target.value)}
-                  disabled={!isEditable}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Data de Nascimento</label>
-                  <input 
-                    type="date"
-                    className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
-                    value={birthDate} 
-                    onChange={e => setBirthDate(e.target.value)}
-                    disabled={!isEditable}
-                  />
-                </div>
-                <div className="flex flex-col space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Médico Solicitante</label>
                   <input 
                     type="text"
@@ -429,7 +399,6 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     disabled={!isEditable}
                   />
                 </div>
-              </div>
 
               <div className="flex flex-col space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Clínica</label>
@@ -503,7 +472,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 <button 
                   type="button"
                   onClick={handleSaveMetadata}
-                  disabled={loadingMetadata || !patientName.trim()}
+                  disabled={loadingMetadata}
                   className="px-6 h-10 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 transition-all active:scale-95"
                 >
                   {loadingMetadata ? <Loader2 size={14} className="animate-spin" /> : 'Salvar Alterações'}

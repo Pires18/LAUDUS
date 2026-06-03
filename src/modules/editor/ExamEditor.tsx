@@ -14,6 +14,7 @@ import { classNames } from '../../utils/format';
 import { PrintLayout } from '../export/PrintLayout';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
+import { PatientForm } from '../patients/PatientForm';
 import { PrintImagesLayout } from '../export/PrintImagesLayout';
 import { DicomThumbnail } from './components/DicomThumbnail';
 
@@ -216,6 +217,7 @@ export function ExamEditor({ examId }: Props) {
 
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showEditPatient, setShowEditPatient] = useState(false);
   const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
@@ -793,6 +795,7 @@ export function ExamEditor({ examId }: Props) {
             hasDicomImages={hasDicomImages}
             onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
             viewerOpen={showIntegratedViewer}
+            onEditPatient={() => setShowEditPatient(true)}
           />
 
           {/* AVISO API KEY */}
@@ -1474,6 +1477,50 @@ export function ExamEditor({ examId }: Props) {
           onClose={() => setShowHistoryModal(false)}
         />
       )}
+
+      {/* Edit Patient Modal */}
+      <AnimatePresence>
+        {showEditPatient && patient && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowEditPatient(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl flex flex-col"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
+                    <UserCog size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-slate-800 uppercase tracking-tight">Editar Paciente</h2>
+                    <p className="text-xs font-semibold text-slate-500">Atualize os dados cadastrais e clínicos do paciente</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditPatient(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-slate-600 border border-slate-200 shadow-sm transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <PatientForm
+                  initial={patient}
+                  onCancel={() => setShowEditPatient(false)}
+                  onSubmit={async (data) => {
+                    await updateItem('patients', patient.id, data);
+                    setShowEditPatient(false);
+                    showToast('Dados do paciente atualizados com sucesso', 'success');
+                  }}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {showVersionsModal && exam && (
         <ReportVersionsModal

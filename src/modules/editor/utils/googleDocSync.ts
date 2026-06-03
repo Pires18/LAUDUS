@@ -17,7 +17,8 @@ export async function syncGoogleDoc(
     throw new Error('Configurações de clínica ou template do Google Docs ausentes.');
   }
 
-  const docDate = formatDate(exam.createdAt || Date.now());
+  const actualExamDate = exam.examDate || exam.createdAt || Date.now();
+  const docDate = formatDate(actualExamDate);
   const docName = `${docDate} | ${patient.name} | ${exam.examType} | ${clinic.name}`;
 
   const templateId = clinic.googleDocsTemplateId;
@@ -92,7 +93,7 @@ export async function syncGoogleDoc(
     'PACIENTE_NOME': patient.name,
     'PACIENTE_NASC': patient.birthDate ? formatDate(patient.birthDate) : '—',
     'PACIENTE_IDADE': patient.birthDate ? calculateAge(patient.birthDate).toString() : '—',
-    'EXAME_DATA': formatDate(exam.createdAt || Date.now()),
+    'EXAME_DATA': formatDate(actualExamDate),
     'EXAME_TIPO': exam.examType,
     'MEDICO_SOLICITANTE': exam.requestingPhysician || 'À determinar',
     'INDICACAO_CLINICA': exam.clinicalIndication || 'Não informada',
@@ -105,7 +106,7 @@ export async function syncGoogleDoc(
     'classificacao_laudo': sections.classificacao_laudo || '',
     'observacao_laudo': sections.observacao_laudo || '',
     'recomendacao_laudo': sections.recomendacao_laudo || '',
-    'data_exame': formatDate(exam.createdAt || Date.now()),
+    'data_exame': formatDate(actualExamDate),
     'numero_laudo': (exam.friendlyId || exam.id).toUpperCase(),
     'nome_completo': patient.name,
     'data_nascimento': patient.birthDate ? formatDate(patient.birthDate) : '—'

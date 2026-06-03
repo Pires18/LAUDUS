@@ -37,6 +37,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
 
   const [anamnesis, setAnamnesis] = useState('');
+  const [examDateStr, setExamDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(settings.dicomDevices?.[0]?.id || '');
 
   // Configura clínica inicial
@@ -155,6 +156,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         consentTerm: template.consentTemplate || undefined,
         consentAccepted: false,
         clinicalIndication: anamnesis.trim() || undefined,
+        examDate: examDateStr ? (() => {
+          const [year, month, day] = examDateStr.split('-').map(Number);
+          return new Date(year, month - 1, day).getTime();
+        })() : Date.now(),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -169,11 +174,17 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         // Formata data de nascimento para AAAAMMDD
         const dicomBirthDate = selectedPatient.birthDate ? selectedPatient.birthDate.replace(/[^0-9]/g, '') : '';
 
-        // Formata data e hora atual do exame
+        // Formata data atual do exame baseada na seleção
         const now = new Date();
-        const stepDate = now.getFullYear() + 
-          String(now.getMonth() + 1).padStart(2, '0') + 
-          String(now.getDate()).padStart(2, '0');
+        let stepDateObj = new Date();
+        if (examDateStr) {
+          const [year, month, day] = examDateStr.split('-').map(Number);
+          stepDateObj = new Date(year, month - 1, day);
+        }
+        
+        const stepDate = stepDateObj.getFullYear() + 
+          String(stepDateObj.getMonth() + 1).padStart(2, '0') + 
+          String(stepDateObj.getDate()).padStart(2, '0');
         const stepTime = String(now.getHours()).padStart(2, '0') + 
           String(now.getMinutes()).padStart(2, '0') + 
           String(now.getSeconds()).padStart(2, '0');
@@ -681,7 +692,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                         </div>
                       )}
                     </div>
-                 </div>
+                  </div>
               </motion.div>
             )}
 
@@ -701,6 +712,36 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-wider mt-1 relative z-10">{selectedTemplate.area}</p>
                 </div>
 
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   {/* Data do Exame */}
+                   <div className="flex flex-col space-y-2.5">
+                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">Data do Exame</label>
+                     <input
+                       type="date"
+                       value={examDateStr}
+                       onChange={(e) => setExamDateStr(e.target.value)}
+                       className="w-full h-14 px-4 bg-white border-2 border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none transition-all font-bold text-sm text-slate-900 shadow-sm"
+                     />
+                   </div>
+
+                   {settings.dicomDevices && settings.dicomDevices.length > 0 && (
+                     <div className="flex flex-col space-y-2.5">
+                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">Enviar Worklist Para</label>
+                       <div className="relative">
+                         <select
+                           value={selectedDeviceId}
+                           onChange={(e) => setSelectedDeviceId(e.target.value)}
+                           className="w-full h-14 px-4 bg-white border-2 border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none transition-all font-bold text-sm text-slate-900 shadow-sm appearance-none cursor-pointer"
+                         >
+                           {settings.dicomDevices.map(device => (
+                             <option key={device.id} value={device.id}>{device.name} ({device.aeTitle})</option>
+                           ))}
+                         </select>
+                       </div>
+                     </div>
+                   )}
+                 </div>
+
                  <div className="flex flex-col space-y-2.5">
                    {/* Anamnese / Indicação Clínica */}
                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">Anamnese / Indicação Clínica</label>
@@ -711,23 +752,6 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                      className="w-full h-36 p-4 bg-white border-2 border-slate-200 rounded-[1rem] focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none transition-all font-medium text-sm text-slate-900 resize-none custom-scrollbar shadow-sm"
                    />
                  </div>
-
-                 {settings.dicomDevices && settings.dicomDevices.length > 0 && (
-                   <div className="flex flex-col space-y-2.5 pt-1">
-                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">Enviar Worklist Para</label>
-                     <div className="relative">
-                       <select
-                         value={selectedDeviceId}
-                         onChange={(e) => setSelectedDeviceId(e.target.value)}
-                         className="w-full h-14 px-4 bg-white border-2 border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none transition-all font-bold text-sm text-slate-900 shadow-sm appearance-none cursor-pointer"
-                       >
-                         {settings.dicomDevices.map(device => (
-                           <option key={device.id} value={device.id}>{device.name} ({device.aeTitle})</option>
-                         ))}
-                       </select>
-                     </div>
-                   </div>
-                 )}
               </motion.div>
             )}
           </AnimatePresence>

@@ -583,7 +583,7 @@ export function LaudCopilot({
           clinicalIndication: exam.clinicalIndication,
           requestingPhysician: exam.requestingPhysician,
           anamnesis: exam.anamnesis,
-          dateMs: exam.createdAt
+          createdAt: exam.examDate || exam.createdAt
         },
         template,
         settings,
@@ -634,7 +634,7 @@ export function LaudCopilot({
               requestingPhysician: exam.requestingPhysician,
               anamnesis: exam.anamnesis,
               previousExams,
-              examDateMs: exam.createdAt,
+              examDateMs: exam.examDate || exam.createdAt,
               signal: controller.signal
             }, (chunk) => {
               refinedHtml = chunk;
