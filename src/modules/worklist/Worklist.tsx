@@ -28,7 +28,7 @@ export function Worklist() {
   });
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>(() => {
-    return (localStorage.getItem('laudus_worklist_date') as 'todos' | 'hoje' | 'semana' | 'mes') || 'hoje';
+    return (localStorage.getItem('laudus_worklist_date_v2') as 'todos' | 'hoje' | 'semana' | 'mes') || 'todos';
   });
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export function Worklist() {
   }, [statusFilter]);
 
   useEffect(() => {
-    localStorage.setItem('laudus_worklist_date', dateFilter);
+    localStorage.setItem('laudus_worklist_date_v2', dateFilter);
   }, [dateFilter]);
 
   // Realtime listeners
