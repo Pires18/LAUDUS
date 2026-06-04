@@ -15,12 +15,13 @@ interface Props {
   content: string;
   onChange: (html: string) => void;
   editable?: boolean;
+  isGenerating?: boolean;
 }
 export interface RichEditorRef {
   insertContent: (content: string) => void;
 }
 
-export const RichEditor = forwardRef<RichEditorRef, Props>(({ content, onChange, editable = true }, ref) => {
+export const RichEditor = forwardRef<RichEditorRef, Props>(({ content, onChange, editable = true, isGenerating = false }, ref) => {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ 
@@ -46,10 +47,12 @@ export const RichEditor = forwardRef<RichEditorRef, Props>(({ content, onChange,
 
   useEffect(() => {
     if (!editor) return;
-    if (content !== editor.getHTML()) {
+    // Fix 14: skip intermediate streaming chunks to avoid cursor flicker
+    // Only update editor when AI finishes (isGenerating goes false) or user changes exam
+    if (!isGenerating && content !== editor.getHTML()) {
       editor.commands.setContent(content || '', false);
     }
-  }, [content, editor]);
+  }, [content, editor, isGenerating]);
 
   useEffect(() => {
     if (editor) {

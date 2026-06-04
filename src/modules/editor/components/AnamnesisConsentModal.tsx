@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../../../components/Modal';
 import { ExamRequest, Patient, ReportTemplate, Clinic, AppSettings } from '../../../types';
-import { updateItem, getItem } from '../../../store/db';
+import { updateItem, getItem, deleteField } from '../../../store/db';
 import { ClipboardList, ShieldCheck, Printer, RotateCcw, Check, FileText, UserCog, Loader2 } from 'lucide-react';
 import { useCollection } from '../../../hooks/useFirestore';
 import { useApp } from '../../../store/app';
@@ -225,9 +225,10 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const handleSaveMetadata = async () => {
     try {
       setLoadingMetadata(true);
+      // Fix 12: use deleteField() for empty clinicId to keep Firestore clean
       await updateItem('exams', exam.id, {
         requestingPhysician: requestingPhysician,
-        clinicId: clinicId
+        clinicId: clinicId || deleteField()
       });
       showToast('Dados do exame atualizados com sucesso!', 'success');
     } catch (err) {

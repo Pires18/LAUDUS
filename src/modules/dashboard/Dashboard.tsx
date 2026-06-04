@@ -10,20 +10,18 @@ import {
 } from 'lucide-react';
 import { AreaIcon } from '../../components/AreaIcon';
 import { classNames, formatDateTime } from '../../utils/format';
+import { motion } from 'framer-motion';
+import { Skeleton } from '../../components/SkeletonLoader';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const { setView, selectedClinicId, settings, showToast } = useApp();
+  const { setView, selectedClinicId, settings, showToast, setShowCreateExamModal } = useApp();
   const currentRole = settings.currentRole || 'medico';
-  const { data: exams } = useCollection<ExamRequest>('exams');
+  const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
 
-
-
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
-  const monthStart = new Date(todayStart); monthStart.setDate(1);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   // Apply clinic filter
   const filteredExams = useMemo(() =>
@@ -33,6 +31,10 @@ export function Dashboard() {
 
   // Stats
   const stats = useMemo(() => {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+    const monthStart = new Date(todayStart); monthStart.setDate(1);
+
     const today = filteredExams.filter(e => e.createdAt >= todayStart.getTime());
     const week = filteredExams.filter(e => e.createdAt >= weekStart.getTime());
     const month = filteredExams.filter(e => e.createdAt >= monthStart.getTime());
@@ -78,8 +80,8 @@ export function Dashboard() {
 
   // Recent exams
   const recentExams = useMemo(() =>
-    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 5),
-    [filteredExams]
+    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, showAllRecent ? 15 : 5),
+    [filteredExams, showAllRecent]
   );
 
   const patientMap = useMemo(() => new Map(patients.map(p => [p.id, p])), [patients]);
@@ -126,18 +128,18 @@ export function Dashboard() {
 
             <div className="flex flex-wrap items-center justify-center xl:justify-start gap-3 pt-2">
               <button 
-                onClick={() => setView({ name: 'worklist' })}
-                className="h-12 px-6 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-3 active:scale-95"
+                onClick={() => setShowCreateExamModal(true)}
+                className="h-12 px-6 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-3 active:scale-95 shadow-sm"
               >
                 <FilePlus size={16} />
-                Acessar Worklist
+                Novo Laudo IA
               </button>
               <button 
-                onClick={() => setView({ name: 'templates' })}
+                onClick={() => setView({ name: 'worklist' })}
                 className="h-12 px-6 rounded-xl bg-white text-slate-700 font-bold text-xs uppercase tracking-widest border border-slate-200 hover:bg-slate-50 transition-all flex items-center gap-3 active:scale-95"
               >
                 <LayoutList size={16} />
-                Minhas Máscaras
+                Worklist
               </button>
             </div>
           </div>
@@ -171,6 +173,7 @@ export function Dashboard() {
           value={stats.pending}
           icon={<Clock size={22} />}
           color="amber"
+          loading={examsLoading}
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
@@ -178,6 +181,7 @@ export function Dashboard() {
           value={stats.inProgress}
           icon={<CircleDot size={22} />}
           color="brand"
+          loading={examsLoading}
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
@@ -185,6 +189,7 @@ export function Dashboard() {
           value={stats.finalizedToday}
           icon={<CheckCircle2 size={22} />}
           color="emerald"
+          loading={examsLoading}
           onClick={() => setView({ name: 'worklist' })}
         />
         <StatCard
@@ -192,6 +197,7 @@ export function Dashboard() {
           value={patients.length}
           icon={<Users size={22} />}
           color="indigo"
+          loading={examsLoading}
           onClick={() => setView({ name: 'patients' })}
         />
       </div>
@@ -225,20 +231,26 @@ export function Dashboard() {
               {stats.dailyActivity.map((day, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center gap-2 group/bar relative">
                   <div className="w-full flex flex-col items-center">
-                    <div 
+                    <motion.div 
+                      initial={{ height: 4 }}
+                      animate={{ height: Math.max((day.count / (stats.maxDaily || 1)) * 140, 4) }}
+                      transition={{ duration: 0.8, delay: i * 0.05, ease: "easeOut" }}
                       className={classNames(
-                        "w-full max-w-[40px] rounded-t-lg transition-all duration-300 relative group-hover/bar:brightness-95 cursor-pointer",
+                        "w-full max-w-[40px] rounded-t-lg transition-colors duration-300 relative group-hover/bar:brightness-95 cursor-pointer",
                         day.count > 0 ? "bg-brand-500" : "bg-slate-100"
                       )}
-                      style={{ height: `${Math.max((day.count / (stats.maxDaily || 1)) * 140, 4)}px` }}
                     >
                       {/* Floating tooltip */}
                       {day.count > 0 && (
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap pointer-events-none">
+                        <div 
+                          role="tooltip"
+                          aria-label={`${day.count} exames em ${day.label}`}
+                          className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap pointer-events-none"
+                        >
                           {day.count} {day.count === 1 ? 'exame' : 'exames'}
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   </div>
                   <span className="text-[10px] text-slate-500 font-bold tracking-widest">{day.label}</span>
                 </div>
@@ -321,6 +333,17 @@ export function Dashboard() {
                 })
               )}
             </div>
+            
+            {!showAllRecent && filteredExams.length > 5 && (
+              <div className="px-6 py-4 border-t border-ink-50 bg-ink-50/10 text-center">
+                <button 
+                  onClick={() => setShowAllRecent(true)}
+                  className="text-xs font-bold text-brand-600 hover:text-brand-700 uppercase tracking-widest transition-colors"
+                >
+                  Ver Mais Antigos
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -369,8 +392,8 @@ export function Dashboard() {
                 <Briefcase size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-slate-800 text-lg tracking-tight">Status da Licença</h4>
-                <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">Médico Autenticado</p>
+                <h4 className="font-bold text-slate-800 text-lg tracking-tight">Resumo da Conta</h4>
+                <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">Sessão Autenticada</p>
               </div>
             </div>
             
@@ -391,11 +414,12 @@ export function Dashboard() {
   );
 }
 
-function StatCard({ label, value, icon, color, onClick }: {
+function StatCard({ label, value, icon, color, loading, onClick }: {
   label: string;
   value: number;
   icon: React.ReactNode;
   color: 'amber' | 'brand' | 'emerald' | 'indigo';
+  loading?: boolean;
   onClick?: () => void;
 }) {
   const borderColors = {
@@ -423,7 +447,11 @@ function StatCard({ label, value, icon, color, onClick }: {
         {icon}
       </div>
       <div>
-        <p className="text-3xl font-bold text-slate-800 leading-none mb-1.5">{value}</p>
+        {loading ? (
+          <Skeleton className="h-8 w-16 mb-1.5 rounded-lg" />
+        ) : (
+          <p className="text-3xl font-bold text-slate-800 leading-none mb-1.5">{value}</p>
+        )}
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</p>
       </div>
     </button>

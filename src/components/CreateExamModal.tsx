@@ -12,6 +12,7 @@ import { generateNumericId } from '../store/db';
 import { getInitialReportContent } from '../modules/templates/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AreaIcon } from './AreaIcon';
+import { syncExamToOrthancWorklist } from '../utils/dicom';
 
 interface CreateExamModalProps {
   onClose: () => void;
@@ -25,7 +26,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
+  const [patientSearch, setPatientSearch] = useState('');
+  const [templateSearch, setTemplateSearch] = useState('');
   const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [newPatientName, setNewPatientName] = useState('');
   const [newPatientBirthDate, setNewPatientBirthDate] = useState('');
@@ -63,38 +65,38 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   }, [setCreateExamDefaultPatient]);
 
   const filteredPatients = useMemo(() => {
-    if (!search) return patients.slice(0, 5);
-    const s = search.toLowerCase();
+    if (!patientSearch) return patients.slice(0, 5);
+    const s = patientSearch.toLowerCase();
     return patients.filter(p => 
       p.name.toLowerCase().includes(s) || 
       p.id.toLowerCase().includes(s)
     ).slice(0, 8);
-  }, [patients, search]);
+  }, [patients, patientSearch]);
 
   const hasExactMatch = useMemo(() => {
-    if (!search.trim()) return true;
-    const s = search.trim().toLowerCase();
+    if (!patientSearch.trim()) return true;
+    const s = patientSearch.trim().toLowerCase();
     return patients.some(p => p.name.toLowerCase() === s);
-  }, [patients, search]);
+  }, [patients, patientSearch]);
 
   // Auto-open quick patient registration when search has no matches
   useEffect(() => {
-    if (search.trim() && filteredPatients.length === 0 && !selectedPatient && !showQuickPatient) {
-      setNewPatientName(search.trim());
+    if (patientSearch.trim() && filteredPatients.length === 0 && !selectedPatient && !showQuickPatient) {
+      setNewPatientName(patientSearch.trim());
       setShowQuickPatient(true);
     }
-  }, [search, filteredPatients, selectedPatient, showQuickPatient]);
+  }, [patientSearch, filteredPatients, selectedPatient, showQuickPatient]);
 
   const handleToggleQuickPatient = () => {
     if (showQuickPatient) {
       setShowQuickPatient(false);
-      setSearch('');
+      setPatientSearch('');
       setNewPatientName('');
       setNewPatientBirthDate('');
       setNewPatientGender('F');
     } else {
       setShowQuickPatient(true);
-      setNewPatientName(search.trim());
+      setNewPatientName(patientSearch.trim());
     }
   };
 
@@ -103,14 +105,14 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
     if (selectedArea && selectedArea !== 'todas') {
       list = list.filter(t => t.area === selectedArea);
     }
-    if (search) {
-      const s = search.toLowerCase();
+    if (templateSearch) {
+      const s = templateSearch.toLowerCase();
       list = list.filter(t => 
         t.name.toLowerCase().includes(s)
       );
     }
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
-  }, [templates, search, selectedArea]);
+  }, [templates, templateSearch, selectedArea]);
 
   const handleQuickPatient = async () => {
     if (!newPatientName.trim()) return;
@@ -166,94 +168,42 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       const id = genId('exams');
       await addItemWithId('exams', id, examData);
 
-      // Sincronização local com a Worklist do Orthanc (Mac Mini M2)
-      try {
-        // Formata o nome para DICOM (Mantendo ordem natural em maiúsculas sem acentos)
-        const dicomName = selectedPatient.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      // Sincronização local com a Worklist do Orthanc
+      const { success, backupSuccess, error } = await syncExamToOrthancWorklist(
+        id,
+        template.name,
+        { id: selectedPatient.id, name: selectedPatient.name, birthDate: selectedPatient.birthDate, gender: selectedPatient.gender },
+        settings,
+        selectedDeviceId,
+        examData.examDate
+      );
+      
+      if (!success) {
+        console.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', error);
+      } else if (backupSuccess === false) {
+        console.warn('[Orthanc Sync] Falha ao enviar para o backup do worklist');
+      }
 
-        // Formata data de nascimento para AAAAMMDD
-        const dicomBirthDate = selectedPatient.birthDate ? selectedPatient.birthDate.replace(/[^0-9]/g, '') : '';
-
-        // Formata data atual do exame baseada na seleção
-        const now = new Date();
-        let stepDateObj = new Date();
-        if (examDateStr) {
-          const [year, month, day] = examDateStr.split('-').map(Number);
-          stepDateObj = new Date(year, month - 1, day);
-        }
-        
-        const stepDate = stepDateObj.getFullYear() + 
-          String(stepDateObj.getMonth() + 1).padStart(2, '0') + 
-          String(stepDateObj.getDate()).padStart(2, '0');
-        const stepTime = String(now.getHours()).padStart(2, '0') + 
-          String(now.getMinutes()).padStart(2, '0') + 
-          String(now.getSeconds()).padStart(2, '0');
-
-        const stepDescription = template.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-
-        const targetDevice = settings.dicomDevices?.find(d => d.id === selectedDeviceId) || 
-                             { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
-
-        if (settings.dicomSyncEnabled !== false && selectedPatient.id !== 'ANONIMO') {
-          try {
-            const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-            const url = (isVercel && settings.dicomLocalAgentUrl)
-              ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-              : '/api/worklist';
-            await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                examId: id,
-                patientName: dicomName,
-                patientId: selectedPatient.id,
-                patientBirthDate: dicomBirthDate,
-                patientSex: selectedPatient.gender || 'F',
-                modality: targetDevice.modality,
-                aeTitle: settings.dicomOrthancAETitle || targetDevice.aeTitle,
-                stepDate,
-                stepTime,
-                stepDescription,
-                outputDir: settings.dicomWorklistFolder,
-                localAgentUrl: settings.dicomLocalAgentUrl
-              })
-            });
-          } catch (syncError) {
-            console.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', syncError);
+      // Tocar som de sucesso
+      if (settings.soundNotifications !== false) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+            osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.4);
           }
-        }
-
-        // Backup Sync
-        if (settings.dicomBackupSyncEnabled) {
-          try {
-            const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-            const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
-              ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-              : '/api/worklist';
-            await fetch(urlBackup, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                examId: id,
-                patientName: dicomName,
-                patientId: selectedPatient.id,
-                patientBirthDate: dicomBirthDate,
-                patientSex: selectedPatient.gender || 'F',
-                modality: targetDevice.modality,
-                aeTitle: settings.dicomBackupOrthancAETitle || targetDevice.aeTitle,
-                stepDate,
-                stepTime,
-                stepDescription,
-                outputDir: settings.dicomBackupWorklistFolder,
-                localAgentUrl: settings.dicomBackupLocalAgentUrl
-              })
-            });
-          } catch (backupSyncError) {
-            console.warn('[Orthanc Backup Sync] Falha ao enviar para o worklist de backup:', backupSyncError);
-          }
-        }
-      } catch (syncError) {
-        console.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', syncError);
+        } catch (err) {}
       }
 
       showToast('Exame iniciado!');
@@ -487,11 +437,11 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                           <input
                             placeholder="Buscar paciente por nome, ID ou nascimento..."
                             className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 focus:bg-white outline-none transition-all font-bold text-sm text-slate-900 shadow-sm"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            value={patientSearch}
+                            onChange={(e) => setPatientSearch(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && patients.length > 0) {
-                                setSelectedPatient(patients.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.id.includes(search))[0]);
+                                setSelectedPatient(patients.filter(p => p.name.toLowerCase().includes(patientSearch.toLowerCase()) || p.id.includes(patientSearch))[0]);
                                 setStep(2);
                               }
                             }}
@@ -523,7 +473,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                           {filteredPatients.map(p => (
                             <button
                               key={p.id}
-                              onClick={() => { setSelectedPatient(p); setSearch(''); }}
+                              onClick={() => { setSelectedPatient(p); setPatientSearch(''); }}
                               className="w-full flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all group shadow-sm"
                             >
                               <div className="flex items-center gap-3 min-w-0">
@@ -540,11 +490,11 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                               </div>
                             </button>
                           ))}
-                          {search.trim() && !hasExactMatch && (
+                          {patientSearch.trim() && !hasExactMatch && (
                             <button
                               type="button"
                               onClick={() => {
-                                setNewPatientName(search.trim());
+                                setNewPatientName(patientSearch.trim());
                                 setShowQuickPatient(true);
                               }}
                               className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-100 transition-all group shadow-sm text-slate-700 font-bold"
@@ -554,7 +504,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                                     <UserPlus size={14} />
                                  </div>
                                  <div className="text-left min-w-0">
-                                    <p className="font-bold text-xs text-slate-700 truncate">Cadastrar "{search.trim()}" como novo paciente</p>
+                                    <p className="font-bold text-xs text-slate-700 truncate">Cadastrar "{patientSearch.trim()}" como novo paciente</p>
                                     <p className="text-[8px] text-slate-500 font-bold mt-0.5 uppercase tracking-wider">Criar registro rápido no banco</p>
                                  </div>
                               </div>
@@ -564,7 +514,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                             </button>
                           )}
                           {filteredPatients.length === 0 && (
-                            search.trim() ? (
+                            patientSearch.trim() ? (
                               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center text-center gap-3 animate-fade-in my-1">
                                 <div className="w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
                                   <UserPlus size={18} />
@@ -572,13 +522,13 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                                 <div className="space-y-0.5">
                                   <h4 className="text-xs font-black text-slate-900 uppercase">Paciente não localizado</h4>
                                   <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                                    Não encontramos nenhum cadastro para "{search}".
+                                    Não encontramos nenhum cadastro para "{patientSearch}".
                                   </p>
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setNewPatientName(search.trim());
+                                    setNewPatientName(patientSearch.trim());
                                     setShowQuickPatient(true);
                                   }}
                                   className="h-9 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-sm transition-all active:scale-95"
@@ -652,21 +602,23 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                       <input
                         placeholder="Pesquisar por nome da máscara técnica..."
                         className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none transition-all font-bold text-slate-900 text-sm shadow-sm bg-white"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        value={templateSearch}
+                        onChange={(e) => setTemplateSearch(e.target.value)}
                         autoFocus
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2.5 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar py-1">
+                    <div className={classNames("grid grid-cols-1 gap-2.5 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar py-1", loading && "pointer-events-none opacity-60")}>
                       {filteredTemplates.map(t => (
                         <button
                           key={t.id}
                           onClick={() => {
+                            if (selectedTemplate?.id !== t.id || !anamnesis.trim()) {
+                              setAnamnesis(t.anamnesisTemplate || '');
+                            }
                             setSelectedTemplate(t);
-                            setAnamnesis(t.anamnesisTemplate || '');
                             setStep(3);
-                            setSearch('');
+                            setTemplateSearch('');
                           }}
                           disabled={loading}
                           className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5"
@@ -765,7 +717,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                    setStep(2);
                  } else {
                    setStep(1);
-                   setSearch('');
+                   setPatientSearch('');
                  }
                }}
                className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-900 uppercase tracking-widest transition-all active:scale-95 group px-2 py-1 rounded-lg hover:bg-slate-100"
@@ -788,7 +740,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
            {step === 1 ? (
              <button 
-               onClick={() => { setStep(2); setSearch(''); }}
+               onClick={() => { setStep(2); setPatientSearch(''); }}
                disabled={!selectedPatient || loading}
                className="flex items-center gap-2 px-5 h-11 rounded-xl bg-slate-900 text-white font-bold text-[10px] uppercase tracking-widest hover:bg-slate-800 disabled:opacity-50 transition-all shadow-sm active:scale-95 group"
              >

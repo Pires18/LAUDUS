@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ExamRequest, ExamArea, EXAM_AREAS, Patient } from '../../../types';
-import { getAll, where } from '../../../store/db';
+import { getAll, where, limit } from '../../../store/db';
 import {
   X, History, Clock, FileText, Search, SplitSquareHorizontal,
   Eye, AlertCircle, Loader2, CalendarDays, Filter
@@ -66,9 +66,11 @@ export function ExamHistoryModal({
   useEffect(() => {
     async function load() {
       try {
+        // Fix 16: limit to 50 most recent exams to avoid large Firestore reads
         const exams = await getAll<ExamRequest>(
           'exams',
-          where('patientId', '==', patient.id)
+          where('patientId', '==', patient.id),
+          limit(50)
         );
         // Ordena por data de criação (mais recente primeiro) no cliente
         const sorted = [...exams].sort(

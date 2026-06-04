@@ -451,7 +451,7 @@ export async function batchAdd<T extends Record<string, unknown>>(
 }
 
 // Re-export for components
-export { where, orderBy, query } from 'firebase/firestore';
+export { where, orderBy, query, limit, deleteField } from 'firebase/firestore';
 
 const EXAM_AREAS_SET = new Set([
   'medicina-interna',

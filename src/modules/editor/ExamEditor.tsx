@@ -489,9 +489,18 @@ export function ExamEditor({ examId }: Props) {
     // Initial check (manual to show initial loaders/errors if any)
     checkImages(true);
 
+    // Fix 7: Adaptive polling — 5s when viewer/modal open, 30s in background
+    // Uses refs (showIntegratedViewerRef, showDicomImagesRef) to read latest state
+    // without recreating the interval on every state change.
+    let tickCount = 0;
     const intervalId = setInterval(() => {
-      checkImages(false);
-    }, 10000);
+      tickCount++;
+      const viewerOpen = showIntegratedViewerRef.current || showDicomImagesRef.current;
+      // 5s always runs; background skips 5 out of 6 ticks (effectively 30s)
+      if (viewerOpen || tickCount % 6 === 0) {
+        checkImages(false);
+      }
+    }, 5000);
 
     return () => {
       active = false;
@@ -549,6 +558,13 @@ export function ExamEditor({ examId }: Props) {
       setInitialized(true);
     }
   }, [exam, template, initialized, examId]);
+
+  // Fix 13: auto-close copilot when exam is finalized
+  useEffect(() => {
+    if (exam?.status === 'finalizado' && showCopilot) {
+      setShowCopilot(false);
+    }
+  }, [exam?.status, showCopilot]);
 
   // Actions Hook
   const {
@@ -651,12 +667,18 @@ export function ExamEditor({ examId }: Props) {
     showToast('Preparando imagens para a impressão...', 'info');
 
     try {
-      const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-      const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-      const proxyPath = getProxyEndpoint(settings, false);
-      const urls = instances.map(instance => 
-        `${proxyPath}?url=${encodeURIComponent(`${baseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${authParams}`
-      );
+      const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+      const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
+
+      // Fix 15: use correct server credentials (backup vs primary) per instance
+      const urls = instances.map(instance => {
+        const isBackup = instance.serverSource === 'backup';
+        const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
+        const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+        const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+        const proxyPath = getProxyEndpoint(settings, isBackup);
+        return `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+      });
 
       // Preload all image URLs into browser cache
       await preloadImages(urls);
@@ -1083,13 +1105,15 @@ export function ExamEditor({ examId }: Props) {
 
             {/* Main Workspace */}
             <div className="flex-1 flex flex-col min-w-0 mr-0">
-              {/* Section Progress Bar */}
+              {/* Section Progress Bar — real state vinculada ao isGenerating */}
               <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
-                 <motion.div 
-                   initial={{ width: 0 }}
-                   animate={{ width: '65%' }} // Mock progress for UI adequacy
-                   className="h-full bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                 />
+                {isGenerating && (
+                  <motion.div
+                    animate={{ x: ['-100%', '100%'] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+                    className="absolute top-0 left-0 h-full w-1/2 bg-gradient-to-r from-transparent via-brand-500 to-transparent shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                  />
+                )}
               </div>
 
               <EditorToolbar
@@ -1257,7 +1281,8 @@ export function ExamEditor({ examId }: Props) {
                           debouncedSave(html);
                         }
                       }} 
-                      editable={exam.status !== 'finalizado' && currentRole !== 'recepcao'} 
+                      editable={exam.status !== 'finalizado' && currentRole !== 'recepcao'}
+                      isGenerating={isGenerating}
                     />
                   </div>
                 </div>
@@ -1324,8 +1349,8 @@ export function ExamEditor({ examId }: Props) {
           )}
         </AnimatePresence>
 
-        {/* FAB Toggle Copilot */}
-        {exam.status !== 'finalizado' && (
+        {/* FAB Toggle Copilot — oculto e fechado ao finalizar */}
+        {exam.status !== 'finalizado' ? (
           <button
             onClick={() => setShowCopilot(!showCopilot)}
             className={classNames(
@@ -1340,7 +1365,7 @@ export function ExamEditor({ examId }: Props) {
                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse" />
             )}
           </button>
-        )}
+        ) : null}
       </div>
 
       {/* Modal de Justificativa de Desbloqueio */}
@@ -1539,7 +1564,8 @@ export function ExamEditor({ examId }: Props) {
       <div className="hidden lg:flex items-center gap-5 px-4 py-1.5 bg-ink-900 text-ink-400 text-[10px] font-mono shrink-0">
         <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘G</kbd> Gerar IA</span>
         <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘⇧C</kbd> Copiar</span>
-        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘K</kbd> Busca</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘S</kbd> Salvar</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘↵</kbd> Finalizar</span>
       </div>
 
       <AnimatePresence>
@@ -1555,8 +1581,8 @@ export function ExamEditor({ examId }: Props) {
             }}
             calculatorData={exam.calculatorData}
             onSaveCalculatorData={async (data) => {
+              // Fix 17: only write to Firestore — useDocument hook propagates reactively, no direct mutation
               await updateItem('exams', exam.id, { calculatorData: data });
-              exam.calculatorData = data;
             }}
             onAppendToForm={(text) => {
               const currentForm = exam.customFormValue || '';

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ExamRequest } from '../../../types';
 import { X, Clock, FileText, SplitSquareHorizontal, CheckCircle2, CalendarDays } from 'lucide-react';
 import { formatDateTime, classNames } from '../../../utils/format';
@@ -34,12 +34,12 @@ export function ReportVersionsModal({
     return [...list].sort((a, b) => b.timestamp - a.timestamp);
   }, [exam.reportVersions]);
 
-  // Auto-seleciona a versão mais recente
-  useState(() => {
-    if (versions.length > 0) {
+  // Fix 5: proper useEffect instead of invalid useState initializer
+  useEffect(() => {
+    if (versions.length > 0 && selectedIdx === null) {
       setSelectedIdx(0);
     }
-  });
+  }, [versions.length, selectedIdx]);
 
   const selectedVersion = selectedIdx !== null ? versions[selectedIdx] : null;
 

@@ -68,6 +68,7 @@ export function useExamActions({
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      // Fix 3: include updatedAt so Firestore ordering stays consistent
       if (latestContentRef.current !== null) {
         updateItem('exams', examId, {
           reportContent: latestContentRef.current,

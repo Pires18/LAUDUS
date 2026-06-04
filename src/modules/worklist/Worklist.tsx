@@ -2,7 +2,7 @@ import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
-import { deleteItem, addAuditLog, deleteWorklistEntry } from '../../store/db';
+import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '../../components/SkeletonLoader';
 import { AreaIcon } from '../../components/AreaIcon';
+import { syncExamToOrthancWorklist } from '../../utils/dicom';
 import type { LucideIcon } from 'lucide-react';
 
 const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: string; dot: string }> = {
@@ -22,9 +23,13 @@ const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: 
 
 export function Worklist() {
   const { setView, showToast, selectedClinicId, setShowCreateExamModal, settings } = useApp();
-  const [statusFilter, setStatusFilter] = useState<ExamStatus | 'todos'>('todos');
+  const [statusFilter, setStatusFilter] = useState<ExamStatus | 'todos'>(() => {
+    return (localStorage.getItem('laudus_worklist_status') as ExamStatus | 'todos') || 'todos';
+  });
   const [areaFilter, setAreaFilter] = useState<string>('todas');
-  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>('todos');
+  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>(() => {
+    return (localStorage.getItem('laudus_worklist_date') as 'todos' | 'hoje' | 'semana' | 'mes') || 'hoje';
+  });
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -36,6 +41,16 @@ export function Worklist() {
     status: 'pendente' as ExamStatus
   });
   const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [syncingExamId, setSyncingExamId] = useState<string | null>(null);
+
+  // Persist filters
+  useEffect(() => {
+    localStorage.setItem('laudus_worklist_status', statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('laudus_worklist_date', dateFilter);
+  }, [dateFilter]);
 
   // Realtime listeners
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams');
@@ -185,90 +200,28 @@ export function Worklist() {
   }
 
   async function handleSyncOrthanc(exam: ExamRequest, patientName: string, patientBirthDate?: string, patientSex?: 'M' | 'F' | 'O') {
+    if (syncingExamId) return;
     try {
-      // Formata o nome para DICOM (Mantendo ordem natural em maiúsculas sem acentos)
-      const dicomName = patientName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-      const dicomBirthDate = patientBirthDate ? patientBirthDate.replace(/[^0-9]/g, '') : '';
+      setSyncingExamId(exam.id);
       
-      const now = new Date();
-      const stepDate = now.getFullYear() + 
-        String(now.getMonth() + 1).padStart(2, '0') + 
-        String(now.getDate()).padStart(2, '0');
-      const stepTime = String(now.getHours()).padStart(2, '0') + 
-        String(now.getMinutes()).padStart(2, '0') + 
-        String(now.getSeconds()).padStart(2, '0');
+      const { success, backupSuccess, error } = await syncExamToOrthancWorklist(
+        exam.id,
+        exam.examType,
+        { id: exam.patientId, name: patientName, birthDate: patientBirthDate, gender: patientSex },
+        settings
+      );
 
-      const targetDevice = settings.dicomDevices?.[0] || 
-                           { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
-
-      const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-      const url = (isVercel && settings.dicomLocalAgentUrl)
-        ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-        : '/api/worklist';
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          examId: exam.id,
-          patientName: dicomName,
-          patientId: exam.patientId,
-          patientBirthDate: dicomBirthDate,
-          patientSex: patientSex || 'F',
-          modality: targetDevice.modality,
-          aeTitle: settings.dicomOrthancAETitle || targetDevice.aeTitle,
-          stepDate,
-          stepTime,
-          stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
-          outputDir: settings.dicomWorklistFolder,
-          localAgentUrl: settings.dicomLocalAgentUrl
-        })
-      });
-      const result = await res.json();
-      let backupSuccess = true;
-
-      if (settings.dicomBackupSyncEnabled) {
-        try {
-          const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-          const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
-            ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-            : '/api/worklist';
-          
-          const backupRes = await fetch(urlBackup, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              examId: exam.id,
-              patientName: dicomName,
-              patientId: exam.patientId,
-              patientBirthDate: dicomBirthDate,
-              patientSex: patientSex || 'F',
-              modality: targetDevice.modality,
-              aeTitle: settings.dicomBackupOrthancAETitle || targetDevice.aeTitle,
-              stepDate,
-              stepTime,
-              stepDescription: exam.examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
-              outputDir: settings.dicomBackupWorklistFolder,
-              localAgentUrl: settings.dicomBackupLocalAgentUrl
-            })
-          });
-          const backupResult = await backupRes.json();
-          if (!backupResult.success) backupSuccess = false;
-        } catch (err) {
-          console.warn('[Orthanc Backup Sync] Erro no envio:', err);
-          backupSuccess = false;
-        }
-      }
-
-      if (result.success && backupSuccess) {
+      if (success && backupSuccess !== false) {
         showToast('Enviado para a Worklist do Orthanc' + (settings.dicomBackupSyncEnabled ? ' e Backup!' : '!'), 'success');
-      } else if (result.success && !backupSuccess) {
+      } else if (success && backupSuccess === false) {
         showToast('Enviado para o principal, mas falhou no backup.', 'error');
       } else {
-        showToast('Erro ao sincronizar: ' + result.error, 'error');
+        showToast('Erro ao sincronizar: ' + (error || 'Desconhecido'), 'error');
       }
     } catch (err: any) {
-      showToast('Erro de conexão com API local do Orthanc', 'error');
+      showToast('Erro de conexão ao tentar sincronizar', 'error');
+    } finally {
+      setSyncingExamId(null);
     }
   }
 
@@ -276,8 +229,7 @@ export function Worklist() {
     if (!editExamId) return;
     try {
       setLoadingMetadata(true);
-      const { updateItem: dbUpdate } = await import('../../store/db');
-      await dbUpdate('exams', editExamId, {
+      await updateItem('exams', editExamId, {
         requestingPhysician: editData.requestingPhysician,
         clinicalIndication: editData.clinicalIndication,
         clinicId: editData.clinicId,
@@ -323,7 +275,11 @@ export function Worklist() {
           const isActive = statusFilter === s;
           const sColors = {
             todos: isActive ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:border-slate-300 text-slate-900',
-            pendente: isActive ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-slate-200 hover:border-amber-300 text-slate-900',
+            pendente: isActive 
+              ? 'bg-amber-500 border-amber-500 text-white' 
+              : counts.pendente > 5 
+                ? 'bg-red-50 border-red-200 hover:border-red-400 text-red-900 animate-[pulse_3s_ease-in-out_infinite]' 
+                : 'bg-white border-slate-200 hover:border-amber-300 text-slate-900',
             'em-andamento': isActive ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-slate-200 hover:border-brand-300 text-slate-900',
             finalizado: isActive ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 hover:border-emerald-300 text-slate-900',
           };
@@ -553,10 +509,11 @@ export function Worklist() {
                                 e.stopPropagation();
                                 handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender);
                               }}
-                              className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 transition-all shadow-sm shrink-0"
+                              disabled={syncingExamId === exam.id}
+                              className="p-2 lg:p-3 rounded-xl lg:rounded-2xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 disabled:opacity-50 transition-all shadow-sm shrink-0"
                               title="Enviar para Worklist Orthanc"
                             >
-                              <RefreshCw className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
+                              {syncingExamId === exam.id ? <Loader2 className="w-4 h-4 lg:w-[18px] lg:h-[18px] animate-spin text-emerald-500" /> : <RefreshCw className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />}
                             </button>
                             <button
                               onClick={() => setDeleteId(exam.id)}
@@ -677,10 +634,11 @@ export function Worklist() {
                             e.stopPropagation();
                             handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender);
                           }}
-                          className="p-2.5 rounded-xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                          disabled={syncingExamId === exam.id}
+                          className="p-2.5 rounded-xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 transition-colors"
                           title="Enviar para Worklist Orthanc"
                         >
-                          <RefreshCw size={16} />
+                          {syncingExamId === exam.id ? <Loader2 size={16} className="animate-spin text-emerald-500" /> : <RefreshCw size={16} />}
                         </button>
                         <button
                           onClick={() => setDeleteId(exam.id)}

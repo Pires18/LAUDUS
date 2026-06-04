@@ -531,7 +531,8 @@ async function callGemini(
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
   const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
   const modelName = getModelForMode(settings, mode, area);
-  const maxTokens = Math.min(getMaxTokens(area), 8192);
+  // Fix 11: use full area-specific token limit (no artificial 8192 cap)
+  const maxTokens = getMaxTokens(area);
   const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction,
@@ -559,7 +560,8 @@ async function callGeminiStream(
   const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
   const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
   const modelName = getModelForMode(settings, mode, area);
-  const maxTokens = Math.min(getMaxTokens(area), 8192);
+  // Fix 11: use full area-specific token limit (no artificial 8192 cap)
+  const maxTokens = getMaxTokens(area);
   const model = genAI.getGenerativeModel({
     model: modelName,
     systemInstruction,

@@ -229,10 +229,17 @@ export function LaudCopilot({
     let analyser: AnalyserNode | null = null;
     let stream: MediaStream | null = null;
     let animationId: number | null = null;
+    // Fix 18: cancelled flag prevents MediaStream leak if isListening toggles quickly
+    let cancelled = false;
 
     const getVolume = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // If already cancelled while awaiting, stop the stream immediately
+        if (cancelled) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
         audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         analyser = audioContext.createAnalyser();
         const source = audioContext.createMediaStreamSource(stream);
@@ -242,7 +249,7 @@ export function LaudCopilot({
         const dataArray = new Uint8Array(bufferLength);
 
         const updateVolume = () => {
-          if (!analyser) return;
+          if (!analyser || cancelled) return;
           analyser.getByteFrequencyData(dataArray);
           let sum = 0;
           for (let i = 0; i < bufferLength; i++) {
@@ -257,6 +264,7 @@ export function LaudCopilot({
         console.warn('[Voice Analyser] Microfone não acessível ou permissão negada:', err);
         // Fallback para volume simulado caso falhe
         let mockInterval = setInterval(() => {
+          if (cancelled) { clearInterval(mockInterval); return; }
           setVoiceVolume(Math.random() * 100);
         }, 100);
         return () => clearInterval(mockInterval);
@@ -270,6 +278,7 @@ export function LaudCopilot({
     }
 
     return () => {
+      cancelled = true;
       if (animationId) cancelAnimationFrame(animationId);
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -705,8 +714,10 @@ export function LaudCopilot({
     if (formSaveTimerRef.current) {
       clearTimeout(formSaveTimerRef.current);
       formSaveTimerRef.current = null;
-      updateItem('exams', exam.id, { customFormValue: formText });
+      // Fix 9: mark as clean immediately to prevent double Firestore write
+      // (handleBlurFormText would write again otherwise)
       isDirtyRef.current = false;
+      updateItem('exams', exam.id, { customFormValue: formText });
     }
 
     // Prefix DEVE corresponder ao que parseFormMessage espera (startsWith check na linha 199)

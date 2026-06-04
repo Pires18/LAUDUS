@@ -58,8 +58,10 @@ export function DicomImagesModal({
       }
       prevInstanceIdsRef.current = currentIds;
     } else {
+      // Fix 8: reset both initializedRef AND selectedIds so modal is fresh on reopen
       initializedRef.current = false;
       prevInstanceIdsRef.current = [];
+      setSelectedIds(new Set());
     }
   }, [open, instances]);
 
