@@ -963,7 +963,7 @@ export function Settings() {
 
           {/* TAB: FINANCEIRO */}
           {activeTab === 'financeiro' && (
-            <div className="animate-fade-in -mt-8">
+            <div className="animate-fade-in">
               <FinancialControl />
             </div>
           )}

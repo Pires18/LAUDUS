@@ -40,26 +40,13 @@ export function useCollection<T extends { id: string }>(
   // Serialize constraints for dependency array
   const constraintKey = JSON.stringify(constraints.map((c) => c.toString()));
 
-  // Resolve o UID do administrador matheuskpires@gmail.com
+  // Hardcoded UID do administrador matheuskpires@gmail.com
+  // Evita falhas de permissão ao tentar buscar na coleção de 'users' via getDocs()
   useEffect(() => {
     if (!enabled || !auth.currentUser || cachedAdminUid) return;
 
-    if (auth.currentUser.email === 'matheuskpires@gmail.com') {
-      cachedAdminUid = auth.currentUser.uid;
-      setAdminUid(cachedAdminUid);
-      return;
-    }
-
-    import('firebase/firestore').then(({ collection, query, where, getDocs }) => {
-      const usersCol = collection(firestore, 'users');
-      const q = query(usersCol, where('email', '==', 'matheuskpires@gmail.com'));
-      getDocs(q).then((snap) => {
-        if (!snap.empty) {
-          cachedAdminUid = snap.docs[0].id;
-          setAdminUid(cachedAdminUid);
-        }
-      });
-    }).catch((err) => console.warn('[useFirestore] Erro ao obter UID do admin:', err));
+    cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
+    setAdminUid(cachedAdminUid);
   }, [enabled, auth.currentUser?.uid]);
 
   useEffect(() => {
@@ -197,36 +184,27 @@ export function useDocument<T extends { id: string }>(
                 );
               });
             } else {
-              // Busca dinamicamente o UID do admin
-              import('firebase/firestore').then(({ collection, query, where, getDocs, onSnapshot: snapListener }) => {
-                const usersCol = collection(firestore, 'users');
-                const q = query(usersCol, where('email', '==', 'matheuskpires@gmail.com'));
-                getDocs(q).then((snap) => {
-                  if (!snap.empty) {
-                    cachedAdminUid = snap.docs[0].id;
-                    const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, documentId);
-                    unsubscribeAdmin = snapListener(
-                      adminDocRef,
-                      (adminSnap) => {
-                        if (adminSnap.exists()) {
-                          setData({ ...adminSnap.data(), id: adminSnap.id, isSystem: true } as any);
-                        } else {
-                          setData(null);
-                        }
-                        setLoading(false);
-                        setError(null);
-                      },
-                      (err) => {
-                        console.warn(`[useDocument] Erro ao assinar fallback do admin:`, err);
-                        setData(null);
-                        setLoading(false);
-                      }
-                    );
-                  } else {
+              // Usa o UID hardcoded do admin
+              cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
+              import('firebase/firestore').then(({ onSnapshot: snapListener }) => {
+                const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, documentId);
+                unsubscribeAdmin = snapListener(
+                  adminDocRef,
+                  (adminSnap) => {
+                    if (adminSnap.exists()) {
+                      setData({ ...adminSnap.data(), id: adminSnap.id, isSystem: true } as any);
+                    } else {
+                      setData(null);
+                    }
+                    setLoading(false);
+                    setError(null);
+                  },
+                  (err) => {
+                    console.warn(`[useDocument] Erro ao assinar fallback do admin:`, err);
                     setData(null);
                     setLoading(false);
                   }
-                });
+                );
               });
             }
           } else {

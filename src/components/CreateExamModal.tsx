@@ -613,9 +613,6 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                         <button
                           key={t.id}
                           onClick={() => {
-                            if (selectedTemplate?.id !== t.id || !anamnesis.trim()) {
-                              setAnamnesis(t.anamnesisTemplate || '');
-                            }
                             setSelectedTemplate(t);
                             setStep(3);
                             setTemplateSearch('');

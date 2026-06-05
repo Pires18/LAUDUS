@@ -114,9 +114,10 @@ export function AdminLicenses() {
 
   // Copia código para clipboard
   function handleCopy(code: string) {
-    navigator.clipboard.writeText(code);
+    const activationLink = `${window.location.origin}?code=${code}`;
+    navigator.clipboard.writeText(activationLink);
     setCopiedCode(code);
-    showToast('Código de licença copiado!', 'success');
+    showToast('Link de ativação copiado!', 'success');
     setTimeout(() => {
       setCopiedCode(null);
     }, 2000);
@@ -280,6 +281,39 @@ export function AdminLicenses() {
             <span>Gerar Licença(s)</span>
           </button>
         </div>
+
+        {/* Selected Plan Details Preview */}
+        {selectedPlanId && plans.find(p => p.id === selectedPlanId) && (
+          <div className="mt-6 p-4 bg-brand-50/50 rounded-2xl border border-brand-100 flex flex-wrap gap-x-6 gap-y-2">
+            {(() => {
+              const p = plans.find(p => p.id === selectedPlanId)!;
+              return (
+                <>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-700">
+                    <span className="text-brand-400 mr-1">Laudos:</span> 
+                    {p.examLimit || 'Ilimitado'}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-700">
+                    <span className="text-brand-400 mr-1">IA Créditos:</span> 
+                    {p.iaLimit || 'Ilimitado'}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-700">
+                    <span className="text-brand-400 mr-1">Storage:</span> 
+                    {p.storageLimitGb ? `${p.storageLimitGb} GB` : 'Ilimitado'}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-700">
+                    <span className="text-brand-400 mr-1">Ditado:</span> 
+                    {p.voiceDictation ? 'Sim' : 'Não'}
+                  </p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-700">
+                    <span className="text-brand-400 mr-1">Máscaras:</span> 
+                    {p.customMasks ? 'Custom' : 'Apenas Padrão'}
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Licenses List Filter & Search Table */}
@@ -348,7 +382,7 @@ export function AdminLicenses() {
                           <button
                             onClick={() => handleCopy(lic.id)}
                             className="p-2 hover:bg-brand-50 hover:text-brand-600 rounded-xl text-ink-400 transition-colors"
-                            title="Copiar código"
+                            title="Copiar Link de Ativação"
                           >
                             {copiedCode === lic.id ? <Check size={14} className="text-brand-600" /> : <Copy size={14} />}
                           </button>

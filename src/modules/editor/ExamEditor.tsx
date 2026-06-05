@@ -776,13 +776,38 @@ export function ExamEditor({ examId }: Props) {
     };
   }, [handleRefine, reportContent, handleCopy, handleReset, debouncedSave, showToast, handleStatusChange]);
 
+  // Timeout to prevent infinite loading
+  const [loadTimeout, setLoadTimeout] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setLoadTimeout(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <>
-      {!exam || !patient || !template ? (
+      {(!exam || !patient || (!template && !loadTimeout)) ? (
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <Loader2 size={24} className="animate-spin-slow text-brand-500 mx-auto mb-3" />
-            <p className="text-sm text-ink-500">Carregando exame...</p>
+            <p className="text-sm text-ink-500">
+              Carregando exame...
+            </p>
+            {loadTimeout && (
+              <div className="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-xs max-w-xs text-left shadow-sm border border-red-100">
+                <p className="font-bold mb-1">Diagnóstico de Falha:</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  {!exam && <li>O exame não foi encontrado.</li>}
+                  {!patient && <li>O paciente do exame não foi encontrado.</li>}
+                  {!template && <li>A máscara do exame não foi encontrada (ou você não tem permissão).</li>}
+                </ul>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="mt-3 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-md font-medium transition-colors w-full"
+                >
+                  Recarregar Página
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (

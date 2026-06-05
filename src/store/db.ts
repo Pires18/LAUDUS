@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../modules/ai/prompts/general';
 
 // Cache global para evitar múltiplas queries do UID do administrador
 let cachedAdminUid: string | null = null;
@@ -117,22 +118,22 @@ export async function getSettings(): Promise<AppSettings> {
         : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
-      dicomOrthancAETitle: 'ORTHANCPACS',
-      dicomViewerUrl: 'http://100.93.111.95:8042',
-      dicomTailscalePublicUrl: 'https://servidor-mac.tail861dda.ts.net:8443',
+      dicomOrthancAETitle: '',
+      dicomViewerUrl: '',
+      dicomTailscalePublicUrl: '',
       dicomViewerType: 'stone',
       dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
       dicomPreset: 'macmini',
-      dicomUsername: 'admin',
-      dicomPassword: '123456789',
-      dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10443',
-      dicomBackupSyncEnabled: true,
-      dicomBackupViewerUrl: 'http://100.124.187.11:8043',
-      dicomBackupTailscalePublicUrl: 'https://servidor-notebook.tail861dda.ts.net:8443',
-      dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
-      dicomBackupUsername: 'admin',
-      dicomBackupPassword: '123456789',
-      dicomBackupLocalAgentUrl: 'https://servidor-notebook.tail861dda.ts.net:10443',
+      dicomUsername: '',
+      dicomPassword: '',
+      dicomLocalAgentUrl: '',
+      dicomBackupSyncEnabled: false,
+      dicomBackupViewerUrl: '',
+      dicomBackupTailscalePublicUrl: '',
+      dicomBackupOrthancAETitle: '',
+      dicomBackupUsername: '',
+      dicomBackupPassword: '',
+      dicomBackupLocalAgentUrl: '',
       dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
       soundNotifications: true,
       autoSave: true,
@@ -165,7 +166,8 @@ export async function getSettings(): Promise<AppSettings> {
     }
 
     // Forçar migração para o novo padrão Tailscale solicitado pelo usuário
-    if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8043') {
+    if (auth.currentUser?.email === 'matheuskpires@gmail.com') {
+      if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8043') {
       data.dicomViewerUrl = 'http://100.93.111.95:8042';
       data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net:10443';
       data.dicomOrthancAETitle = 'ORTHANCPACS';
@@ -180,6 +182,7 @@ export async function getSettings(): Promise<AppSettings> {
       data.dicomBackupUsername = 'admin';
       data.dicomBackupPassword = '123456789';
       migrated = true;
+      }
     }
 
     if (migrated && snap.exists()) {
@@ -194,17 +197,21 @@ export async function getSettings(): Promise<AppSettings> {
       if (adminSettings) {
         const merged = {
           ...defaultSettings,
-          ...adminSettings,
-          ...data, // Configurações locais do médico (CRM, RQE, nome) prevalecem
-          // Mas os prompts do sistema e do LAUD.IA publicados pelo administrador são herdados
-          aiMasterPrompt: data.aiMasterPrompt || adminSettings.aiMasterPrompt,
-          aiGlobalInstructions: data.aiGlobalInstructions || adminSettings.aiGlobalInstructions,
-          aiStructurePrompt: data.aiStructurePrompt || adminSettings.aiStructurePrompt,
-          aiRigidRules: data.aiRigidRules || adminSettings.aiRigidRules,
-          aiAreaPrompts: { ...adminSettings.aiAreaPrompts, ...data.aiAreaPrompts },
-          geminiApiKey: data.geminiApiKey || adminSettings.geminiApiKey || '',
-          anthropicApiKey: data.anthropicApiKey || adminSettings.anthropicApiKey || '',
+          ...data, // Configurações locais do médico (Motor, PACS, CRM, RQE, etc) prevalecem
+          
+          // Prompts do sistema, doutrina e LAUD.IA publicados pelo administrador sobrepõem as locais:
+          aiMasterPrompt: adminSettings.aiMasterPrompt || defaultSettings.aiMasterPrompt || DEFAULT_MASTER_PROMPT,
+          aiGlobalInstructions: adminSettings.aiGlobalInstructions || defaultSettings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS,
+          aiStructurePrompt: adminSettings.aiStructurePrompt || defaultSettings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT,
+          aiRigidRules: adminSettings.aiRigidRules || defaultSettings.aiRigidRules || DEFAULT_RIGID_RULES,
+          normalDoctrine: adminSettings.normalDoctrine || defaultSettings.normalDoctrine,
+          aiAreaPrompts: adminSettings.aiAreaPrompts || defaultSettings.aiAreaPrompts,
+          
+          // Chaves de API estritamente isoladas por usuário (sem fallback do admin)
+          geminiApiKey: data.geminiApiKey || '',
+          anthropicApiKey: data.anthropicApiKey || '',
         };
+        
         if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
           merged.anthropicModel = 'claude-3-5-sonnet-latest';
         }
@@ -212,6 +219,11 @@ export async function getSettings(): Promise<AppSettings> {
       }
     }
     const finalData = { ...defaultSettings, ...data };
+    finalData.aiMasterPrompt = finalData.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
+    finalData.aiGlobalInstructions = finalData.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
+    finalData.aiStructurePrompt = finalData.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
+    finalData.aiRigidRules = finalData.aiRigidRules || DEFAULT_RIGID_RULES;
+    
     if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
       finalData.anthropicModel = 'claude-3-5-sonnet-latest';
     }
@@ -230,22 +242,22 @@ export async function getSettings(): Promise<AppSettings> {
       : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
-    dicomOrthancAETitle: 'ORTHANCPACS',
-    dicomViewerUrl: 'http://100.93.111.95:8042',
-    dicomTailscalePublicUrl: 'https://servidor-mac.tail861dda.ts.net:8443',
+    dicomOrthancAETitle: '',
+    dicomViewerUrl: '',
+    dicomTailscalePublicUrl: '',
     dicomViewerType: 'stone',
     dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
     dicomPreset: 'macmini',
-    dicomUsername: 'admin',
-    dicomPassword: '123456789',
-    dicomLocalAgentUrl: 'https://servidor-mac.tail861dda.ts.net:10443',
-    dicomBackupSyncEnabled: true,
-    dicomBackupViewerUrl: 'http://100.124.187.11:8043',
-    dicomBackupTailscalePublicUrl: 'https://servidor-notebook.tail861dda.ts.net:8443',
-    dicomBackupOrthancAETitle: 'ORTHANCBACKUP',
-    dicomBackupUsername: 'admin',
-    dicomBackupPassword: '123456789',
-    dicomBackupLocalAgentUrl: 'https://servidor-notebook.tail861dda.ts.net:10443',
+    dicomUsername: '',
+    dicomPassword: '',
+    dicomLocalAgentUrl: '',
+    dicomBackupSyncEnabled: false,
+    dicomBackupViewerUrl: '',
+    dicomBackupTailscalePublicUrl: '',
+    dicomBackupOrthancAETitle: '',
+    dicomBackupUsername: '',
+    dicomBackupPassword: '',
+    dicomBackupLocalAgentUrl: '',
     dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
     soundNotifications: true,
     autoSave: true,
@@ -256,12 +268,7 @@ export async function getSettings(): Promise<AppSettings> {
 export async function getAdminSettings(): Promise<AppSettings | null> {
   try {
     if (!cachedAdminUid) {
-      const usersCol = collection(firestore, 'users');
-      const q = query(usersCol, where('email', '==', 'matheuskpires@gmail.com'));
-      const snapAdmin = await getDocs(q);
-      if (!snapAdmin.empty) {
-        cachedAdminUid = snapAdmin.docs[0].id;
-      }
+      cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
     }
     if (cachedAdminUid) {
       const adminDocRef = doc(firestore, `users/${cachedAdminUid}/settings`, SETTINGS_DOC_ID);
@@ -382,14 +389,9 @@ export async function getItem<T>(
   // Fallback de segurança para buscar templates oficiais do administrador/sistema
   if (collectionName === 'templates' && auth.currentUser?.email !== 'matheuskpires@gmail.com') {
     try {
-      // 1. Resolve o UID do administrador matheuskpires@gmail.com se não estiver em cache
+      // 1. Usa o UID hardcoded do administrador matheuskpires@gmail.com
       if (!cachedAdminUid) {
-        const usersCol = collection(firestore, 'users');
-        const q = query(usersCol, where('email', '==', 'matheuskpires@gmail.com'));
-        const snapAdmin = await getDocs(q);
-        if (!snapAdmin.empty) {
-          cachedAdminUid = snapAdmin.docs[0].id;
-        }
+        cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
       }
 
       // 2. Tenta carregar o template na coleção do administrador
@@ -878,6 +880,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
 
 export interface AiUsageLog {
   id?: string;
+  examId?: string;
   timestamp: number;
   model: string;
   provider: string;

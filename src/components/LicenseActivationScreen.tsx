@@ -22,8 +22,13 @@ export function LicenseActivationScreen({
   onActivated 
 }: LicenseActivationScreenProps) {
   const { user, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<'acquire' | 'activate'>('acquire');
-  const [code, setCode] = useState('');
+  
+  // Pre-fill code if passed via URL parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialCode = urlParams.get('code') || '';
+  
+  const [activeTab, setActiveTab] = useState<'acquire' | 'activate'>(initialCode ? 'activate' : 'acquire');
+  const [code, setCode] = useState(initialCode);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

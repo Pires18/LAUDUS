@@ -173,59 +173,14 @@ function UserAccessGate({ children }: { children: ReactNode }) {
           return;
         }
 
+        // O sistema não usa mais pré-cadastro manual (que causaria Permission Denied no Firebase)
+        // Se o usuário já existir no banco (criado pelo auto-cadastro com licença), tudo certo.
+        // Se não existir, ele será barrado a não ser que use a tela de ativação de licença.
         if (!snap.exists()) {
-          // Se não existe o documento com UID, busca um pré-cadastro pelo e-mail
-          const { collection, query, where, getDocs, setDoc, deleteDoc, updateDoc } = await import('firebase/firestore');
-          const usersCol = collection(firestore, 'users');
-          const q = query(usersCol, where('email', '==', user.email));
-          const querySnap = await getDocs(q);
-
-          if (!querySnap.empty) {
-            // Pré-cadastro encontrado! Vincula ao UID
-            const preRegDoc = querySnap.docs[0];
-            const preRegData = preRegDoc.data();
-
-            const newUserPayload = {
-              ...preRegData,
-              name: user.displayName || preRegData.name || user.email?.split('@')[0],
-              updatedAt: Date.now()
-            };
-
-            // 1. Cria o documento com o UID do usuário
-            await setDoc(userRef, newUserPayload);
-
-            // 2. Remove o documento de pré-cadastro antigo
-            await deleteDoc(preRegDoc.ref);
-
-            // 3. Atualiza o UID na licença (seguro contra regras de segurança)
-            if (preRegData.licenseCode) {
-              try {
-                const licenseRef = doc(firestore, 'plans', `LICENSE_${preRegData.licenseCode}`);
-                await updateDoc(licenseRef, {
-                  usedByUid: user.uid,
-                  updatedAt: Date.now()
-                });
-              } catch (err) {
-                console.warn('[AccessGate] Não foi possível atualizar o UID na licença:', err);
-              }
-            }
-
-            // 4. Avalia acesso herdado do pré-cadastro
-            if (preRegData.active === false) {
-              setIsAllowed(false);
-              setIsExpired(false);
-            } else if (preRegData.licenseExpiresAt && preRegData.licenseExpiresAt < Date.now()) {
-              setIsAllowed(false);
-              setIsExpired(true);
-              setExpiredPlanName(preRegData.licensePlanName);
-            } else {
-              setIsAllowed(true);
-            }
-          } else {
-            // Sem pré-cadastro: Usuário novo real - precisa de ativação por chave
-            setIsAllowed(false);
-            setIsExpired(false);
-          }
+          console.warn('[AUTH] Usuário autenticado, mas não possui documento no Firestore. Deve ativar licença.');
+          // Sem documento: Usuário novo real - precisa de ativação por chave
+          setIsAllowed(false);
+          setIsExpired(false);
         } else {
           const data = snap.data();
           if (data.active === false) {

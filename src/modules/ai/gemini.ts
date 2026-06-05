@@ -7,6 +7,7 @@ import { logAiUsage } from '../../store/db';
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
 interface GenerateReportParams {
+  examId?: string;
   template: ReportTemplate;
   patient: Patient | null;
   settings: AppSettings;
@@ -19,6 +20,7 @@ interface GenerateReportParams {
 }
 
 interface CopilotParams {
+  examId?: string;
   instruction: string;
   currentReport: string;
   patient: Patient | null;
@@ -30,6 +32,7 @@ interface CopilotParams {
 }
 
 interface RefineParams {
+  examId?: string;
   currentReport: string;
   template: ReportTemplate;
   patient: Patient | null;
@@ -50,6 +53,7 @@ export interface BuiltPrompt {
 }
 
 export interface CallMetrics {
+  examId?: string;
   mode: 'generation' | 'refine' | 'copilot' | 'template';
   provider: 'gemini' | 'anthropic';
   area: string;
@@ -84,6 +88,7 @@ function recordMetrics(m: CallMetrics) {
     
     // Log asynchronously
     logAiUsage({
+      examId: m.examId,
       model: m.modelName,
       provider: m.provider,
       inputTokens: m.estimatedInputTokens,
@@ -503,7 +508,6 @@ export function resolveGeminiModel(rawModel: string | undefined): string {
   if (!rawModel) return 'gemini-3.5-flash';
   const raw = rawModel.toLowerCase();
   
-  // O Google exige o sufixo -preview para o 3.1 Pro atualmente
   if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro-preview';
   if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
   if (raw.includes('pro')) return 'gemini-3.1-pro-preview';
@@ -513,10 +517,7 @@ export function resolveGeminiModel(rawModel: string | undefined): string {
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
-  let modelToUse = settings.geminiModel || 'gemini-3.5-flash';
-  if (settings.geminiModelByMode?.[mode as keyof typeof settings.geminiModelByMode]) {
-    modelToUse = settings.geminiModelByMode[mode as keyof typeof settings.geminiModelByMode]!;
-  }
+  const modelToUse = settings.geminiModel || 'gemini-3.5-flash';
   return resolveGeminiModel(modelToUse);
 }
 
@@ -776,6 +777,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     success = true;
     const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
+      examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
       provider,
       area,
@@ -791,6 +793,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
   } catch (err) {
     const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
+      examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
       provider,
       area,
@@ -836,6 +839,7 @@ export async function generateReportStream(
     }
     const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
+      examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
       provider,
       area,
@@ -851,6 +855,7 @@ export async function generateReportStream(
   } catch (err) {
     const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
+      examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
       provider,
       area,

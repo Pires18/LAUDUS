@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator,
-  Lightbulb, Zap, Command, ChevronRight, ClipboardList, RotateCcw, CheckCircle2
+  Lightbulb, Zap, Command, ChevronRight, ClipboardList, RotateCcw, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
@@ -353,42 +353,7 @@ export function LaudCopilot({
       body = fallbackStart !== -1 ? content.substring(fallbackStart + 3) : '';
     }
 
-    const items: Array<{ structure: string; status: 'Normal' | 'Alterado'; details: string }> = [];
-
-    // Tenta parsear linhas no formato "Estrutura: valor"
-    const lines = body.split('\n');
-    lines.forEach(line => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-
-      const cleanLine = trimmed.startsWith('- ') ? trimmed.substring(2).trim() : trimmed;
-      const colonIndex = cleanLine.indexOf(':');
-      if (colonIndex !== -1 && colonIndex < 60) {
-        const structure = cleanLine.substring(0, colonIndex).trim();
-        let rest = cleanLine.substring(colonIndex + 1).trim();
-        
-        // Pular campos que foram deixados totalmente em branco pelo médico
-        if (!rest) return;
-
-        // Remove colchetes se houver (ex: [Normal] -> Normal)
-        if (rest.startsWith('[') && rest.endsWith(']')) {
-          rest = rest.substring(1, rest.length - 1).trim();
-        }
-        const isAlterado = rest.toLowerCase().includes('alterado') || rest.toLowerCase().includes('patolog') || rest.toLowerCase().includes('alteraç');
-        const cleanRest = rest.replace(/alterado/i, '').replace(/normal/i, '').trim();
-        const details = cleanRest.replace(/^[,\s\-()]+/, '').trim();
-        items.push({ structure, status: isAlterado ? 'Alterado' : 'Normal', details });
-        return;
-      }
-
-      // Formato livre: linha de texto simples → usa como item único
-      if (trimmed.length > 3 && items.length < 20) {
-        const isAlterado = /alterado|patolog|anormal|ectásic|aumentad|diminuíd|calcif|cistos?|nódulo/i.test(trimmed);
-        items.push({ structure: trimmed.substring(0, 60) + (trimmed.length > 60 ? '...' : ''), status: isAlterado ? 'Alterado' : 'Normal', details: '' });
-      }
-    });
-
-    return { title, items };
+    return { title, body: body.trim() };
   };
 
   const parseMessageContent = (content: string) => {
@@ -583,6 +548,7 @@ export function LaudCopilot({
       let currentResponse = '';
 
       const finalHtml = await generateReportStream({
+        examId: exam.id,
         instruction: messageToSend,
         currentReport: reportContent,
         patient,
@@ -635,6 +601,7 @@ export function LaudCopilot({
 
             let refinedHtml = '';
             const finalRefined = await generateReportStream({
+              examId: exam.id,
               currentReport: cleanProposal,
               template,
               patient,
@@ -921,27 +888,10 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                                 </div>
                               </div>
 
-                              <div className="space-y-2 relative z-10 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
-                                {formData.items.map((item, i) => (
-                                  <div key={i} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex flex-col gap-1.5 hover:bg-white transition-all shadow-sm">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold text-slate-700">{item.structure}</span>
-                                      <span className={classNames(
-                                        "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider shadow-sm",
-                                        item.status === 'Alterado'
-                                          ? "bg-amber-100 text-amber-700 border border-amber-200"
-                                          : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                      )}>
-                                        {item.status}
-                                      </span>
-                                    </div>
-                                    {item.details && (
-                                      <span className="text-[11px] font-medium text-slate-600 pt-1.5 border-t border-slate-200/50 mt-1">
-                                        {item.details}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
+                              <div className="relative z-10 p-4 bg-slate-50 border border-slate-100 rounded-xl max-h-[220px] overflow-y-auto custom-scrollbar">
+                                <p className="text-[11px] font-medium text-slate-700 whitespace-pre-wrap leading-relaxed">
+                                  {formData.body}
+                                </p>
                               </div>
                             </div>
                           </div>

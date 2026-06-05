@@ -102,7 +102,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   // Set default view mode based on structured fields
   useEffect(() => {
     if (open) {
-      const fields = parseAnamnesis(exam.anamnesis || template?.anamnesisTemplate || '');
+      const fields = parseAnamnesis(exam.anamnesis || '');
       const hasStructured = fields.some(f => f.isStructured);
       setViewMode(hasStructured ? 'form' : 'text');
     }
@@ -125,11 +125,6 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
       getItem<ReportTemplate>('templates', exam.templateId).then((t) => {
         if (t) {
           setTemplate(t);
-          // Auto-fill if empty
-          if (!exam.anamnesis && t.anamnesisTemplate) {
-            setAnamnesis(t.anamnesisTemplate);
-            updateItem('exams', exam.id, { anamnesis: t.anamnesisTemplate });
-          }
           if (!exam.consentTerm && t.consentTemplate) {
             setConsentTerm(t.consentTemplate);
             updateItem('exams', exam.id, { consentTerm: t.consentTemplate });
@@ -204,14 +199,6 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
       consentAccepted: checked,
       consentAcceptedAt: checked ? Date.now() : null,
     });
-  };
-
-  const handleRestoreAnamnesis = async () => {
-    if (!template?.anamnesisTemplate) return;
-    if (window.confirm('Deseja restaurar a anamnese para o padrão da máscara?')) {
-      setAnamnesis(template.anamnesisTemplate);
-      await updateItem('exams', exam.id, { anamnesis: template.anamnesisTemplate });
-    }
   };
 
   const handleRestoreConsent = async () => {
@@ -440,7 +427,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                             area: newTemplate.area,
                             reportContent: getInitialReportContent(newTemplate),
                             chatHistory: [],
-                            anamnesis: newTemplate.anamnesisTemplate || '',
+                            anamnesis: '',
                             consentTerm: newTemplate.consentTemplate || ''
                           });
                           showToast('Exame alterado e reiniciado com sucesso!', 'success');
@@ -544,16 +531,6 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {template?.anamnesisTemplate && isEditable && (
-                    <button
-                      onClick={handleRestoreAnamnesis}
-                      title="Restaurar anamnese padrão da máscara"
-                      className="text-[10px] font-black text-slate-500 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors border border-slate-200 bg-slate-50 hover:bg-brand-50 px-2 py-1.5 rounded-lg"
-                    >
-                      <RotateCcw size={11} />
-                      Restaurar Padrão
-                    </button>
-                  )}
                   <button
                     onClick={() => printDocument('Anamnese de Exame', anamnesis, false)}
                     className="text-[10px] font-black text-white bg-slate-900 hover:bg-slate-800 flex items-center gap-1.5 uppercase tracking-wider transition-all px-3 py-1.5 rounded-lg shadow-sm"

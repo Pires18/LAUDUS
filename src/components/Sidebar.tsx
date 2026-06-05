@@ -21,7 +21,7 @@ const items = [
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
   { key: 'laud-ia', label: 'LaudIA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
-  { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin'] },
+  { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 

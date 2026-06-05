@@ -111,6 +111,7 @@ export function useExamActions({
           await saveVersionSnapshot(examId, currentReport, 'generation');
           // Modo: GERAÇÃO INICIAL — gera do zero a partir da máscara como referência
           html = await generateReportStream({
+            examId,
             template,
             patient,
             settings,
@@ -130,6 +131,7 @@ export function useExamActions({
           await saveVersionSnapshot(examId, currentReport, 'refine');
           // Modo: REFINAMENTO — edição cirúrgica do laudo já existente (R10)
           html = await generateReportStream({
+            examId,
             currentReport,
             template,
             patient,

@@ -7,13 +7,12 @@ import { addAuditLog } from '../../../store/db';
 import { 
   updateUserRole, 
   setUserActiveStatus, 
-  createUserDocument, 
   deleteUserDocument 
 } from '../../../store/adminUsers';
 import { 
-  Search, UserPlus, Shield, MoreVertical, 
+  Search, Shield, MoreVertical, 
   CheckCircle2, XCircle, Loader2,
-  ChevronDown, Trash2, Mail, User, Filter
+  ChevronDown, Trash2, Filter
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
@@ -38,23 +37,8 @@ export function AdminUsers() {
   const [roleChangeTarget, setRoleChangeTarget] = useState<SystemUser | null>(null);
   const [statusChangeTarget, setStatusChangeTarget] = useState<SystemUser | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SystemUser | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // New User Form State
-  const [newName, setNewName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [newRole, setNewRole] = useState<UserRole>('medico');
-  const [selectedLicenseCode, setSelectedLicenseCode] = useState('');
 
   const { data: users, loading } = useCollection<SystemUser>('users', { isGlobal: true });
-  const { data: rawPlansAndLicenses } = useCollection<any>('plans', { isGlobal: true });
-
-  const availableLicenses = rawPlansAndLicenses
-    .filter((p: any) => p.id?.startsWith('LICENSE_') && p.active && !p.usedByUid)
-    .map((lic: any) => ({
-      ...lic,
-      cleanId: lic.id.replace('LICENSE_', '')
-    }));
 
   const filtered = users.filter(u => {
     const matchesSearch = 
@@ -64,45 +48,6 @@ export function AdminUsers() {
     return matchesSearch && matchesRole;
   });
 
-  async function handleCreateUser() {
-    if (!newName || !newEmail || !currentUser) return;
-    setIsProcessing('creating');
-    try {
-      const selectedLic = availableLicenses.find(l => l.cleanId === selectedLicenseCode);
-      
-      const licensePayload = selectedLic ? {
-        licenseCode: selectedLic.cleanId,
-        licensePlanId: selectedLic.planId,
-        licensePlanName: selectedLic.planName,
-        licenseExpiresAt: selectedLic.durationMonths === 9999 ? null : Date.now() + selectedLic.durationMonths * 30 * 24 * 60 * 60 * 1000
-      } : {};
-
-      await createUserDocument(
-        { 
-          name: newName, 
-          email: newEmail, 
-          role: newRole,
-          ...licensePayload
-        },
-        currentUser.uid,
-        currentUser.displayName || currentUser.email || 'Admin'
-      );
-      await addAuditLog({ 
-        action: 'CRIAR_USUARIO', 
-        details: `Usuário ${newName} (${newEmail}) criado como ${newRole}.${selectedLic ? ` Licença vinculada: ${selectedLic.cleanId}` : ''}`, 
-        module: 'AdminUsers' 
-      });
-      showToast(`Usuário ${newName} criado com sucesso!`, 'success');
-      setIsCreateModalOpen(false);
-      setNewName('');
-      setNewEmail('');
-      setSelectedLicenseCode('');
-    } catch (err) {
-      showToast('Erro ao criar usuário', 'error');
-    } finally {
-      setIsProcessing(null);
-    }
-  }
 
   async function handleRoleChange(newRole: UserRole) {
     if (!roleChangeTarget || !currentUser) return;
@@ -171,10 +116,11 @@ export function AdminUsers() {
           <h3 className="text-xl font-black text-ink-900">Gestão de Profissionais</h3>
           <p className="text-sm text-ink-500">Controle de acesso e níveis de permissão da plataforma.</p>
         </div>
-        <button onClick={() => setIsCreateModalOpen(true)} className="btn-primary group">
-          <UserPlus size={18} className="group-hover:scale-110 transition-transform" />
-          Cadastrar Profissional
-        </button>
+        <div className="hidden md:flex flex-col items-end">
+          <p className="text-[10px] font-black uppercase tracking-widest text-brand-600 bg-brand-50 px-3 py-1.5 rounded-lg border border-brand-100">
+            Dica: Novos usuários devem se cadastrar via Link de Ativação (Aba Licenças)
+          </p>
+        </div>
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-ink-100 shadow-sm overflow-hidden">
@@ -294,90 +240,7 @@ export function AdminUsers() {
         </div>
       </div>
 
-      {/* Create User Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-           <div className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full shadow-2xl border border-ink-100 animate-fade-in-up">
-              <h4 className="text-2xl font-black text-ink-900 mb-2">Novo Profissional</h4>
-              <p className="text-sm text-ink-500 mb-8 font-medium">Cadastre manualmente os dados de um novo colaborador.</p>
-              
-              <div className="space-y-6">
-                 <div>
-                    <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2 flex items-center gap-2">
-                       <User size={14} /> Nome Completo
-                    </label>
-                    <input 
-                      value={newName}
-                      onChange={e => setNewName(e.target.value)}
-                      placeholder="Ex: Dr. Lucas Ribeiro"
-                      className="input h-14"
-                    />
-                 </div>
-                 <div>
-                    <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2 flex items-center gap-2">
-                       <Mail size={14} /> E-mail Profissional
-                    </label>
-                    <input 
-                      value={newEmail}
-                      onChange={e => setNewEmail(e.target.value)}
-                      placeholder="lucas@clinica.com"
-                      className="input h-14"
-                    />
-                 </div>
-                 <div>
-                    <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2 flex items-center gap-2">
-                       <Shield size={14} /> Nível de Acesso
-                    </label>
-                    <select 
-                      value={newRole}
-                      onChange={e => setNewRole(e.target.value as any)}
-                      className="input h-14 font-bold"
-                    >
-                       <option value="medico">MÉDICO (Diagnósticos)</option>
-                       <option value="admin">ADMIN (Gestão Total)</option>
-                       <option value="recepcao">RECEPÇÃO (Agenda)</option>
-                    </select>
-                 </div>
-                 <div>
-                    <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2 flex items-center gap-2">
-                       <CheckCircle2 size={14} className="text-brand-500" /> Vincular Licença Ativa (Opcional)
-                    </label>
-                    <select 
-                      value={selectedLicenseCode}
-                      onChange={e => setSelectedLicenseCode(e.target.value)}
-                      className="input h-14 font-bold"
-                    >
-                       <option value="">Nenhuma licença vinculada (ativar por chave depois)</option>
-                       {availableLicenses.map(lic => (
-                          <option key={lic.cleanId} value={lic.cleanId}>
-                             {lic.cleanId} ({lic.planName} — {lic.durationMonths === 9999 ? 'Vitalício' : `${lic.durationMonths} meses`})
-                          </option>
-                       ))}
-                    </select>
-                    {availableLicenses.length === 0 && (
-                      <p className="text-[10px] text-amber-600 font-bold mt-1.5 uppercase tracking-wider">
-                        ⚠️ Nenhuma licença ativa e disponível. Crie licenças na aba "Licenças".
-                      </p>
-                    )}
-                 </div>
-              </div>
 
-              <div className="flex gap-4 mt-10">
-                 <button 
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-ink-400 hover:bg-ink-50 rounded-2xl transition-all"
-                 >Cancelar</button>
-                 <button 
-                  onClick={handleCreateUser}
-                  disabled={isProcessing === 'creating' || !newName || !newEmail}
-                  className="flex-[2] btn-primary h-14 uppercase text-xs tracking-widest shadow-lg shadow-brand-500/30"
-                 >
-                    {isProcessing === 'creating' ? <Loader2 size={18} className="animate-spin" /> : 'Finalizar Cadastro'}
-                 </button>
-              </div>
-           </div>
-        </div>
-      )}
 
       {/* Role Change Modal */}
       {roleChangeTarget && (
