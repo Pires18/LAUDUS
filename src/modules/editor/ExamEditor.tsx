@@ -230,6 +230,14 @@ export function ExamEditor({ examId }: Props) {
   const [pacsBackupConnected, setPacsBackupConnected] = useState<'loading' | 'connected' | 'disconnected' | 'disabled'>('loading');
   const [candidateStudies, setCandidateStudies] = useState<any[]>([]);
   const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
+  const selectedStudyIdRef = useRef<string | null>(null);
+  const [activePacsServer, setActivePacsServer] = useState<'primary' | 'backup' | 'both'>(() => {
+    return (localStorage.getItem('laudus_active_pacs_server') as 'primary' | 'backup' | 'both') || 'both';
+  });
+  const changeSelectedStudy = useCallback((id: string | null) => {
+    setSelectedStudyId(id);
+    selectedStudyIdRef.current = id;
+  }, []);
   const [showStudySelector, setShowStudySelector] = useState(false);
 
   // Estado LOCAL do histórico do copiloto — evita spam de escritas no Firestore
@@ -318,6 +326,44 @@ export function ExamEditor({ examId }: Props) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showFullScreenImage, handlePrevImage, handleNextImage]);
 
+  const fetchInstancesForStudy = useCallback(async (studyId: string, serverSource: 'primary' | 'backup') => {
+    const isBackupStudy = serverSource === 'backup';
+    const currentUrl = isBackupStudy ? (settings.dicomBackupViewerUrl || 'http://localhost:8042') : (settings.dicomViewerUrl || 'http://localhost:8042');
+    const currentAuth = isBackupStudy 
+      ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` 
+      : `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+    const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+    const proxyPath = getProxyEndpoint(settings, isBackupStudy);
+    
+    try {
+      const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
+      if (!instancesRes.ok) throw new Error();
+      const instances = await instancesRes.json();
+      
+      const sorted = (instances || []).sort((a: any, b: any) => {
+        const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
+        const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
+        return numA - numB;
+      });
+
+      const taggedInstances = sorted.map((inst: any) => ({
+        ...inst,
+        serverSource
+      }));
+
+      setDicomInstances(prev => {
+        if (prev.length === taggedInstances.length && prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)) {
+          return prev;
+        }
+        return taggedInstances;
+      });
+      setHasDicomImages(taggedInstances.length > 0);
+      setDicomError(null);
+    } catch (e) {
+      console.warn('[PACS Instances] Falha ao obter instâncias', e);
+    }
+  }, [settings]);
+
   useEffect(() => {
     let active = true;
 
@@ -362,10 +408,6 @@ export function ExamEditor({ examId }: Props) {
           }
         };
 
-        if (active && !backupUrl) {
-          setPacsBackupConnected('disabled');
-        }
-
         const processServer = async (source: 'primary' | 'backup', serverBaseUrl: string, serverAuth: string) => {
           const proxyPath = getProxyEndpoint(settings, source === 'backup');
           const pingUrl = `${serverBaseUrl.replace(/\/$/, '')}/system`;
@@ -382,97 +424,71 @@ export function ExamEditor({ examId }: Props) {
             if (source === 'backup') setPacsBackupConnected(pingOk ? 'connected' : 'disconnected');
           }
 
-          if (!pingOk) return { source, candidates: [], serverBaseUrl, serverAuth, proxyPath };
+          if (!pingOk) return { source, candidates: [], pingOk: false };
 
           const candidates = await locateStudies(serverBaseUrl, serverAuth, exam, patient, source, settings);
-          return { source, candidates, serverBaseUrl, serverAuth, proxyPath };
+          return { source, candidates, pingOk: true };
         };
 
-        const primaryPromise = processServer('primary', baseUrl, authParams);
-        const backupPromise = backupUrl ? processServer('backup', backupUrl, backupAuth) : Promise.resolve({ source: 'backup', candidates: [], serverBaseUrl: '', serverAuth: '', proxyPath: '' });
+        const queryPrimary = activePacsServer !== 'backup';
+        const queryBackup = activePacsServer !== 'primary' && !!backupUrl;
 
-        let currentCandidates: any[] = [];
-        
-        const updateUI = async (result: any) => {
-          if (!active || !result) return;
+        if (active) {
+          if (!queryPrimary) setPacsConnected('disconnected');
+          if (!queryBackup) setPacsBackupConnected(backupUrl ? 'disconnected' : 'disabled');
+        }
+
+        const primaryPromise = queryPrimary 
+          ? processServer('primary', baseUrl, authParams) 
+          : Promise.resolve({ source: 'primary' as const, candidates: [], pingOk: false });
           
-          if (result.candidates.length > 0) {
-            const mergedMap = new Map<string, any>();
-            for (const c of currentCandidates) mergedMap.set(c.ID, c);
-            for (const c of result.candidates) {
-              if (c.serverSource === 'primary') {
-                mergedMap.set(c.ID, c);
-              } else {
-                if (!mergedMap.has(c.ID) || mergedMap.get(c.ID).serverSource === 'backup') {
-                  mergedMap.set(c.ID, c);
-                }
-              }
+        const backupPromise = queryBackup 
+          ? processServer('backup', backupUrl, backupAuth) 
+          : Promise.resolve({ source: 'backup' as const, candidates: [], pingOk: false });
+
+        const [primaryRes, backupRes] = await Promise.allSettled([primaryPromise, backupPromise]);
+
+        let mergedCandidates: any[] = [];
+        if (primaryRes.status === 'fulfilled' && primaryRes.value.candidates) {
+          mergedCandidates = [...mergedCandidates, ...primaryRes.value.candidates];
+        }
+        if (backupRes.status === 'fulfilled' && backupRes.value.candidates) {
+          for (const c of backupRes.value.candidates) {
+            if (!mergedCandidates.some(mc => mc.ID === c.ID)) {
+              mergedCandidates.push(c);
             }
-            currentCandidates = Array.from(mergedMap.values());
-            setCandidateStudies(currentCandidates);
           }
+        }
 
-          if (currentCandidates.length === 0) {
-            if (isManual) {
-              setDicomInstances([]);
-              setHasDicomImages(false);
-              setDicomError(`Estudo não localizado nos servidores ativos.`);
-            }
-            return;
+        if (active) {
+          setCandidateStudies(mergedCandidates);
+        }
+
+        if (mergedCandidates.length === 0) {
+          if (isManual && active) {
+            setDicomInstances([]);
+            setHasDicomImages(false);
+            setDicomError(`Estudo não localizado nos servidores ativos.`);
           }
+          return;
+        }
 
-          let activeStudy = null;
-          if (selectedStudyId) {
-            activeStudy = currentCandidates.find(c => c.ID === selectedStudyId);
+        let activeStudy = null;
+        const currentSelectedId = selectedStudyIdRef.current;
+        if (currentSelectedId) {
+          activeStudy = mergedCandidates.find(c => c.ID === currentSelectedId);
+        }
+        if (!activeStudy && mergedCandidates.length > 0) {
+          const sorted = scoreStudies(mergedCandidates, exam.createdAt);
+          activeStudy = sorted[0];
+          if (active) {
+            changeSelectedStudy(activeStudy.ID);
           }
-          if (!activeStudy && currentCandidates.length > 0) {
-            const sorted = scoreStudies(currentCandidates, exam.createdAt);
-            activeStudy = sorted[0];
-            setSelectedStudyId(activeStudy.ID);
-          }
+        }
 
-          if (!activeStudy) return;
-
-          const isBackupStudy = activeStudy.serverSource === 'backup';
-          const currentUrl = isBackupStudy ? (backupUrl || 'http://localhost:8042') : baseUrl;
-          const currentAuth = isBackupStudy ? backupAuth : authParams;
-          const studyId = activeStudy.ID;
-          const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-          const proxyPath = getProxyEndpoint(settings, isBackupStudy);
-          
-          try {
-            const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
-            if (!instancesRes.ok) throw new Error();
-            const instances = await instancesRes.json();
-            
-            const sorted = (instances || []).sort((a: any, b: any) => {
-              const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
-              const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
-              return numA - numB;
-            });
-
-            const taggedInstances = sorted.map((inst: any) => ({
-              ...inst,
-              serverSource: activeStudy.serverSource
-            }));
-
-            setDicomInstances(prev => {
-              if (prev.length === taggedInstances.length && prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)) {
-                return prev;
-              }
-              return taggedInstances;
-            });
-            setHasDicomImages(taggedInstances.length > 0);
-            setDicomError(null);
-          } catch (e) {
-            console.warn('[PACS Instances] Falha ao obter instâncias', e);
-          }
-        };
-
-        primaryPromise.then(updateUI).catch(() => {});
-        backupPromise.then(updateUI).catch(() => {});
-
-        await Promise.allSettled([primaryPromise, backupPromise]);
+        if (activeStudy) {
+          await fetchInstancesForStudy(activeStudy.ID, activeStudy.serverSource);
+        }
       } catch (e: any) {
         console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
         if (active && isManual) {
@@ -516,10 +532,8 @@ export function ExamEditor({ examId }: Props) {
     settings.dicomBackupViewerUrl,
     settings.dicomBackupUsername,
     settings.dicomBackupPassword,
-    // showIntegratedViewer e showDicomImages REMOVIDOS das deps — agora via ref.
-    // Isso evita que o intervalo seja destruído/recriado ao abrir/fechar o viewer.
     dicomRefreshKey,
-    selectedStudyId
+    activePacsServer
   ]);
   
 
@@ -866,29 +880,54 @@ export function ExamEditor({ examId }: Props) {
                       <Loader2 size={12} className="animate-spin text-emerald-500" />
                     )}
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <div 
-                          className={classNames(
-                            "w-2 h-2 rounded-full",
-                            pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
-                          )} 
-                          title={`PACS Principal: ${pacsConnected === 'connected' ? 'Online' : pacsConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
-                        />
-                        <span className="font-black text-[9px] uppercase tracking-widest text-slate-450">
-                          PACS Principal
-                        </span>
-                      </div>
-                      {settings.dicomBackupViewerUrl && (
-                        <div className="flex items-center gap-1.5 border-l border-slate-850 pl-3">
+                      {settings.dicomBackupViewerUrl ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={activePacsServer}
+                            onChange={(e) => {
+                              const val = e.target.value as 'primary' | 'backup' | 'both';
+                              setActivePacsServer(val);
+                              localStorage.setItem('laudus_active_pacs_server', val);
+                              setDicomRefreshKey(prev => prev + 1);
+                            }}
+                            className="bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg px-2 py-1 focus:outline-none cursor-pointer hover:border-slate-700 transition-colors"
+                          >
+                            <option value="both">Ambos PACS</option>
+                            <option value="primary">PACS Principal</option>
+                            <option value="backup">PACS Backup</option>
+                          </select>
+                          <div className="flex items-center gap-1.5 ml-1">
+                            {activePacsServer !== 'backup' && (
+                              <div 
+                                className={classNames(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                                )} 
+                                title={`PACS Principal: ${pacsConnected}`} 
+                              />
+                            )}
+                            {activePacsServer !== 'primary' && (
+                              <div 
+                                className={classNames(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                                )} 
+                                title={`PACS Backup: ${pacsBackupConnected}`} 
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
                           <div 
                             className={classNames(
                               "w-2 h-2 rounded-full",
-                              pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                              pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
                             )} 
-                            title={`PACS Backup: ${pacsBackupConnected === 'connected' ? 'Online' : pacsBackupConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
+                            title={`PACS Principal: ${pacsConnected === 'connected' ? 'Online' : pacsConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
                           />
                           <span className="font-black text-[9px] uppercase tracking-widest text-slate-450">
-                            Backup
+                            PACS Principal
                           </span>
                         </div>
                       )}
@@ -972,8 +1011,9 @@ export function ExamEditor({ examId }: Props) {
                           <button
                             key={study.ID}
                             onClick={() => {
-                              setSelectedStudyId(study.ID);
+                              changeSelectedStudy(study.ID);
                               setShowStudySelector(false);
+                              fetchInstancesForStudy(study.ID, study.serverSource);
                             }}
                             className={classNames(
                               "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3",
@@ -1654,6 +1694,7 @@ export function ExamEditor({ examId }: Props) {
           onPrint={(instances, gridType) => {
             handlePrintImages(instances, gridType);
           }}
+          activePacsServer={activePacsServer}
         />
       )}
 
