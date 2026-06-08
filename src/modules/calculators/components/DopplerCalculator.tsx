@@ -62,7 +62,6 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   const [efwPercentile, setEfwPercentile] = useState(value?.efwPercentile || '');
 
   const gaDecimal = Number(gaWeeks||0)+(Number(gaDays||0)/7);
-  const ga = Math.round(gaDecimal); // kept for any potential integer fallback, though gaDecimal is preferred
 
   const calc = useMemo(() => {
     let rcp: number|null = null;
