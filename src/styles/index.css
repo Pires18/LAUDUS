@@ -259,8 +259,8 @@ html, body, #root {
     page-break-after: always;
     page-break-inside: avoid;
     box-sizing: border-box;
-    height: 287mm;
-    max-height: 287mm;
+    height: 275mm;
+    max-height: 275mm;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -315,6 +315,7 @@ html, body, #root {
     overflow: hidden;
     height: 100%;
     width: 100%;
+    position: relative;
   }
 
   .no-print {
