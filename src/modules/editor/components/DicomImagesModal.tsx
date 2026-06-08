@@ -16,6 +16,7 @@ interface Props {
   error: string | null;
   onRefresh: () => void;
   onPrint: (instances: any[], gridType: string) => void;
+  activePacsServer: 'primary' | 'backup' | 'both';
 }
 
 export function DicomImagesModal({ 
@@ -27,12 +28,15 @@ export function DicomImagesModal({
   loading, 
   error, 
   onRefresh, 
-  onPrint 
+  onPrint,
+  activePacsServer
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [gridType, setGridType] = useState<string>('2x4');
 
-  const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+  const baseUrl = activePacsServer === 'backup'
+    ? (settings.dicomBackupViewerUrl || 'http://localhost:8043')
+    : (settings.dicomViewerUrl || 'http://localhost:8042');
 
   const initializedRef = useRef(false);
   const prevInstanceIdsRef = useRef<string[]>([]);
