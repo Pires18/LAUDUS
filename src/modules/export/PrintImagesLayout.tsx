@@ -96,9 +96,6 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
                     alt={`Imagem ${instanceNum}`}
                     className="w-full h-full object-contain"
                   />
-                  <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-white/10">
-                    FOTO {globalIndex}
-                  </div>
                 </div>
               );
             })}

@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
   Calculator, Sparkles, Hospital, Sliders, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
-  Users, LogOut
+  Users, LogOut, CalendarDays
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { CreateExamModal } from './CreateExamModal';
@@ -17,6 +17,7 @@ import { LogoIcon } from './LogoIcon';
 const items = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, view: { name: 'dashboard' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'worklist', label: 'Worklist', icon: ClipboardList, view: { name: 'worklist' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'appointments', label: 'Agendamentos', icon: CalendarDays, view: { name: 'appointments' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
   { key: 'laud-ia', label: 'LaudIA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },

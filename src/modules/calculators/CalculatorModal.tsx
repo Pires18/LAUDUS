@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send, ClipboardPaste, BarChart3 } from 'lucide-react';
+import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send, ClipboardPaste, Wand2, Loader2 } from 'lucide-react';
 import { CALCULATORS } from './registry';
 
 import { ExamArea } from '../../types';
@@ -7,6 +7,8 @@ import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalculatorReference } from './components/CalculatorUI';
+import { extractCalculatorData } from '../ai/engine';
+import { useApp } from '../../store/app';
 
 interface Props {
   area?: ExamArea;
@@ -14,11 +16,13 @@ interface Props {
   onSendToCopilot: (result: string) => void;
   onAppendToForm?: (text: string) => void;
   examDateMs?: number;
+  reportContent?: string;
   calculatorData?: Record<string, any>;
   onSaveCalculatorData?: (data: Record<string, any>) => void;
 }
 
-  export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, calculatorData = {}, onSaveCalculatorData }: Props) {
+  export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, reportContent, calculatorData = {}, onSaveCalculatorData }: Props) {
+  const settings = useApp((state) => state.settings);
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
   
   // O result atual da calculadora selecionada. 
@@ -30,6 +34,8 @@ interface Props {
   const [copiedForm, setCopiedForm] = useState(false);
   const [sentCopilot, setSentCopilot] = useState(false);
   const [activeTab, setActiveTab] = useState<'params' | 'result'>('params');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [updateKey, setUpdateKey] = useState(0);
 
   const filteredCalculators = CALCULATORS.filter(calc =>
     showAll || !area || calc.areas.includes(area)
@@ -89,6 +95,33 @@ interface Props {
     setSentCopilot(true);
     onSendToCopilot(buildTechnicalMessage());
     setTimeout(() => onClose(), 600);
+  };
+
+  const handleAutoFill = async () => {
+    if (!reportContent || !selectedCalc) return;
+    
+    setIsExtracting(true);
+    try {
+      const data = await extractCalculatorData(
+        reportContent,
+        selectedCalc,
+        settings
+      );
+      // Mantém os dados antigos se o retorno for inválido, senão substitui
+      if (data && typeof data === 'object') {
+        const newData = { ...calcResult, ...data };
+        setCalcResult(newData);
+        if (selectedCalcId && onSaveCalculatorData) {
+          onSaveCalculatorData({ ...calculatorData, [selectedCalcId]: newData });
+        }
+        setUpdateKey(prev => prev + 1); // Força o remount do componente para ler o novo value
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Não foi possível extrair dados do laudo.');
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   return (
@@ -241,10 +274,34 @@ interface Props {
                   'flex-1 overflow-y-auto p-4 custom-scrollbar',
                   activeTab === 'params' ? 'block' : 'hidden'
                 )}>
+                  {/* AI Auto-fill Button */}
+                  {selectedCalc && reportContent && reportContent.trim().length > 50 && (
+                    <button
+                      type="button"
+                      onClick={handleAutoFill}
+                      disabled={isExtracting}
+                      className="w-full mb-4 px-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-50 to-brand-50 border border-indigo-100/50 flex items-center justify-center gap-3 text-brand-700 font-bold text-xs uppercase tracking-wider hover:shadow-md hover:from-indigo-100 hover:to-brand-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden"
+                    >
+                      {isExtracting ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin text-brand-500" />
+                          <span>Analisando Laudo...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                          <Wand2 size={16} className="text-brand-500" />
+                          <span>✨ Autopreencher com IA</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     {selectedCalc && (
                       <>
                         <selectedCalc.component
+                          key={updateKey}
                           value={calcResult || {}}
                           onChange={handleCalcChange}
                           examDateMs={examDateMs}

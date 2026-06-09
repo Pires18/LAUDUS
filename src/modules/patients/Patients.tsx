@@ -1,28 +1,39 @@
 import { useApp } from '../../store/app';
-import { useCollection } from '../../hooks/useFirestore';
+import { usePaginatedCollection, orderBy, where } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { Modal } from '../../components/Modal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Patient } from '../../types';
 import { addItemWithId, deleteItem, generateStandardId, countWhere } from '../../store/db';
-import { useState } from 'react';
-import { UserPlus, Search, User as UserIcon, Trash2, Users as UsersIcon } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { UserPlus, Search, User as UserIcon, Trash2, Users as UsersIcon, Loader2 } from 'lucide-react';
 import { calculateAge, formatDate, formatCPF, formatPhone } from '../../utils/format';
 import { PatientForm } from './PatientForm';
 import { ListSkeleton } from '../../components/SkeletonLoader';
 
 export function Patients() {
-  const { setView, showToast } = useApp();
-  const [search, setSearch] = useState('');
+  const { setView, showToast, patientsSearch: search, setPatientsSearch: setSearch } = useApp();
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
 
-  const { data: patients, loading } = useCollection<Patient>('patients');
+  // Capitaliza a primeira letra para melhorar as chances de match na busca prefixada do Firebase
+  const searchPrefix = search.charAt(0).toUpperCase() + search.slice(1);
+  const constraints = search 
+    ? [orderBy('name', 'asc'), where('name', '>=', searchPrefix), where('name', '<=', searchPrefix + '\uf8ff')] 
+    : [orderBy('name', 'asc')];
 
-  const filtered = patients.filter((p) =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.cpf?.includes(search)
-  );
+  const { data: patients, loading, hasMore, loadMore } = usePaginatedCollection<Patient>('patients', {
+    constraints,
+    initialLimit: 50
+  });
+
+  // Filtro local adicional caso a busca prefixada traga maiúsculas/minúsculas diferentes, ou para buscar por CPF
+  const filtered = useMemo(() => {
+    return patients.filter((p) =>
+      !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.cpf?.includes(search)
+    );
+  }, [patients, search]);
 
   // Sort alphabetically
   const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
@@ -196,6 +207,19 @@ export function Patients() {
                 </div>
               ))}
             </div>
+
+            {hasMore && (
+              <div className="p-4 flex justify-center border-t border-ink-100">
+                <button 
+                  onClick={loadMore} 
+                  className="btn-secondary w-full md:w-auto flex items-center justify-center gap-2"
+                  disabled={loading}
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                  Carregar mais pacientes
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

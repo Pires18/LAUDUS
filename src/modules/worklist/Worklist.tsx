@@ -1,5 +1,5 @@
 import { useApp } from '../../store/app';
-import { useCollection } from '../../hooks/useFirestore';
+import { useCollection, usePaginatedCollection, orderBy } from '../../hooks/useFirestore';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
@@ -22,15 +22,14 @@ const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: 
 };
 
 export function Worklist() {
-  const { setView, showToast, selectedClinicId, setShowCreateExamModal, settings } = useApp();
-  const [statusFilter, setStatusFilter] = useState<ExamStatus | 'todos'>(() => {
-    return (localStorage.getItem('laudus_worklist_status') as ExamStatus | 'todos') || 'todos';
-  });
-  const [areaFilter, setAreaFilter] = useState<string>('todas');
-  const [dateFilter, setDateFilter] = useState<'todos' | 'hoje' | 'semana' | 'mes'>(() => {
-    return (localStorage.getItem('laudus_worklist_date_v2') as 'todos' | 'hoje' | 'semana' | 'mes') || 'todos';
-  });
-  const [search, setSearch] = useState('');
+  const { 
+    setView, showToast, selectedClinicId, setShowCreateExamModal, settings,
+    worklistStatusFilter: statusFilter, setWorklistStatusFilter: setStatusFilter,
+    worklistAreaFilter: areaFilter, setWorklistAreaFilter: setAreaFilter,
+    worklistDateFilter: dateFilter, setWorklistDateFilter: setDateFilter,
+    worklistSearch: search, setWorklistSearch: setSearch
+  } = useApp();
+  
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [editExamId, setEditExamId] = useState<string | null>(null);
@@ -43,17 +42,14 @@ export function Worklist() {
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [syncingExamId, setSyncingExamId] = useState<string | null>(null);
 
-  // Persist filters
-  useEffect(() => {
-    localStorage.setItem('laudus_worklist_status', statusFilter);
-  }, [statusFilter]);
+  // Os filtros agora são persistidos e gerenciados automaticamente pelo Zustand (store/app.ts)
 
-  useEffect(() => {
-    localStorage.setItem('laudus_worklist_date_v2', dateFilter);
-  }, [dateFilter]);
+  // Paginated exams listener
+  const { data: exams, loading: examsLoading, hasMore, loadMore } = usePaginatedCollection<ExamRequest>('exams', {
+    constraints: [orderBy('createdAt', 'desc')],
+    initialLimit: 50
+  });
 
-  // Realtime listeners
-  const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
 
@@ -533,6 +529,19 @@ export function Worklist() {
               )}
             </tbody>
           </table>
+          
+          {hasMore && (
+            <div className="hidden md:flex p-4 justify-center border-t border-ink-100">
+              <button 
+                onClick={loadMore} 
+                className="btn-secondary flex items-center gap-2 px-8"
+                disabled={examsLoading}
+              >
+                {examsLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                Carregar exames mais antigos
+              </button>
+            </div>
+          )}
 
           {/* Mobile Card List View */}
           <div className="md:hidden divide-y divide-ink-50">
@@ -652,6 +661,19 @@ export function Worklist() {
                   </div>
                 );
               })
+            )}
+            
+            {hasMore && (
+              <div className="p-4 flex justify-center border-t border-ink-100">
+                <button 
+                  onClick={loadMore} 
+                  className="btn-secondary w-full flex items-center justify-center gap-2"
+                  disabled={examsLoading}
+                >
+                  {examsLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                  Carregar mais
+                </button>
+              </div>
             )}
           </div>
         </div>

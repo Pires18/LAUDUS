@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings, ExamArea } from '../../types';
 import { getRecentFinalizedReports } from '../../store/db';
-import { resolveGeminiModel } from './gemini';
+import { resolveGeminiModel } from './engine';
 
 interface GeneratedTemplate {
   title: string;

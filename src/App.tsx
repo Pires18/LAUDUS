@@ -29,6 +29,7 @@ import { ExamEditor } from './modules/editor/ExamEditor';
 // ── Lazy loads (secondary modules) ──
 const Patients = lazy(() => import('./modules/patients/Patients').then(m => ({ default: m.Patients })));
 const PatientDetail = lazy(() => import('./modules/patients/PatientDetail').then(m => ({ default: m.PatientDetail })));
+const Appointments = lazy(() => import('./modules/appointments/Appointments').then(m => ({ default: m.Appointments })));
 const Templates = lazy(() => import('./modules/templates/Templates').then(m => ({ default: m.Templates })));
 const TemplateEditor = lazy(() => import('./modules/templates/TemplateEditor').then(m => ({ default: m.TemplateEditor })));
 const Settings = lazy(() => import('./modules/settings/Settings').then(m => ({ default: m.Settings })));
@@ -54,6 +55,7 @@ function ViewRenderer() {
     dashboard: <Dashboard />,
     worklist: <Worklist />,
     patients: <Suspense fallback={<LazyFallback />}><Patients /></Suspense>,
+    appointments: <Suspense fallback={<LazyFallback />}><Appointments /></Suspense>,
     'patient-detail': view.name === 'patient-detail' ? <Suspense fallback={<LazyFallback />}><PatientDetail key={view.patientId} patientId={view.patientId} /></Suspense> : null,
     'exam-editor': view.name === 'exam-editor' ? <ExamEditor key={view.examId} examId={view.examId} /> : null,
     templates: <Suspense fallback={<LazyFallback />}><Templates /></Suspense>,
@@ -154,20 +156,8 @@ function UserAccessGate({ children }: { children: ReactNode }) {
         const userRef = doc(firestore, 'users', user.uid);
         const snap = await getDoc(userRef);
 
-        // Super Admin Bypass
-        if (user.email === 'matheuskpires@gmail.com') {
-          if (!snap.exists()) {
-            await setDoc(userRef, {
-              name: user.displayName || 'Super Admin',
-              email: user.email,
-              role: 'admin',
-              active: true,
-              licensePlanName: 'Unlimited Dev Bypass',
-              licenseExpiresAt: Date.now() + 100 * 365 * 24 * 60 * 60 * 1000,
-              createdAt: Date.now(),
-              updatedAt: Date.now()
-            });
-          }
+        // Se o usuário existir e for admin (Super Admin Bypass baseado em role, não em email hardcoded)
+        if (snap.exists() && snap.data().role === 'admin') {
           setIsAllowed(true);
           setChecking(false);
           return;

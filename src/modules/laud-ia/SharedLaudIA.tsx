@@ -11,9 +11,9 @@ import {
   ChevronDown, ChevronUp, Wifi, WifiOff, TrendingUp
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
-import { resolveGeminiModel } from '../ai/gemini';
+import { resolveGeminiModel } from '../ai/engine';
 import { EXAM_AREAS, ExamArea, ReportTemplate } from '../../types';
-import { generateReport, callMetricsHistory, type CallMetrics, getAnthropicBaseUrl } from '../ai/gemini';
+import { generateReport, callMetricsHistory, type CallMetrics, getAnthropicBaseUrl } from '../ai/engine';
 import {
   DEFAULT_MASTER_PROMPT,
   DEFAULT_STRUCTURE_PROMPT,
@@ -710,9 +710,9 @@ ${examplesText}`;
       showToast('Selecione uma área primeiro para melhorar os prompts em lote.', 'error');
       return;
     }
-    const templatesToProcess = templates.filter(t => t.area === selectedAreaFilter && t.aiInstructions && t.aiInstructions.trim().length > 0);
+    const templatesToProcess = templates.filter(t => t.area === selectedAreaFilter);
     if (templatesToProcess.length === 0) {
-      showToast('Nenhum exame com prompt existente encontrado nesta área.', 'info');
+      showToast('Nenhum exame encontrado nesta área.', 'info');
       return;
     }
 
@@ -743,13 +743,47 @@ ${examplesText}`;
       const template = templatesToProcess[i];
       setBatchProgress({ current: i + 1, total: templatesToProcess.length });
 
-      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
-Sua tarefa é melhorar o prompt de IA para o exame de "${template.name}" a seguir, tornando-o mais completo,
-claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
-Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.
-IMPORTANTE: NÃO repita regras globais desnecessariamente. Seja objetivo, não entre em loops de repetição e não corte o texto no meio.${userRequest}`;
+      const templateStructure = `
+Nome do Exame: ${template.name}
+Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
 
-      const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${template.aiInstructions}`;
+TÉCNICA:
+${template.technique || 'Não definida'}
+
+ANÁLISE PADRÃO:
+${template.analysisTemplate || 'Não definida'}
+
+CONCLUSÃO PADRÃO:
+${template.conclusionTemplate || 'Não definida'}
+
+RECOMENDAÇÕES PADRÃO:
+${template.recommendationsTemplate || 'Não definida'}
+`;
+
+      const hasInstructions = template.aiInstructions && template.aiInstructions.trim().length > 0;
+      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
+Sua tarefa é ${hasInstructions ? 'melhorar o prompt de IA (aiInstructions) existente' : 'gerar um prompt de IA (aiInstructions) excelente do zero'} para o exame de "${template.name}".
+O prompt deve ser completo, claro, clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
+Retorne APENAS o prompt melhorado/gerado em formato Markdown. Não inclua saudações, comentários, nem explicações. O seu output deve ser diretamente o texto do prompt.
+IMPORTANTE: NÃO copie nem repita o Prompt Mestre ou regras globais desnecessariamente no seu output. Foque estritamente nas regras do órgão/exame em questão. Seja objetivo e não entre em loops de repetição.`;
+
+      const promptAtualMsg = hasInstructions
+        ? `=== PROMPT ATUAL DO EXAME ===\n${template.aiInstructions}`
+        : `=== PROMPT ATUAL DO EXAME ===\n(Nenhum prompt definido. Por favor, crie um do zero com base na estrutura do exame e técnicas abaixo)`;
+
+      const fullMessage = `${systemMsg}
+
+=== ESTRUTURA DO EXAME ===
+${templateStructure}
+
+${promptAtualMsg}
+
+=== DIRETRIZES OPERACIONAIS DE REFERÊNCIA (NÃO REPETIR NO OUTPUT) ===
+Mestre: ${localSettings.aiMasterPrompt || DEFAULT_MASTER_PROMPT}
+Instruções Globais: ${localSettings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS}
+Skeleton: ${localSettings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT}
+Regras Rígidas: ${localSettings.aiRigidRules || DEFAULT_RIGID_RULES}
+${userRequest}`;
 
       try {
         let improved = '';

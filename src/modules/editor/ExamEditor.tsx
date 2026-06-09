@@ -5,7 +5,7 @@ import { useApp } from '../../store/app';
 import { ExamStatus, EXAM_AREAS, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
 import { RichEditor, RichEditorRef } from './RichEditor';
-import { buildPrompt } from '../ai/gemini';
+import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
 import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw, SlidersHorizontal, ExternalLink } from 'lucide-react';
@@ -1638,6 +1638,7 @@ export function ExamEditor({ examId }: Props) {
           <CalculatorModal 
             area={exam.area} 
             examDateMs={exam.createdAt}
+            reportContent={reportContent}
             onClose={() => setShowCalculators(false)} 
             onSendToCopilot={(text) => {
               setCopilotPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));

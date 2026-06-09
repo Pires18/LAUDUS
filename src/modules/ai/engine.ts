@@ -15,6 +15,7 @@ interface GenerateReportParams {
   requestingPhysician?: string;
   anamnesis?: string;
   previousExams?: string[];
+  patientPreviousExams?: string[];
   examDateMs?: number;
   signal?: AbortSignal;
 }
@@ -27,6 +28,7 @@ interface CopilotParams {
   exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string; createdAt?: number };
   settings: AppSettings;
   previousExams?: string[];
+  patientPreviousExams?: string[];
   template?: ReportTemplate | null;
   signal?: AbortSignal;
 }
@@ -41,6 +43,7 @@ interface RefineParams {
   requestingPhysician?: string;
   anamnesis?: string;
   previousExams?: string[];
+  patientPreviousExams?: string[];
   customPrompt?: string;
   examDateMs?: number;
   signal?: AbortSignal;
@@ -255,6 +258,7 @@ function buildContextMessage({
   originalMaskHtml,
   requestingPhysician,
   previousExams = [],
+  patientPreviousExams = [],
   examDateMs,
 }: {
   mode: 'GERAÇÃO INICIAL' | 'REFINAMENTO';
@@ -267,6 +271,7 @@ function buildContextMessage({
   originalMaskHtml?: string;
   requestingPhysician?: string;
   previousExams?: string[];
+  patientPreviousExams?: string[];
   examDateMs?: number;
 }): string {
   const dateObj = examDateMs ? new Date(examDateMs) : new Date();
@@ -297,6 +302,10 @@ function buildContextMessage({
     ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${previousExams.join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
     : '';
 
+  const patientHistoryBlock = patientPreviousExams && patientPreviousExams.length > 0
+    ? `\n\n═══════════════════════════════════════════\nHISTÓRICO CLÍNICO ANTERIOR DO PACIENTE:\n═══════════════════════════════════════════\nVocê tem acesso aos exames passados deste paciente na mesma especialidade. Seu dever máximo é atuar como médico analista: cruze as medidas e informações do INPUT ATUAL com o HISTÓRICO abaixo e descreva ativamente a evolução clínica (ex: informe se um nódulo aumentou de volume, se um cisto regrediu, ou se a biometria evoluiu normalmente comparado ao exame anterior). NÃO copie o laudo antigo, apenas use-o para inferir a EVOLUÇÃO cronológica da doença ou gestação.\n\n[INÍCIO DO HISTÓRICO DO PACIENTE]\n${patientPreviousExams.join('\n\n---\n\n')}\n[FIM DO HISTÓRICO DO PACIENTE]`
+    : '';
+
   const maskLabel = mode === 'GERAÇÃO INICIAL'
     ? 'MÁSCARA DE REFERÊNCIA'
     : 'LAUDO ATUAL (modificar conforme instrução acima)';
@@ -305,7 +314,7 @@ function buildContextMessage({
     ? `\n\n═══════════════════════════════════════════\nMÁSCARA MODELO ORIGINAL DO EXAME (ÂNCORA ESTRUTURAL E TEXTUAL RÍGIDA):\n═══════════════════════════════════════════\nUse o HTML abaixo apenas como a referência absoluta de estrutura de seções, nomenclatura de títulos, parágrafos, ordem e texto padrão que devem ser preservados para os órgãos inalterados:\n${originalMaskHtml}\n`
     : '';
 
-  return `${lines.join('\n')}${prevContext}${originalMaskBlock}
+  return `${lines.join('\n')}${prevContext}${patientHistoryBlock}${originalMaskBlock}
 
 ${maskLabel}:
 ${maskHtml}`;
@@ -371,7 +380,55 @@ export function extractScratchpad(text: string): string | undefined {
   return undefined;
 }
 
-// ─── Builders de prompt ──────────────────────────────────────────────────────
+export async function extractCalculatorData(
+  reportContent: string,
+  calcDef: { id: string, name: string, description: string },
+  settings: AppSettings,
+  signal?: AbortSignal
+): Promise<any> {
+  const aiProvider = settings.aiProvider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
+  const systemContext = `Você é um assistente médico especialista em ultrassonografia e radiologia.
+Sua tarefa é ler um texto (laudo médico) e extrair os dados necessários para preencher a calculadora clínica chamada "${calcDef.name}".
+A calculadora faz o seguinte: "${calcDef.description}".
+
+Regras:
+1. Extraia estritamente os valores mencionados no texto.
+2. Não invente valores se eles não existirem no laudo.
+3. Retorne a resposta em formato JSON válido, respeitando os campos que essa calculadora espera.
+4. Para a calculadora TI-RADS, por exemplo, retorne: { "lesions": [{ "location": string, "d1": number, "d2": number, "d3": number, "composition": number (0-2), "echogenicity": number (0-3), "shape": number (0,3), "margin": number (0-3), "echogenicFoci": number[] (0-3) }] }
+5. Para calculadoras de volume simples: { "d1": number, "d2": number, "d3": number }
+6. Você deve inferir os campos esperados baseado no nome e descrição da calculadora, caso não tenha recebido o schema completo.
+
+Retorne APENAS um objeto JSON.`;
+
+  const built: BuiltPrompt = {
+    universalContext: systemContext,
+    areaContext: '',
+    userMessage: `Extraia os dados para a calculadora ${calcDef.name} a partir deste laudo:\n\n${reportContent}`
+  };
+
+  try {
+    return await aiProvider.extractJson(
+      built,
+      settings,
+      'geral',
+      signal,
+      {
+        withRetry,
+        cleanMarkdownFromResponse,
+        extractScratchpad,
+        stripScratchpad,
+        getMaxTokens,
+        getModeTemperature,
+      }
+    );
+  } catch (error) {
+    console.error('Erro na extração de dados da calculadora:', error);
+    throw error;
+  }
+}
+
+// ─── Auditoria Estrutural Simples ──────────────────────────────────────────────────────
 
 export function buildPrompt({
   template,
@@ -381,12 +438,15 @@ export function buildPrompt({
   anamnesis,
   settings,
   previousExams = [],
+  patientPreviousExams = [],
   examDateMs,
 }: GenerateReportParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template);
   const maskHtml = buildMaskHtml(template);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
+  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
+
   const contextMessage = buildContextMessage({
     mode: 'GERAÇÃO INICIAL',
     examType: template.name,
@@ -397,6 +457,7 @@ export function buildPrompt({
     maskHtml,
     requestingPhysician,
     previousExams: safePreviousExams,
+    patientPreviousExams: safePatientExams,
     examDateMs,
   });
 
@@ -421,6 +482,7 @@ function buildRefinePrompt({
   requestingPhysician,
   anamnesis,
   previousExams = [],
+  patientPreviousExams = [],
   customPrompt,
   examDateMs,
 }: RefineParams): BuiltPrompt {
@@ -432,6 +494,8 @@ function buildRefinePrompt({
     : `INSTRUÇÃO DE REFINAMENTO ESTRUTURAL (CRÍTICA): Você deve cruzar o LAUDO ATUAL com a MÁSCARA MODELO ORIGINAL. Sua função primária é GARANTIR que nenhuma seção, título, parágrafo de órgão normal ou estrutura da máscara tenha sido apagado ou corrompido no laudo atual. Restaure RIGOROSAMENTE a exata ordem, a formatação em <p> e a estruturação original da máscara, mesclando apenas os dados clínicos patológicos ou medidas inseridos no laudo atual. É proibido suprimir estruturas da máscara.`;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
+  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
+
   const contextMessage = buildContextMessage({
     mode: 'REFINAMENTO',
     examType: template.name,
@@ -443,6 +507,7 @@ function buildRefinePrompt({
     originalMaskHtml: getInitialReportContent(template),
     requestingPhysician,
     previousExams: safePreviousExams,
+    patientPreviousExams: safePatientExams,
     examDateMs,
   });
 
@@ -469,6 +534,7 @@ function buildCopilotPrompt({
   exam,
   settings,
   previousExams = [],
+  patientPreviousExams = [],
   template,
 }: CopilotParams): BuiltPrompt {
   const copilotModeOverride = DEFAULT_COPILOT_OVERRIDE;
@@ -478,6 +544,8 @@ function buildCopilotPrompt({
 
   const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
+  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
+
   const contextMessage = buildContextMessage({
     mode: 'REFINAMENTO',
     examType: exam.examType,
@@ -489,6 +557,7 @@ function buildCopilotPrompt({
     originalMaskHtml: template ? getInitialReportContent(template) : undefined,
     requestingPhysician: exam.requestingPhysician,
     previousExams: safePreviousExams,
+    patientPreviousExams: safePatientExams,
     examDateMs: exam.createdAt,
   });
 
@@ -521,215 +590,21 @@ function getModelForMode(settings: AppSettings, mode: string, area: string): str
   return resolveGeminiModel(modelToUse);
 }
 
-async function callGemini(
-  built: BuiltPrompt,
-  settings: AppSettings,
-  area: string,
-  mode: string,
-  signal?: AbortSignal,
-  onComplete?: (scratchpad?: string) => void
-): Promise<string> {
-  const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
-  const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
-  const modelName = getModelForMode(settings, mode, area);
-  // Fix 11: use full area-specific token limit (no artificial 8192 cap)
-  const maxTokens = getMaxTokens(area);
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    systemInstruction,
-    generationConfig: {
-      temperature: getModeTemperature(mode, settings.aiTemperature),
-      topP: 0.9,
-      maxOutputTokens: maxTokens,
-    }
-  });
-  const result = await withRetry(() => model.generateContent(built.userMessage, { signal }));
-  const fullText = result.response.text();
-  if (onComplete) onComplete(extractScratchpad(fullText));
-  return cleanMarkdownFromResponse(fullText);
-}
+import { GeminiProvider } from './providers/GeminiProvider';
+import { AnthropicProvider, getAnthropicBaseUrl } from './providers/AnthropicProvider';
 
-async function callGeminiStream(
-  built: BuiltPrompt,
-  settings: AppSettings,
-  area: string,
-  mode: string,
-  onChunk: (text: string) => void,
-  signal?: AbortSignal,
-  onComplete?: (scratchpad?: string) => void
-): Promise<string> {
-  const genAI = new GoogleGenerativeAI(settings.geminiApiKey!);
-  const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
-  const modelName = getModelForMode(settings, mode, area);
-  // Fix 11: use full area-specific token limit (no artificial 8192 cap)
-  const maxTokens = getMaxTokens(area);
-  const model = genAI.getGenerativeModel({
-    model: modelName,
-    systemInstruction,
-    generationConfig: {
-      temperature: getModeTemperature(mode, settings.aiTemperature),
-      topP: 0.9,
-      maxOutputTokens: maxTokens,
-    }
-  });
+const helpers = {
+  getModeTemperature,
+  getMaxTokens,
+  withRetry,
+  extractScratchpad,
+  cleanMarkdownFromResponse,
+  stripScratchpad,
+};
 
-  const result = await withRetry(() => model.generateContentStream(built.userMessage, { signal }));
-  let fullText = '';
+export { getAnthropicBaseUrl };
 
-  for await (const chunk of result.stream) {
-    fullText += chunk.text();
-    onChunk(stripScratchpad(cleanMarkdownFromResponse(fullText)));
-  }
-
-  if (onComplete) onComplete(extractScratchpad(fullText));
-  return stripScratchpad(cleanMarkdownFromResponse(fullText));
-}
-
-// ─── URL da API Anthropic (resolve CORS em desenvolvimento via proxy Vite) ───
-// Em produção, as chamadas vão direto para api.anthropic.com (sem proxy Vite).
-// Em desenvolvimento (localhost), usamos o proxy configurado em vite.config.ts.
-export function getAnthropicBaseUrl(): string {
-  const isLocalDev = typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  return isLocalDev ? '/api/anthropic' : 'https://api.anthropic.com';
-}
-
-async function callAnthropic(
-  built: BuiltPrompt,
-  settings: AppSettings,
-  area: string,
-  mode: string,
-  signal?: AbortSignal,
-  onComplete?: (scratchpad?: string) => void
-): Promise<string> {
-  const systemBlocks: Array<{ type: string; text: string; cache_control?: { type: string } }> = [
-    {
-      type: 'text',
-      text: built.universalContext,
-      cache_control: { type: 'ephemeral' }
-    }
-  ];
-  if (built.areaContext) {
-    systemBlocks.push({
-      type: 'text',
-      text: built.areaContext
-    });
-  }
-
-  const response = await withRetry(() => fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': settings.anthropicApiKey!,
-      'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-      'anthropic-dangerous-direct-browser-access': 'true',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-      max_tokens: getMaxTokens(area),
-      system: systemBlocks,
-      messages: [{ role: 'user', content: built.userMessage }],
-      temperature: getModeTemperature(mode, settings.aiTemperature)
-    }),
-    signal
-  }));
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
-  }
-
-  const result = await response.json();
-  const fullText = result.content?.[0]?.text || '';
-  if (onComplete) onComplete(extractScratchpad(fullText));
-  return stripScratchpad(cleanMarkdownFromResponse(fullText));
-}
-
-async function callAnthropicStream(
-  built: BuiltPrompt,
-  settings: AppSettings,
-  area: string,
-  mode: string,
-  onChunk: (text: string) => void,
-  signal?: AbortSignal,
-  onComplete?: (scratchpad?: string) => void
-): Promise<string> {
-  const systemBlocks: Array<{ type: string; text: string; cache_control?: { type: string } }> = [
-    {
-      type: 'text',
-      text: built.universalContext,
-      cache_control: { type: 'ephemeral' }
-    }
-  ];
-  if (built.areaContext) {
-    systemBlocks.push({
-      type: 'text',
-      text: built.areaContext
-    });
-  }
-
-  const response = await withRetry(() => fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'x-api-key': settings.anthropicApiKey!,
-      'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-      'anthropic-dangerous-direct-browser-access': 'true',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-      max_tokens: getMaxTokens(area),
-      system: systemBlocks,
-      messages: [{ role: 'user', content: built.userMessage }],
-      temperature: getModeTemperature(mode, settings.aiTemperature),
-      stream: true
-    }),
-    signal
-  }));
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Não foi possível inicializar o leitor de stream.');
-
-  const decoder = new TextDecoder('utf-8');
-  let fullText = '';
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      const cleanLine = line.trim();
-      if (!cleanLine || !cleanLine.startsWith('data:')) continue;
-
-      const dataStr = cleanLine.slice(5).trim();
-      if (dataStr === '[DONE]') continue;
-
-      try {
-        const parsed = JSON.parse(dataStr);
-        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-          fullText += parsed.delta.text;
-          onChunk(stripScratchpad(cleanMarkdownFromResponse(fullText)));
-        }
-      } catch {
-        // Ignorar eventos não-JSON
-      }
-    }
-  }
-
-  return stripScratchpad(cleanMarkdownFromResponse(fullText));
-}
+// stream deleted
 
 // ─── Detecção de modo e área ─────────────────────────────────────────────────
 
@@ -767,13 +642,10 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
   try {
     let text: string;
     let scratchpad: string | undefined;
-    if (provider === 'gemini') {
-      if (!settings.geminiApiKey) throw new Error('API Key do Gemini não configurada.');
-      text = await callGemini(built, settings, area, mode, signal, (sp) => scratchpad = sp);
-    } else {
-      if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
-      text = await callAnthropic(built, settings, area, mode, signal, (sp) => scratchpad = sp);
-    }
+    
+    const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
+    text = await aiProvider.generate(built, settings, area, mode, signal, (sp) => scratchpad = sp, helpers);
+
     success = true;
     const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
@@ -830,13 +702,9 @@ export async function generateReportStream(
   try {
     let text: string;
     let scratchpad: string | undefined;
-    if (provider === 'gemini') {
-      if (!settings.geminiApiKey) throw new Error('API Key do Gemini não configurada.');
-      text = await callGeminiStream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp);
-    } else {
-      if (!settings.anthropicApiKey) throw new Error('API Key do Anthropic não configurada.');
-      text = await callAnthropicStream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp);
-    }
+    
+    const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
+    text = await aiProvider.stream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
     const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       examId: (params as any).examId,

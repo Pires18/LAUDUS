@@ -17,9 +17,15 @@ import { classNames } from '../../utils/format';
 
 
 export function Templates() {
-  const { setView, showToast, selectedClinicId } = useApp();
-  const [search, setSearch] = useState('');
-  const [areaFilter, setAreaFilter] = useState<string>('todas');
+  const { 
+    setView, 
+    showToast, 
+    selectedClinicId,
+    templateSearch: search,
+    setTemplateSearch: setSearch,
+    templateAreaFilter: areaFilter,
+    setTemplateAreaFilter: setAreaFilter
+  } = useApp();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
 
 

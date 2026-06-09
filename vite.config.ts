@@ -353,9 +353,9 @@ export default defineConfig({
     open: process.env.RUNNING_IN_DOCKER === 'true' ? false : true,
     proxy: {
       '/api/anthropic': {
-        target: 'https://api.anthropic.com',
+        target: 'https://api.anthropic.com/v1/messages',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
+        rewrite: (path) => '',
         secure: true,
       }
     }

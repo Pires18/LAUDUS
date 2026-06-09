@@ -315,6 +315,24 @@ export async function addItemWithId<T extends Record<string, unknown>>(
 ): Promise<void> {
   const docRef = getDocRef(collectionName, id);
   const now = Date.now();
+
+  // Versionamento Automático de Templates (Fase 3)
+  if (collectionName === 'templates') {
+    try {
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const oldData = snap.data();
+        const versionsRef = collection(docRef, 'versions');
+        await addDoc(versionsRef, {
+          ...oldData,
+          versionSavedAt: now,
+        });
+      }
+    } catch (err) {
+      console.warn('[DB] Erro ao salvar versão do template no setDoc:', err);
+    }
+  }
+
   await setDoc(docRef, sanitize({
     ...data,
     createdAt: now,
@@ -342,6 +360,24 @@ export async function updateItem(
   data: Record<string, unknown>
 ): Promise<void> {
   const docRef = getDocRef(collectionName, id);
+
+  // Versionamento Automático de Templates (Fase 3)
+  if (collectionName === 'templates') {
+    try {
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const oldData = snap.data();
+        const versionsRef = collection(docRef, 'versions');
+        await addDoc(versionsRef, {
+          ...oldData,
+          versionSavedAt: Date.now(),
+        });
+      }
+    } catch (err) {
+      console.warn('[DB] Erro ao salvar versão do template:', err);
+    }
+  }
+
   await updateDoc(docRef, {
     ...sanitize(data),
     updatedAt: Date.now()
@@ -515,6 +551,40 @@ export async function getRecentFinalizedReports(templateIdOrArea: string, limitC
       .filter(Boolean);
   } catch (err) {
     console.error('Erro ao buscar laudos recentes:', err);
+    return [];
+  }
+}
+
+/**
+ * Busca o histórico de laudos anteriores do paciente (RAG Clínico).
+ * Retorna laudos do mesmo paciente, na mesma especialidade (area).
+ */
+export async function getPatientPreviousExams(patientId: string, area: string, currentExamId: string, limitCount: number = 2): Promise<string[]> {
+  if (!patientId || patientId === 'ANONIMO') return [];
+  try {
+    const q = query(
+      getCollectionRef('exams'),
+      where('patientId', '==', patientId),
+      where('status', '==', 'finalizado')
+    );
+    const snap = await getDocs(q);
+    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    
+    // Filtra pela mesma área e exclui o exame atual
+    const filtered = docs.filter(d => d.area === area && d.id !== currentExamId);
+    
+    // Ordena do mais recente para o mais antigo
+    filtered.sort((a, b) => (b.finalizedAt || b.createdAt || 0) - (a.finalizedAt || a.createdAt || 0));
+
+    return filtered
+      .slice(0, limitCount)
+      .map(doc => {
+        const dateStr = new Date(doc.finalizedAt || doc.createdAt).toLocaleDateString('pt-BR');
+        return `[EXAME DE ${dateStr}]\n${doc.reportContent}`;
+      })
+      .filter(Boolean);
+  } catch (err) {
+    console.error('Erro ao buscar histórico clínico do paciente:', err);
     return [];
   }
 }

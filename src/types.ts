@@ -279,6 +279,37 @@ export interface Clinic {
   /** HTML para o rodapé do documento impresso */
   footerHtml?: string;
   active: boolean;
+  schedulingConfig?: {
+    weekdayShifts: {
+      day: number; // 0 (Sunday) to 6 (Saturday)
+      active: boolean;
+      shifts: {
+        id: string;
+        name: string; // e.g. "Manhã", "Tarde", "Noite"
+        start: string; // e.g. "08:00"
+        end: string; // e.g. "12:00"
+        slotDurationMinutes: number;
+      }[];
+    }[];
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Registro de agendamento de exames */
+export interface Appointment {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientBirthDate?: string;
+  patientGender?: 'M' | 'F' | 'O';
+  clinicId?: string;
+  area: ExamArea;
+  examType: string;
+  templateId?: string;
+  scheduledAt: number; // Timestamp da data/hora do agendamento
+  status: 'agendado' | 'confirmado' | 'cancelado';
+  notes?: string;
   createdAt: number;
   updatedAt: number;
 }

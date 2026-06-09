@@ -7,7 +7,7 @@ import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
 import { updateItem, saveVersionSnapshot } from '../../store/db';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
-import { generateReportStream, stripScratchpad } from '../ai/gemini';
+import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 

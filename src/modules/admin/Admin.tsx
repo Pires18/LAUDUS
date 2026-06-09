@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { setBroadcast } from '../../store/db';
-import { callMetricsHistory } from '../ai/gemini';
+import { callMetricsHistory } from '../ai/engine';
 
 // Submodules
 import { AdminUsers } from './submodules/AdminUsers';

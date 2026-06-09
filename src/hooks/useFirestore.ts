@@ -6,6 +6,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   QueryConstraint,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
@@ -230,5 +231,59 @@ export function useDocument<T extends { id: string }>(
   return { data, loading, error };
 }
 
+// ─── usePaginatedCollection: realtime listener with infinite scroll ───
+export function usePaginatedCollection<T extends { id: string }>(
+  collectionName: string,
+  options: UseCollectionOptions & { initialLimit?: number } = {}
+) {
+  const { constraints = [], enabled = true, isGlobal = false, initialLimit = 50 } = options;
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentLimit, setCurrentLimit] = useState(initialLimit);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Serialize constraints for dependency array
+  const constraintKey = JSON.stringify(constraints.map((c) => c.toString()));
+
+  useEffect(() => {
+    if (!enabled || !auth.currentUser) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const path = isGlobal ? collectionName : userPath(collectionName);
+    const colRef = collection(firestore, path);
+    const q = query(colRef, ...constraints, limit(currentLimit));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as T));
+        setData(docs);
+        setHasMore(docs.length === currentLimit);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(`[Firestore] Error listening to paginated ${collectionName}:`, err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, currentLimit]);
+
+  const loadMore = () => {
+    if (hasMore) {
+      setCurrentLimit((prev) => prev + initialLimit);
+    }
+  };
+
+  return { data, loading, error, loadMore, hasMore };
+}
+
 // ─── Re-export query helpers for use in components ───
-export { where, orderBy } from 'firebase/firestore';
+export { where, orderBy, limit } from 'firebase/firestore';

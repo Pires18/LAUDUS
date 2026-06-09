@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { updateItem, getRecentFinalizedReports, saveVersionSnapshot, deleteWorklistEntry } from '../../../store/db';
+import { updateItem, getRecentFinalizedReports, getPatientPreviousExams, saveVersionSnapshot, deleteWorklistEntry } from '../../../store/db';
 import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types';
-import { generateReportStream, generateMockReport } from '../../ai/gemini';
+import { generateReportStream, generateMockReport } from '../../ai/engine';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
 import { getInitialReportContent } from '../../templates/utils';
 
@@ -94,6 +94,8 @@ export function useExamActions({
       const previousExams = settings.aiTrainingEnabled
         ? await getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
         : [];
+        
+      const patientPreviousExams = await getPatientPreviousExams(patient.id, template.area, examId, 2);
 
       const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
       let html: string;
@@ -119,6 +121,7 @@ export function useExamActions({
             requestingPhysician,
             anamnesis,
             previousExams,
+            patientPreviousExams,
             examDateMs,
           }, (chunk) => {
             if (chunk.trim()) {
@@ -140,6 +143,7 @@ export function useExamActions({
             requestingPhysician,
             anamnesis,
             previousExams,
+            patientPreviousExams,
             customPrompt,
             examDateMs,
           }, (chunk) => {

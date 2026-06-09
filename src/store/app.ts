@@ -1,12 +1,14 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { User } from 'firebase/auth';
-import { AppSettings, Patient } from '../types';
+import { AppSettings, Patient, ExamStatus } from '../types';
 import { getSettings, saveSettings } from './db';
 
 type View =
   | { name: 'dashboard' }
   | { name: 'worklist' }
   | { name: 'patients' }
+  | { name: 'appointments' }
   | { name: 'patient-detail'; patientId: string }
   | { name: 'exam-editor'; examId: string }
   | { name: 'templates' }
@@ -49,9 +51,31 @@ interface AppState {
   setShowSupportModal: (val: boolean) => void;
   createExamDefaultPatient: Patient | null;
   setCreateExamDefaultPatient: (p: Patient | null) => void;
+
+  // ── Templates Filter State ──
+  templateSearch: string;
+  setTemplateSearch: (s: string) => void;
+  templateAreaFilter: string;
+  setTemplateAreaFilter: (a: string) => void;
+
+  // ── Worklist Filter State ──
+  worklistStatusFilter: ExamStatus | 'todos';
+  setWorklistStatusFilter: (s: ExamStatus | 'todos') => void;
+  worklistAreaFilter: string;
+  setWorklistAreaFilter: (a: string) => void;
+  worklistDateFilter: 'todos' | 'hoje' | 'semana' | 'mes';
+  setWorklistDateFilter: (d: 'todos' | 'hoje' | 'semana' | 'mes') => void;
+  worklistSearch: string;
+  setWorklistSearch: (s: string) => void;
+
+  // ── Patients Filter State ──
+  patientsSearch: string;
+  setPatientsSearch: (s: string) => void;
 }
 
-export const useApp = create<AppState>((set, get) => ({
+export const useApp = create<AppState>()(
+  persist(
+    (set, get) => ({
   // ── Auth ──
   user: null,
   setUser: (u) => set({ user: u }),
@@ -109,4 +133,39 @@ export const useApp = create<AppState>((set, get) => ({
   setShowSupportModal: (val) => set({ showSupportModal: val }),
   createExamDefaultPatient: null,
   setCreateExamDefaultPatient: (p) => set({ createExamDefaultPatient: p }),
-}));
+
+  // ── Templates Filter State ──
+  templateSearch: '',
+  setTemplateSearch: (s) => set({ templateSearch: s }),
+  templateAreaFilter: 'todas',
+  setTemplateAreaFilter: (a) => set({ templateAreaFilter: a }),
+
+  // ── Worklist Filter State ──
+  worklistStatusFilter: 'todos',
+  setWorklistStatusFilter: (s) => set({ worklistStatusFilter: s }),
+  worklistAreaFilter: 'todas',
+  setWorklistAreaFilter: (a) => set({ worklistAreaFilter: a }),
+  worklistDateFilter: 'todos',
+  setWorklistDateFilter: (d) => set({ worklistDateFilter: d }),
+  worklistSearch: '',
+  setWorklistSearch: (s) => set({ worklistSearch: s }),
+
+  // ── Patients Filter State ──
+  patientsSearch: '',
+  setPatientsSearch: (s) => set({ patientsSearch: s }),
+    }),
+    {
+      name: 'laudus-storage',
+      // Define quais propriedades devem ser persistidas localmente
+      partialize: (state) => ({
+        worklistStatusFilter: state.worklistStatusFilter,
+        worklistAreaFilter: state.worklistAreaFilter,
+        worklistDateFilter: state.worklistDateFilter,
+        worklistSearch: state.worklistSearch,
+        patientsSearch: state.patientsSearch,
+        templateSearch: state.templateSearch,
+        templateAreaFilter: state.templateAreaFilter,
+      }),
+    }
+  )
+);
