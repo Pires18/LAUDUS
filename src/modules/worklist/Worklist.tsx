@@ -1,5 +1,5 @@
 import { useApp } from '../../store/app';
-import { useCollection, usePaginatedCollection, orderBy } from '../../hooks/useFirestore';
+import { useCollection, usePaginatedCollection, orderBy, where } from '../../hooks/useFirestore';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
@@ -46,7 +46,10 @@ export function Worklist() {
 
   // Paginated exams listener
   const { data: exams, loading: examsLoading, hasMore, loadMore } = usePaginatedCollection<ExamRequest>('exams', {
-    constraints: [orderBy('createdAt', 'desc')],
+    constraints: [
+      ...(selectedClinicId ? [where('clinicId', '==', selectedClinicId)] : []),
+      orderBy('createdAt', 'desc')
+    ],
     initialLimit: 50
   });
 

@@ -145,7 +145,7 @@ export const useApp = create<AppState>()(
   setWorklistStatusFilter: (s) => set({ worklistStatusFilter: s }),
   worklistAreaFilter: 'todas',
   setWorklistAreaFilter: (a) => set({ worklistAreaFilter: a }),
-  worklistDateFilter: 'todos',
+  worklistDateFilter: 'hoje',
   setWorklistDateFilter: (d) => set({ worklistDateFilter: d }),
   worklistSearch: '',
   setWorklistSearch: (s) => set({ worklistSearch: s }),
