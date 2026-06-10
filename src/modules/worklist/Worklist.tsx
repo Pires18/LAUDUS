@@ -1,5 +1,5 @@
 import { useApp } from '../../store/app';
-import { useCollection, usePaginatedCollection, orderBy, where } from '../../hooks/useFirestore';
+import { useCollection, orderBy, where } from '../../hooks/useFirestore';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
@@ -44,13 +44,12 @@ export function Worklist() {
 
   // Os filtros agora são persistidos e gerenciados automaticamente pelo Zustand (store/app.ts)
 
-  // Paginated exams listener
-  const { data: exams, loading: examsLoading, hasMore, loadMore } = usePaginatedCollection<ExamRequest>('exams', {
+  // Exams listener - load all without pagination
+  const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams', {
     constraints: [
       ...(selectedClinicId ? [where('clinicId', '==', selectedClinicId)] : []),
       orderBy('createdAt', 'desc')
-    ],
-    initialLimit: 50
+    ]
   });
 
   const { data: patients } = useCollection<Patient>('patients');
@@ -533,18 +532,7 @@ export function Worklist() {
             </tbody>
           </table>
           
-          {hasMore && (
-            <div className="hidden md:flex p-4 justify-center border-t border-ink-100">
-              <button 
-                onClick={loadMore} 
-                className="btn-secondary flex items-center gap-2 px-8"
-                disabled={examsLoading}
-              >
-                {examsLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-                Carregar exames mais antigos
-              </button>
-            </div>
-          )}
+
 
           {/* Mobile Card List View */}
           <div className="md:hidden divide-y divide-ink-50">
@@ -666,18 +654,7 @@ export function Worklist() {
               })
             )}
             
-            {hasMore && (
-              <div className="p-4 flex justify-center border-t border-ink-100">
-                <button 
-                  onClick={loadMore} 
-                  className="btn-secondary w-full flex items-center justify-center gap-2"
-                  disabled={examsLoading}
-                >
-                  {examsLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-                  Carregar mais
-                </button>
-              </div>
-            )}
+
           </div>
         </div>
       </div>
