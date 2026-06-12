@@ -20,6 +20,7 @@ import { StatsBar } from './components/StatsBar';
 import { AppointmentCard } from './components/AppointmentCard';
 import { DailyTimeline } from './components/DailyTimeline';
 import { CreateAppointmentModal } from './components/CreateAppointmentModal';
+import { EditAppointmentModal } from './components/EditAppointmentModal';
 import { ConfirmAppointmentModal } from './components/ConfirmAppointmentModal';
 import { RescheduleModal } from './components/RescheduleModal';
 import { ShiftConfigPanel } from './components/ShiftConfigPanel';
@@ -329,6 +330,36 @@ export function Appointments() {
     }
   };
 
+  // Salvar Edição de Agendamento
+  const handleUpdateAppointment = async (updatedFields: Partial<Appointment>) => {
+    const app = state.editingApp;
+    if (!app) return;
+
+    // Se mudou a data ou horário, valida o slot
+    if (updatedFields.scheduledAt && updatedFields.scheduledAt !== app.scheduledAt) {
+      const newDateStr = getLocalDateStr(updatedFields.scheduledAt);
+      const d = new Date(updatedFields.scheduledAt);
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      const newTimeStr = `${h}:${m}`;
+
+      const conflict = isSlotAvailable(updatedFields.clinicId || app.clinicId || '', newDateStr, newTimeStr, appointments, app.id);
+      if (!conflict.available) {
+        showToast(`Horário ${newTimeStr} já reservado para ${conflict.bookedBy}`, 'error');
+        return;
+      }
+    }
+
+    try {
+      await updateItem('appointments', app.id, updatedFields);
+      showToast('Agendamento atualizado com sucesso!');
+      dispatch({ type: 'SET_EDITING_APP', payload: null });
+    } catch (error) {
+      console.error(error);
+      showToast('Erro ao atualizar agendamento', 'error');
+    }
+  };
+
   // Salvar configuracao de turnos
   const handleSaveClinicConfig = async (clinicId: string, weekdayShifts: any) => {
     try {
@@ -522,6 +553,7 @@ export function Appointments() {
                     onCancel={(a) => dispatch({ type: 'SET_CANCELING_APP', payload: a })}
                     onDelete={(a) => dispatch({ type: 'SET_DELETING_APP', payload: a })}
                     onReschedule={(a) => dispatch({ type: 'SET_RESCHEDULING_APP', payload: a })}
+                    onEdit={(a) => dispatch({ type: 'SET_EDITING_APP', payload: a })}
                   />
                 ))}
               </div>
@@ -537,6 +569,7 @@ export function Appointments() {
                     onCancel={(a) => dispatch({ type: 'SET_CANCELING_APP', payload: a })}
                     onDelete={(a) => dispatch({ type: 'SET_DELETING_APP', payload: a })}
                     onReschedule={(a) => dispatch({ type: 'SET_RESCHEDULING_APP', payload: a })}
+                    onEdit={(a) => dispatch({ type: 'SET_EDITING_APP', payload: a })}
                     onQuickSchedule={(time) => {
                       dispatch({ type: 'RESET_FORM' });
                       dispatch({ type: 'SET_APPOINTMENT_TIME', payload: time });
@@ -595,6 +628,21 @@ export function Appointments() {
             dicomDevices={settings.dicomDevices || []}
             onClose={() => dispatch({ type: 'SET_CONFIRMING_APP', payload: null })}
             onConfirm={handleConfirmAppointment}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* EDIT MODAL */}
+      <AnimatePresence>
+        {state.editingApp && (
+          <EditAppointmentModal
+            appointment={state.editingApp}
+            clinics={clinics}
+            patients={patients}
+            templates={templates}
+            appointments={appointments}
+            onClose={() => dispatch({ type: 'SET_EDITING_APP', payload: null })}
+            onSave={handleUpdateAppointment}
           />
         )}
       </AnimatePresence>

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Clinic, Appointment } from '../../../types';
 import { generateSlotsForDay } from '../utils/scheduleUtils';
 import { 
-  Clock, Plus, Check, RefreshCw, X, Trash2, ShieldCheck
+  Clock, Plus, Check, RefreshCw, X, Trash2, ShieldCheck, Edit
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { AreaIcon } from '../../../components/AreaIcon';
@@ -15,6 +15,7 @@ interface DailyTimelineProps {
   onCancel: (app: Appointment) => void;
   onDelete: (app: Appointment) => void;
   onReschedule: (app: Appointment) => void;
+  onEdit: (app: Appointment) => void;
   onQuickSchedule: (time: string) => void;
 }
 
@@ -26,6 +27,7 @@ export function DailyTimeline({
   onCancel,
   onDelete,
   onReschedule,
+  onEdit,
   onQuickSchedule,
 }: DailyTimelineProps) {
   const slots = useMemo(() => {
@@ -143,6 +145,14 @@ export function DailyTimeline({
                             className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[9px] uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-1 active:scale-95 transition-all"
                           >
                             <Check size={10} /> Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onEdit(appointment)}
+                            className="p-1.5 text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 rounded-lg transition-all active:scale-95"
+                            title="Editar"
+                          >
+                            <Edit size={12} />
                           </button>
                           <button
                             type="button"

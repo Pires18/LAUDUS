@@ -18,6 +18,7 @@ export interface AppointmentFormState {
   cancelingApp: Appointment | null;
   deletingApp: Appointment | null;
   reschedulingApp: Appointment | null;
+  editingApp: Appointment | null;
 
   // Creation modal form state
   modalStep: 1 | 2 | 3;
@@ -63,6 +64,7 @@ export type AppointmentAction =
   | { type: 'SET_CANCELING_APP'; payload: Appointment | null }
   | { type: 'SET_DELETING_APP'; payload: Appointment | null }
   | { type: 'SET_RESCHEDULING_APP'; payload: Appointment | null }
+  | { type: 'SET_EDITING_APP'; payload: Appointment | null }
   | { type: 'SET_MODAL_STEP'; payload: 1 | 2 | 3 }
   | { type: 'SET_PATIENT_SEARCH'; payload: string }
   | { type: 'SET_TEMPLATE_SEARCH'; payload: string }
@@ -95,6 +97,7 @@ const getInitialState = (defaultClinic: Clinic | null, defaultDeviceId: string):
   cancelingApp: null,
   deletingApp: null,
   reschedulingApp: null,
+  editingApp: null,
 
   modalStep: 1,
   patientSearch: '',
@@ -145,6 +148,8 @@ function appointmentReducer(state: AppointmentFormState, action: AppointmentActi
       return { ...state, deletingApp: action.payload };
     case 'SET_RESCHEDULING_APP':
       return { ...state, reschedulingApp: action.payload };
+    case 'SET_EDITING_APP':
+      return { ...state, editingApp: action.payload };
     case 'SET_MODAL_STEP':
       return { ...state, modalStep: action.payload };
     case 'SET_PATIENT_SEARCH':
@@ -205,6 +210,7 @@ function appointmentReducer(state: AppointmentFormState, action: AppointmentActi
         appointmentPriority: 'normal',
         appointmentRequestingPhysician: '',
         appointmentInsurance: '',
+        editingApp: null,
       };
     default:
       return state;

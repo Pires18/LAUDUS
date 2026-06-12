@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Appointment, Clinic } from '../../../types';
 import { 
   Clock, Check, X, Building2, Phone, 
-  Trash2, RefreshCw, AlertTriangle, ShieldCheck
+  Trash2, RefreshCw, AlertTriangle, ShieldCheck, Edit
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { AreaIcon } from '../../../components/AreaIcon';
@@ -15,6 +15,7 @@ interface AppointmentCardProps {
   onCancel: (app: Appointment) => void;
   onDelete: (app: Appointment) => void;
   onReschedule: (app: Appointment) => void;
+  onEdit: (app: Appointment) => void;
 }
 
 export function AppointmentCard({
@@ -24,6 +25,7 @@ export function AppointmentCard({
   onCancel,
   onDelete,
   onReschedule,
+  onEdit,
 }: AppointmentCardProps) {
   const appTime = new Date(appointment.scheduledAt).toLocaleTimeString('pt-BR', {
     hour: '2-digit',
@@ -226,6 +228,14 @@ export function AppointmentCard({
               className="flex-1 h-9 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm flex items-center justify-center gap-1 active:scale-95 transition-all"
             >
               <Check size={12} /> Confirmar
+            </button>
+            <button
+              type="button"
+              onClick={() => onEdit(appointment)}
+              className="p-2 text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 rounded-xl transition-all active:scale-95 flex items-center justify-center shadow-sm"
+              title="Editar"
+            >
+              <Edit size={13} />
             </button>
             <button
               type="button"
