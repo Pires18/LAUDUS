@@ -303,6 +303,12 @@ export interface Appointment {
   patientName: string;
   patientBirthDate?: string;
   patientGender?: 'M' | 'F' | 'O';
+  patientPhone?: string;
+  patientCPF?: string;
+  patientInsurance?: string;
+  requestingPhysician?: string;
+  priority?: 'normal' | 'urgente';
+  rescheduledFrom?: string;
   clinicId?: string;
   area: ExamArea;
   examType: string;
