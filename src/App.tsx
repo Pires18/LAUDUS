@@ -163,6 +163,13 @@ function UserAccessGate({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Acesso para desenvolvimento (Bypass DEV)
+        if (import.meta.env.DEV && user.uid === 'dev-admin-uid') {
+          setIsAllowed(true);
+          setChecking(false);
+          return;
+        }
+
         // O sistema não usa mais pré-cadastro manual (que causaria Permission Denied no Firebase)
         // Se o usuário já existir no banco (criado pelo auto-cadastro com licença), tudo certo.
         // Se não existir, ele será barrado a não ser que use a tela de ativação de licença.

@@ -227,9 +227,25 @@ function buildUniversalContext(settings: AppSettings): string {
   return parts.join('\n\n');
 }
 
-function buildSpecificContext(template?: ReportTemplate | null): string {
-  if (!template || !template.aiInstructions) return '';
-  return `═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions}`;
+function buildSpecificContext(
+  template?: ReportTemplate | null,
+  settings?: AppSettings,
+  fallbackArea?: string
+): string {
+  const area = template?.area || fallbackArea;
+  const areaPrompt = area && settings?.aiAreaPrompts?.[area as ExamArea];
+  
+  const parts: string[] = [];
+  
+  if (areaPrompt && areaPrompt.trim()) {
+    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt.trim()}`);
+  }
+  
+  if (template?.aiInstructions && template.aiInstructions.trim()) {
+    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions.trim()}`);
+  }
+  
+  return parts.join('\n\n');
 }
 
 function buildMaskHtml(template: ReportTemplate): string {
@@ -442,7 +458,7 @@ export function buildPrompt({
   examDateMs,
 }: GenerateReportParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildSpecificContext(template);
+  const areaContext = buildSpecificContext(template, settings);
   const maskHtml = buildMaskHtml(template);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
@@ -487,7 +503,7 @@ function buildRefinePrompt({
   examDateMs,
 }: RefineParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildSpecificContext(template);
+  const areaContext = buildSpecificContext(template, settings);
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"`
@@ -540,7 +556,7 @@ function buildCopilotPrompt({
   const copilotModeOverride = DEFAULT_COPILOT_OVERRIDE;
 
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildSpecificContext(template) + copilotModeOverride;
+  const areaContext = buildSpecificContext(template, settings, exam.area) + copilotModeOverride;
 
   const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
@@ -749,7 +765,7 @@ interface QualityReport {
   }>;
 }
 
-function auditReportQuality(html: string, area?: string): QualityReport {
+export function auditReportQuality(html: string, area?: string): QualityReport {
   const issues: QualityReport['issues'] = [];
   let score = 100;
 

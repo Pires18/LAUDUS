@@ -1,4 +1,5 @@
 import { useAuth } from '../hooks/useAuth';
+import { useApp } from '../store/app';
 import { 
   Loader2, ShieldCheck, Sparkles, 
   Lock, CheckCircle, FileText, Layers
@@ -96,7 +97,7 @@ export function LoginScreen() {
             <button
               onClick={signIn}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-4 bg-white text-slate-900 font-bold py-4 px-6 rounded-2xl transition-all duration-200 shadow-sm border border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus:ring-4 focus:ring-brand-500/10 outline-none"
+              className="w-full flex items-center justify-center gap-4 bg-white text-slate-900 font-bold py-4 px-6 rounded-2xl transition-all duration-200 shadow-sm border border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus:ring-4 focus:ring-brand-500/10 outline-none animate-fade-in"
             >
               {loading ? (
                 <Loader2 size={20} className="animate-spin text-slate-400" />
@@ -112,6 +113,28 @@ export function LoginScreen() {
                 {loading ? 'Autenticando...' : 'Continuar com o Google'}
               </span>
             </button>
+
+            {import.meta.env.DEV && (
+              <button
+                onClick={() => {
+                  const { setUser } = useApp.getState();
+                  setUser({
+                    uid: 'dev-admin-uid',
+                    email: 'admin@laud.us',
+                    displayName: 'Dr. Dev Admin',
+                    emailVerified: true,
+                    isAnonymous: false,
+                    providerId: 'google.com',
+                    metadata: {},
+                    providerData: []
+                  } as any);
+                }}
+                className="w-full flex items-center justify-center gap-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-4 px-6 rounded-2xl transition-all duration-200 shadow-sm border border-indigo-200 active:scale-95 cursor-pointer outline-none text-sm animate-fade-in"
+              >
+                <Sparkles size={20} className="text-indigo-600 animate-pulse" />
+                <span>Bypass de Teste (Admin Dev)</span>
+              </button>
+            )}
 
             {/* Secure Notice */}
             <div className="bg-slate-100/50 p-4 rounded-xl border border-slate-200 flex gap-3 text-left">

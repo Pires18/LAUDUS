@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { resolveGeminiModel } from '../ai/engine';
-import { EXAM_AREAS, ExamArea, ReportTemplate } from '../../types';
-import { generateReport, callMetricsHistory, type CallMetrics, getAnthropicBaseUrl } from '../ai/engine';
+import { generateReport, callMetricsHistory, type CallMetrics, getAnthropicBaseUrl, auditReportQuality } from '../ai/engine';
+import { EXAM_AREAS, ExamArea, ReportTemplate, Patient } from '../../types';
 import {
   DEFAULT_MASTER_PROMPT,
   DEFAULT_STRUCTURE_PROMPT,
@@ -316,15 +316,156 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   const [isImprovingAll, setIsImprovingAll] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number, total: number } | null>(null);
 
+  const [templateSubTab, setTemplateSubTab] = useState<'exams' | 'area'>('exams');
+  const [editingAreaPrompt, setEditingAreaPrompt] = useState<string>('');
+  
+  // Playground States
+  const [playgroundNotes, setPlaygroundNotes] = useState<string>(
+    "Vesícula biliar normodistendida, apresentando cálculo móvel de 1,2 cm em seu interior, sem espessamento de paredes. Restante do abdome superior sem alterações."
+  );
+  const [isPlayinggroundTesting, setIsPlaygroundTesting] = useState(false);
+  const [playgroundResult, setPlaygroundResult] = useState('');
+  const [playgroundScratchpad, setPlaygroundScratchpad] = useState('');
+  const [playgroundScore, setPlaygroundScore] = useState<any>(null);
+  const [showPlayground, setShowPlayground] = useState(false);
+
   // Sync selected template prompt when selection changes or templates load
   useEffect(() => {
-    if (selectedTemplateId && templates.length > 0) {
+    if (templates.length > 0) {
+      const filtered = selectedAreaFilter
+        ? templates.filter(t => t.area === selectedAreaFilter)
+        : templates;
+      
+      const currentExists = filtered.some(t => t.id === selectedTemplateId);
+      if (!currentExists && filtered.length > 0) {
+        setSelectedTemplateId(filtered[0].id);
+      } else if (selectedTemplateId) {
+        const template = templates.find(t => t.id === selectedTemplateId);
+        setEditingTemplatePrompt(template?.aiInstructions || '');
+      }
+    }
+  }, [selectedTemplateId, templates, selectedAreaFilter]);
+
+  useEffect(() => {
+    if (selectedAreaFilter) {
+      setEditingAreaPrompt(localSettings.aiAreaPrompts?.[selectedAreaFilter] || '');
+    } else {
+      setEditingAreaPrompt('');
+    }
+  }, [selectedAreaFilter, localSettings.aiAreaPrompts]);
+
+  useEffect(() => {
+    if (selectedTemplateId) {
       const template = templates.find(t => t.id === selectedTemplateId);
-      setEditingTemplatePrompt(template?.aiInstructions || '');
-    } else if (templates.length > 0 && !selectedTemplateId) {
-      setSelectedTemplateId(templates[0].id);
+      if (template?.name.toLowerCase().includes('tireoide')) {
+        setPlaygroundNotes("Nódulo hipoecoico, sólido, contornos regulares, no terço médio do lobo direito, medindo 1,5 x 1,2 x 1,0 cm, sem microcalcificações.");
+      } else if (template?.name.toLowerCase().includes('mama')) {
+        setPlaygroundNotes("Nódulo sólido, espiculado, mais alto do que largo, medindo 1,8 cm no quadrante superior externo da mama esquerda. Linfonodos axilares normais.");
+      } else if (template?.name.toLowerCase().includes('obstetr') || template?.name.toLowerCase().includes('fetal')) {
+        setPlaygroundNotes("Feto único, cefálico. DUM de 20 semanas atrás. Medidas: DBP 50mm, CC 180mm, CA 150mm, Femur 32mm. Doppler da artéria umbilical com IP 0.95 e ACM com IP 1.45.");
+      } else {
+        setPlaygroundNotes("Vesícula biliar normodistendida, com cálculo móvel de 1,2 cm, sem espessamento parietal. Rins, pâncreas e baço normais.");
+      }
     }
   }, [selectedTemplateId, templates]);
+
+  async function handleSaveAreaPrompt() {
+    if (!selectedAreaFilter) return;
+    setIsSavingTemplate(true);
+    try {
+      const updatedAreaPrompts = {
+        ...(localSettings.aiAreaPrompts || {}),
+        [selectedAreaFilter]: editingAreaPrompt,
+      };
+      const nextSettings = {
+        ...localSettings,
+        aiAreaPrompts: updatedAreaPrompts,
+      };
+      setLocalSettings(nextSettings);
+      await updateSettings(nextSettings);
+      showToast('Diretriz da área salva com sucesso! ✓', 'success');
+    } catch {
+      showToast('Erro ao salvar diretriz da área', 'error');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  }
+
+  async function handleRunPlaygroundTest() {
+    if (!selectedTemplateId) {
+      showToast('Selecione um exame para testar.', 'error');
+      return;
+    }
+    
+    setIsPlaygroundTesting(true);
+    setPlaygroundResult('');
+    setPlaygroundScratchpad('');
+    setPlaygroundScore(null);
+    
+    try {
+      const template = templates.find(t => t.id === selectedTemplateId);
+      if (!template) throw new Error('Template não encontrado');
+      
+      const tempTemplate = {
+        ...template,
+        aiInstructions: editingTemplatePrompt,
+      };
+      
+      const tempAreaPrompts = {
+        ...(localSettings.aiAreaPrompts || {}),
+      };
+      if (selectedAreaFilter) {
+        tempAreaPrompts[selectedAreaFilter] = editingAreaPrompt;
+      }
+      const tempSettings = {
+        ...localSettings,
+        aiAreaPrompts: tempAreaPrompts,
+      };
+      
+      const dummyPatient: Patient = {
+        id: 'dummy',
+        name: 'Paciente Teste',
+        birthDate: '1985-05-15', // 41 anos
+        gender: 'F',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        history: 'Paciente feminina, 41 anos, sem histórico oncológico.'
+      };
+      
+      const testResult = await generateReport({
+        template: tempTemplate,
+        patient: dummyPatient,
+        clinicalIndication: playgroundNotes || 'Indicação clínica de teste',
+        settings: tempSettings,
+        examDateMs: Date.now(),
+      });
+      
+      setPlaygroundResult(testResult);
+      
+      // Obter scratchpad da métrica que acabou de ser salva
+      if (callMetricsHistory.length > 0) {
+        const lastMetric = callMetricsHistory[0];
+        if (lastMetric.scratchpad) {
+          setPlaygroundScratchpad(lastMetric.scratchpad);
+        }
+      }
+      
+      // Rodar auditoria
+      const scoreData = auditReportQuality(testResult, template.area);
+      setPlaygroundScore(scoreData);
+      showToast('Laudo simulado com sucesso!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao simular laudo: ' + (err instanceof Error ? err.message : String(err)), 'error');
+    } finally {
+      setIsPlaygroundTesting(false);
+    }
+  }
+
+  function handleInjectDirective(snippet: string) {
+    setEditingTemplatePrompt(prev => prev ? `${prev}\n\n${snippet}` : snippet);
+    showToast('Diretriz de padronização adicionada! ✓', 'success');
+  }
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -921,6 +1062,157 @@ ${userRequest}`;
     }
   }
 
+  const renderPlayground = () => {
+    return (
+      <div className="bg-zinc-950 rounded-[2.5rem] border border-zinc-800 shadow-2xl overflow-hidden mt-8">
+        <button
+          type="button"
+          onClick={() => setShowPlayground(!showPlayground)}
+          className="w-full px-8 py-5 flex items-center justify-between text-left hover:bg-zinc-900/40 transition-all border-b border-zinc-900"
+        >
+          <div className="flex items-center gap-3">
+            <FlaskConical className="text-violet-500 animate-pulse" size={22} />
+            <div>
+              <h5 className="text-xs font-black text-zinc-100 uppercase tracking-wider">🔬 Playground de Teste Rápido (Simulação)</h5>
+              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Teste e refine suas diretrizes simulando a IA em tempo real</p>
+            </div>
+          </div>
+          <span className="px-3 py-1 bg-zinc-900 text-zinc-400 hover:text-zinc-200 text-[10px] rounded-xl font-black uppercase tracking-widest border border-zinc-800">
+            {showPlayground ? 'Recolher' : 'Expandir Playground'}
+          </span>
+        </button>
+
+        {showPlayground && (
+          <div className="p-8 space-y-6 text-zinc-300">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left Pane: Notes Input */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Notas Clínicas do Médico (Input do Teste)</label>
+                  {/* Select template dropdown for testing when in Area sub-tab */}
+                  {templateSubTab === 'area' && selectedAreaFilter && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Exame de Teste:</span>
+                      <select
+                        value={selectedTemplateId}
+                        onChange={(e) => setSelectedTemplateId(e.target.value)}
+                        className="bg-zinc-900 text-zinc-300 border border-zinc-800 rounded-xl text-[10px] px-2 py-1 focus:ring-1 focus:ring-violet-500/30 font-bold"
+                      >
+                        <option value="">Selecione um exame...</option>
+                        {templates
+                          .filter(t => t.area === selectedAreaFilter)
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <textarea
+                  value={playgroundNotes}
+                  onChange={(e) => setPlaygroundNotes(e.target.value)}
+                  rows={5}
+                  className="w-full rounded-2xl border border-zinc-850 bg-zinc-900/40 text-zinc-200 text-xs p-4 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-550 placeholder-zinc-700 resize-none font-semibold leading-relaxed"
+                  placeholder="Digite notas médicas de teste. Ex: fígado ok, vesícula com cálculo de 12mm móvel..."
+                />
+                
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                  <div className="text-[10px] text-zinc-500 font-mono font-semibold">
+                    Paciente Simulado: F, 41 anos
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handleRunPlaygroundTest}
+                    disabled={isPlayinggroundTesting || !selectedTemplateId}
+                    className="px-5 py-3 bg-violet-600 hover:bg-violet-750 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md hover:shadow-violet-900/10 active:scale-95 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isPlayinggroundTesting ? (
+                      <><Loader2 size={13} className="animate-spin" /> Simulando...</>
+                    ) : (
+                      <><Play size={13} /> Simular Laudo</>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Pane: Quality Score & Feedback */}
+              <div className="bg-zinc-900/20 border border-zinc-900 rounded-3xl p-6 space-y-4 flex flex-col justify-between min-h-[180px]">
+                {isPlayinggroundTesting ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-zinc-500 font-mono text-[11px] h-full my-auto">
+                    <Loader2 size={28} className="animate-spin text-violet-500 mb-3" />
+                    <span>Chamando inteligência artificial em segundo plano...</span>
+                  </div>
+                ) : playgroundResult ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-zinc-850 pb-3">
+                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest font-mono">Resultado da Auditoria</span>
+                      {playgroundScore && (
+                        <span className={classNames(
+                          "px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm",
+                          playgroundScore.score >= 90 ? "bg-emerald-950/60 text-emerald-400 border border-emerald-900/50" :
+                          playgroundScore.score >= 75 ? "bg-amber-950/60 text-amber-400 border border-amber-900/50" :
+                          "bg-rose-950/60 text-rose-400 border border-rose-900/50"
+                        )}>
+                          Nota: {playgroundScore.score}/100
+                        </span>
+                      )}
+                    </div>
+                    
+                    {playgroundScore && playgroundScore.issues.length > 0 ? (
+                      <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                        {playgroundScore.issues.map((issue: any, index: number) => (
+                          <div key={index} className={classNames(
+                            "flex items-start gap-2.5 p-2.5 rounded-xl text-xs font-semibold border",
+                            issue.severity === 'error' ? "bg-rose-950/30 text-rose-350 border-rose-900/20" : "bg-amber-950/30 text-amber-350 border-amber-900/20"
+                          )}>
+                            <AlertCircle size={14} className="mt-0.5 shrink-0 text-current" />
+                            <span>{issue.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-3 bg-emerald-950/30 border border-emerald-900/20 text-emerald-400 rounded-xl text-xs font-semibold">
+                        <CheckCircle2 size={15} className="shrink-0 animate-fade-in" />
+                        <span>Nenhum erro de conformidade ou placeholder órfão detectado!</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-zinc-500 font-mono text-[11px] text-center h-full my-auto">
+                    <Sparkles size={24} className="text-zinc-800 mb-2" />
+                    <span>Simulação inativa. Digite notas clínicas e clique em <strong>Simular Laudo</strong> para testar as diretrizes locais da IA.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Split Display of HTML Report vs Scratchpad thought */}
+            {playgroundResult && !isPlayinggroundTesting && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t border-zinc-900">
+                {/* Left: Rendered report */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Laudo Final (Visualização HTML)</span>
+                  <div className="bg-white text-zinc-900 rounded-3xl border border-zinc-850 p-6 shadow-inner max-h-[350px] overflow-y-auto prose prose-sm max-w-none">
+                    <div dangerouslySetInnerHTML={{ __html: playgroundResult }} />
+                  </div>
+                </div>
+
+                {/* Right: Thought log */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Raciocínio Clínico Realizado (Scratchpad)</span>
+                  <div className="bg-zinc-900/60 text-zinc-400 font-mono text-[10px] rounded-3xl border border-zinc-850 p-6 shadow-inner max-h-[350px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {playgroundScratchpad || "Nenhum bloco de pensamento foi capturado na resposta."}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
 
 
   const sidebarItems = [
@@ -1177,19 +1469,66 @@ ${userRequest}`;
             <div className="border-b border-ink-50 pb-6 space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h4 className="text-lg font-black text-ink-900 uppercase tracking-wider">Prompts por Exame (Máscara)</h4>
-                  <p className="text-xs text-ink-400 font-semibold uppercase tracking-wider mt-0.5">Gestão e refinamento das diretrizes específicas aplicadas a cada máscara de laudo</p>
+                  <h4 className="text-lg font-black text-ink-900 uppercase tracking-wider">
+                    {templateSubTab === 'exams' ? 'Prompts por Exame (Máscara)' : 'Diretrizes por Área (Especialidade)'}
+                  </h4>
+                  <p className="text-xs text-ink-400 font-semibold uppercase tracking-wider mt-0.5">
+                    {templateSubTab === 'exams'
+                      ? 'Gestão e refinamento das diretrizes específicas aplicadas a cada máscara de laudo'
+                      : 'Defina diretrizes padronizadas herdadas por todos os exames de uma mesma especialidade'}
+                  </p>
                 </div>
-                {!readOnly && selectedTemplateId && (
-                  <button
-                    onClick={handleSaveTemplatePrompt}
-                    disabled={isSavingTemplate}
-                    className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-all flex items-center gap-2"
-                  >
-                    {isSavingTemplate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                    Salvar Prompt do Exame
-                  </button>
+                {!readOnly && (
+                  templateSubTab === 'exams' ? (
+                    selectedTemplateId && (
+                      <button
+                        onClick={handleSaveTemplatePrompt}
+                        disabled={isSavingTemplate}
+                        className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-all flex items-center gap-2"
+                      >
+                        {isSavingTemplate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        Salvar Prompt do Exame
+                      </button>
+                    )
+                  ) : (
+                    selectedAreaFilter && (
+                      <button
+                        onClick={handleSaveAreaPrompt}
+                        disabled={isSavingTemplate}
+                        className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-all flex items-center gap-2"
+                      >
+                        {isSavingTemplate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        Salvar Diretriz da Área
+                      </button>
+                    )
+                  )
                 )}
+              </div>
+
+              {/* Sub-tab selection: Prompts dos Exames vs Diretriz Base da Área */}
+              <div className="flex gap-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-2xl w-fit">
+                <button
+                  onClick={() => setTemplateSubTab('exams')}
+                  className={classNames(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                    templateSubTab === 'exams'
+                      ? "bg-white text-indigo-650 shadow-sm font-bold"
+                      : "text-slate-500 hover:text-slate-850 font-bold"
+                  )}
+                >
+                  Prompts dos Exames
+                </button>
+                <button
+                  onClick={() => setTemplateSubTab('area')}
+                  className={classNames(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
+                    templateSubTab === 'area'
+                      ? "bg-white text-indigo-650 shadow-sm font-bold"
+                      : "text-slate-500 hover:text-slate-850 font-bold"
+                  )}
+                >
+                  Diretriz Base da Área
+                </button>
               </div>
 
               {/* Template Dropdown Selector */}
@@ -1199,8 +1538,18 @@ ${userRequest}`;
                   <select disabled={readOnly}
                     value={selectedAreaFilter}
                     onChange={(e) => {
-                      setSelectedAreaFilter(e.target.value as ExamArea | '');
-                      setSelectedTemplateId('');
+                      const area = e.target.value as ExamArea | '';
+                      setSelectedAreaFilter(area);
+                      if (area) {
+                        const areaTemplates = templates.filter(t => t.area === area);
+                        if (areaTemplates.length > 0) {
+                          setSelectedTemplateId(areaTemplates[0].id);
+                        } else {
+                          setSelectedTemplateId('');
+                        }
+                      } else {
+                        setSelectedTemplateId('');
+                      }
                     }}
                     className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
                   >
@@ -1210,28 +1559,30 @@ ${userRequest}`;
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => setSelectedTemplateId(e.target.value)}
-                    className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border disabled:opacity-50"
-                    disabled={readOnly || (selectedAreaFilter !== '' && templates.filter(t => t.area === selectedAreaFilter).length === 0)}
-                  >
-                    <option value="">Selecione um exame...</option>
-                    {templates
-                      .filter(t => selectedAreaFilter === '' || t.area === selectedAreaFilter)
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} {!selectedAreaFilter && `(${EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})`}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                {templateSubTab === 'exams' && (
+                  <div>
+                    <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
+                    <select
+                      value={selectedTemplateId}
+                      onChange={(e) => setSelectedTemplateId(e.target.value)}
+                      className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border disabled:opacity-50"
+                      disabled={readOnly || (selectedAreaFilter !== '' && templates.filter(t => t.area === selectedAreaFilter).length === 0)}
+                    >
+                      <option value="">Selecione um exame...</option>
+                      {templates
+                        .filter(t => selectedAreaFilter === '' || t.area === selectedAreaFilter)
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name} {!selectedAreaFilter && `(${EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})`}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Ações em Lote */}
-              {!readOnly && selectedAreaFilter && (
+              {!readOnly && selectedAreaFilter && templateSubTab === 'exams' && (
                 <div className="space-y-3">
                   <div className="flex flex-col md:flex-row md:items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1">
@@ -1287,7 +1638,7 @@ ${userRequest}`;
                             handleImproveAllPrompts();
                           }}
                           disabled={isImprovingAll || isGeneratingAll}
-                          className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
+                          className="btn-primary bg-violet-600 hover:bg-violet-750 border-violet-700 flex items-center gap-2"
                         >
                           {isImprovingAll ? (
                             <><Loader2 size={16} className="animate-spin" /> Processando Lote...</>
@@ -1317,100 +1668,260 @@ ${userRequest}`;
               )}
             </div>
 
-            {selectedTemplateId ? (
-              <div className="space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100 flex items-center gap-1.5 w-fit">
-                      EXAM SPECIFIC DIRECTIVE
-                    </span>
-                    <h5 className="text-sm font-black text-ink-900 mt-2">
-                      Exame: {templates.find(t => t.id === selectedTemplateId)?.name}
-                    </h5>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {!readOnly && (
-                      <>
-                        <button
-                          onClick={handleGenerateTemplatePrompt}
-                          disabled={isGeneratingTemplatePrompt}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
-                        >
-                          {isGeneratingTemplatePrompt ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
-                          Gerar Prompt
-                        </button>
-                        <button
-                          onClick={() => setShowImprovePanel(!showImprovePanel)}
-                          className={classNames(
-                            'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
-                            showImprovePanel
-                              ? 'bg-violet-600 text-white border-violet-700'
-                              : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+            {templateSubTab === 'exams' ? (
+              selectedTemplateId ? (
+                <div className="space-y-6 pt-4">
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    {/* Left side: Code Editor */}
+                    <div className="xl:col-span-2 space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100 flex items-center gap-1.5 w-fit">
+                            EXAM SPECIFIC DIRECTIVE
+                          </span>
+                          <h5 className="text-sm font-black text-ink-900 mt-2">
+                            Exame: {templates.find(t => t.id === selectedTemplateId)?.name}
+                          </h5>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {!readOnly && (
+                            <>
+                              <button
+                                onClick={handleGenerateTemplatePrompt}
+                                disabled={isGeneratingTemplatePrompt}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-indigo-50 text-indigo-750 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+                              >
+                                {isGeneratingTemplatePrompt ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
+                                Gerar Prompt
+                              </button>
+                              <button
+                                onClick={() => setShowImprovePanel(!showImprovePanel)}
+                                className={classNames(
+                                  'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
+                                  showImprovePanel
+                                    ? 'bg-violet-600 text-white border-violet-700'
+                                    : 'bg-violet-50 text-violet-750 border-violet-200 hover:bg-violet-100'
+                                )}
+                              >
+                                <Sparkles size={12} />
+                                Melhorar com IA
+                                {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                              </button>
+                            </>
                           )}
-                        >
-                          <Sparkles size={12} />
-                          Melhorar com IA
-                          {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
+                        </div>
+                      </div>
 
-                {/* AI Improve Panel */}
-                {!readOnly && showImprovePanel && (
-                  <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={16} className="text-violet-600" />
-                      <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
+                      {/* AI Improve Panel */}
+                      {!readOnly && showImprovePanel && (
+                        <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
+                          <div className="flex items-center gap-2">
+                            <Sparkles size={16} className="text-violet-600" />
+                            <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
+                          </div>
+                          <p className="text-[11px] text-violet-700 leading-relaxed">
+                            A IA analisará o prompt atual deste exame e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
+                          </p>
+                          <textarea readOnly={readOnly} disabled={readOnly}
+                            value={templateImprovePrompt}
+                            onChange={(e) => setTemplateImprovePrompt(e.target.value)}
+                            rows={3}
+                            className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
+                            placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BI-RADS detalhados, focar em condutas específicas...)"
+                          />
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={handleImproveTemplatePrompt}
+                              disabled={isImprovingTemplate}
+                              className="btn-primary bg-violet-600 hover:bg-violet-750 border-violet-700 flex items-center gap-2"
+                            >
+                              {isImprovingTemplate ? (
+                                <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
+                              ) : (
+                                <><Sparkles size={16} /> Melhorar Prompt</>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => { setShowImprovePanel(false); setTemplateImprovePrompt(''); }}
+                              className="text-sm text-violet-500 hover:underline font-semibold"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="w-full">
+                        <CognitiveCodeEditor readOnly={readOnly}
+                          value={editingTemplatePrompt}
+                          onChange={(v) => setEditingTemplatePrompt(v)}
+                          fileName={`${(templates.find(t => t.id === selectedTemplateId)?.name || '').toLowerCase().replace(/\s+/g, '_')}_prompt.md`}
+                          badge="EXAM SPECIFIC DIRECTIVE"
+                          glowColor="violet"
+                          placeholder="Digite as instruções e diretrizes clínicas específicas para este exame..."
+                        />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-violet-700 leading-relaxed">
-                      A IA analisará o prompt atual deste exame e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
-                    </p>
-                    <textarea readOnly={readOnly} disabled={readOnly}
-                      value={templateImprovePrompt}
-                      onChange={(e) => setTemplateImprovePrompt(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
-                      placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BI-RADS detalhados, focar em condutas específicas...)"
-                    />
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleImproveTemplatePrompt}
-                        disabled={isImprovingTemplate}
-                        className="btn-primary bg-violet-600 hover:bg-violet-700 border-violet-700 flex items-center gap-2"
-                      >
-                        {isImprovingTemplate ? (
-                          <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
-                        ) : (
-                          <><Sparkles size={16} /> Melhorar Prompt</>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => { setShowImprovePanel(false); setTemplateImprovePrompt(''); }}
-                        className="text-sm text-violet-500 hover:underline"
-                      >
-                        Cancelar
-                      </button>
+
+                    {/* Right side: Assistant Panel */}
+                    <div>
+                      <div className="bg-zinc-50 border border-zinc-200 rounded-[2rem] p-6 space-y-6 shadow-sm">
+                        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+                          <Sparkles size={16} className="text-violet-600" />
+                          <h5 className="font-black text-zinc-900 text-sm">Assistente de Prompt</h5>
+                        </div>
+                        
+                        {/* Checklist */}
+                        <div className="space-y-3">
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Checklist de Qualidade</span>
+                          <ul className="space-y-2 text-xs text-zinc-650 font-semibold leading-relaxed font-semibold">
+                            <li className="flex items-start gap-2">
+                              <CheckCircle2 size={13} className="text-emerald-500 mt-0.5 shrink-0" />
+                              <span>Instruir normalidade para placeholders <code>(...)</code> não preenchidos.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <CheckCircle2 size={13} className="text-emerald-500 mt-0.5 shrink-0" />
+                              <span>Garantir correlação direta: Análise &rarr; Conclusão &rarr; Recomendação.</span>
+                            </li>
+                            {templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('tireoide') && (
+                              <li className="flex items-start gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-805 border border-amber-100 animate-fade-in font-semibold">
+                                <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                                <span>Dica: Use critérios TI-RADS e injeção de volumes de nódulos.</span>
+                              </li>
+                            )}
+                            {templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('mama') && (
+                              <li className="flex items-start gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-805 border border-amber-100 animate-fade-in font-semibold">
+                                <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                                <span>Dica: Use classificação BI-RADS e descrição morfológica do CBR.</span>
+                              </li>
+                            )}
+                            {(templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('obstetr') || 
+                              templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('fetal')) && (
+                              <li className="flex items-start gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-805 border border-amber-100 animate-fade-in font-semibold">
+                                <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
+                                <span>Dica: Prever cálculo de IG, DDP por DUM e regras de Diástole Zero.</span>
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                        
+                        {/* Injeção de Diretrizes / Padronização */}
+                        <div className="space-y-3">
+                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Injetar Diretrizes Clínicas</span>
+                          <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-1 font-semibold">
+                            {[
+                              { 
+                                label: 'Fórmula Volume (Elipsoide)', 
+                                text: '- Cálculo de volume de estruturas tridimensionais (cistos, nódulos, tireoide, próstata, útero): utilize a fórmula do elipsoide: Diâmetro1 x Diâmetro2 x Diâmetro3 x 0,523. SEMPRE converta as medidas de milímetros (mm) para centímetros (cm) dividindo por 10 antes de computar o volume final.' 
+                              },
+                              { 
+                                label: 'Regras TI-RADS (Tireoide)', 
+                                text: '- Classificação TI-RADS (ACR): para cada nódulo tireoidiano descrito, classifique-o segundo a pontuação de composição, ecogenicidade, formato, margem e focos ecogênicos. Declare a pontuação total e a categoria TI-RADS (TR1 a TR5) com a recomendação de seguimento ou punção (PAAF).' 
+                              },
+                              { 
+                                label: 'Classificação BI-RADS (Mama)', 
+                                text: '- Classificação BI-RADS: descreva detalhadamente os nódulos mamários (forma, orientação, margem, limite, ecotextura, achados acústicos posteriores). Atribua uma categoria final de classificação (BI-RADS 1 a 6) e determine a conduta (controle, mamografia digital complementar, ultrassonografia, ou core biopsy).' 
+                              },
+                              { 
+                                label: 'Regras Simples IOTA (Ovário)', 
+                                text: '- Regras Simples IOTA (International Ovarian Tumor Analysis): ao identificar massas ou cistos anexiais, classifique-os em Benigno (regras B) ou Maligno (regras M) e declare se a massa é classificável ou indeterminada pelas Regras Simples.' 
+                              },
+                              { 
+                                label: 'Urgência Médica / Alerta (R9)', 
+                                text: '- Situação de Emergência Médica (Alerta): em caso de achados de gravidade imediata (ex: diástole zero ou reversa nas artérias uterinas/umbilical, descolamento prematuro de placenta, sofrimento fetal agudo, gestação ectópica rota), inclua obrigatoriamente um bullet destacado nas RECOMENDAÇÕES com "ALERTA OBSTÉTRICO: recomenda-se encaminhamento imediato para serviço de urgência/emergência obstétrica devido a...".' 
+                              },
+                              { 
+                                label: 'Normalidade Qualitativa', 
+                                text: '- Redação Qualitativa: se alguma estrutura não for explicitamente citada nas notas do exame, adote redação qualitativa padrão de normalidade (ex: "de aspecto anatômico preservado", "com contornos regulares e ecotextura homogênea"). Nunca invente medidas numéricas fictícias.' 
+                              }
+                            ].map((item) => (
+                              <button
+                                key={item.label}
+                                type="button"
+                                onClick={() => handleInjectDirective(item.text)}
+                                className="text-left px-3 py-2 bg-white hover:bg-violet-50 text-zinc-700 hover:text-violet-750 border border-zinc-200 rounded-xl text-[11px] font-semibold transition-all flex items-center justify-between group shadow-sm active:scale-95 animate-fade-in"
+                              >
+                                <span>{item.label}</span>
+                                <Zap size={11} className="text-zinc-400 group-hover:text-violet-500 shrink-0 ml-2" />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
 
-                <div className="w-full">
-                  <CognitiveCodeEditor readOnly={readOnly}
-                    value={editingTemplatePrompt}
-                    onChange={(v) => setEditingTemplatePrompt(v)}
-                    fileName={`${(templates.find(t => t.id === selectedTemplateId)?.name || '').toLowerCase().replace(/\s+/g, '_')}_prompt.md`}
-                    badge="EXAM SPECIFIC DIRECTIVE"
-                    glowColor="violet"
-                    placeholder="Digite as instruções e diretrizes clínicas específicas para este exame..."
-                  />
+                  {/* 🔬 Playground de Teste Rápido */}
+                  {renderPlayground()}
                 </div>
-              </div>
+              ) : (
+                <div className="p-8 text-center border border-dashed border-ink-200 rounded-3xl text-ink-400 font-semibold">
+                  Nenhum exame cadastrado ou selecionado.
+                </div>
+              )
             ) : (
-              <div className="p-8 text-center border border-dashed border-ink-200 rounded-3xl text-ink-400">
-                Nenhum exame cadastrado ou selecionado.
-              </div>
+              selectedAreaFilter ? (
+                <div className="space-y-6 pt-4">
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    {/* Left side: Area Code Editor */}
+                    <div className="xl:col-span-2 space-y-4">
+                      <div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600 text-[9px] font-black uppercase tracking-wider border border-brand-100 flex items-center gap-1.5 w-fit font-bold">
+                          AREA LEVEL DIRECTIVE
+                        </span>
+                        <h5 className="text-sm font-black text-ink-900 mt-2">
+                          Área: {EXAM_AREAS.find(a => a.id === selectedAreaFilter)?.label}
+                        </h5>
+                      </div>
+                      
+                      <div className="w-full">
+                        <CognitiveCodeEditor readOnly={readOnly}
+                          value={editingAreaPrompt}
+                          onChange={(v) => setEditingAreaPrompt(v)}
+                          fileName={`${selectedAreaFilter.replace(/\s+/g, '_')}_area_prompt.md`}
+                          badge="AREA LEVEL DIRECTIVE"
+                          glowColor="brand"
+                          placeholder="Digite as diretrizes e regras clínicas gerais compartilhadas por todos os exames desta especialidade..."
+                        />
+                      </div>
+                    </div>
+
+                    {/* Right side: Area Info / Assistant */}
+                    <div>
+                      <div className="bg-zinc-50 border border-zinc-200 rounded-[2rem] p-6 space-y-6 shadow-sm">
+                        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+                          <Sparkles size={16} className="text-brand-600" />
+                          <h5 className="font-black text-zinc-900 text-sm">Padronização da Área</h5>
+                        </div>
+                        <p className="text-xs text-zinc-650 leading-relaxed font-semibold">
+                          As diretrizes escritas aqui serão herdadas automaticamente por todos os exames da área <strong>{EXAM_AREAS.find(a => a.id === selectedAreaFilter)?.label}</strong>.
+                        </p>
+                        <div className="p-4 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl text-xs text-indigo-950 font-semibold leading-relaxed">
+                          💡 <strong>Dica de Organização:</strong>
+                          <ul className="list-disc list-inside mt-2 space-y-1.5 text-indigo-900">
+                            <li>Defina regras de formatação comuns para todos os laudos desta especialidade.</li>
+                            <li>Escreva fórmulas e tabelas que múltiplos exames utilizam (ex: doppler vascular, biometrias).</li>
+                            <li>Insira termos específicos preferidos pelos médicos desta área.</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Playground */}
+                  {selectedTemplateId ? (
+                    renderPlayground()
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-850 font-semibold">
+                      Adicione pelo menos um exame/máscara a esta área para habilitar o Playground de simulação.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center border border-dashed border-ink-200 rounded-3xl text-ink-400 font-semibold">
+                  Selecione uma área no menu superior para começar a editar as diretrizes da especialidade.
+                </div>
+              )
             )}
           </div>
         )}

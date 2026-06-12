@@ -11,8 +11,8 @@ export function useAdmin() {
 
   const SUPER_ADMIN_EMAIL = 'matheuskpires@gmail.com';
 
-  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
-  const isAdminRole = settings.currentRole === 'admin';
+  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL || (import.meta.env.DEV && user?.uid === 'dev-admin-uid');
+  const isAdminRole = settings.currentRole === 'admin' || (import.meta.env.DEV && user?.uid === 'dev-admin-uid');
 
   return {
     isAdmin: isSuperAdmin || isAdminRole,
