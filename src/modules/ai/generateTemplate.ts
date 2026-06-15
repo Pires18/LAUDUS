@@ -1,7 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings, ExamArea } from '../../types';
 import { getRecentFinalizedReports } from '../../store/db';
-import { resolveGeminiModel } from './engine';
+import { resolveGeminiModel, getAnthropicBaseUrl } from './engine';
+import { robustJsonParse } from './json';
+import { 
+  DEFAULT_TEMPLATE_GENERATION_PROMPT,
+  DEFAULT_CUSTOM_FORM_PROMPT,
+  DEFAULT_ANAMNESIS_PROMPT,
+  DEFAULT_CONSENT_PROMPT
+} from './prompts/template';
 
 interface GeneratedTemplate {
   title: string;
@@ -112,13 +119,12 @@ Gere o JSON da máscara do laudo agora.`;
     const result = await model.generateContent(userMessage);
     text = result.response.text();
   } else {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
       method: 'POST',
       headers: {
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },
       body: JSON.stringify({
@@ -145,12 +151,8 @@ Gere o JSON da máscara do laudo agora.`;
     text = result.content?.[0]?.text || '';
   }
 
-  // Clean markdown code blocks if present
-  text = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-  text = text.replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-
   try {
-    const parsed = JSON.parse(text);
+    const parsed = robustJsonParse<GeneratedTemplate>(text);
     if (
       typeof parsed.title !== 'string' ||
       typeof parsed.technique !== 'string' ||
@@ -160,10 +162,10 @@ Gere o JSON da máscara do laudo agora.`;
     ) {
       throw new Error('Campos obrigatórios ausentes na resposta da IA.');
     }
-    return parsed as GeneratedTemplate;
-  } catch (err) {
-    console.error('Erro ao processar JSON da IA:', text);
-    throw new Error('A IA gerou uma resposta em formato inválido. Tente novamente.');
+    return parsed;
+  } catch (err: any) {
+    console.error('Erro ao processar JSON da IA:', err.message, text);
+    throw new Error('A IA gerou uma resposta em formato inválido que não pôde ser auto-corrigida. Tente novamente.');
   }
 }
 
@@ -187,64 +189,13 @@ export async function generateTemplateField(
   let userMessage = '';
 
   if (fieldType === 'customForm') {
-    systemContext = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie um modelo de formulário em formato de texto livre para o copiloto do exame.
-Este formulário deve listar os principais órgãos, regiões ou estruturas avaliados neste tipo de exame em linhas separadas.
-É OBRIGATÓRIO que todas as estruturas contenham apenas colchetes completamente vazios para preenchimento. NÃO escreva texto de exemplo ou de normalidade dentro dos colchetes.
-
-Exemplo de formato esperado:
-Fígado: [ ]
-Vesícula biliar: [ ]
-Pâncreas: [ ]
-Rins: [ ]
-Bexiga: [ ]
-
-Regras importantes:
-- Retorne APENAS o modelo de texto livre sugerido.
-- NÃO inclua títulos, explicações, saudações, introduções ou bloco de código markdown (como \`\`\`). Retorne apenas o texto puro das linhas do formulário.`;
+    systemContext = settings.aiCustomFormPrompt || DEFAULT_CUSTOM_FORM_PROMPT;
     userMessage = `Gere o formulário para o exame de "${examName}" (Área: ${area}).`;
   } else if (fieldType === 'anamnesis') {
-    systemContext = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie um modelo de anamnese padrão no formato de formulário estruturado para o exame.
-Este formulário deve listar perguntas e itens clínicos essenciais a serem respondidos/preenchidos pelo médico ou recepcionista antes ou durante o exame.
-Foque ESTRITAMENTE em: queixas principais, tempo de evolução, antecedentes patológicos, cirurgias prévias e dados clínicos essenciais para o exame.
-NÃO inclua campos de identificação do paciente (nome, idade, sexo, convênio), pois já constam no cabeçalho automático.
-É OBRIGATÓRIO que cada item siga rigorosamente o padrão "Rótulo do Campo: [ ]" em linhas separadas.
-TODOS os colchetes devem estar VAZIOS (com apenas um espaço dentro). NÃO inclua textos de exemplo ou valores padrão.
-
-Personalize as perguntas de acordo com o tipo de exame. Exemplos:
-- Se for exame Obstétrico (Medicina Fetal):
-  DUM (Data da Última Menstruação): [ ]
-  Gestações anteriores (G/P/A): [ ]
-  Queixa ou Indicação: [ ]
-- Se for Abdome (Medicina Interna):
-  Indicação / Suspeita Clínica: [ ]
-  Tempo de evolução dos sintomas: [ ]
-  Sintomas associados: [ ]
-  Cirurgias abdominais prévias: [ ]
-- Se for Musculoesquelético:
-  Indicação / Queixa: [ ]
-  Trauma ou queda recente: [ ]
-  Tempo de evolução: [ ]
-
-Regras importantes:
-- Cada linha de pergunta/campo DEVE seguir o formato: "Nome do Campo: [ ]".
-- Crie de 3 a 5 campos cruciais e diretos para este exame específico.
-- Retorne APENAS as linhas do formulário estruturado.
-- NÃO inclua títulos, explicações, saudações, introduções ou bloco de código markdown (como \`\`\`). Retorne apenas o texto puro do formulário.`;
+    systemContext = settings.aiAnamnesisPrompt || DEFAULT_ANAMNESIS_PROMPT;
     userMessage = `Gere o formulário estruturado de anamnese para o exame de "${examName}" (Área: ${area}).`;
   } else {
-    systemContext = `Você é um Médico Radiologista Sênior e especialista em direito médico. Crie um Termo de Consentimento Livre e Esclarecido (TCLE) direto e formal para a realização do exame.
-O termo deve ser redigido de forma simples e genérica, na primeira pessoa.
-NÃO inclua campos, linhas ou lacunas para preencher nome do paciente, RG, CPF, médico, data, clínica ou assinaturas no corpo do texto, pois o sistema já insere essas variáveis automaticamente no cabeçalho e rodapé do documento impresso.
-
-O texto deve conter apenas a declaração do procedimento:
-1. Explicação muito breve e simples do procedimento e seus benefícios.
-2. Riscos mínimos (como desconforto leve pela pressão do transdutor, preparo prévio se houver).
-3. Declaração direta: "Eu, paciente ou responsável legal, declaro que fui devidamente esclarecido(a) sobre a natureza e os propósitos do exame..."
-
-Regras importantes:
-- Retorne APENAS o corpo do texto do termo de consentimento.
-- NÃO inclua título do documento, pois o sistema já gera o título impresso com o nome do exame.
-- NÃO inclua explicações adicionais, comentários, notas ao programador ou bloco de código markdown (como \`\`\`). Retorne apenas o texto puro do termo.`;
+    systemContext = settings.aiConsentPrompt || DEFAULT_CONSENT_PROMPT;
     userMessage = `Gere o Termo de Consentimento para o exame de "${examName}" (Área: ${area}).`;
   }
 
@@ -264,13 +215,12 @@ Regras importantes:
     const result = await model.generateContent(userMessage);
     text = result.response.text();
   } else {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
       method: 'POST',
       headers: {
         'x-api-key': settings.anthropicApiKey || '',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json'
       },
       body: JSON.stringify({

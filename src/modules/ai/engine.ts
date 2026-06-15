@@ -193,24 +193,46 @@ function calculateAge(birthDateStr?: string, referenceDateMs?: number): string {
 }
 
 /**
- * Trunca laudos anteriores respeitando limites semânticos (laudos inteiros).
+ * Estima tokens (heurística: 1 token ~= 3.5 caracteres para pt-BR)
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3.5);
+}
+
+/**
+ * Trunca laudos anteriores respeitando limites de tokens.
  * Respeita aiTrainingEnabled: false — retorna [] se desabilitado.
+ * Se um laudo exceder o limite, ele é cortado de forma segura, mantendo o máximo de contexto.
  */
 function truncatePreviousExams(
   exams: string[],
   settings: AppSettings,
-  maxChars = 12000
+  maxTokens = 3500 // budget aproximado para histórico
 ): string[] {
   if (settings.aiTrainingEnabled === false) return [];
   if (!exams || exams.length === 0) return [];
 
   const result: string[] = [];
-  let total = 0;
+  let tokensUsed = 0;
+
   for (const ex of exams) {
     if (!ex || !ex.trim()) continue;
-    if (total + ex.length > maxChars) break;
-    result.push(ex);
-    total += ex.length;
+    
+    const exTokens = estimateTokens(ex);
+    if (tokensUsed + exTokens <= maxTokens) {
+      result.push(ex);
+      tokensUsed += exTokens;
+    } else {
+      // Se não cabe inteiro, trunca o laudo atual para usar o budget restante
+      const tokensLeft = maxTokens - tokensUsed;
+      if (tokensLeft > 100) { // Só aproveita se sobrar um pedaço significativo
+        const charsLeft = Math.floor(tokensLeft * 3.5);
+        const truncated = ex.substring(0, charsLeft) + '\n\n...[HISTÓRICO TRUNCADO POR LIMITE DE MEMÓRIA]';
+        result.push(truncated);
+        tokensUsed += estimateTokens(truncated);
+      }
+      break; // Limite atingido, ignora os exames mais antigos
+    }
   }
   return result;
 }
@@ -461,7 +483,7 @@ export function buildPrompt({
   const areaContext = buildSpecificContext(template, settings);
   const maskHtml = buildMaskHtml(template);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
-  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
+  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
   const contextMessage = buildContextMessage({
     mode: 'GERAÇÃO INICIAL',
@@ -510,7 +532,7 @@ function buildRefinePrompt({
     : `INSTRUÇÃO DE REFINAMENTO ESTRUTURAL (CRÍTICA): Você deve cruzar o LAUDO ATUAL com a MÁSCARA MODELO ORIGINAL. Sua função primária é GARANTIR que nenhuma seção, título, parágrafo de órgão normal ou estrutura da máscara tenha sido apagado ou corrompido no laudo atual. Restaure RIGOROSAMENTE a exata ordem, a formatação em <p> e a estruturação original da máscara, mesclando apenas os dados clínicos patológicos ou medidas inseridos no laudo atual. É proibido suprimir estruturas da máscara.`;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
-  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
+  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
   const contextMessage = buildContextMessage({
     mode: 'REFINAMENTO',
@@ -560,7 +582,7 @@ function buildCopilotPrompt({
 
   const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
-  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 8000);
+  const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
   const contextMessage = buildContextMessage({
     mode: 'REFINAMENTO',

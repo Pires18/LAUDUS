@@ -201,6 +201,11 @@ export interface AppSettings {
   defaultClinicId?: string;
   /** Prompt principal que rege o comportamento da IA */
   aiMasterPrompt?: string;
+  /** Prompts para Geração de Máscara de Laudo e Anexos */
+  aiTemplateGenerationPrompt?: string;
+  aiCustomFormPrompt?: string;
+  aiAnamnesisPrompt?: string;
+  aiConsentPrompt?: string;
   /** Prompts customizados por área médica */
   aiAreaPrompts?: Partial<Record<ExamArea, string>>;
   /** Criatividade da IA (0 a 1) */

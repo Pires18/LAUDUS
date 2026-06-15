@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings } from '../../../types';
 import { AiProvider, BuiltPrompt } from '../types';
+import { robustJsonParse } from '../json';
 
 export class GeminiProvider implements AiProvider {
   resolveModelName(settings: AppSettings, mode: string, area: string): string {
@@ -85,34 +86,44 @@ export class GeminiProvider implements AiProvider {
     signal?: AbortSignal,
     helpers?: any
   ): Promise<any> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${settings.geminiApiKey}`;
+    const attemptFetch = async (isRetry = false, errorContext = '') => {
+      let prompt = built.userMessage;
+      if (isRetry) {
+        prompt += `\n\nATENÇÃO: A sua resposta anterior falhou ao ser processada como JSON. Erro: ${errorContext}. Por favor, retorne APENAS um JSON válido, sem texto adicional ou markdown.`;
+      }
+      
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${settings.geminiApiKey}`;
+      const response = await helpers.withRetry(() => fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: built.universalContext }] },
+          generationConfig: {
+            temperature: isRetry ? 0.0 : 0.1,
+            responseMimeType: 'application/json',
+          }
+        }),
+        signal
+      }));
 
-    const response = await helpers.withRetry(() => fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: built.userMessage }] }],
-        systemInstruction: { parts: [{ text: built.universalContext }] },
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: 'application/json',
-        }
-      }),
-      signal
-    }));
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Erro na API do Gemini JSON (${response.status}): ${errText}`);
+      }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Erro na API do Gemini JSON (${response.status}): ${errText}`);
-    }
+      const result = await response.json();
+      return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    };
 
-    const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let text = await attemptFetch();
     
     try {
-      return JSON.parse(text);
-    } catch (e) {
-      throw new Error('O modelo não retornou um JSON válido: ' + text);
+      return robustJsonParse(text);
+    } catch (e: any) {
+      console.warn('Auto-healing JSON parsing triggered for Gemini:', e.message);
+      text = await attemptFetch(true, e.message);
+      return robustJsonParse(text);
     }
   }
 }

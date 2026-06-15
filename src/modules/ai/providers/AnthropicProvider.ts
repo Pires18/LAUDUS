@@ -1,5 +1,6 @@
 import { AppSettings } from '../../../types';
 import { AiProvider, BuiltPrompt } from '../types';
+import { robustJsonParse } from '../json';
 
 export function getAnthropicBaseUrl(): string {
   const isLocalDev = typeof window !== 'undefined' &&
@@ -156,42 +157,45 @@ export class AnthropicProvider implements AiProvider {
     signal?: AbortSignal,
     helpers?: any
   ): Promise<any> {
-    const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': settings.anthropicApiKey!,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307', // Using haiku for fast JSON extraction
-        max_tokens: 1024,
-        system: built.universalContext,
-        messages: [{ role: 'user', content: built.userMessage }],
-        temperature: 0.1, // Low temperature for consistent JSON
-      }),
-      signal
-    }));
+    const attemptFetch = async (isRetry = false, errorContext = '') => {
+      let prompt = built.userMessage;
+      if (isRetry) {
+        prompt += `\n\nATENÇÃO: A sua resposta anterior falhou ao ser processada como JSON. Erro: ${errorContext}. Por favor, retorne APENAS um JSON válido, sem texto adicional ou markdown.`;
+      }
+      const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': settings.anthropicApiKey!,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 2048,
+          system: built.universalContext,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: isRetry ? 0.0 : 0.1,
+        }),
+        signal
+      }));
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Erro na API da Anthropic JSON (${response.status}): ${errText}`);
-    }
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Erro na API da Anthropic JSON (${response.status}): ${errText}`);
+      }
 
-    const result = await response.json();
-    let text = result.content?.[0]?.text || '';
+      const result = await response.json();
+      return result.content?.[0]?.text || '';
+    };
+
+    let text = await attemptFetch();
     
-    // Clean up potential markdown formatting block
-    if (text.includes('```json')) {
-      text = text.split('```json')[1].split('```')[0].trim();
-    } else if (text.includes('```')) {
-      text = text.split('```')[1].split('```')[0].trim();
-    }
-
     try {
-      return JSON.parse(text);
-    } catch (e) {
-      throw new Error('O modelo não retornou um JSON válido: ' + text);
+      return robustJsonParse(text);
+    } catch (e: any) {
+      console.warn('Auto-healing JSON parsing triggered for Anthropic:', e.message);
+      text = await attemptFetch(true, e.message);
+      return robustJsonParse(text);
     }
   }
 }
