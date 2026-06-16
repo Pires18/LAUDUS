@@ -21,6 +21,7 @@ import { DicomThumbnail } from './components/DicomThumbnail';
 // Refactored Hooks
 import { useExamActions } from './hooks/useExamActions';
 import { useGoogleDocs } from './hooks/useGoogleDocs';
+import { useDicomSync } from './hooks/useDicomSync';
 
 // Refactored Components
 import { EditorHeader } from './components/EditorHeader';
@@ -30,129 +31,7 @@ import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
 import { ReportVersionsModal } from './components/ReportVersionsModal';
 
-const locateStudies = async (
-  baseUrl: string,
-  authParams: string,
-  exam: ExamRequest,
-  patient: Patient | null,
-  serverSource: 'primary' | 'backup',
-  settings: any
-): Promise<any[]> => {
-  const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
-  
-  const queryOrthanc = async (query: any) => {
-    try {
-      const proxyPath = getProxyEndpoint(settings, serverSource === 'backup');
-      const res = await fetch(
-        `${proxyPath}?url=${encodeURIComponent(findUrl)}${authParams}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            Level: 'Study',
-            Expand: true,
-            Query: query
-          })
-        }
-      );
-      if (!res.ok) return [];
-      return await res.json();
-    } catch (err) {
-      console.warn('[locateStudy Query Error]', err);
-      return [];
-    }
-  };
 
-  const candidatesMap = new Map<string, any>();
-
-  const processResults = (list: any[]) => {
-    let found = false;
-    for (const item of (list || [])) {
-      if (item) {
-        if (typeof item === 'string') {
-          candidatesMap.set(item, { ID: item, MainDicomTags: {}, serverSource });
-          found = true;
-        } else {
-          const id = item.ID || item.id;
-          if (id) {
-            candidatesMap.set(id, { ...item, ID: id, serverSource });
-            found = true;
-          }
-        }
-      }
-    }
-    return found;
-  };
-
-  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
-  
-  // Phase 1: Exact unique matches (StudyInstanceUID & AccessionNumber)
-  const exactQueries = [
-    queryOrthanc({ StudyInstanceUID: studyUid }),
-    queryOrthanc({ AccessionNumber: exam.id })
-  ];
-  if (exam.friendlyId) {
-    exactQueries.push(queryOrthanc({ AccessionNumber: exam.friendlyId }));
-  }
-
-  const exactResults = await Promise.all(exactQueries);
-  let hasExact = false;
-  for (const list of exactResults) {
-    if (processResults(list)) hasExact = true;
-  }
-
-  // Se já encontrou um estudo pelos identificadores exatos,
-  // aborta as buscas por PatientID para evitar lentidão excessiva no servidor Orthanc.
-  if (hasExact) {
-    return Array.from(candidatesMap.values());
-  }
-
-  // Phase 2: Patient ID Fallback
-  const patientIds = new Set<string>();
-  if (exam.patientId) patientIds.add(exam.patientId);
-  if (patient?.id) patientIds.add(patient.id);
-  patientIds.add(exam.id);
-
-  const patientQueries = Array.from(patientIds).map(pid => queryOrthanc({ PatientID: pid }));
-  const patientResults = await Promise.all(patientQueries);
-  
-  for (const list of patientResults) {
-    processResults(list);
-  }
-
-  return Array.from(candidatesMap.values());
-};
-
-const scoreStudies = (candidates: any[], examTime: number): any[] => {
-  const scored = candidates.map((c) => {
-    const studyDate = c.MainDicomTags?.StudyDate || ''; // YYYYMMDD
-    const studyTime = c.MainDicomTags?.StudyTime || '000000'; // HHMMSS
-    
-    let diffMs = Infinity;
-    if (studyDate.length === 8) {
-      const year = parseInt(studyDate.substring(0, 4), 10);
-      const month = parseInt(studyDate.substring(4, 6), 10) - 1;
-      const day = parseInt(studyDate.substring(6, 8), 10);
-      
-      let hour = 0, minute = 0, second = 0;
-      if (studyTime.length >= 6) {
-        hour = parseInt(studyTime.substring(0, 2), 10);
-        minute = parseInt(studyTime.substring(2, 4), 10);
-        second = parseInt(studyTime.substring(4, 6), 10);
-      }
-      
-      const sDate = new Date(year, month, day, hour, minute, second);
-      diffMs = Math.abs(sDate.getTime() - examTime);
-    }
-    return { study: c, diffMs };
-  });
-
-  // Sort by time difference ascending
-  scored.sort((a, b) => a.diffMs - b.diffMs);
-  return scored.map(item => item.study);
-};
 
 const preloadImages = (urls: string[]): Promise<void> => {
   return new Promise((resolve) => {
@@ -220,24 +99,16 @@ export function ExamEditor({ examId }: Props) {
   const [showEditPatient, setShowEditPatient] = useState(false);
   const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
+  const [calcModalInitialId, setCalcModalInitialId] = useState<string | null>(null);
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
   const [showDicomImages, setShowDicomImages] = useState(false);
   const [selectedInstancesForPrint, setSelectedInstancesForPrint] = useState<any[]>([]);
   const [copilotPrompt, setCopilotPrompt] = useState('');
   const [showSnippets, setShowSnippets] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
-  const [pacsConnected, setPacsConnected] = useState<'loading' | 'connected' | 'disconnected'>('loading');
-  const [pacsBackupConnected, setPacsBackupConnected] = useState<'loading' | 'connected' | 'disconnected' | 'disabled'>('loading');
-  const [candidateStudies, setCandidateStudies] = useState<any[]>([]);
-  const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
-  const selectedStudyIdRef = useRef<string | null>(null);
   const [activePacsServer, setActivePacsServer] = useState<'primary' | 'backup' | 'both'>(() => {
     return (localStorage.getItem('laudus_active_pacs_server') as 'primary' | 'backup' | 'both') || 'both';
   });
-  const changeSelectedStudy = useCallback((id: string | null) => {
-    setSelectedStudyId(id);
-    selectedStudyIdRef.current = id;
-  }, []);
   const [showStudySelector, setShowStudySelector] = useState(false);
 
   // Estado LOCAL do histórico do copiloto — evita spam de escritas no Firestore
@@ -247,14 +118,63 @@ export function ExamEditor({ examId }: Props) {
   const chatHistoryInitialized = useRef(false);
   const chatSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [hasDicomImages, setHasDicomImages] = useState(false);
-  const [dicomInstances, setDicomInstances] = useState<any[]>([]);
   const [showIntegratedViewer, setShowIntegratedViewer] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
-  const [dicomLoading, setDicomLoading] = useState(false);
-  const [dicomError, setDicomError] = useState<string | null>(null);
   const [dicomRefreshKey, setDicomRefreshKey] = useState(0);
+
+  const noopChangeStudy = useCallback((id: string | null) => {}, []);
+
+  const {
+    pacsConnected,
+    pacsBackupConnected,
+    candidateStudies,
+    selectedStudyId,
+    setSelectedStudyId,
+    hasDicomImages,
+    dicomInstances,
+    dicomLoading,
+    dicomError
+  } = useDicomSync({
+    exam,
+    patient,
+    settings,
+    activePacsServer,
+    changeSelectedStudy: noopChangeStudy,
+    dicomRefreshKey,
+    showIntegratedViewer,
+    showDicomImages,
+    isManualCheck: false
+  });
+
+  const handlePrevImage = useCallback(() => {
+    setActiveImageIndex(prev => (prev > 0 ? prev - 1 : prev));
+  }, []);
+
+  const handleNextImage = useCallback(() => {
+    setActiveImageIndex(prev => (prev < dicomInstances.length - 1 ? prev + 1 : prev));
+  }, [dicomInstances.length]);
+
+  // Keyboard navigation for DICOM viewer
+  useEffect(() => {
+    if (!showIntegratedViewer && !showFullScreenImage) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        handlePrevImage();
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        handleNextImage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showIntegratedViewer, showFullScreenImage, handlePrevImage, handleNextImage]);
   const getExternalViewerUrl = useCallback(() => {
     if (!candidateStudies || candidateStudies.length === 0) return null;
     const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId) || candidateStudies[0];
@@ -281,260 +201,7 @@ export function ExamEditor({ examId }: Props) {
     }
     return `${currentBaseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
   }, [candidateStudies, selectedStudyId, settings, exam?.id]);
-  const dicomLoadingRef = useRef(false);
-  // Refs para showIntegratedViewer e showDicomImages — permite que o polling
-  // leia os valores mais recentes SEM precisar recriar o intervalo a cada render.
-  const showIntegratedViewerRef = useRef(showIntegratedViewer);
-  const showDicomImagesRef = useRef(showDicomImages);
-  useEffect(() => { showIntegratedViewerRef.current = showIntegratedViewer; }, [showIntegratedViewer]);
-  useEffect(() => { showDicomImagesRef.current = showDicomImages; }, [showDicomImages]);
 
-  // Reseta o índice SOMENTE quando muda o estudo selecionado (não quando o array é recriado pelo polling)
-  const lastStudyIdForIndexRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (selectedStudyId !== lastStudyIdForIndexRef.current) {
-      lastStudyIdForIndexRef.current = selectedStudyId;
-      setActiveImageIndex(0);
-    }
-  }, [selectedStudyId]);
-
-  const handlePrevImage = useCallback(() => {
-    if (dicomInstances.length === 0) return;
-    setActiveImageIndex((prev) => (prev === 0 ? dicomInstances.length - 1 : prev - 1));
-  }, [dicomInstances.length]);
-
-  const handleNextImage = useCallback(() => {
-    if (dicomInstances.length === 0) return;
-    setActiveImageIndex((prev) => (prev === dicomInstances.length - 1 ? 0 : prev + 1));
-  }, [dicomInstances.length]);
-
-  // Keyboard navigation for Full Screen Lightbox
-  useEffect(() => {
-    if (!showFullScreenImage) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        handlePrevImage();
-      } else if (e.key === 'ArrowRight') {
-        handleNextImage();
-      } else if (e.key === 'Escape') {
-        setShowFullScreenImage(false);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showFullScreenImage, handlePrevImage, handleNextImage]);
-
-  const fetchInstancesForStudy = useCallback(async (studyId: string, serverSource: 'primary' | 'backup') => {
-    const isBackupStudy = serverSource === 'backup';
-    const currentUrl = isBackupStudy ? (settings.dicomBackupViewerUrl || 'http://localhost:8042') : (settings.dicomViewerUrl || 'http://localhost:8042');
-    const currentAuth = isBackupStudy 
-      ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` 
-      : `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-    const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
-    const proxyPath = getProxyEndpoint(settings, isBackupStudy);
-    
-    try {
-      const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
-      if (!instancesRes.ok) throw new Error();
-      const instances = await instancesRes.json();
-      
-      const sorted = (instances || []).sort((a: any, b: any) => {
-        const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
-        const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
-        return numA - numB;
-      });
-
-      const taggedInstances = sorted.map((inst: any) => ({
-        ...inst,
-        serverSource
-      }));
-
-      setDicomInstances(prev => {
-        if (prev.length === taggedInstances.length && prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)) {
-          return prev;
-        }
-        return taggedInstances;
-      });
-      setHasDicomImages(taggedInstances.length > 0);
-      setDicomError(null);
-    } catch (e) {
-      console.warn('[PACS Instances] Falha ao obter instâncias', e);
-    }
-  }, [settings]);
-
-  useEffect(() => {
-    let active = true;
-
-    if (!exam || !exam.id) {
-      setHasDicomImages(false);
-      setDicomInstances([]);
-      setShowIntegratedViewer(false);
-      return;
-    }
-
-    if (settings.dicomSyncEnabled === false) {
-      setHasDicomImages(false);
-      setDicomInstances([]);
-      setShowIntegratedViewer(false);
-      return;
-    }
-
-    const checkImages = async (isManual = false) => {
-      if (!isManual && dicomLoadingRef.current) return;
-      dicomLoadingRef.current = true;
-      if (isManual) {
-        setDicomLoading(true);
-        setDicomError(null);
-      }
-      try {
-        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-        const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-        
-        const backupUrl = settings.dicomBackupViewerUrl;
-        const backupAuth = backupUrl ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
-
-        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 2500) => {
-          const controller = new AbortController();
-          const id = setTimeout(() => controller.abort(), timeoutMs);
-          try {
-            const res = await fetch(url, { ...options, signal: controller.signal });
-            clearTimeout(id);
-            return res;
-          } catch (err) {
-            clearTimeout(id);
-            throw err;
-          }
-        };
-
-        const processServer = async (source: 'primary' | 'backup', serverBaseUrl: string, serverAuth: string) => {
-          const proxyPath = getProxyEndpoint(settings, source === 'backup');
-          const pingUrl = `${serverBaseUrl.replace(/\/$/, '')}/system`;
-          let pingOk = false;
-          try {
-            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${serverAuth}`);
-            pingOk = res.ok;
-          } catch {
-            pingOk = false;
-          }
-
-          if (active) {
-            if (source === 'primary') setPacsConnected(pingOk ? 'connected' : 'disconnected');
-            if (source === 'backup') setPacsBackupConnected(pingOk ? 'connected' : 'disconnected');
-          }
-
-          if (!pingOk) return { source, candidates: [], pingOk: false };
-
-          const candidates = await locateStudies(serverBaseUrl, serverAuth, exam, patient, source, settings);
-          return { source, candidates, pingOk: true };
-        };
-
-        const queryPrimary = activePacsServer !== 'backup';
-        const queryBackup = activePacsServer !== 'primary' && !!backupUrl;
-
-        if (active) {
-          if (!queryPrimary) setPacsConnected('disconnected');
-          if (!queryBackup) setPacsBackupConnected(backupUrl ? 'disconnected' : 'disabled');
-        }
-
-        const primaryPromise = queryPrimary 
-          ? processServer('primary', baseUrl, authParams) 
-          : Promise.resolve({ source: 'primary' as const, candidates: [], pingOk: false });
-          
-        const backupPromise = queryBackup 
-          ? processServer('backup', backupUrl, backupAuth) 
-          : Promise.resolve({ source: 'backup' as const, candidates: [], pingOk: false });
-
-        const [primaryRes, backupRes] = await Promise.allSettled([primaryPromise, backupPromise]);
-
-        let mergedCandidates: any[] = [];
-        if (primaryRes.status === 'fulfilled' && primaryRes.value.candidates) {
-          mergedCandidates = [...mergedCandidates, ...primaryRes.value.candidates];
-        }
-        if (backupRes.status === 'fulfilled' && backupRes.value.candidates) {
-          for (const c of backupRes.value.candidates) {
-            if (!mergedCandidates.some(mc => mc.ID === c.ID)) {
-              mergedCandidates.push(c);
-            }
-          }
-        }
-
-        if (active) {
-          setCandidateStudies(mergedCandidates);
-        }
-
-        if (mergedCandidates.length === 0) {
-          if (isManual && active) {
-            setDicomInstances([]);
-            setHasDicomImages(false);
-            setDicomError(`Estudo não localizado nos servidores ativos.`);
-          }
-          return;
-        }
-
-        let activeStudy = null;
-        const currentSelectedId = selectedStudyIdRef.current;
-        if (currentSelectedId) {
-          activeStudy = mergedCandidates.find(c => c.ID === currentSelectedId);
-        }
-        if (!activeStudy && mergedCandidates.length > 0) {
-          const sorted = scoreStudies(mergedCandidates, exam.createdAt);
-          activeStudy = sorted[0];
-          if (active) {
-            changeSelectedStudy(activeStudy.ID);
-          }
-        }
-
-        if (activeStudy) {
-          await fetchInstancesForStudy(activeStudy.ID, activeStudy.serverSource);
-        }
-      } catch (e: any) {
-        console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
-        if (active && isManual) {
-          setDicomError(e.message || 'Erro de conexão com o servidor local Orthanc.');
-        }
-      } finally {
-        dicomLoadingRef.current = false;
-        if (active && isManual) {
-          setDicomLoading(false);
-        }
-      }
-    };
-
-    // Initial check (manual to show initial loaders/errors if any)
-    checkImages(true);
-
-    // Fix 7: Adaptive polling — 5s when viewer/modal open, 30s in background
-    // Uses refs (showIntegratedViewerRef, showDicomImagesRef) to read latest state
-    // without recreating the interval on every state change.
-    let tickCount = 0;
-    const intervalId = setInterval(() => {
-      tickCount++;
-      const viewerOpen = showIntegratedViewerRef.current || showDicomImagesRef.current;
-      // 5s always runs; background skips 5 out of 6 ticks (effectively 30s)
-      if (viewerOpen || tickCount % 6 === 0) {
-        checkImages(false);
-      }
-    }, 5000);
-
-    return () => {
-      active = false;
-      clearInterval(intervalId);
-    };
-  }, [
-    exam?.id,
-    patient?.id,
-    settings.dicomSyncEnabled,
-    settings.dicomViewerUrl,
-    settings.dicomUsername,
-    settings.dicomPassword,
-    settings.dicomBackupViewerUrl,
-    settings.dicomBackupUsername,
-    settings.dicomBackupPassword,
-    dicomRefreshKey,
-    activePacsServer
-  ]);
   
 
 
@@ -1054,7 +721,16 @@ export function ExamEditor({ examId }: Props) {
                     const activeServerSource = activeStudy?.serverSource || 'primary';
                     if (!activeInstance) {
                       return (
-                        <div className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex flex-col items-center justify-center text-slate-650 p-6 text-center">
+                        <div 
+                          className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-slate-650 p-6 text-center"
+                          onWheel={(e) => {
+                            if (e.deltaY < 0) {
+                              handlePrevImage();
+                            } else if (e.deltaY > 0) {
+                              handleNextImage();
+                            }
+                          }}
+                        >
                           <Eye size={32} className="opacity-25 mb-2" />
                           <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Sem Imagem Selecionada</span>
                         </div>
@@ -1074,12 +750,20 @@ export function ExamEditor({ examId }: Props) {
                       <div className="w-full flex flex-col gap-3">
                         <div 
                           onClick={() => setShowFullScreenImage(true)}
+                          onWheel={(e) => {
+                            if (e.deltaY < 0) {
+                              handlePrevImage();
+                            } else if (e.deltaY > 0) {
+                              handleNextImage();
+                            }
+                          }}
                           className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
                         >
                           <DicomThumbnail 
                             src={previewUrl} 
                             alt={`Instance ${instanceNum}`}
                             className="hover:scale-[1.02]"
+                            priority={true}
                           />
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
@@ -1364,7 +1048,7 @@ export function ExamEditor({ examId }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 30 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[120] overflow-hidden"
+              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[300] overflow-hidden"
             >
               {/* Premium Header with Mesh-style Gradient */}
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
@@ -1404,7 +1088,10 @@ export function ExamEditor({ examId }: Props) {
                   patient={patient}
                   chatHistory={localChatHistory}
                   onChatUpdate={handleChatUpdate}
-                  onShowCalculators={() => setShowCalculators(true)}
+                  onShowCalculators={(id) => {
+                    setCalcModalInitialId(id || null);
+                    setShowCalculators(true);
+                  }}
                   prompt={copilotPrompt}
                   onChangePrompt={setCopilotPrompt}
                   isDocked={false}
@@ -1636,6 +1323,7 @@ export function ExamEditor({ examId }: Props) {
       <AnimatePresence>
         {showCalculators && (
           <CalculatorModal 
+            initialCalcId={calcModalInitialId}
             area={exam.area} 
             examDateMs={exam.createdAt}
             reportContent={reportContent}
@@ -1756,12 +1444,23 @@ export function ExamEditor({ examId }: Props) {
             const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
             return (
-              <div className="relative max-w-full max-h-full flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+              <div 
+                className="relative max-w-full max-h-full flex flex-col items-center gap-4" 
+                onClick={(e) => e.stopPropagation()}
+                onWheel={(e) => {
+                  if (e.deltaY < 0) {
+                    handlePrevImage();
+                  } else if (e.deltaY > 0) {
+                    handleNextImage();
+                  }
+                }}
+              >
                 <DicomThumbnail 
                   src={previewUrl} 
                   alt={`Instance ${instanceNum}`}
                   className="max-w-[95vw] max-h-[85vh] rounded-lg shadow-2xl border border-white/5"
                   containerClassName="bg-transparent"
+                  priority={true}
                 />
                 <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-black tracking-widest text-white uppercase select-none z-10">
                   FOTO {activeImageIndex + 1} DE {dicomInstances.length} (INSTÂNCIA {instanceNum})

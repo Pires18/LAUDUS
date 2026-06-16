@@ -7,9 +7,10 @@ interface Props {
   alt: string;
   className?: string;
   containerClassName?: string;
+  priority?: boolean;
 }
 
-export function DicomThumbnail({ src, alt, className, containerClassName }: Props) {
+export function DicomThumbnail({ src, alt, className, containerClassName, priority = false }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -59,6 +60,8 @@ export function DicomThumbnail({ src, alt, className, containerClassName }: Prop
       <img
         src={finalSrc}
         alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "low"}
         onLoad={() => setLoading(false)}
         onError={() => {
           setLoading(false);

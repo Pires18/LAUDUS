@@ -1,0 +1,414 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
+import { ExamRequest, Patient } from '../../../types';
+
+interface UseDicomSyncProps {
+  exam: ExamRequest | undefined;
+  patient: Patient | null;
+  settings: any;
+  activePacsServer: 'primary' | 'backup' | 'both';
+  changeSelectedStudy: (id: string | null) => void;
+  dicomRefreshKey: number;
+  showIntegratedViewer: boolean;
+  showDicomImages: boolean;
+  isManualCheck?: boolean;
+}
+
+const locateStudies = async (
+  baseUrl: string,
+  authParams: string,
+  exam: ExamRequest,
+  patient: Patient | null,
+  serverSource: 'primary' | 'backup',
+  settings: any
+): Promise<any[]> => {
+  const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
+  
+  const queryOrthanc = async (query: any) => {
+    try {
+      const proxyPath = getProxyEndpoint(settings, serverSource === 'backup');
+      const res = await fetch(
+        `${proxyPath}?url=${encodeURIComponent(findUrl)}${authParams}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            Level: 'Study',
+            Expand: true,
+            Query: query
+          })
+        }
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (err) {
+      console.warn('[locateStudy Query Error]', err);
+      return [];
+    }
+  };
+
+  const candidatesMap = new Map<string, any>();
+
+  const processResults = (list: any[]) => {
+    let found = false;
+    for (const item of (list || [])) {
+      if (item) {
+        if (typeof item === 'string') {
+          candidatesMap.set(item, { ID: item, MainDicomTags: {}, serverSource });
+          found = true;
+        } else {
+          const id = item.ID || item.id;
+          if (id) {
+            candidatesMap.set(id, { ...item, ID: id, serverSource });
+            found = true;
+          }
+        }
+      }
+    }
+    return found;
+  };
+
+  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+  
+  // Phase 1: Exact unique matches (StudyInstanceUID & AccessionNumber)
+  const exactQueries = [
+    queryOrthanc({ StudyInstanceUID: studyUid }),
+    queryOrthanc({ AccessionNumber: exam.id })
+  ];
+  if (exam.friendlyId) {
+    exactQueries.push(queryOrthanc({ AccessionNumber: exam.friendlyId }));
+  }
+
+  const exactResults = await Promise.all(exactQueries);
+  let hasExact = false;
+  for (const list of exactResults) {
+    if (processResults(list)) hasExact = true;
+  }
+
+  // Aborta as buscas por PatientID para evitar lentidão
+  if (hasExact) {
+    return Array.from(candidatesMap.values());
+  }
+
+  // Phase 2: Patient ID Fallback
+  const patientIds = new Set<string>();
+  if (exam.patientId) patientIds.add(exam.patientId);
+  if (patient?.id) patientIds.add(patient.id);
+  patientIds.add(exam.id);
+
+  const patientQueries = Array.from(patientIds).map(pid => queryOrthanc({ PatientID: pid }));
+  const patientResults = await Promise.all(patientQueries);
+  
+  for (const list of patientResults) {
+    processResults(list);
+  }
+
+  return Array.from(candidatesMap.values());
+};
+
+const scoreStudies = (candidates: any[], examTime: number): any[] => {
+  const scored = candidates.map((c) => {
+    const studyDate = c.MainDicomTags?.StudyDate || ''; // YYYYMMDD
+    const studyTime = c.MainDicomTags?.StudyTime || '000000'; // HHMMSS
+    
+    let diffMs = Infinity;
+    if (studyDate.length === 8) {
+      const year = parseInt(studyDate.substring(0, 4), 10);
+      const month = parseInt(studyDate.substring(4, 6), 10) - 1;
+      const day = parseInt(studyDate.substring(6, 8), 10);
+      
+      let hour = 0, minute = 0, second = 0;
+      if (studyTime.length >= 6) {
+        hour = parseInt(studyTime.substring(0, 2), 10);
+        minute = parseInt(studyTime.substring(2, 4), 10);
+        second = parseInt(studyTime.substring(4, 6), 10);
+      }
+      
+      const sDate = new Date(year, month, day, hour, minute, second);
+      diffMs = Math.abs(sDate.getTime() - examTime);
+    }
+    return { study: c, diffMs };
+  });
+
+  scored.sort((a, b) => a.diffMs - b.diffMs);
+  return scored.map(item => item.study);
+};
+
+export function useDicomSync({
+  exam,
+  patient,
+  settings,
+  activePacsServer,
+  changeSelectedStudy,
+  dicomRefreshKey,
+  showIntegratedViewer,
+  showDicomImages,
+  isManualCheck = false
+}: UseDicomSyncProps) {
+  const [pacsConnected, setPacsConnected] = useState<'loading' | 'connected' | 'disconnected'>('loading');
+  const [pacsBackupConnected, setPacsBackupConnected] = useState<'loading' | 'connected' | 'disconnected' | 'disabled'>('loading');
+  const [candidateStudies, setCandidateStudies] = useState<any[]>([]);
+  const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
+  
+  const selectedStudyIdRef = useRef<string | null>(null);
+  const internalChangeSelectedStudy = useCallback((id: string | null) => {
+    setSelectedStudyId(id);
+    selectedStudyIdRef.current = id;
+    changeSelectedStudy(id);
+  }, [changeSelectedStudy]);
+
+  const [hasDicomImages, setHasDicomImages] = useState(false);
+  const [dicomInstances, setDicomInstances] = useState<any[]>([]);
+  const [dicomLoading, setDicomLoading] = useState(false);
+  const [dicomError, setDicomError] = useState<string | null>(null);
+  const dicomLoadingRef = useRef(false);
+
+  // Refs for polling
+  const showIntegratedViewerRef = useRef(showIntegratedViewer);
+  const showDicomImagesRef = useRef(showDicomImages);
+  const hasDicomImagesRef = useRef(hasDicomImages);
+  
+  useEffect(() => { showIntegratedViewerRef.current = showIntegratedViewer; }, [showIntegratedViewer]);
+  useEffect(() => { showDicomImagesRef.current = showDicomImages; }, [showDicomImages]);
+  useEffect(() => { hasDicomImagesRef.current = hasDicomImages; }, [hasDicomImages]);
+
+  const fetchInstancesForStudy = useCallback(async (studyId: string, serverSource: 'primary' | 'backup', studyInstanceUID?: string) => {
+    const isBackupStudy = serverSource === 'backup';
+    const currentUrl = isBackupStudy ? (settings.dicomBackupViewerUrl || 'http://localhost:8042') : (settings.dicomViewerUrl || 'http://localhost:8042');
+    const currentAuth = isBackupStudy 
+      ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` 
+      : `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+    const proxyPath = getProxyEndpoint(settings, isBackupStudy);
+    
+    try {
+      let instances = [];
+      if (studyInstanceUID) {
+        const findUrl = `${currentUrl.replace(/\/$/, '')}/tools/find`;
+        const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(findUrl)}${currentAuth}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Level: 'Instance',
+            Expand: true,
+            Query: { StudyInstanceUID: studyInstanceUID }
+          })
+        });
+        if (!instancesRes.ok) throw new Error();
+        instances = await instancesRes.json();
+      } else {
+        const instancesUrl = `${currentUrl.replace(/\/$/, '')}/studies/${studyId}/instances`;
+        const instancesRes = await fetch(`${proxyPath}?url=${encodeURIComponent(instancesUrl)}${currentAuth}`);
+        if (!instancesRes.ok) throw new Error();
+        instances = await instancesRes.json();
+      }
+      
+      const sorted = (instances || []).sort((a: any, b: any) => {
+        const numA = parseInt(a.MainDicomTags?.InstanceNumber || '0', 10);
+        const numB = parseInt(b.MainDicomTags?.InstanceNumber || '0', 10);
+        return numA - numB;
+      });
+
+      const taggedInstances = sorted.map((inst: any) => ({
+        ...inst,
+        serverSource
+      }));
+
+      setDicomInstances(prev => {
+        if (prev.length === taggedInstances.length && prev.every((inst, i) => inst.ID === taggedInstances[i]?.ID)) {
+          return prev;
+        }
+        return taggedInstances;
+      });
+      setHasDicomImages(taggedInstances.length > 0);
+      setDicomError(null);
+    } catch (e) {
+      console.warn('[PACS Instances] Falha ao obter instâncias', e);
+    }
+  }, [
+    settings.dicomViewerUrl,
+    settings.dicomBackupViewerUrl,
+    settings.dicomUsername,
+    settings.dicomBackupUsername,
+    settings.dicomPassword,
+    settings.dicomBackupPassword
+  ]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!exam || !exam.id || settings.dicomSyncEnabled === false) {
+      setHasDicomImages(false);
+      setDicomInstances([]);
+      return;
+    }
+
+    const checkImages = async (isManual = false) => {
+      if (!isManual && dicomLoadingRef.current) return;
+      dicomLoadingRef.current = true;
+      if (isManual) {
+        setDicomLoading(true);
+        setDicomError(null);
+      }
+      try {
+        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+        const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+        
+        const backupUrl = settings.dicomBackupViewerUrl;
+        const backupAuth = backupUrl ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
+
+        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 2500) => {
+          const controller = new AbortController();
+          const id = setTimeout(() => controller.abort(), timeoutMs);
+          try {
+            const res = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(id);
+            return res;
+          } catch (err) {
+            clearTimeout(id);
+            throw err;
+          }
+        };
+
+        const processServer = async (source: 'primary' | 'backup', serverBaseUrl: string, serverAuth: string) => {
+          const proxyPath = getProxyEndpoint(settings, source === 'backup');
+          const pingUrl = `${serverBaseUrl.replace(/\/$/, '')}/system`;
+          let pingOk = false;
+          try {
+            const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${serverAuth}`);
+            pingOk = res.ok;
+          } catch {
+            pingOk = false;
+          }
+
+          if (active) {
+            if (source === 'primary') setPacsConnected(pingOk ? 'connected' : 'disconnected');
+            if (source === 'backup') setPacsBackupConnected(pingOk ? 'connected' : 'disconnected');
+          }
+
+          if (!pingOk) return { source, candidates: [], pingOk: false };
+
+          const candidates = await locateStudies(serverBaseUrl, serverAuth, exam, patient, source, settings);
+          return { source, candidates, pingOk: true };
+        };
+
+        const queryPrimary = activePacsServer !== 'backup';
+        const queryBackup = activePacsServer !== 'primary' && !!backupUrl;
+
+        if (active) {
+          if (!queryPrimary) setPacsConnected('disconnected');
+          if (!queryBackup) setPacsBackupConnected(backupUrl ? 'disconnected' : 'disabled');
+        }
+
+        const primaryPromise = queryPrimary 
+          ? processServer('primary', baseUrl, authParams) 
+          : Promise.resolve({ source: 'primary' as const, candidates: [], pingOk: false });
+          
+        const backupPromise = queryBackup 
+          ? processServer('backup', backupUrl, backupAuth) 
+          : Promise.resolve({ source: 'backup' as const, candidates: [], pingOk: false });
+
+        const [primaryRes, backupRes] = await Promise.allSettled([primaryPromise, backupPromise]);
+
+        let mergedCandidates: any[] = [];
+        if (primaryRes.status === 'fulfilled' && primaryRes.value.candidates) {
+          mergedCandidates = [...mergedCandidates, ...primaryRes.value.candidates];
+        }
+        if (backupRes.status === 'fulfilled' && backupRes.value.candidates) {
+          for (const c of backupRes.value.candidates) {
+            if (!mergedCandidates.some(mc => mc.ID === c.ID)) {
+              mergedCandidates.push(c);
+            }
+          }
+        }
+
+        if (active) {
+          setCandidateStudies(mergedCandidates);
+        }
+
+        if (mergedCandidates.length === 0) {
+          if (isManual && active) {
+            setDicomInstances([]);
+            setHasDicomImages(false);
+            setDicomError(`Estudo não localizado nos servidores ativos.`);
+          }
+          return;
+        }
+
+        let activeStudy = null;
+        const currentSelectedId = selectedStudyIdRef.current;
+        if (currentSelectedId) {
+          activeStudy = mergedCandidates.find(c => c.ID === currentSelectedId);
+        }
+        if (!activeStudy && mergedCandidates.length > 0) {
+          const sorted = scoreStudies(mergedCandidates, exam.createdAt);
+          activeStudy = sorted[0];
+          if (active) {
+            internalChangeSelectedStudy(activeStudy.ID);
+          }
+        }
+
+        if (activeStudy) {
+          await fetchInstancesForStudy(activeStudy.ID, activeStudy.serverSource, activeStudy.MainDicomTags?.StudyInstanceUID);
+        }
+      } catch (e: any) {
+        console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
+        if (active && isManual) {
+          setDicomError(e.message || 'Erro de conexão com o servidor local Orthanc.');
+        }
+      } finally {
+        dicomLoadingRef.current = false;
+        if (active && isManual) {
+          setDicomLoading(false);
+        }
+      }
+    };
+
+    checkImages(true);
+
+    let tickCount = 0;
+    const intervalId = setInterval(() => {
+      tickCount++;
+      const viewerOpen = showIntegratedViewerRef.current || showDicomImagesRef.current;
+      const alreadyHasImages = hasDicomImagesRef.current;
+      
+      // Stop aggressive polling if images are already loaded to prevent flickering and scrolling bugs
+      if (!alreadyHasImages && (viewerOpen || tickCount % 6 === 0)) {
+        checkImages(false);
+      }
+    }, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [
+    exam?.id,
+    patient?.id,
+    settings.dicomSyncEnabled,
+    settings.dicomViewerUrl,
+    settings.dicomUsername,
+    settings.dicomPassword,
+    settings.dicomBackupViewerUrl,
+    settings.dicomBackupUsername,
+    settings.dicomBackupPassword,
+    dicomRefreshKey,
+    activePacsServer,
+    internalChangeSelectedStudy,
+    fetchInstancesForStudy,
+    exam?.createdAt
+  ]);
+
+  return {
+    pacsConnected,
+    pacsBackupConnected,
+    candidateStudies,
+    selectedStudyId,
+    setSelectedStudyId: internalChangeSelectedStudy,
+    hasDicomImages,
+    dicomInstances,
+    dicomLoading,
+    dicomError
+  };
+}

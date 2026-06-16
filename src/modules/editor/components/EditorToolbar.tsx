@@ -64,50 +64,50 @@ export function EditorToolbar({
 
       <button
         onClick={onShowPrompt}
-        className="btn-secondary text-xs py-1.5 px-2.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 rounded-lg border shadow-sm transition-all"
+        className="btn-secondary text-xs py-1.5 px-2.5 sm:px-3 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 rounded-lg border shadow-sm transition-all flex items-center gap-1.5"
         title="Ver prompt enviado à IA"
       >
-        <Eye size={14} /> Prompt
+        <Eye size={14} /> <span className="hidden sm:inline">Prompt</span>
       </button>
 
       <button
         onClick={onCopy}
-        className="btn-secondary text-xs py-1.5 px-2.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 rounded-lg border shadow-sm transition-all"
+        className="btn-secondary text-xs py-1.5 px-2.5 sm:px-3 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 rounded-lg border shadow-sm transition-all flex items-center gap-1.5"
         title="Copiar texto do laudo (Ctrl+Shift+C)"
       >
-        <Copy size={14} /> Copiar Laudo
+        <Copy size={14} /> <span className="hidden sm:inline">Copiar Laudo</span>
       </button>
 
       <button
         onClick={onReset}
         disabled={status === 'finalizado'}
         className={classNames(
-          "btn-secondary text-xs py-1.5 px-2.5 rounded-lg border shadow-sm transition-all",
+          "btn-secondary text-xs py-1.5 px-2.5 sm:px-3 rounded-lg border shadow-sm transition-all flex items-center gap-1.5",
           status === 'finalizado' 
             ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-200 text-slate-400" 
             : "bg-white border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300"
         )}
         title="Reiniciar laudo para o padrão da máscara (Ctrl+Shift+R)"
       >
-        <RotateCcw size={14} /> Reiniciar Máscara
+        <RotateCcw size={14} /> <span className="hidden sm:inline">Reiniciar Máscara</span>
       </button>
 
 
 
       <button
         onClick={onShowHistory}
-        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100 transition-all shadow-sm active:scale-95"
+        className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 sm:px-3 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-bold hover:bg-indigo-100 transition-all shadow-sm active:scale-95"
         title="Ver histórico de laudos anteriores do paciente"
       >
-        <History size={14} /> Histórico Clínico
+        <History size={14} /> <span className="hidden md:inline">Histórico Clínico</span>
       </button>
 
       <button
         onClick={onShowVersions}
-        className="flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 font-bold hover:bg-teal-100 transition-all shadow-sm active:scale-95"
+        className="flex items-center gap-1.5 text-xs py-1.5 px-2.5 sm:px-3 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 font-bold hover:bg-teal-100 transition-all shadow-sm active:scale-95"
         title="Ver histórico de versões/alterações do laudo"
       >
-        <Clock size={14} /> Versões do Laudo
+        <Clock size={14} /> <span className="hidden md:inline">Versões do Laudo</span>
       </button>
 
 
@@ -123,7 +123,7 @@ export function EditorToolbar({
           title="Frases prontas"
         >
           <BookOpen size={14} />
-          Frases
+          <span className="hidden sm:inline">Frases</span>
           <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-500 text-white text-[8px] font-black rounded-full flex items-center justify-center">
             {snippetCount > 9 ? '9+' : snippetCount}
           </span>
@@ -151,7 +151,7 @@ export function EditorToolbar({
         )}
       </div>
 
-      <span className="text-[11px] font-medium text-slate-400">{geminiModel}</span>
+      <span className="hidden sm:inline text-[11px] font-medium text-slate-400">{geminiModel}</span>
     </div>
   );
 }

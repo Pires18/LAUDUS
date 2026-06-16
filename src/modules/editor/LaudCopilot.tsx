@@ -10,6 +10,7 @@ import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useVoiceAnalyzer } from './hooks/useVoiceAnalyzer';
 
 interface FormField {
   id: string;
@@ -36,7 +37,7 @@ interface LaudCopilotProps {
   patient: Patient | null;
   chatHistory: Array<{ role: 'user' | 'assistant', content: string }>;
   onChatUpdate: (history: Array<{ role: 'user' | 'assistant', content: string }>) => void;
-  onShowCalculators: () => void;
+  onShowCalculators: (calcId?: string) => void;
   prompt: string;
   onChangePrompt: (val: string) => void;
   isDocked?: boolean;
@@ -167,16 +168,13 @@ export function LaudCopilot({
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const [voiceVolume, setVoiceVolume] = useState(0);
+  
   const lastCallRef = useRef<number>(0);
   const promptRef = useRef(prompt);
   promptRef.current = prompt;
   const onChangePromptRef = useRef(onChangePrompt);
   onChangePromptRef.current = onChangePrompt;
-  // Ref para evitar stale closure no useEffect de auto-submit da calculadora
   const handleSendRef = useRef<(customPrompt?: string) => Promise<void>>(async () => {});
-
-  // Sugestões inteligentes removidas para interface limpa
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -186,7 +184,6 @@ export function LaudCopilot({
     scrollToBottom();
   }, [chatHistory, isGenerating]);
 
-  // Voice Recognition Setup
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return;
@@ -223,71 +220,7 @@ export function LaudCopilot({
     };
   }, [showToast]);
 
-  // Real voice volume analyzer using Web Audio API
-  useEffect(() => {
-    let audioContext: AudioContext | null = null;
-    let analyser: AnalyserNode | null = null;
-    let stream: MediaStream | null = null;
-    let animationId: number | null = null;
-    // Fix 18: cancelled flag prevents MediaStream leak if isListening toggles quickly
-    let cancelled = false;
-
-    const getVolume = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // If already cancelled while awaiting, stop the stream immediately
-        if (cancelled) {
-          stream.getTracks().forEach(track => track.stop());
-          return;
-        }
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        const source = audioContext.createMediaStreamSource(stream);
-        source.connect(analyser);
-        analyser.fftSize = 256;
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-
-        const updateVolume = () => {
-          if (!analyser || cancelled) return;
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < bufferLength; i++) {
-            sum += dataArray[i];
-          }
-          const average = sum / bufferLength;
-          setVoiceVolume(Math.min(100, Math.round(average * 2.5)));
-          animationId = requestAnimationFrame(updateVolume);
-        };
-        updateVolume();
-      } catch (err) {
-        console.warn('[Voice Analyser] Microfone não acessível ou permissão negada:', err);
-        // Fallback para volume simulado caso falhe
-        let mockInterval = setInterval(() => {
-          if (cancelled) { clearInterval(mockInterval); return; }
-          setVoiceVolume(Math.random() * 100);
-        }, 100);
-        return () => clearInterval(mockInterval);
-      }
-    };
-
-    if (isListening) {
-      getVolume();
-    } else {
-      setVoiceVolume(0);
-    }
-
-    return () => {
-      cancelled = true;
-      if (animationId) cancelAnimationFrame(animationId);
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (audioContext && audioContext.state !== 'closed') {
-        audioContext.close();
-      }
-    };
-  }, [isListening]);
+  const { voiceVolume } = useVoiceAnalyzer(isListening);
 
   const toggleListening = () => {
     if (isListening) {
@@ -312,7 +245,18 @@ export function LaudCopilot({
     if (!content.startsWith('[RESULTADO TÉCNICO:')) return null;
 
     const titleMatch = content.match(/\[RESULTADO TÉCNICO:\s*(.*?)\]/);
-    const title = titleMatch ? titleMatch[1] : 'Calculadora';
+    let title = 'Calculadora';
+    let calcId: string | undefined;
+    if (titleMatch) {
+      const fullTitle = titleMatch[1];
+      if (fullTitle.includes(' | ID: ')) {
+        const parts = fullTitle.split(' | ID: ');
+        title = parts[0];
+        calcId = parts[1];
+      } else {
+        title = fullTitle;
+      }
+    }
 
     const conclusionMatch = content.match(/CONCLUSÃO:\s*(.*?)(?=\n\nMÉTRICAS|$)/s);
     const conclusion = conclusionMatch ? conclusionMatch[1].trim() : '';
@@ -331,7 +275,7 @@ export function LaudCopilot({
       });
     }
 
-    return { title, conclusion, metrics };
+    return { title, conclusion, metrics, calcId };
   };
 
   // Parser para converter dados do formulário rápido em itens do chat
@@ -360,9 +304,9 @@ export function LaudCopilot({
     let conversation = content;
     let proposal = '';
 
-    // Procura os marcadores de forma case-insensitive e tolerante a espaços
-    const conversaRegex = /===\s*CONVERSA\s*===/i;
-    const propostaRegex = /===\s*PROPOSTA\s*===/i;
+    // Procura os marcadores de forma case-insensitive, tolerante a espaços e outros caracteres de formatação (Markdown)
+    const conversaRegex = /^[=*\-#]*\s*CONVERSA\s*[=*\-#]*\s*$/im;
+    const propostaRegex = /^[=*\-#]*\s*PROPOSTA\s*[=*\-#]*\s*$/im;
 
     const conversaMatch = content.match(conversaRegex);
     const propostaMatch = content.match(propostaRegex);
@@ -787,6 +731,13 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                   </p>
 
                   <div className="flex flex-wrap justify-center gap-2 max-w-[320px]">
+                    <button
+                      onClick={() => onShowCalculators()}
+                      className="px-3 py-2 bg-gradient-to-r from-brand-50 to-brand-100 border border-brand-200 hover:border-brand-400 hover:from-brand-100 hover:to-brand-200 text-brand-700 rounded-full text-[11px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Calculator size={14} />
+                      Abrir Calculadoras
+                    </button>
                     {[
                       { label: 'Adicionar Cisto', text: 'Adicionar cisto simples de 15 mm' },
                       { label: 'Refinar Texto', text: 'Refinar o tom deste laudo' },
@@ -853,6 +804,16 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
                                     </div>
                                   ))}
                                 </div>
+                              )}
+                              
+                              {calcData.calcId && (
+                                <button
+                                  onClick={() => onShowCalculators(calcData.calcId)}
+                                  className="mt-2 w-full py-2 bg-white border border-brand-200 hover:border-brand-400 hover:bg-brand-50 text-brand-600 rounded-xl text-[10px] font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+                                >
+                                  <RotateCcw size={12} />
+                                  Reabrir Calculadora
+                                </button>
                               )}
                             </div>
                           </div>
@@ -1019,7 +980,7 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
           </div>
 
           {/* Input Section */}
-          <div className="p-4 bg-white border-t border-slate-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] shrink-0 flex flex-col gap-3">
+          <div className="p-4 pb-8 sm:pb-4 bg-white border-t border-slate-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] shrink-0 flex flex-col gap-3">
             <AnimatePresence>
               {isListening && (
                 <motion.div

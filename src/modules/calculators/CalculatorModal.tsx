@@ -19,15 +19,18 @@ interface Props {
   reportContent?: string;
   calculatorData?: Record<string, any>;
   onSaveCalculatorData?: (data: Record<string, any>) => void;
+  initialCalcId?: string;
 }
 
-  export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, reportContent, calculatorData = {}, onSaveCalculatorData }: Props) {
+  export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, reportContent, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
   const settings = useApp((state) => state.settings);
-  const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
+  const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
   
   // O result atual da calculadora selecionada. 
   // Na montagem inicial, já carregamos do calculatorData.
-  const [calcResult, setCalcResult] = useState<any>(null);
+  const [calcResult, setCalcResult] = useState<any>(
+    initialCalcId ? (calculatorData[initialCalcId] || null) : null
+  );
   
   const [showAll, setShowAll] = useState(false);
   const [copiedTechnical, setCopiedTechnical] = useState(false);
@@ -63,7 +66,11 @@ interface Props {
 
   /** Formato técnico: prefixo para o Copiloto processar como resultado de calculadora */
   const buildTechnicalMessage = () => {
-    return calcResult?._summary || '';
+    if (!calcResult || !selectedCalc) return '';
+    return `[RESULTADO TÉCNICO: ${selectedCalc.name} | ID: ${selectedCalcId}]\n\nCONCLUSÃO:\n${calcResult._summary || ''}\n\nMÉTRICAS COLETADAS:\n${Object.entries(calcResult)
+      .filter(([k, v]) => !k.startsWith('_') && typeof v !== 'object' && v !== '')
+      .map(([k, v]) => `- ${k}: ${v}`)
+      .join('\n')}`;
   };
 
   /** Formato limpo para colar no formulário / clipboard simples */
@@ -244,7 +251,7 @@ interface Props {
                   type="button"
                   onClick={() => setActiveTab('params')}
                   className={classNames(
-                    'flex-1 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2',
+                    'flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2',
                     activeTab === 'params' ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'
                   )}
                 >
@@ -255,7 +262,7 @@ interface Props {
                   type="button"
                   onClick={() => setActiveTab('result')}
                   className={classNames(
-                    'flex-1 py-2.5 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 relative',
+                    'flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 relative',
                     activeTab === 'result' ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'
                   )}
                 >
@@ -386,7 +393,7 @@ interface Props {
                   </div>
 
                   {/* ── Action Buttons ─────────────────────────────── */}
-                  <div className="p-4 border-t border-slate-100 bg-white shrink-0 space-y-2.5 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                  <div className="p-4 pb-8 sm:pb-4 border-t border-slate-100 bg-white shrink-0 space-y-2.5 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                     {/* Row 1: Copiar para Formulário + Copiar Técnico */}
                     <div className="grid grid-cols-2 gap-2">
                       <button
