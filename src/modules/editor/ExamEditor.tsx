@@ -136,7 +136,7 @@ export function ExamEditor({ examId }: Props) {
     dicomLoading,
     dicomError
   } = useDicomSync({
-    exam,
+    exam: exam || undefined,
     patient,
     settings,
     activePacsServer,
@@ -678,9 +678,8 @@ export function ExamEditor({ examId }: Props) {
                           <button
                             key={study.ID}
                             onClick={() => {
-                              changeSelectedStudy(study.ID);
+                              setSelectedStudyId(study.ID);
                               setShowStudySelector(false);
-                              fetchInstancesForStudy(study.ID, study.serverSource);
                             }}
                             className={classNames(
                               "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3",
@@ -1321,9 +1320,9 @@ export function ExamEditor({ examId }: Props) {
       </div>
 
       <AnimatePresence>
-        {showCalculators && (
+          {showCalculators && (
           <CalculatorModal 
-            initialCalcId={calcModalInitialId}
+            initialCalcId={calcModalInitialId || undefined}
             area={exam.area} 
             examDateMs={exam.createdAt}
             reportContent={reportContent}

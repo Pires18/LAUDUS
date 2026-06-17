@@ -1006,7 +1006,7 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
 
             <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/10 rounded-2xl p-1.5 transition-all">
               <button
-                onClick={onShowCalculators}
+                onClick={() => onShowCalculators()}
                 className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-200/50 hover:text-slate-700 transition-colors shrink-0"
                 title="Calculadoras Clínicas"
               >
@@ -1087,7 +1087,7 @@ Estes são os achados do exame coletados via formulário. Você DEVE:
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={onShowCalculators}
+                  onClick={() => onShowCalculators()}
                   className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-2.5 py-1.5 rounded-md transition-colors"
                 >
                   <Calculator size={14} />

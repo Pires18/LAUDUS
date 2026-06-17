@@ -122,7 +122,7 @@ export async function getSettings(): Promise<AppSettings> {
       dicomViewerUrl: '',
       dicomTailscalePublicUrl: '',
       dicomViewerType: 'stone',
-      dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
+      dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study={{StudyInstanceUID}}',
       dicomPreset: 'macmini',
       dicomUsername: '',
       dicomPassword: '',
@@ -148,6 +148,11 @@ export async function getSettings(): Promise<AppSettings> {
         '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase',
         '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase'
       );
+      migrated = true;
+    }
+
+    if (data.dicomViewerUrlPattern && data.dicomViewerUrlPattern.includes('1.2.276.0.7230010.3.1.2.{{examId}}')) {
+      data.dicomViewerUrlPattern = data.dicomViewerUrlPattern.replace('1.2.276.0.7230010.3.1.2.{{examId}}', '{{StudyInstanceUID}}');
       migrated = true;
     }
 
@@ -246,7 +251,7 @@ export async function getSettings(): Promise<AppSettings> {
     dicomViewerUrl: '',
     dicomTailscalePublicUrl: '',
     dicomViewerType: 'stone',
-    dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study=1.2.276.0.7230010.3.1.2.{{examId}}',
+    dicomViewerUrlPattern: '{{baseUrl}}/stone-webviewer/index.html?study={{StudyInstanceUID}}',
     dicomPreset: 'macmini',
     dicomUsername: '',
     dicomPassword: '',
