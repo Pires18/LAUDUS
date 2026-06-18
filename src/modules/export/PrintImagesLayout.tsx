@@ -23,6 +23,10 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
     cols = 1;
     rows = 2;
     chunkSize = 2;
+  } else if (gridType === '2x2') {
+    cols = 2;
+    rows = 2;
+    chunkSize = 4;
   } else if (gridType === '2x4') {
     cols = 2;
     rows = 4;
@@ -74,7 +78,7 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
 
           {/* Grid Layout — classes definidas em index.css para impressão */}
           <div 
-            className={gridType === '1x2' ? 'print-images-grid-1x2 flex-grow' : 'print-images-grid-2x4 flex-grow'}
+            className={gridType === '1x2' ? 'print-images-grid-1x2 flex-grow' : gridType === '2x2' ? 'print-images-grid-2x2 flex-grow' : 'print-images-grid-2x4 flex-grow'}
           >
             {pageInstances.map((instance, instIdx) => {
               const globalIndex = pageIdx * chunkSize + instIdx + 1;

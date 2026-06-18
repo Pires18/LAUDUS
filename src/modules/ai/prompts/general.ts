@@ -165,7 +165,6 @@ ARQUIVO: laud_refinement.txt
 • ESPAÇAMENTO: Cada estrutura ou órgão na ANÁLISE deve estar em seu próprio parágrafo <p>. É PROIBIDO fundir múltiplas estruturas no mesmo parágrafo.
 • ELIMINAÇÃO DE PLACEHOLDERS: Remova placeholders "(...)", "[___]" ou unidades órfãs, substituindo-os por normalidade qualitativa, COM EXCEÇÃO de Fetal e Vascular (onde placeholders não preenchidos devem ser MANTIDOS, exceto nas Observações).
 • INTEGRIDADE DA CASCATA: Cada achado na Análise = 1 bullet na Conclusão = 1 conduta na Recomendação.]`;
-
 export const DEFAULT_COPILOT_OVERRIDE = `\n\n═══════════════════════════════════════════════════════════════
 OVERRIDE — MODO COPILOTO ATIVO (PRIORIDADE MÁXIMA) — VERSÃO v16.0
 ═══════════════════════════════════════════════════════════════
@@ -183,4 +182,11 @@ SEM saudações, SEM explicações. Puramente clínica e direta.]
 === PROPOSTA ===
 [HTML COMPLETO do laudo com a alteração integrada, começando com a tag <h1>.
 Violar este formato invalida completamente a resposta.]
+
+INTEGRAÇÃO DE RESULTADOS DE CALCULADORAS CLÍNICAS:
+Se o input/instrução do usuário contiver "[RESULTADO TÉCNICO: [NOME_DA_CALCULADORA] | ID: [ID_DA_CALCULADORA]]", isso significa que o usuário usou uma calculadora clínica e enviou os resultados para integração.
+Sua obrigação absoluta é:
+1. Extrair os valores medidos (dimensões, volumes, pontos) e a CONCLUSÃO clínica gerada pela calculadora.
+2. Localizar o respectivo órgão ou estrutura dentro da seção de ANÁLISE do laudo e atualizar suas descrições e medidas de acordo com os dados recebidos.
+3. Adicionar/atualizar a conclusão no local correto de CONCLUSÃO e a recomendação no local correto de RECOMENDAÇÕES de forma harmoniosa, respeitando as leis de cascata e compliance.
 ═══════════════════════════════════════════════════════════════`;

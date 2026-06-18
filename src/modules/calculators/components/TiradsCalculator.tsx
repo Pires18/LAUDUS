@@ -11,10 +11,10 @@ interface Lesion {
   d1: number | '';
   d2: number | '';
   d3: number | '';
-  composition: number | null;
-  echogenicity: number | null;
-  shape: number | null;
-  margin: number | null;
+  composition: string | number | null;
+  echogenicity: string | number | null;
+  shape: string | number | null;
+  margin: string | number | null;
   /** ACR TI-RADS: múltiplos focos podem coexistir — array de pontos selecionados */
   echogenicFoci: number[];
   totalPoints: number | null;
@@ -23,29 +23,29 @@ interface Lesion {
 }
 
 const COMPOSITION = [
-  { label: 'Cística', points: 0, description: 'Completamente cística ou quase cística' },
-  { label: 'Espongiforme', points: 0, description: 'Aspecto em esponja (≥ 50% pequenos cistos)' },
-  { label: 'Mista (cística + sólida)', points: 1, description: 'Porções sólidas e císticas' },
-  { label: 'Sólida', points: 2, description: 'Completamente ou quase completamente sólida' },
+  { label: 'Cística', value: 'cistica', points: 0, description: 'Completamente cística ou quase cística' },
+  { label: 'Espongiforme', value: 'espongiforme', points: 0, description: 'Aspecto em esponja (≥ 50% pequenos cistos)' },
+  { label: 'Mista (cística + sólida)', value: 'mista', points: 1, description: 'Porções sólidas e císticas' },
+  { label: 'Sólida', value: 'solida', points: 2, description: 'Completamente ou quase completamente sólida' },
 ];
 
 const ECHOGENICITY = [
-  { label: 'Anecóico', points: 0 },
-  { label: 'Hiperecóico / Isoecóico', points: 1 },
-  { label: 'Hipoecóico', points: 2 },
-  { label: 'Muito Hipoecóico', points: 3, description: 'Mais hipoecóico que a musculatura adjacente' },
+  { label: 'Anecóico', value: 'anecoico', points: 0 },
+  { label: 'Hiperecóico / Isoecóico', value: 'hiperecoico', points: 1 },
+  { label: 'Hipoecóico', value: 'hipoecoico', points: 2 },
+  { label: 'Muito Hipoecóico', value: 'muito_hipoecoico', points: 3, description: 'Mais hipoecóico que a musculatura adjacente' },
 ];
 
 const SHAPE = [
-  { label: 'Mais largo que alto (oval/redondo)', points: 0 },
-  { label: 'Mais alto que largo (taller-than-wide)', points: 3 },
+  { label: 'Mais largo que alto (oval/redondo)', value: 'mais_largo', points: 0 },
+  { label: 'Mais alto que largo (taller-than-wide)', value: 'mais_alto', points: 3 },
 ];
 
 const MARGIN = [
-  { label: 'Lisa', points: 0 },
-  { label: 'Mal definida', points: 0 },
-  { label: 'Lobulada / Irregular', points: 2 },
-  { label: 'Extensão extratireoideana', points: 3 },
+  { label: 'Lisa', value: 'lisa', points: 0 },
+  { label: 'Mal definida', value: 'mal_definida', points: 0 },
+  { label: 'Lobulada / Irregular', value: 'irregular', points: 2 },
+  { label: 'Extensão extratireoideana', value: 'extratireoideana', points: 3 },
 ];
 
 // ACR TI-RADS: focos ecogênicos são ADITIVOS — vários podem coexistir
@@ -55,6 +55,12 @@ const ECHOGENIC_FOCI = [
   { label: 'Calcificações periféricas', points: 2, description: 'Calcificações em casca de ovo ou anel' },
   { label: 'Focos ecogênicos puntiformes', points: 3, description: 'Pontos brilhantes < 1mm, suspeitos de microcalcificações' },
 ];
+
+const getPoints = (opts: any[], currentVal: any): number => {
+  if (currentVal === null || currentVal === undefined || currentVal === '') return -1;
+  const match = opts.find(o => o.value === currentVal || o.points === currentVal);
+  return match ? (match.points ?? 0) : -1;
+};
 
 export function TiradsCalculator({ value, onChange }: CalculatorProps) {
   const [lesions, setLesions] = useState<Lesion[]>(() => {
@@ -69,10 +75,17 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
       let total = 0;
       let complete = true;
 
-      if (lesion.composition !== null) total += lesion.composition; else complete = false;
-      if (lesion.echogenicity !== null) total += lesion.echogenicity; else complete = false;
-      if (lesion.shape !== null) total += lesion.shape; else complete = false;
-      if (lesion.margin !== null) total += lesion.margin; else complete = false;
+      const compPts = getPoints(COMPOSITION, lesion.composition);
+      if (compPts !== -1) total += compPts; else complete = false;
+
+      const echoPts = getPoints(ECHOGENICITY, lesion.echogenicity);
+      if (echoPts !== -1) total += echoPts; else complete = false;
+
+      const shapePts = getPoints(SHAPE, lesion.shape);
+      if (shapePts !== -1) total += shapePts; else complete = false;
+
+      const marginPts = getPoints(MARGIN, lesion.margin);
+      if (marginPts !== -1) total += marginPts; else complete = false;
 
       // Soma TODOS os focos ecogênicos selecionados (aditivo per ACR 2017)
       lesion.echogenicFoci.forEach(p => { total += p; });
@@ -248,10 +261,10 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
                 </div>
 
                 <div className="space-y-8">
-                  <CategorySelector label="1. Composição" options={COMPOSITION} current={lesion.composition} onSelect={(pts: number) => updateLesion(lesion.id, { composition: pts })} />
-                  <CategorySelector label="2. Ecogenicidade" options={ECHOGENICITY} current={lesion.echogenicity} onSelect={(pts: number) => updateLesion(lesion.id, { echogenicity: pts })} />
-                  <CategorySelector label="3. Forma" options={SHAPE} current={lesion.shape} onSelect={(pts: number) => updateLesion(lesion.id, { shape: pts })} columns={1} />
-                  <CategorySelector label="4. Margem" options={MARGIN} current={lesion.margin} onSelect={(pts: number) => updateLesion(lesion.id, { margin: pts })} />
+                  <CategorySelector label="1. Composição" options={COMPOSITION} current={lesion.composition} onSelect={(val: any) => updateLesion(lesion.id, { composition: val })} />
+                  <CategorySelector label="2. Ecogenicidade" options={ECHOGENICITY} current={lesion.echogenicity} onSelect={(val: any) => updateLesion(lesion.id, { echogenicity: val })} />
+                  <CategorySelector label="3. Forma" options={SHAPE} current={lesion.shape} onSelect={(val: any) => updateLesion(lesion.id, { shape: val })} columns={1} />
+                  <CategorySelector label="4. Margem" options={MARGIN} current={lesion.margin} onSelect={(val: any) => updateLesion(lesion.id, { margin: val })} />
 
                   {/* 5. Focos Ecogênicos — MULTI-SELECT per ACR TI-RADS 2017 */}
                   <div className="space-y-2">

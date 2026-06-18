@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
 import { ExamRequest, Patient } from '../../../types';
+import { getStudyInstanceUID } from '../../../utils/dicom';
 
 interface UseDicomSyncProps {
   exam: ExamRequest | undefined;
@@ -70,7 +71,7 @@ const locateStudies = async (
     return found;
   };
 
-  const studyUid = `1.2.276.0.7230010.3.1.2.${exam.id}`;
+  const studyUid = getStudyInstanceUID(exam.id);
   
   // Phase 1: Exact unique matches (StudyInstanceUID & AccessionNumber)
   const exactQueries = [

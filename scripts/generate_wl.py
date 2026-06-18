@@ -12,6 +12,17 @@ except ImportError:
     }), file=sys.stderr)
     sys.exit(1)
 
+def get_numeric_uid_from_firestore_id(id_str):
+    chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    value = 0
+    for char in id_str:
+        index = chars.find(char)
+        if index == -1:
+            value = value * 62 + (ord(char) % 62)
+        else:
+            value = value * 62 + index
+    return str(value)
+
 def main():
     try:
         # Ler dados do JSON fornecido via stdin
@@ -31,6 +42,8 @@ def main():
         if not exam_id:
             raise ValueError("O campo 'examId' e obrigatorio.")
 
+        numeric_id = get_numeric_uid_from_firestore_id(exam_id)
+
         # Garantir a pasta de destino configurada (com fallback dependendo do SO)
         output_dir = data.get('outputDir', '')
         if not output_dir:
@@ -48,7 +61,7 @@ def main():
         file_meta = FileMetaDataset()
         file_meta.TransferSyntaxUID = pydicom.uid.ImplicitVRLittleEndian
         file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.31'  # Modality Worklist Info Model - FIND
-        file_meta.MediaStorageSOPInstanceUID = '1.2.276.0.7230010.3.1.4.234324.' + str(exam_id)
+        file_meta.MediaStorageSOPInstanceUID = '1.2.276.0.7230010.3.1.4.234324.' + numeric_id
 
         ds = Dataset()
         ds.file_meta = file_meta
@@ -61,7 +74,7 @@ def main():
         if patient_birth_date:
             ds.PatientBirthDate = patient_birth_date
         ds.PatientSex = patient_sex
-        ds.StudyInstanceUID = '1.2.276.0.7230010.3.1.2.' + str(exam_id)
+        ds.StudyInstanceUID = '1.2.276.0.7230010.3.1.2.' + numeric_id
         ds.AccessionNumber = str(exam_id)
         ds.StudyDescription = step_desc
         ds.RequestedProcedureDescription = step_desc

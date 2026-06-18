@@ -22,6 +22,7 @@ import { DicomThumbnail } from './components/DicomThumbnail';
 import { useExamActions } from './hooks/useExamActions';
 import { useGoogleDocs } from './hooks/useGoogleDocs';
 import { useDicomSync } from './hooks/useDicomSync';
+import { getStudyInstanceUID } from '../../utils/dicom';
 
 // Refactored Components
 import { EditorHeader } from './components/EditorHeader';
@@ -184,7 +185,7 @@ export function ExamEditor({ examId }: Props) {
     const currentBaseUrl = isBackup 
       ? getActivePacsUrl(settings, true)
       : getActivePacsUrl(settings, false);
-    const studyUid = activeStudy.MainDicomTags?.StudyInstanceUID || `1.2.276.0.7230010.3.1.2.${exam?.id}`;
+    const studyUid = activeStudy.MainDicomTags?.StudyInstanceUID || getStudyInstanceUID(exam?.id || '');
 
     const viewerType = settings.dicomViewerType || 'stone';
     if (viewerType === 'stone') {

@@ -282,6 +282,33 @@ html, body, #root {
     flex-grow: 1;
   }
 
+  /* Layout 2 colunas × 2 linhas (4 imagens por página) */
+  .print-images-grid-2x2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 4mm;
+    margin-top: 4mm;
+    margin-bottom: 4mm;
+    flex-grow: 1;
+  }
+
+  .print-images-grid-2x2 .print-image-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .print-images-grid-2x2 .print-image-card img {
+    position: absolute;
+    width: 116%;
+    height: 87%;
+    transform: rotate(270deg);
+    object-fit: contain;
+  }
   /* Layout 2 colunas × 4 linhas (8 imagens por página) */
   .print-images-grid-2x4 {
     display: grid;

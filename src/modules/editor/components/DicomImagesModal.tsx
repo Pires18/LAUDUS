@@ -170,7 +170,7 @@ export function DicomImagesModal({
             </div>
 
             {/* Images Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[260px] overflow-y-auto pr-1.5 custom-scrollbar">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[460px] md:max-h-[50vh] overflow-y-auto pr-1.5 custom-scrollbar">
               {instances.map((instance, idx) => {
                 const isSelected = selectedIds.has(instance.ID);
                 const isBackup = instance.serverSource === 'backup';
@@ -188,16 +188,16 @@ export function DicomImagesModal({
                     key={instance.ID}
                     onClick={() => handleToggleSelect(instance.ID)}
                     className={classNames(
-                      "group relative aspect-square rounded-xl border overflow-hidden flex flex-col justify-between bg-black transition-all",
+                      "group relative aspect-square rounded-xl border overflow-hidden flex flex-col justify-between bg-black transition-all duration-300",
                       isSelected 
-                        ? "border-slate-900 ring-2 ring-slate-900/20 scale-[0.98] shadow-sm" 
-                        : "border-slate-200 hover:border-slate-400"
+                        ? "border-brand-500 ring-4 ring-brand-500/10 scale-[0.97] shadow-lg shadow-brand-500/5" 
+                        : "border-slate-200 hover:border-slate-400 hover:shadow-md"
                     )}
                   >
                     {/* Checkbox Overlay */}
                     <div className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-black/40 backdrop-blur-sm border border-white/20 text-white transition-all">
                       {isSelected ? (
-                        <div className="w-3.5 h-3.5 bg-slate-900 rounded flex items-center justify-center">
+                        <div className="w-3.5 h-3.5 bg-brand-500 rounded flex items-center justify-center">
                           <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
@@ -212,7 +212,7 @@ export function DicomImagesModal({
                       <DicomThumbnail
                         src={previewUrl}
                         alt={`Instance ${instNum}`}
-                        className="group-hover:scale-105"
+                        className="group-hover:scale-105 transition-transform duration-500"
                       />
                     </div>
 
@@ -238,6 +238,7 @@ export function DicomImagesModal({
               className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
             >
               <option value="1x2">1 Coluna x 2 Linhas (2 fotos/pág)</option>
+              <option value="2x2">2 Colunas x 2 Linhas (4 fotos/pág)</option>
               <option value="2x4">2 Colunas x 4 Linhas (8 fotos/pág)</option>
             </select>
           </div>

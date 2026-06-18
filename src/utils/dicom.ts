@@ -116,3 +116,29 @@ export async function syncExamToOrthancWorklist(
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * Converte um ID alfanumérico do Firestore (base62) em uma string numérica (base 10) determinística e sem colisões.
+ */
+export function getNumericUidFromFirestoreId(id: string): string {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  let value = BigInt(0);
+  for (let i = 0; i < id.length; i++) {
+    const char = id[i];
+    const index = chars.indexOf(char);
+    if (index === -1) {
+      value = value * BigInt(62) + BigInt(char.charCodeAt(0) % 62);
+    } else {
+      value = value * BigInt(62) + BigInt(index);
+    }
+  }
+  return value.toString();
+}
+
+/**
+ * Retorna o StudyInstanceUID numérico válido com base no ID do exame do Firestore.
+ */
+export function getStudyInstanceUID(examId: string): string {
+  if (!examId) return '';
+  return `1.2.276.0.7230010.3.1.2.${getNumericUidFromFirestoreId(examId)}`;
+}

@@ -138,7 +138,7 @@ interface Props {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/65 backdrop-blur-md lg:hidden z-[125]"
+        className="fixed inset-0 bg-slate-900/65 backdrop-blur-md lg:hidden z-[410]"
       />
 
       <motion.div
@@ -146,7 +146,7 @@ interface Props {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 30 }}
         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[130] overflow-hidden"
+        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[420] overflow-hidden"
       >
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="relative h-16 shrink-0 overflow-hidden bg-slate-900 border-b border-slate-800">

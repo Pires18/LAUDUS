@@ -29,12 +29,12 @@ export function CategorySelector({ label, options, current, onSelect, columns = 
         columns === 1 ? "grid-cols-1" : "grid-cols-2"
       )}>
         {options.map((o) => {
-          const isSelected = current === (o.points !== undefined ? o.points : o.value);
+          const isSelected = current === (o.value !== undefined ? o.value : o.points);
           return (
             <button
               key={o.label}
               type="button"
-              onClick={() => onSelect(o.points !== undefined ? o.points : o.value)}
+              onClick={() => onSelect(o.value !== undefined ? o.value : o.points)}
               className={classNames(
                 "flex flex-col items-start text-left p-3 rounded-2xl border-2 transition-all group relative overflow-hidden",
                 isSelected 
