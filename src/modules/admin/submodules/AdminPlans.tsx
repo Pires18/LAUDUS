@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { Modal } from '../../../components/Modal';
 
 export function AdminPlans() {
   const { showToast } = useApp();
@@ -88,9 +89,9 @@ export function AdminPlans() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-          [1, 2, 3].map(i => <div key={i} className="h-96 bg-white rounded-[2.5rem] border border-ink-100 animate-pulse" />)
+          [1, 2, 3].map(i => <div key={i} className="h-96 bg-white rounded-3xl border border-ink-100 animate-pulse" />)
         ) : plans.length === 0 ? (
-          <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-ink-100 border-dashed">
+          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-ink-100 border-dashed">
             <DollarSign size={48} className="text-ink-200 mx-auto mb-4" />
             <p className="text-ink-400 font-bold">Nenhum plano configurado.</p>
             <button 
@@ -102,7 +103,7 @@ export function AdminPlans() {
           </div>
         ) : (
           plans.map((plan) => (
-            <div key={plan.id} className="bg-white rounded-[2.5rem] border border-ink-100 shadow-sm p-8 flex flex-col hover:border-brand-300 hover:shadow-premium transition-all group relative overflow-hidden">
+            <div key={plan.id} className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 flex flex-col hover:border-brand-300 hover:shadow-premium transition-all group relative overflow-hidden">
               {!plan.active && (
                 <div className="absolute top-4 right-4 px-3 py-1 bg-ink-100 text-ink-500 rounded-full text-[8px] font-black uppercase tracking-widest">
                   Inativo
@@ -211,136 +212,129 @@ export function AdminPlans() {
       </div>
 
       {/* Plan Editor Modal */}
-      {editingPlan && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-8 max-w-2xl w-full shadow-2xl border border-ink-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-8">
+      <Modal
+        open={editingPlan !== null}
+        onClose={() => setEditingPlan(null)}
+        title="Configurar Plano"
+        size="lg"
+      >
+        {editingPlan && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h4 className="text-2xl font-black text-ink-900">Configurar Plano</h4>
-                <p className="text-sm text-ink-500">Defina os termos comerciais e técnicos deste nível.</p>
-              </div>
-              <button onClick={() => setEditingPlan(null)} className="p-2 hover:bg-ink-50 rounded-full">
-                <X size={24} className="text-ink-400" />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Nome do Plano</label>
-                  <input
-                    value={editingPlan.name}
-                    onChange={e => setEditingPlan({...editingPlan, name: e.target.value})}
-                    placeholder="Ex: Clínica Premium"
-                    className="input h-14"
-                  />
-                </div>
-                <div>
-                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Preço Mensal (R$)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.price}
-                    onChange={e => setEditingPlan({...editingPlan, price: Number(e.target.value)})}
-                    className="input h-14 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Limite de Exames/Mês</label>
-                  <input
-                    type="number"
-                    value={editingPlan.examLimit || ''}
-                    onChange={e => setEditingPlan({...editingPlan, examLimit: e.target.value ? Number(e.target.value) : undefined})}
-                    placeholder="Vazio para Ilimitado"
-                    className="input h-14 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Limite de Clínicas</label>
-                  <input
-                    type="number"
-                    value={editingPlan.clinicLimit || ''}
-                    onChange={e => setEditingPlan({...editingPlan, clinicLimit: e.target.value ? Number(e.target.value) : undefined})}
-                    placeholder="Ex: 1"
-                    className="input h-14 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Laud.IA / Mês (Créditos AI)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.iaLimit || ''}
-                    onChange={e => setEditingPlan({...editingPlan, iaLimit: e.target.value ? Number(e.target.value) : undefined})}
-                    placeholder="Vazio para Ilimitado"
-                    className="input h-14 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Armazenamento de Imagens (GB)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.storageLimitGb || ''}
-                    onChange={e => setEditingPlan({...editingPlan, storageLimitGb: e.target.value ? Number(e.target.value) : undefined})}
-                    placeholder="Vazio para Ilimitado"
-                    className="input h-14 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Funcionalidades Extras (uma por linha)</label>
-                <textarea
-                  value={editingPlan.features?.join('\n')}
-                  onChange={e => setEditingPlan({...editingPlan, features: e.target.value.split('\n').filter(Boolean)})}
-                  placeholder="Ex: Suporte 24h&#10;Laud.IA Premium"
-                  rows={3}
-                  className="input p-4 font-medium"
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Nome do Plano</label>
+                <input
+                  value={editingPlan.name}
+                  onChange={e => setEditingPlan({...editingPlan, name: e.target.value})}
+                  placeholder="Ex: Clínica Premium"
+                  className="input h-14"
                 />
               </div>
-
-              {/* Advanced Clinic Options Toggles */}
-              <div className="space-y-3 p-4 bg-ink-50 rounded-3xl border border-ink-100">
-                <p className="text-[9px] font-black uppercase tracking-widest text-ink-400 mb-1">Permissões Especiais do Sistema</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={!!editingPlan.voiceDictation}
-                      onChange={e => setEditingPlan({...editingPlan, voiceDictation: e.target.checked})}
-                      className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Ditado de Voz</span>
-                  </label>
-                  
-                  <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={!!editingPlan.customMasks}
-                      onChange={e => setEditingPlan({...editingPlan, customMasks: e.target.checked})}
-                      className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Máscaras Custom</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={editingPlan.active !== false}
-                      onChange={e => setEditingPlan({...editingPlan, active: e.target.checked})}
-                      className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
-                    />
-                    <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Ativo</span>
-                  </label>
-                </div>
+              <div>
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Preço Mensal (R$)</label>
+                <input
+                  type="number"
+                  value={editingPlan.price}
+                  onChange={e => setEditingPlan({...editingPlan, price: Number(e.target.value)})}
+                  className="input h-14 font-mono"
+                />
               </div>
             </div>
 
-            <div className="flex gap-3 mt-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Limite de Exames/Mês</label>
+                <input
+                  type="number"
+                  value={editingPlan.examLimit || ''}
+                  onChange={e => setEditingPlan({...editingPlan, examLimit: e.target.value ? Number(e.target.value) : undefined})}
+                  placeholder="Vazio para Ilimitado"
+                  className="input h-14 font-mono"
+                />
+              </div>
+              <div>
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Limite de Clínicas</label>
+                <input
+                  type="number"
+                  value={editingPlan.clinicLimit || ''}
+                  onChange={e => setEditingPlan({...editingPlan, clinicLimit: e.target.value ? Number(e.target.value) : undefined})}
+                  placeholder="Ex: 1"
+                  className="input h-14 font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Laud.IA / Mês (Créditos AI)</label>
+                <input
+                  type="number"
+                  value={editingPlan.iaLimit || ''}
+                  onChange={e => setEditingPlan({...editingPlan, iaLimit: e.target.value ? Number(e.target.value) : undefined})}
+                  placeholder="Vazio para Ilimitado"
+                  className="input h-14 font-mono"
+                />
+              </div>
+              <div>
+                <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Armazenamento de Imagens (GB)</label>
+                <input
+                  type="number"
+                  value={editingPlan.storageLimitGb || ''}
+                  onChange={e => setEditingPlan({...editingPlan, storageLimitGb: e.target.value ? Number(e.target.value) : undefined})}
+                  placeholder="Vazio para Ilimitado"
+                  className="input h-14 font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label uppercase tracking-widest text-[10px] mb-2 font-black text-ink-400">Funcionalidades Extras (uma por linha)</label>
+              <textarea
+                value={editingPlan.features?.join('\n')}
+                onChange={e => setEditingPlan({...editingPlan, features: e.target.value.split('\n').filter(Boolean)})}
+                placeholder="Ex: Suporte 24h&#10;Laud.IA Premium"
+                rows={3}
+                className="input p-4 font-medium"
+              />
+            </div>
+
+            {/* Advanced Clinic Options Toggles */}
+            <div className="space-y-3 p-4 bg-ink-50 rounded-3xl border border-ink-100">
+              <p className="text-[9px] font-black uppercase tracking-widest text-ink-400 mb-1">Permissões Especiais do Sistema</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={!!editingPlan.voiceDictation}
+                    onChange={e => setEditingPlan({...editingPlan, voiceDictation: e.target.checked})}
+                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Ditado de Voz</span>
+                </label>
+                
+                <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={!!editingPlan.customMasks}
+                    onChange={e => setEditingPlan({...editingPlan, customMasks: e.target.checked})}
+                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Máscaras Custom</span>
+                </label>
+
+                <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={editingPlan.active !== false}
+                    onChange={e => setEditingPlan({...editingPlan, active: e.target.checked})}
+                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-[10px] font-bold text-ink-700 uppercase tracking-wider">Ativo</span>
+                </label>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 mt-8">
               <button 
                 onClick={() => setEditingPlan(null)}
                 className="flex-1 py-4 rounded-2xl text-ink-600 font-black text-[10px] uppercase tracking-widest hover:bg-ink-50 transition-all border border-ink-100"
@@ -357,8 +351,8 @@ export function AdminPlans() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={deleteTarget !== null}

@@ -289,7 +289,7 @@ export function PatientDetail({ patientId }: Props) {
                         setSelectedExamForModal(exam);
                         setModalTab('anamnesis');
                       }}
-                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-brand-50 hover:text-brand-600 text-slate-600 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                      className="h-8 px-2.5 rounded-lg border border-ink-200 bg-white hover:bg-brand-50 hover:text-brand-600 text-ink-600 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
                       title="Visualizar Anamnese"
                     >
                       <ClipboardList size={12} />
@@ -303,7 +303,7 @@ export function PatientDetail({ patientId }: Props) {
                       className={`h-8 px-2.5 rounded-lg border transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider shadow-sm ${
                         exam.consentAccepted
                           ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
-                          : 'bg-white text-slate-600 border-slate-200 hover:bg-indigo-50 hover:text-indigo-600'
+                          : 'bg-white text-ink-600 border-ink-200 hover:bg-indigo-50 hover:text-indigo-600'
                       }`}
                       title={exam.consentAccepted ? 'Termo Assinado' : 'Pendente de Assinatura'}
                     >

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings, ExamArea } from '../../types';
+import { logger } from '../../utils/logger';
 import { getRecentFinalizedReports } from '../../store/db';
 import { resolveGeminiModel, getAnthropicBaseUrl } from './engine';
 import { robustJsonParse } from './json';
@@ -164,7 +165,7 @@ Gere o JSON da máscara do laudo agora.`;
     }
     return parsed;
   } catch (err: any) {
-    console.error('Erro ao processar JSON da IA:', err.message, text);
+    logger.error('Erro ao processar JSON da IA:', err);
     throw new Error('A IA gerou uma resposta em formato inválido que não pôde ser auto-corrigida. Tente novamente.');
   }
 }

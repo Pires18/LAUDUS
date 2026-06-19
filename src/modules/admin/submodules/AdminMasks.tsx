@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useApp } from '../../../store/app';
 import { useCollection } from '../../../hooks/useFirestore';
 import { ReportTemplate, EXAM_AREAS, ExamArea, Clinic } from '../../../types';
 import { genId, addItemWithId, deleteItem, updateItem } from '../../../store/db';
-import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid } from 'lucide-react';
+import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, Download, Upload } from 'lucide-react';
 import { AreaIcon } from '../../../components/AreaIcon';
 import { classNames } from '../../../utils/format';
 
@@ -12,6 +12,8 @@ export function AdminMasks() {
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [typeFilter, setTypeFilter] = useState<'all' | 'system' | 'clinics'>('all');
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const { data: allTemplates, loading } = useCollection<ReportTemplate>('templates');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -40,6 +42,39 @@ export function AdminMasks() {
     setView({ name: 'template-editor', templateId: id });
   }
 
+  async function handleImportAI(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const imported: Array<{ id: string; aiInstructions?: string; [key: string]: unknown }> = JSON.parse(text);
+      if (!Array.isArray(imported)) throw new Error('JSON inválido: esperado array de templates.');
+      const existingIds = new Set(allTemplates.map(t => t.id));
+      let updated = 0;
+      let created = 0;
+      for (const tmpl of imported) {
+        if (!tmpl.id || tmpl.aiInstructions === undefined) continue;
+        if (existingIds.has(tmpl.id)) {
+          await updateItem('templates', tmpl.id, { aiInstructions: tmpl.aiInstructions });
+          updated++;
+        } else {
+          // Template novo: exige campos obrigatórios
+          const { id, ...rest } = tmpl;
+          await addItemWithId('templates', id, rest as Record<string, unknown>);
+          created++;
+        }
+      }
+      const msg = [updated && `${updated} atualizados`, created && `${created} criados`].filter(Boolean).join(', ');
+      showToast(`✓ ${msg} com sucesso!`, 'success');
+    } catch (err: any) {
+      showToast(`Erro ao importar: ${err.message}`, 'error');
+    } finally {
+      setImporting(false);
+      if (importRef.current) importRef.current.value = '';
+    }
+  }
+
   async function handleChangeClinic(templateId: string, clinicId: string) {
     try {
       await updateItem('templates', templateId, { clinicId: clinicId || null });
@@ -56,19 +91,65 @@ export function AdminMasks() {
           <h3 className="text-xl font-black text-ink-900">Gerenciador de Máscaras Clínicas</h3>
           <p className="text-sm text-ink-500">Publique e adeque os modelos de laudos padrões e específicos para as clínicas.</p>
         </div>
-        <button className="btn-primary shrink-0 self-start md:self-auto shadow-lg shadow-brand-500/20" onClick={handleCreateNew}>
-          <Plus size={18} />
-          Nova Máscara Padrão
-        </button>
+        <div className="flex gap-2">
+          {/* Input oculto para importação */}
+          <input
+            ref={importRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleImportAI}
+          />
+          <button
+            className="btn-secondary shrink-0 self-start md:self-auto"
+            title="Importar aiInstructions de arquivo JSON"
+            disabled={importing}
+            onClick={() => importRef.current?.click()}
+          >
+            <Upload size={16} />
+            {importing ? 'Importando...' : 'Importar AI'}
+          </button>
+          <button
+            className="btn-secondary shrink-0 self-start md:self-auto"
+            title="Exportar todos os templates como JSON"
+            onClick={() => {
+              const data = allTemplates.map(t => ({
+                id: t.id, area: t.area, name: t.name,
+                title: t.title, technique: t.technique,
+                analysisTemplate: t.analysisTemplate,
+                conclusionTemplate: t.conclusionTemplate,
+                classificationTemplate: t.classificationTemplate,
+                recommendationsTemplate: t.recommendationsTemplate,
+                observationsTemplate: t.observationsTemplate,
+                aiInstructions: t.aiInstructions || '',
+                customForm: t.customForm || '',
+                clinicId: t.clinicId || null,
+              }));
+              data.sort((a, b) => (a.area||'').localeCompare(b.area||'') || (a.name||'').localeCompare(b.name||''));
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = 'templates-export.json'; a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download size={16} />
+            Exportar JSON
+          </button>
+          <button className="btn-primary shrink-0 self-start md:self-auto shadow-lg shadow-brand-500/20" onClick={handleCreateNew}>
+            <Plus size={18} />
+            Nova Máscara Padrão
+          </button>
+        </div>
       </div>
 
       {/* Mask Type Filters */}
-      <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit border border-slate-200/60 shadow-sm">
+      <div className="flex bg-ink-100 p-1.5 rounded-2xl w-fit border border-ink-200/60 shadow-sm">
         <button
           onClick={() => setTypeFilter('all')}
           className={classNames(
             "px-4 py-2.5 text-xs font-black uppercase tracking-tight rounded-xl transition-all",
-            typeFilter === 'all' ? "bg-white text-brand-600 shadow-sm border border-slate-200/10" : "text-slate-500 hover:text-slate-700"
+            typeFilter === 'all' ? "bg-white text-brand-600 shadow-sm border border-ink-200/10" : "text-ink-500 hover:text-ink-700"
           )}
         >
           🌐 Todas ({allTemplates.length})
@@ -77,7 +158,7 @@ export function AdminMasks() {
           onClick={() => setTypeFilter('system')}
           className={classNames(
             "px-4 py-2.5 text-xs font-black uppercase tracking-tight rounded-xl transition-all",
-            typeFilter === 'system' ? "bg-white text-brand-600 shadow-sm border border-slate-200/10" : "text-slate-500 hover:text-slate-700"
+            typeFilter === 'system' ? "bg-white text-brand-600 shadow-sm border border-ink-200/10" : "text-ink-500 hover:text-ink-700"
           )}
         >
           ⭐ Padrão do Sistema ({allTemplates.filter(t => !t.clinicId).length})
@@ -86,7 +167,7 @@ export function AdminMasks() {
           onClick={() => setTypeFilter('clinics')}
           className={classNames(
             "px-4 py-2.5 text-xs font-black uppercase tracking-tight rounded-xl transition-all",
-            typeFilter === 'clinics' ? "bg-white text-brand-600 shadow-sm border border-slate-200/10" : "text-slate-500 hover:text-slate-700"
+            typeFilter === 'clinics' ? "bg-white text-brand-600 shadow-sm border border-ink-200/10" : "text-ink-500 hover:text-ink-700"
           )}
         >
           🏢 Exclusivas de Clínicas ({allTemplates.filter(t => t.clinicId).length})
@@ -140,7 +221,7 @@ export function AdminMasks() {
                 <div
                   key={template.id}
                   onClick={() => setView({ name: 'template-editor', templateId: template.id })}
-                  className="group bg-white p-6 rounded-[2rem] border border-ink-100 hover:border-brand-300 hover:shadow-premium transition-all cursor-pointer flex flex-col justify-between min-h-[140px] space-y-4"
+                  className="group bg-white p-6 rounded-3xl border border-ink-100 hover:border-brand-300 hover:shadow-premium transition-all cursor-pointer flex flex-col justify-between min-h-[140px] space-y-4"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -187,7 +268,7 @@ export function AdminMasks() {
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-50 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="pt-3 border-t border-ink-50 flex items-center justify-between gap-3 flex-wrap">
                     {clinicName ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/50">
                         <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
@@ -204,7 +285,7 @@ export function AdminMasks() {
                       <select
                         value={template.clinicId || ''}
                         onChange={(e) => handleChangeClinic(template.id, e.target.value)}
-                        className="px-2.5 py-1 bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-600 rounded-lg outline-none focus:border-brand-500"
+                        className="px-2.5 py-1 bg-ink-50 border border-ink-100 text-[10px] font-bold text-ink-600 rounded-lg outline-none focus:border-brand-500"
                       >
                         <option value="">⭐ Padrão do Sistema</option>
                         {clinics.map((c) => (

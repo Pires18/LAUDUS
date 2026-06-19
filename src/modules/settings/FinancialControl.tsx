@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { getAiUsageStats, AiUsageLog } from '../../store/db';
 import { classNames } from '../../utils/format';
+import { logger } from '../../utils/logger';
 
 const USD_TO_BRL = 5.50;
 
@@ -142,7 +143,7 @@ export function FinancialControl() {
       setGroupedLogs(sorted);
       setLastUpdated(new Date());
     } catch (err) {
-      console.error('Failed to load financial data', err);
+      logger.error('Failed to load financial data', err);
     } finally {
       setLoading(false);
     }

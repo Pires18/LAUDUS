@@ -21,7 +21,7 @@ export const EXAM_AREAS: { id: ExamArea; label: string; color: string; icon: str
   { id: 'musculoesqueletico', label: 'Musculoesquelético', color: 'bg-orange-100 text-orange-700', icon: 'Bone' },
   { id: 'vascular', label: 'Vascular', color: 'bg-red-100 text-red-700', icon: 'Waves' },
   { id: 'pediatria', label: 'Pediatria', color: 'bg-cyan-100 text-cyan-700', icon: 'ToyBrick' },
-  { id: 'procedimentos', label: 'Procedimentos', color: 'bg-slate-100 text-slate-700', icon: 'Syringe' },
+  { id: 'procedimentos', label: 'Procedimentos', color: 'bg-ink-100 text-ink-700', icon: 'Syringe' },
   { id: 'reumatologico', label: 'Reumatológico', color: 'bg-amber-100 text-amber-700', icon: 'Dna' },
   { id: 'mastologia', label: 'Mastologia', color: 'bg-rose-100 text-rose-700', icon: 'Ribbon' },
 ];
@@ -250,6 +250,20 @@ export interface AppSettings {
   dicomBackupWorklistFolder?: string;
   dicomBackupLocalAgentUrl?: string;
   dicomBackupOrthancAETitle?: string;
+
+  /** Criatividade da IA por modo operacional */
+  aiTemperatureByMode?: {
+    generation?: number;  // default 0.35
+    refine?: number;      // default 0.10
+    copilot?: number;     // default 0.20
+    template?: number;    // default 0.20
+  };
+  /** Regras de ouro do refinamento (Bloco 5) — editável pelo admin */
+  aiRefinementGoldenRules?: string;
+  /** Override do copiloto (formato de saída CONVERSA/PROPOSTA) — editável pelo admin */
+  aiCopilotOverride?: string;
+  /** Taxa de conversão USD → BRL para exibição de custos (default: 5.50) */
+  aiConversionRateBRL?: number;
 
   // Preferências do Sistema
   soundNotifications?: boolean;

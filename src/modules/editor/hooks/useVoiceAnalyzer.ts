@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '../../../utils/logger';
 
 export function useVoiceAnalyzer(isListening: boolean) {
   const [voiceVolume, setVoiceVolume] = useState(0);
@@ -38,7 +39,7 @@ export function useVoiceAnalyzer(isListening: boolean) {
         };
         updateVolume();
       } catch (err) {
-        console.warn('[Voice Analyser] Microfone não acessível ou permissão negada:', err);
+        logger.warn('[Voice Analyser] Microfone não acessível ou permissão negada:', err);
         let mockInterval = setInterval(() => {
           if (cancelled) { clearInterval(mockInterval); return; }
           setVoiceVolume(Math.random() * 100);

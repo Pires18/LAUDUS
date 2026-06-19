@@ -332,13 +332,13 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     >
       <div className="flex flex-col h-full space-y-4">
         {/* Navigation Tabs inside Modal */}
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+        <div className="flex bg-ink-100 p-1 rounded-xl w-fit border border-ink-200">
           <button
             onClick={() => setActiveTab('metadata')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
               activeTab === 'metadata'
-                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-brand-650 shadow-sm border border-ink-200'
+                : 'text-ink-500 hover:text-ink-800'
             }`}
           >
             <UserCog size={14} />
@@ -348,8 +348,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             onClick={() => setActiveTab('anamnesis')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
               activeTab === 'anamnesis'
-                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-brand-650 shadow-sm border border-ink-200'
+                : 'text-ink-500 hover:text-ink-800'
             }`}
           >
             <ClipboardList size={14} />
@@ -359,8 +359,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             onClick={() => setActiveTab('consent')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
               activeTab === 'consent'
-                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-brand-650 shadow-sm border border-ink-200'
+                : 'text-ink-500 hover:text-ink-800'
             }`}
           >
             <ShieldCheck size={14} />
@@ -371,17 +371,17 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
         {/* Tab 0: Metadata (Dados do Exame) */}
         {activeTab === 'metadata' && (
           <div className="flex-1 flex flex-col space-y-4 min-h-[350px]">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 pb-2 border-b border-ink-100">
               <UserCog size={16} className="text-brand-500" />
-              <span className="text-xs font-bold text-slate-700">Configuração de Identificação & Unidade</span>
+              <span className="text-xs font-bold text-ink-700">Configuração de Identificação & Unidade</span>
             </div>
 
             <div className="space-y-4">
               <div className="flex flex-col space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Médico Solicitante</label>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Médico Solicitante</label>
                   <input 
                     type="text"
-                    className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                    className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
                     value={requestingPhysician} 
                     onChange={e => setRequestingPhysician(e.target.value)}
                     disabled={!isEditable}
@@ -389,9 +389,9 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 </div>
 
               <div className="flex flex-col space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Clínica</label>
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Clínica</label>
                 <select 
-                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
                   value={clinicId} 
                   onChange={e => setClinicId(e.target.value)}
                   disabled={!isEditable}
@@ -401,15 +401,15 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-                <p className="text-[9px] text-slate-400 mt-1 ml-1 italic">
+                <p className="text-[9px] text-ink-400 mt-1 ml-1 italic">
                   * Alterar a clínica afeta o template e a pasta de exportação do Google Docs.
                 </p>
               </div>
 
-              <div className="flex flex-col space-y-1.5 pt-2 border-t border-slate-100">
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Tipo de Exame (Máscara)</label>
+              <div className="flex flex-col space-y-1.5 pt-2 border-t border-ink-100">
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Tipo de Exame (Máscara)</label>
                 <select 
-                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
                   value={examTemplateId} 
                   onChange={async (e) => {
                     const newTemplateId = e.target.value;
@@ -456,7 +456,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             </div>
 
             {isEditable && (
-              <div className="flex justify-end pt-4 border-t border-slate-100">
+              <div className="flex justify-end pt-4 border-t border-ink-100">
                 <button 
                   type="button"
                   onClick={handleSaveMetadata}
@@ -502,17 +502,17 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     <FileText size={16} className="text-brand-500" />
-                    <span className="text-xs font-bold text-slate-700">Anamnese do Paciente</span>
+                    <span className="text-xs font-bold text-ink-700">Anamnese do Paciente</span>
                   </div>
                   
                   {hasStructured && (
-                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
+                    <div className="flex bg-ink-100 p-0.5 rounded-lg border border-ink-200 text-[10px]">
                       <button
                         onClick={() => setViewMode('form')}
                         className={`px-2 py-1 font-bold rounded-md transition-all ${
                           viewMode === 'form'
-                            ? 'bg-white text-brand-650 shadow-sm border border-slate-200/50'
-                            : 'text-slate-500 hover:text-slate-800'
+                            ? 'bg-white text-brand-650 shadow-sm border border-ink-200/50'
+                            : 'text-ink-500 hover:text-ink-800'
                         }`}
                       >
                         Formulário
@@ -521,8 +521,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                         onClick={() => setViewMode('text')}
                         className={`px-2 py-1 font-bold rounded-md transition-all ${
                           viewMode === 'text'
-                            ? 'bg-white text-brand-650 shadow-sm border border-slate-200/50'
-                            : 'text-slate-500 hover:text-slate-800'
+                            ? 'bg-white text-brand-650 shadow-sm border border-ink-200/50'
+                            : 'text-ink-500 hover:text-ink-800'
                         }`}
                       >
                         Texto Livre
@@ -533,7 +533,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => printDocument('Anamnese de Exame', anamnesis, false)}
-                    className="text-[10px] font-black text-white bg-slate-900 hover:bg-slate-800 flex items-center gap-1.5 uppercase tracking-wider transition-all px-3 py-1.5 rounded-lg shadow-sm"
+                    className="text-[10px] font-black text-white bg-ink-900 hover:bg-ink-800 flex items-center gap-1.5 uppercase tracking-wider transition-all px-3 py-1.5 rounded-lg shadow-sm"
                   >
                     <Printer size={11} />
                     Imprimir
@@ -544,12 +544,12 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
               {viewMode === 'form' && hasStructured ? (
                 <div className="flex-1 flex flex-col space-y-4 min-h-[350px] overflow-y-auto max-h-[400px] pr-1">
                   {/* Form Fields Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-ink-50 rounded-2xl border border-ink-200">
                     {fields.map((field, idx) => {
                       if (!field.isStructured) return null;
                       return (
                         <div key={idx} className="flex flex-col space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                          <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest ml-1">
                             {field.label}
                           </label>
                           <input
@@ -559,7 +559,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                             onFocus={() => isAnamnesisFocusedRef.current = true}
                             onBlur={() => handleBlurAnamnesis(serializeAnamnesis(fields))}
                             onChange={(e) => handleFieldChange(idx, e.target.value)}
-                            className="h-10 px-3 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60"
+                            className="h-10 px-3 bg-white border border-ink-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60"
                             placeholder={`Preencher ${field.label.toLowerCase()}...`}
                           />
                         </div>
@@ -569,7 +569,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
                   {/* Additional Free Text Notes */}
                   <div className="flex flex-col space-y-1.5 flex-1 min-h-[120px]">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                    <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest ml-1">
                       Anotações Adicionais / Observações
                     </label>
                     <textarea
@@ -579,7 +579,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                       onBlur={() => handleBlurAnamnesis(anamnesis)}
                       onChange={(e) => handleUnstructuredChange(e.target.value)}
                       placeholder="Outros achados, cirurgias, observações ou queixas clínicas livres..."
-                      className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 min-h-[100px] disabled:opacity-60"
+                      className="w-full flex-1 p-4 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-ink-850 min-h-[100px] disabled:opacity-60"
                     />
                   </div>
                 </div>
@@ -591,7 +591,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                   onBlur={(e) => handleBlurAnamnesis(e.target.value)}
                   onChange={(e) => handleSaveAnamnesis(e.target.value)}
                   placeholder="Descreva o histórico clínico do paciente, sintomas e indicações para este exame..."
-                  className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
+                  className="w-full flex-1 p-4 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-ink-850 disabled:opacity-60"
                 />
               )}
             </div>
@@ -604,14 +604,14 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <ShieldCheck size={16} className="text-indigo-500" />
-                <span className="text-xs font-bold text-slate-700">Termo de Consentimento Informado</span>
+                <span className="text-xs font-bold text-ink-700">Termo de Consentimento Informado</span>
               </div>
               <div className="flex items-center gap-2">
                 {template?.consentTemplate && isEditable && (
                   <button
                     onClick={handleRestoreConsent}
                     title="Restaurar termo padrão da máscara"
-                    className="text-[10px] font-black text-slate-500 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors border border-slate-200 bg-slate-50 hover:bg-brand-50 px-2 py-1.5 rounded-lg"
+                    className="text-[10px] font-black text-ink-500 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors border border-ink-200 bg-ink-50 hover:bg-brand-50 px-2 py-1.5 rounded-lg"
                   >
                     <RotateCcw size={11} />
                     Restaurar Padrão
@@ -634,7 +634,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
               onBlur={(e) => handleBlurConsentTerm(e.target.value)}
               onChange={(e) => handleSaveConsentTerm(e.target.value)}
               placeholder="Insira o texto explicativo do termo de consentimento livre e esclarecido..."
-              className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
+              className="w-full flex-1 p-4 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-ink-850 disabled:opacity-60"
             />
 
             {/* Checkbox for Acceptance */}

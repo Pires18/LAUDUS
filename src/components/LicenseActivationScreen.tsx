@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { logger } from '../utils/logger';
 import { validateAndActivateLicense } from '../store/db';
 import { useCollection } from '../hooks/useFirestore';
 import { firestore } from '../lib/firebase';
@@ -129,7 +130,7 @@ export function LicenseActivationScreen({
           module: 'ACCESS_GATE'
         });
       } catch (e) {
-        console.warn('Erro ao logar auditoria da aquisição:', e);
+        logger.warn('Erro ao logar auditoria da aquisição:', e);
       }
 
       setSuccess(true);

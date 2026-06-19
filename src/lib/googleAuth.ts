@@ -1,5 +1,6 @@
 import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { app } from './firebase';
+import { logger } from '../utils/logger';
 
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
@@ -17,7 +18,7 @@ try {
   const storedExpiration = localStorage.getItem('google_token_expiration');
   tokenExpirationTime = storedExpiration ? Number(storedExpiration) : null;
 } catch (e) {
-  console.warn('[Google Auth] Erro ao ler do localStorage:', e);
+  logger.warn('[Google Auth] Erro ao ler do localStorage:', e);
 }
 
 /**
@@ -30,7 +31,7 @@ export function storeGoogleAccessToken(token: string, expirationTimeOffsetMs = 3
     localStorage.setItem('google_access_token', token);
     localStorage.setItem('google_token_expiration', tokenExpirationTime.toString());
   } catch (e) {
-    console.warn('[Google Auth] Erro ao salvar no localStorage:', e);
+    logger.warn('[Google Auth] Erro ao salvar no localStorage:', e);
   }
 }
 
@@ -44,7 +45,7 @@ export function clearGoogleAccessToken(): void {
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('google_token_expiration');
   } catch (e) {
-    console.warn('[Google Auth] Erro ao limpar o localStorage:', e);
+    logger.warn('[Google Auth] Erro ao limpar o localStorage:', e);
   }
 }
 
@@ -78,7 +79,7 @@ export async function getGoogleAccessToken(forceRefresh = false): Promise<string
     return cachedAccessToken!;
   } catch (error: unknown) {
     // Se falhar em background, tentamos com prompt interativo
-    console.warn('[Google Auth] Erro ao renovar token silenciosamente, solicitando interativamente...', error);
+    logger.warn('[Google Auth] Erro ao renovar token silenciosamente, solicitando interativamente...', error);
     provider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);

@@ -8,9 +8,10 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw, SlidersHorizontal, ExternalLink, Zap } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
+import { logger } from '../../utils/logger';
 import { PrintLayout } from '../export/PrintLayout';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
@@ -135,7 +136,10 @@ export function ExamEditor({ examId }: Props) {
     hasDicomImages,
     dicomInstances,
     dicomLoading,
-    dicomError
+    dicomError,
+    dicomStatus,
+    activeServer,
+    lastErrorMessage
   } = useDicomSync({
     exam: exam || undefined,
     patient,
@@ -381,7 +385,7 @@ export function ExamEditor({ examId }: Props) {
         }, 500);
       }, 150);
     } catch (err) {
-      console.error('[PACS Print Preload Error]', err);
+      logger.error('[PACS Print Preload Error]', err);
       showToast('Erro ao carregar imagens para a impressão.', 'error');
       setIsPrintingImages(false);
     }
@@ -525,6 +529,11 @@ export function ExamEditor({ examId }: Props) {
             onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
             viewerOpen={showIntegratedViewer}
             onEditPatient={() => setShowEditPatient(true)}
+            dicomStatus={dicomStatus}
+            activeServer={activeServer}
+            lastErrorMessage={lastErrorMessage}
+            googleDocUrl={exam.googleDocUrl || null}
+            saveState={saveState}
           />
 
           {/* AVISO API KEY */}
@@ -540,9 +549,9 @@ export function ExamEditor({ examId }: Props) {
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Integrated Dicom Image Viewer Sidebar */}
             {showIntegratedViewer && (
-               <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-slate-850 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0">
+               <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-ink-850 bg-ink-950 text-ink-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0">
                 {/* Header */}
-                <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <div className="px-5 py-4 border-b border-ink-800 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-4">
                     {dicomLoading && (
                       <Loader2 size={12} className="animate-spin text-emerald-500" />
@@ -558,7 +567,7 @@ export function ExamEditor({ examId }: Props) {
                               localStorage.setItem('laudus_active_pacs_server', val);
                               setDicomRefreshKey(prev => prev + 1);
                             }}
-                            className="bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg px-2 py-1 focus:outline-none cursor-pointer hover:border-slate-700 transition-colors"
+                            className="bg-ink-900 border border-ink-800 text-ink-300 text-[10px] font-black uppercase tracking-wider rounded-lg px-2 py-1 focus:outline-none cursor-pointer hover:border-ink-700 transition-colors"
                           >
                             <option value="both">Ambos PACS</option>
                             <option value="primary">PACS Principal</option>
@@ -569,7 +578,7 @@ export function ExamEditor({ examId }: Props) {
                               <div 
                                 className={classNames(
                                   "w-1.5 h-1.5 rounded-full",
-                                  pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                                  pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-ink-500 animate-pulse"
                                 )} 
                                 title={`PACS Principal: ${pacsConnected}`} 
                               />
@@ -578,7 +587,7 @@ export function ExamEditor({ examId }: Props) {
                               <div 
                                 className={classNames(
                                   "w-1.5 h-1.5 rounded-full",
-                                  pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                                  pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-ink-500 animate-pulse"
                                 )} 
                                 title={`PACS Backup: ${pacsBackupConnected}`} 
                               />
@@ -590,11 +599,11 @@ export function ExamEditor({ examId }: Props) {
                           <div 
                             className={classNames(
                               "w-2 h-2 rounded-full",
-                              pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
+                              pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-ink-500 animate-pulse"
                             )} 
                             title={`PACS Principal: ${pacsConnected === 'connected' ? 'Online' : pacsConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
                           />
-                          <span className="font-black text-[9px] uppercase tracking-widest text-slate-450">
+                          <span className="font-black text-[9px] uppercase tracking-widest text-ink-450">
                             PACS Principal
                           </span>
                         </div>
@@ -609,7 +618,7 @@ export function ExamEditor({ examId }: Props) {
                           "h-8 px-2.5 rounded-xl flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border",
                           showStudySelector
                             ? "bg-brand-600 text-white border-brand-500"
-                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
+                            : "bg-ink-800 text-ink-300 border-ink-700 hover:bg-ink-700 hover:text-white"
                         )}
                         title="Vários estudos localizados para este paciente"
                       >
@@ -621,7 +630,7 @@ export function ExamEditor({ examId }: Props) {
                       onClick={() => setDicomRefreshKey(prev => prev + 1)}
                       disabled={dicomLoading}
                       className={classNames(
-                        "p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-slate-700",
+                        "p-1.5 rounded-lg hover:bg-ink-800 text-ink-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-ink-700",
                         dicomLoading && "animate-spin"
                       )}
                       title="Atualizar Imagens"
@@ -636,7 +645,7 @@ export function ExamEditor({ examId }: Props) {
                           href={extUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="h-8 px-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-slate-750 hover:border-slate-700 active:scale-95 shadow-sm select-none"
+                          className="h-8 px-2.5 rounded-xl bg-ink-850 hover:bg-ink-800 text-ink-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-ink-750 hover:border-ink-700 active:scale-95 shadow-sm select-none"
                           title="Abrir no Visualizador Orthanc Externo (Stone Viewer, etc.)"
                         >
                           <ExternalLink size={12} className="text-brand-400" />
@@ -654,7 +663,7 @@ export function ExamEditor({ examId }: Props) {
                     </button>
                     <button 
                       onClick={() => setShowIntegratedViewer(false)}
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
+                      className="p-1 rounded-lg hover:bg-ink-800 text-ink-400 hover:text-white transition-all active:scale-95"
                       title="Fechar Visualizador"
                     >
                       <X size={16} />
@@ -664,8 +673,8 @@ export function ExamEditor({ examId }: Props) {
 
                 {/* Candidate Studies Dropdown Selector Panel */}
                 {showStudySelector && candidateStudies.length > 0 && (
-                  <div className="bg-slate-900 border-b border-slate-850 p-4 space-y-2 shrink-0 animate-slide-down">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
+                  <div className="bg-ink-900 border-b border-ink-850 p-4 space-y-2 shrink-0 animate-slide-down">
+                    <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
                     <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
                       {candidateStudies.map((study) => {
                         const date = study.MainDicomTags?.StudyDate || '';
@@ -686,7 +695,7 @@ export function ExamEditor({ examId }: Props) {
                               "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3",
                               isCurrent
                                 ? "bg-emerald-950/30 border-emerald-500/50 text-emerald-300"
-                                : "bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white"
+                                : "bg-ink-950/50 border-ink-800 text-ink-400 hover:border-ink-700 hover:text-white"
                             )}
                           >
                             <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
@@ -714,7 +723,7 @@ export function ExamEditor({ examId }: Props) {
                 )}
 
                 {/* Main Preview Area */}
-                <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-slate-800 bg-slate-900/50">
+                <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-ink-800 bg-ink-900/50">
                   {(() => {
                     const activeInstance = dicomInstances[activeImageIndex];
                     const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
@@ -722,7 +731,7 @@ export function ExamEditor({ examId }: Props) {
                     if (!activeInstance) {
                       return (
                         <div 
-                          className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-slate-650 p-6 text-center"
+                          className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-ink-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-ink-650 p-6 text-center"
                           onWheel={(e) => {
                             if (e.deltaY < 0) {
                               handlePrevImage();
@@ -732,7 +741,7 @@ export function ExamEditor({ examId }: Props) {
                           }}
                         >
                           <Eye size={32} className="opacity-25 mb-2" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Sem Imagem Selecionada</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-ink-500">Sem Imagem Selecionada</span>
                         </div>
                       );
                     }
@@ -757,7 +766,7 @@ export function ExamEditor({ examId }: Props) {
                               handleNextImage();
                             }
                           }}
-                          className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
+                          className="relative aspect-square w-full bg-black rounded-2xl border border-ink-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
                         >
                           <DicomThumbnail 
                             src={previewUrl} 
@@ -779,11 +788,11 @@ export function ExamEditor({ examId }: Props) {
                           >
                             <ChevronRight size={16} />
                           </button>
-                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md animate-fade-in z-20">
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-ink-300 uppercase shadow-md animate-fade-in z-20">
                             FOTO {activeImageIndex + 1} / {dicomInstances.length}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 px-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-ink-400 px-1">
                           <span>Instância: {instanceNum}</span>
                         </div>
                       </div>
@@ -794,9 +803,9 @@ export function ExamEditor({ examId }: Props) {
                 {/* Thumbnails Grid List or Error State */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                   {dicomLoading && dicomInstances.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-center">
+                    <div className="flex flex-col items-center justify-center py-16 text-ink-500 text-center">
                       <Loader2 size={24} className="animate-spin text-brand-500 mb-3" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Buscando Exames no PACS...</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-ink-400">Buscando Exames no PACS...</span>
                     </div>
                   ) : dicomError && dicomInstances.length === 0 ? (
                     <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 flex flex-col items-center text-center gap-2.5 my-4">
@@ -813,10 +822,10 @@ export function ExamEditor({ examId }: Props) {
                       </button>
                     </div>
                   ) : dicomInstances.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-center px-4">
-                      <AlertCircle className="text-slate-500 mb-3" size={24} />
-                      <span className="text-[10px] font-black uppercase tracking-wider block text-slate-300">Nenhum Estudo Selecionado</span>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
+                    <div className="flex flex-col items-center justify-center py-16 text-ink-500 text-center px-4">
+                      <AlertCircle className="text-ink-500 mb-3" size={24} />
+                      <span className="text-[10px] font-black uppercase tracking-wider block text-ink-300">Nenhum Estudo Selecionado</span>
+                      <p className="text-[9px] text-ink-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-2">
@@ -839,7 +848,7 @@ export function ExamEditor({ examId }: Props) {
                               "relative aspect-square bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md",
                               isActive 
                                 ? "border-emerald-500 ring-2 ring-emerald-500/25 scale-[0.98]" 
-                                : "border-slate-800 hover:border-slate-600 hover:scale-[1.02]"
+                                : "border-ink-800 hover:border-ink-600 hover:scale-[1.02]"
                             )}
                           >
                             <DicomThumbnail src={previewUrl} alt={`Instance ${idx + 1}`} />
@@ -879,8 +888,10 @@ export function ExamEditor({ examId }: Props) {
                     : true
                 }
                 status={exam.status}
+                examArea={exam.area || template?.area}
                 hasGoogleDoc={!!exam.googleDocId}
                 onCopy={handleCopy}
+                onShowCalculators={(calcId) => { setCalcModalInitialId(calcId || null); setShowCalculators(true); }}
                 onRefine={() => {
                   if (currentRole === 'recepcao') {
                     showToast('Acesso restrito: Secretárias não utilizam Laud.IA.', 'error');
@@ -908,6 +919,30 @@ export function ExamEditor({ examId }: Props) {
                     : (settings.geminiModel || 'gemini-3.5-flash')
                 }
               />
+
+              {/* ── LAUD.IA Cascade Status Hint ── */}
+              {template && !template.aiInstructions?.trim() && currentRole !== 'recepcao' && (
+                <div className="border-b border-violet-100 bg-violet-50/50 px-4 py-2 shrink-0 flex items-center justify-between gap-3 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <Zap size={12} className="text-violet-400 shrink-0" />
+                    <span className="text-[10px] text-violet-600 font-semibold">
+                      <span className="font-black text-violet-700">LAUD.IA:</span> Cascata ativa com{' '}
+                      {settings.aiAreaPrompts?.[template.area as import('../../types').ExamArea]
+                        ? <span className="text-emerald-600 font-black">Camada 1 + Área customizada</span>
+                        : <span className="text-blue-600 font-black">Camada 1 + Área padrão V2.0</span>
+                      }. Sem instruções específicas para este exame (Camada 3 vazia).
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setView({ name: 'laud-ia' })}
+                    className="text-[10px] font-black text-violet-600 hover:text-violet-800 uppercase tracking-widest whitespace-nowrap flex items-center gap-1 transition-colors"
+                    title="Abrir LAUD.IA para configurar o prompt deste exame"
+                  >
+                    <Sparkles size={10} />
+                    Configurar →
+                  </button>
+                </div>
+              )}
 
               {/* ── Snippet Picker Panel ── */}
               {showSnippets && (
@@ -1048,10 +1083,10 @@ export function ExamEditor({ examId }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 30 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[300] overflow-hidden"
+              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[300] overflow-hidden"
             >
               {/* Premium Header with Mesh-style Gradient */}
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-brand-600/30 via-brand-800/10 to-transparent pointer-events-none" />
                 <div className="absolute top-[-50%] left-[-10%] w-[120%] h-[200%] bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.1),transparent_50%)] animate-pulse pointer-events-none" />
                 
@@ -1061,7 +1096,7 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                   <div>
                     <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copiloto</span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
+                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
                   </div>
                 </div>
                 
@@ -1259,26 +1294,26 @@ export function ExamEditor({ examId }: Props) {
       <AnimatePresence>
         {showEditPatient && patient && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowEditPatient(false)} />
+            <div className="absolute inset-0 bg-ink-900/60 backdrop-blur-sm" onClick={() => setShowEditPatient(false)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl flex flex-col"
             >
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center justify-between p-5 border-b border-ink-100 bg-ink-50/50">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
                     <UserCog size={20} />
                   </div>
                   <div>
-                    <h2 className="text-base font-black text-slate-800 uppercase tracking-tight">Editar Paciente</h2>
-                    <p className="text-xs font-semibold text-slate-500">Atualize os dados cadastrais e clínicos do paciente</p>
+                    <h2 className="text-base font-black text-ink-800 uppercase tracking-tight">Editar Paciente</h2>
+                    <p className="text-xs font-semibold text-ink-500">Atualize os dados cadastrais e clínicos do paciente</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowEditPatient(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-slate-600 border border-slate-200 shadow-sm transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-ink-400 hover:text-ink-600 border border-ink-200 shadow-sm transition-colors"
                 >
                   <X size={16} />
                 </button>

@@ -99,11 +99,11 @@ export function DicomImagesModal({
     <Modal open={open} onClose={onClose} title="Imagens do Exame (Orthanc PACS)" size="lg">
       <div className="space-y-5">
         {/* Info Header */}
-        <div className="flex items-start justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+        <div className="flex items-start justify-between gap-3 bg-ink-50 p-4 rounded-2xl border border-ink-200">
           <div className="flex items-start gap-3">
-            <Camera className="text-slate-500 shrink-0 mt-0.5" size={18} />
-            <div className="text-xs leading-normal font-semibold text-slate-600">
-              Busca direta de imagens no servidor Orthanc local em <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[10px]">{baseUrl}</code>.
+            <Camera className="text-ink-500 shrink-0 mt-0.5" size={18} />
+            <div className="text-xs leading-normal font-semibold text-ink-600">
+              Busca direta de imagens no servidor Orthanc local em <code className="bg-ink-200 px-1 py-0.5 rounded text-ink-800 font-mono text-[10px]">{baseUrl}</code>.
               Selecione as fotos do PACS que deseja incluir na documentação fotográfica impressa.
             </div>
           </div>
@@ -119,7 +119,7 @@ export function DicomImagesModal({
         {loading && (
           <div className="py-12 flex flex-col items-center justify-center gap-3">
             <Loader2 size={32} className="animate-spin text-brand-600" />
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Buscando imagens do exame no PACS...</p>
+            <p className="text-xs text-ink-500 font-bold uppercase tracking-wider">Buscando imagens do exame no PACS...</p>
           </div>
         )}
 
@@ -146,22 +146,22 @@ export function DicomImagesModal({
         {/* Gallery Content */}
         {!loading && !error && instances.length > 0 && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <div className="flex items-center justify-between border-b border-ink-100 pb-3">
+              <span className="text-[10px] font-black text-ink-400 uppercase tracking-widest">
                 {instances.length} imagens carregadas • {selectedIds.size} selecionadas
               </span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleSelectAll}
-                  className="text-[9px] font-bold text-slate-900 hover:text-slate-700 uppercase tracking-wider flex items-center gap-1"
+                  className="text-[9px] font-bold text-ink-900 hover:text-ink-700 uppercase tracking-wider flex items-center gap-1"
                 >
                   <CheckSquare size={12} />
                   Selecionar Tudo
                 </button>
-                <div className="h-3 w-px bg-slate-200" />
+                <div className="h-3 w-px bg-ink-200" />
                 <button
                   onClick={handleClearSelection}
-                  className="text-[9px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider flex items-center gap-1"
+                  className="text-[9px] font-bold text-ink-400 hover:text-ink-600 uppercase tracking-wider flex items-center gap-1"
                 >
                   <Square size={12} />
                   Limpar
@@ -191,7 +191,7 @@ export function DicomImagesModal({
                       "group relative aspect-square rounded-xl border overflow-hidden flex flex-col justify-between bg-black transition-all duration-300",
                       isSelected 
                         ? "border-brand-500 ring-4 ring-brand-500/10 scale-[0.97] shadow-lg shadow-brand-500/5" 
-                        : "border-slate-200 hover:border-slate-400 hover:shadow-md"
+                        : "border-ink-200 hover:border-ink-400 hover:shadow-md"
                     )}
                   >
                     {/* Checkbox Overlay */}
@@ -217,7 +217,7 @@ export function DicomImagesModal({
                     </div>
 
                     {/* Metadata Footer */}
-                    <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 text-left w-full text-[9px] font-bold text-slate-300 border-t border-white/5 z-10">
+                    <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 text-left w-full text-[9px] font-bold text-ink-300 border-t border-white/5 z-10">
                       Foto {idx + 1} {instance.MainDicomTags?.InstanceNumber ? `(Inst. ${instance.MainDicomTags.InstanceNumber})` : ''}
                     </div>
                   </button>
@@ -228,30 +228,31 @@ export function DicomImagesModal({
         )}
 
         {/* Footer Actions */}
-        <div className="flex flex-col gap-4 pt-3 border-t border-slate-100">
+        <div className="flex flex-col gap-4 pt-3 border-t border-ink-100">
           {/* Grid Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider shrink-0">Layout de Impressão:</span>
+            <span className="text-[10px] font-black uppercase text-ink-400 tracking-wider shrink-0">Layout de Impressão:</span>
             <select
               value={gridType}
               onChange={(e) => setGridType(e.target.value)}
-              className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
+              className="flex-1 px-3 py-1.5 rounded-xl border border-ink-200 bg-white text-xs font-bold text-ink-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
             >
+              <option value="1x1">1 Coluna x 1 Linha (1 foto/pág - Cheio)</option>
               <option value="1x2">1 Coluna x 2 Linhas (2 fotos/pág)</option>
-              <option value="2x2">2 Colunas x 2 Linhas (4 fotos/pág)</option>
+              <option value="2x3">2 Colunas x 3 Linhas (6 fotos/pág)</option>
               <option value="2x4">2 Colunas x 4 Linhas (8 fotos/pág)</option>
             </select>
           </div>
 
           <div className="flex items-center gap-3 justify-end">
-            <button type="button" onClick={onClose} className="h-11 px-5 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all font-semibold text-xs">
+            <button type="button" onClick={onClose} className="h-11 px-5 rounded-2xl bg-white border border-ink-200 text-ink-600 hover:bg-ink-50 transition-all font-semibold text-xs">
               Cancelar
             </button>
             <button
               type="button"
               disabled={selectedIds.size === 0 || loading || !!error}
               onClick={handleGeneratePdf}
-              className="h-11 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white shadow-sm flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+              className="h-11 px-6 rounded-2xl bg-ink-900 hover:bg-ink-800 text-white shadow-sm flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
             >
               <Printer size={16} />
               <span className="font-bold text-xs uppercase tracking-widest">

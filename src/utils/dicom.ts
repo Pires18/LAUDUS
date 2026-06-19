@@ -1,4 +1,5 @@
 import { ExamRequest, Patient } from '../types';
+import { logger } from './logger';
 
 /**
  * Envia um exame para a Worklist do Orthanc (Primário e Backup)
@@ -66,7 +67,7 @@ export async function syncExamToOrthancWorklist(
         primarySuccess = result.success;
         if (!result.success) primaryError = result.error;
       } catch (err: any) {
-        console.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', err);
+        logger.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', err);
         primaryError = err.message || 'Erro de conexão';
       }
     } else {
@@ -102,7 +103,7 @@ export async function syncExamToOrthancWorklist(
         const backupResult = await backupRes.json();
         if (!backupResult.success) backupSuccess = false;
       } catch (err) {
-        console.warn('[Orthanc Backup Sync] Falha ao enviar:', err);
+        logger.warn('[Orthanc Backup Sync] Falha ao enviar:', err);
         backupSuccess = false;
       }
     }

@@ -28,7 +28,7 @@ export function StatsBar({ appointments, selectedDate, clinicId }: StatsBarProps
   }, [counts]);
 
   return (
-    <div className="relative bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 rounded-3xl p-5 shadow-lg overflow-hidden flex flex-col md:flex-row items-center justify-between gap-5">
+    <div className="relative bg-gradient-to-br from-ink-900 to-ink-950 text-white border border-ink-800 rounded-3xl p-5 shadow-lg overflow-hidden flex flex-col md:flex-row items-center justify-between gap-5">
       {/* Decorative Glows */}
       <div className="absolute -right-12 -top-12 w-36 h-36 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
       <div className="absolute -left-12 -bottom-12 w-36 h-36 bg-blue-500/10 blur-3xl rounded-full pointer-events-none" />
@@ -39,7 +39,7 @@ export function StatsBar({ appointments, selectedDate, clinicId }: StatsBarProps
           <CalendarDays size={20} />
         </div>
         <div>
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Resumo Diário</h4>
+          <h4 className="text-[10px] font-black text-ink-400 uppercase tracking-widest leading-none">Resumo Diário</h4>
           <span className="text-xs font-black text-white mt-1.5 block capitalize leading-none">{formattedDate}</span>
         </div>
       </div>
@@ -48,11 +48,11 @@ export function StatsBar({ appointments, selectedDate, clinicId }: StatsBarProps
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto flex-1 max-w-3xl z-10">
         {/* Total */}
         <div className="bg-white/5 border border-white/10 p-3 rounded-2xl flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-slate-300">
+          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-ink-300">
             <CalendarDays size={16} />
           </div>
           <div>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block leading-none">Agendados</span>
+            <span className="text-[9px] font-bold text-ink-400 uppercase tracking-wider block leading-none">Agendados</span>
             <span className="text-base font-black text-white mt-1 block leading-none">{counts.total}</span>
           </div>
         </div>

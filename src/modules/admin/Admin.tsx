@@ -17,10 +17,9 @@ import { AdminPlans } from './submodules/AdminPlans';
 import { AdminAudit } from './submodules/AdminAudit';
 import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
-import { AdminLaudIA } from './submodules/AdminLaudIA';
 import { AdminLicenses } from './submodules/AdminLicenses';
 
-type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'laud-ia' | 'licenses';
+type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'licenses';
 
 export function Admin() {
   const { view, setView } = useApp();
@@ -34,7 +33,6 @@ export function Admin() {
     { id: 'audit', label: 'Auditoria', icon: History },
     { id: 'support', label: 'Suporte', icon: LifeBuoy },
     { id: 'masks', label: 'Máscaras', icon: FileSignature },
-    { id: 'laud-ia', label: 'Laud.IA', icon: Sparkles },
   ] as const;
 
   return (
@@ -47,16 +45,14 @@ export function Admin() {
         />
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 bg-white p-1.5 rounded-3xl border border-ink-100 shadow-sm overflow-x-auto scrollbar-hide">
+        <div className="tab-group w-full max-w-full">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={classNames(
-                "flex items-center gap-2.5 px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap",
-                activeTab === tab.id 
-                  ? "bg-ink-900 text-white shadow-lg scale-[1.02]" 
-                  : "text-ink-500 hover:bg-ink-50 hover:text-ink-900"
+                "tab-item",
+                activeTab === tab.id && "tab-item-active"
               )}
             >
               <tab.icon size={16} />
@@ -74,7 +70,6 @@ export function Admin() {
           {activeTab === 'audit' && <AdminAudit />}
           {activeTab === 'support' && <AdminSupport />}
           {activeTab === 'masks' && <AdminMasks />}
-          {activeTab === 'laud-ia' && <AdminLaudIA />}
         </div>
       </div>
     </div>
@@ -151,7 +146,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           <button 
             key={stat.label} 
             onClick={() => onNavigate(stat.tab as AdminTab)}
-            className="bg-white p-6 rounded-[2.5rem] border border-ink-100 shadow-sm hover:shadow-premium hover:border-brand-300 transition-all text-left group"
+            className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm hover:shadow-premium hover:border-brand-300 transition-all text-left group"
           >
             <div className="flex justify-between items-start mb-4">
               <div className={classNames("p-3 rounded-2xl bg-ink-50 transition-colors group-hover:bg-brand-50", stat.color)}>
@@ -169,7 +164,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Broadcast System */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-ink-100 shadow-sm">
+        <div className="bg-white p-8 rounded-3xl border border-ink-100 shadow-sm">
            <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-2">
             <Megaphone size={20} className="text-brand-600" /> Sistema de Broadcast
           </h4>
@@ -209,7 +204,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[2.5rem] border border-ink-100 shadow-sm">
+        <div className="bg-white p-8 rounded-3xl border border-ink-100 shadow-sm">
           <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-2">
             <Sparkles size={20} className="text-brand-600" /> Status LAUD.IA
           </h4>
@@ -237,12 +232,10 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
                  const successRate = totalCalls > 0
                    ? Math.round((successfulCalls.length / totalCalls) * 100) + '%'
                    : '100%';
-                 return `O motor de inteligência está operando normalmente com latência média de ${avgLatency} (taxa de sucesso: ${successRate} nas últimas requisições).`;
+                 return `Motor operando normalmente. Latência média: ${avgLatency} · Taxa de sucesso: ${successRate} nas últimas requisições.`;
                })()}
              </p>
-             <button onClick={() => onNavigate('laud-ia')} className="btn-ghost text-xs font-black text-brand-600 uppercase tracking-widest">
-               Gerenciar IA Command Center →
-             </button>
+             <p className="text-[10px] text-ink-400 font-semibold">Personalizações disponíveis para cada usuário via sidebar → LAUD.IA.</p>
           </div>
         </div>
       </div>

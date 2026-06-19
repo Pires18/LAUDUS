@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
 import { ExamRequest, Patient } from '../../../types';
 import { getStudyInstanceUID } from '../../../utils/dicom';
+import { logger } from '../../../utils/logger';
 
 interface UseDicomSyncProps {
   exam: ExamRequest | undefined;
@@ -45,7 +46,7 @@ const locateStudies = async (
       if (!res.ok) return [];
       return await res.json();
     } catch (err) {
-      console.warn('[locateStudy Query Error]', err);
+      logger.warn('[PACS] Erro na query:', err);
       return [];
     }
   };
@@ -152,7 +153,16 @@ export function useDicomSync({
   const [pacsBackupConnected, setPacsBackupConnected] = useState<'loading' | 'connected' | 'disconnected' | 'disabled'>('loading');
   const [candidateStudies, setCandidateStudies] = useState<any[]>([]);
   const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
-  
+
+  // New: explicit PACS status, active server, and last error
+  const [dicomStatus, setDicomStatus] = useState<'idle' | 'searching' | 'found' | 'not-found' | 'error' | 'connecting-backup'>('idle');
+  const [activeServer, setActiveServer] = useState<'primary' | 'backup' | null>(null);
+  const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
+
+  // Cache: store the last found study result with TTL (5 minutes)
+  const studyCacheRef = useRef<{ studyId: string; serverSource: 'primary' | 'backup'; studyUID?: string; timestamp: number } | null>(null);
+  const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   const selectedStudyIdRef = useRef<string | null>(null);
   const internalChangeSelectedStudy = useCallback((id: string | null) => {
     setSelectedStudyId(id);
@@ -225,7 +235,7 @@ export function useDicomSync({
       setHasDicomImages(taggedInstances.length > 0);
       setDicomError(null);
     } catch (e) {
-      console.warn('[PACS Instances] Falha ao obter instâncias', e);
+      logger.warn('[PACS] Falha ao obter instâncias', e);
     }
   }, [
     settings.dicomViewerUrl,
@@ -276,16 +286,26 @@ export function useDicomSync({
           const proxyPath = getProxyEndpoint(settings, source === 'backup');
           const pingUrl = `${serverBaseUrl.replace(/\/$/, '')}/system`;
           let pingOk = false;
+          let errorMsg: string | null = null;
           try {
             const res = await fetchWithTimeout(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${serverAuth}`);
             pingOk = res.ok;
-          } catch {
+            if (!res.ok) {
+              errorMsg = res.status === 401 || res.status === 403
+                ? 'Autenticação PACS falhou. Verifique usuário/senha.'
+                : `Servidor ${source === 'backup' ? 'backup' : 'primário'} retornou erro ${res.status}.`;
+            }
+          } catch (err: any) {
             pingOk = false;
+            errorMsg = err?.name === 'AbortError'
+              ? `Timeout ao conectar ao PACS ${source === 'backup' ? 'backup' : 'primário'}.`
+              : `Sem conexão com o PACS ${source === 'backup' ? 'backup' : 'primário'}.`;
           }
 
           if (active) {
             if (source === 'primary') setPacsConnected(pingOk ? 'connected' : 'disconnected');
             if (source === 'backup') setPacsBackupConnected(pingOk ? 'connected' : 'disconnected');
+            if (!pingOk && errorMsg && source === 'primary') setLastErrorMessage(errorMsg);
           }
 
           if (!pingOk) return { source, candidates: [], pingOk: false };
@@ -329,10 +349,13 @@ export function useDicomSync({
         }
 
         if (mergedCandidates.length === 0) {
-          if (isManual && active) {
-            setDicomInstances([]);
-            setHasDicomImages(false);
-            setDicomError(`Estudo não localizado nos servidores ativos.`);
+          if (active) {
+            setDicomStatus('not-found');
+            if (isManual) {
+              setDicomInstances([]);
+              setHasDicomImages(false);
+              setDicomError(`Estudo não localizado nos servidores ativos.`);
+            }
           }
           return;
         }
@@ -351,12 +374,31 @@ export function useDicomSync({
         }
 
         if (activeStudy) {
+          // Update active server indicator
+          if (active) {
+            setActiveServer(activeStudy.serverSource as 'primary' | 'backup');
+            setDicomStatus('found');
+          }
+
+          // Update cache
+          studyCacheRef.current = {
+            studyId: activeStudy.ID,
+            serverSource: activeStudy.serverSource,
+            studyUID: activeStudy.MainDicomTags?.StudyInstanceUID,
+            timestamp: Date.now()
+          };
+
           await fetchInstancesForStudy(activeStudy.ID, activeStudy.serverSource, activeStudy.MainDicomTags?.StudyInstanceUID);
         }
       } catch (e: any) {
-        console.warn('[PACS Check] Erro ao checar imagens no Orthanc:', e);
-        if (active && isManual) {
-          setDicomError(e.message || 'Erro de conexão com o servidor local Orthanc.');
+        logger.warn('[PACS] Erro ao checar imagens no Orthanc', e);
+        if (active) {
+          setDicomStatus('error');
+          const errMsg = e.message || 'Erro de conexão com o servidor PACS.';
+          setLastErrorMessage(errMsg);
+          if (isManual) {
+            setDicomError(errMsg);
+          }
         }
       } finally {
         dicomLoadingRef.current = false;
@@ -373,9 +415,17 @@ export function useDicomSync({
       tickCount++;
       const viewerOpen = showIntegratedViewerRef.current || showDicomImagesRef.current;
       const alreadyHasImages = hasDicomImagesRef.current;
-      
-      // Stop aggressive polling if images are already loaded to prevent flickering and scrolling bugs
+
+      // Use cache: if images already found and within TTL, skip searching
+      const cache = studyCacheRef.current;
+      const cacheValid = cache && (Date.now() - cache.timestamp < CACHE_TTL_MS);
+
+      // Stop polling if images already loaded and cache is valid
+      if (alreadyHasImages && cacheValid) return;
+
       if (!alreadyHasImages && (viewerOpen || tickCount % 6 === 0)) {
+        setDicomStatus('searching');
+        setLastErrorMessage(null);
         checkImages(false);
       }
     }, 5000);
@@ -410,6 +460,10 @@ export function useDicomSync({
     hasDicomImages,
     dicomInstances,
     dicomLoading,
-    dicomError
+    dicomError,
+    // New exports
+    dicomStatus,
+    activeServer,
+    lastErrorMessage
   };
 }

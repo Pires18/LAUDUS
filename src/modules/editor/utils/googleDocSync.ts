@@ -1,4 +1,5 @@
 import { updateItem } from '../../../store/db';
+import { logger } from '../../../utils/logger';
 import { Patient, ExamRequest, Clinic, AppSettings } from '../../../types';
 import { copyFile, deleteFile } from '../../../lib/googleDrive';
 import { replaceTextInDoc } from '../../../lib/googleDocs';
@@ -134,7 +135,7 @@ export async function cleanupGoogleDoc(examId: string, docId: string) {
       finalizedAt: deleteField()
     });
   } catch (err) {
-    console.warn('[cleanupGoogleDoc] Erro ao remover arquivo:', err);
+    logger.warn('[cleanupGoogleDoc] Erro ao remover arquivo:', err);
     throw err;
   }
 }

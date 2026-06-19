@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { Modal } from '../../../components/Modal';
 
 interface SystemUser {
   id: string;
@@ -123,7 +124,7 @@ export function AdminUsers() {
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-ink-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-ink-100 bg-ink-50/10 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -187,7 +188,7 @@ export function AdminUsers() {
                         "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all",
                         u.role === 'admin' ? "bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100 shadow-sm" :
                         u.role === 'medico' ? "bg-brand-50 text-brand-700 border-brand-100 hover:bg-brand-100 shadow-sm" :
-                        "bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100 shadow-sm"
+                        "bg-ink-50 text-ink-700 border-ink-100 hover:bg-ink-100 shadow-sm"
                       )}
                     >
                       <Shield size={12} />
@@ -243,11 +244,15 @@ export function AdminUsers() {
 
 
       {/* Role Change Modal */}
-      {roleChangeTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl border border-ink-100">
-            <h4 className="text-xl font-black text-ink-900 mb-2">Alterar Permissão</h4>
-            <p className="text-sm text-ink-500 mb-8">Defina o novo nível de acesso para <strong>{roleChangeTarget.name}</strong>.</p>
+      <Modal
+        open={roleChangeTarget !== null}
+        onClose={() => setRoleChangeTarget(null)}
+        title="Alterar Permissão"
+        size="sm"
+      >
+        {roleChangeTarget && (
+          <div className="space-y-6">
+            <p className="text-sm text-ink-500">Defina o novo nível de acesso para <strong>{roleChangeTarget.name}</strong>.</p>
             
             <div className="space-y-3">
               {(['admin', 'medico', 'recepcao'] as UserRole[]).map(role => (
@@ -255,7 +260,7 @@ export function AdminUsers() {
                   key={role}
                   onClick={() => handleRoleChange(role)}
                   className={classNames(
-                    "w-full p-5 rounded-[1.5rem] border-2 text-left transition-all flex items-center justify-between group",
+                    "w-full p-4 rounded-2xl border-2 text-left transition-all flex items-center justify-between group",
                     roleChangeTarget.role === role 
                       ? "border-brand-500 bg-brand-50 shadow-sm" 
                       : "border-ink-50 hover:border-brand-200 hover:bg-ink-50"
@@ -275,16 +280,9 @@ export function AdminUsers() {
                 </button>
               ))}
             </div>
-            
-            <button 
-              onClick={() => setRoleChangeTarget(null)}
-              className="w-full mt-6 py-4 rounded-2xl text-ink-400 font-black uppercase tracking-widest text-[10px] hover:bg-ink-50 transition-all"
-            >
-              Cancelar
-            </button>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Status Toggle Modal */}
       <ConfirmDialog

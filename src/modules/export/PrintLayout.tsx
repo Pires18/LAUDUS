@@ -30,7 +30,7 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
             {!clinic?.logoUrl ? (
               <h1 className="text-2xl font-bold uppercase">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
             ) : (
-              <h2 className="text-lg font-bold uppercase text-slate-800 leading-tight">{clinic?.name || settings.clinicName}</h2>
+              <h2 className="text-lg font-bold uppercase text-ink-800 leading-tight">{clinic?.name || settings.clinicName}</h2>
             )}
             <p className="text-xs text-gray-600 mt-1.5 max-w-sm whitespace-pre-wrap">
               {clinic?.address ? (typeof clinic.address === 'string' ? clinic.address : [clinic.address.street, clinic.address.number, clinic.address.city, clinic.address.state].filter(Boolean).join(', ')) : settings.clinicAddress}

@@ -1,8 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
-import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE } from './prompts';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
 import { logAiUsage } from '../../store/db';
+import { logger } from '../../utils/logger';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
@@ -68,16 +69,33 @@ export interface CallMetrics {
   success: boolean;
   scratchpad?: string;
   modelName?: string;
+  promptHash?: string;
+}
+
+function hashPrompt(built: BuiltPrompt): string {
+  const content = built.universalContext.slice(0, 500) + built.areaContext.slice(0, 200);
+  let h = 5381;
+  for (let i = 0; i < content.length; i++) {
+    h = ((h << 5) + h) ^ content.charCodeAt(i);
+    h = h >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
 }
 
 let lastCallMetrics: CallMetrics | null = null;
 export const callMetricsHistory: CallMetrics[] = [];
 
 const PRICING: Record<string, { input: number, output: number }> = {
-  'claude-3-5-sonnet-latest': { input: 3.0, output: 15.0 },
-  'claude-3-7-sonnet-latest': { input: 3.0, output: 15.0 },
-  'gemini-3.5-flash': { input: 0.075, output: 0.30 },
-  'gemini-3.1-pro-preview': { input: 1.25, output: 5.0 },
+  // Anthropic
+  'claude-3-5-sonnet-latest':    { input: 3.0,   output: 15.0  },
+  'claude-3-7-sonnet-latest':    { input: 3.0,   output: 15.0  },
+  'claude-opus-4-5':             { input: 15.0,  output: 75.0  },
+  'claude-3-haiku-20240307':     { input: 0.25,  output: 1.25  },
+  // Gemini
+  'gemini-3.5-flash':            { input: 0.075, output: 0.30  },
+  'gemini-3.1-pro-preview':      { input: 1.25,  output: 5.0   },
+  'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
+  'gemini-2.5-pro-preview-06-05':   { input: 1.25, output: 10.0 },
 };
 
 function recordMetrics(m: CallMetrics) {
@@ -97,7 +115,8 @@ function recordMetrics(m: CallMetrics) {
       inputTokens: m.estimatedInputTokens,
       outputTokens: m.estimatedOutputTokens,
       costUsd,
-      area: m.area
+      area: m.area,
+      promptHash: m.promptHash
     }).catch(() => {});
   }
 }
@@ -130,8 +149,20 @@ function getMaxTokens(area: string): number {
   return MAX_TOKENS_BY_AREA[area as ExamArea] ?? 8192;
 }
 
-function getModeTemperature(mode: string, override?: number): number {
+/**
+ * Retorna temperatura adaptativa por modo.
+ * Prioridade: settings.aiTemperatureByMode[mode] → override legado → default hardcoded
+ */
+function getModeTemperature(mode: string, override?: number, settings?: AppSettings): number {
+  // 1. Override explícito (legado, vindo direto como número)
   if (override !== undefined && override >= 0 && override <= 1) return override;
+  // 2. Configuração por modo nas settings (novo)
+  const byMode = settings?.aiTemperatureByMode;
+  if (byMode) {
+    const configured = byMode[mode as keyof typeof byMode];
+    if (configured !== undefined && configured >= 0 && configured <= 1) return configured;
+  }
+  // 3. Default hardcoded
   return TEMPERATURE_BY_MODE[mode] ?? 0.3;
 }
 
@@ -249,24 +280,43 @@ function buildUniversalContext(settings: AppSettings): string {
   return parts.join('\n\n');
 }
 
+/**
+ * buildSpecificContext — monta o contexto de Camada 2 (Área) + Camada 3 (Exame).
+ *
+ * Prioridade da diretriz de área:
+ *   1. Diretriz customizada do usuário (settings.aiAreaPrompts[area])
+ *   2. Diretriz padrão do sistema (DEFAULT_AREA_PROMPTS[area])
+ *   3. Sem diretriz de área (se a área não tiver padrão definido)
+ *
+ * Após a diretriz de área, injeta as INSTRUÇÕES ESPECÍFICAS DO EXAME (template.aiInstructions).
+ */
 function buildSpecificContext(
   template?: ReportTemplate | null,
   settings?: AppSettings,
   fallbackArea?: string
 ): string {
   const area = template?.area || fallbackArea;
-  const areaPrompt = area && settings?.aiAreaPrompts?.[area as ExamArea];
-  
+
+  // Camada 2 — Diretriz de Área: customizada > padrão > vazia
+  const customAreaPrompt = area && settings?.aiAreaPrompts?.[area as ExamArea];
+  const defaultAreaPrompt = area && DEFAULT_AREA_PROMPTS[area];
+  const areaPrompt = (customAreaPrompt && customAreaPrompt.trim())
+    ? customAreaPrompt.trim()
+    : (defaultAreaPrompt && defaultAreaPrompt.trim())
+      ? defaultAreaPrompt.trim()
+      : null;
+
   const parts: string[] = [];
-  
-  if (areaPrompt && areaPrompt.trim()) {
-    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt.trim()}`);
+
+  if (areaPrompt && area) {
+    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt}`);
   }
-  
+
+  // Camada 3 — Instruções Específicas do Exame
   if (template?.aiInstructions && template.aiInstructions.trim()) {
     parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions.trim()}`);
   }
-  
+
   return parts.join('\n\n');
 }
 
@@ -461,7 +511,7 @@ Retorne APENAS um objeto JSON.`;
       }
     );
   } catch (error) {
-    console.error('Erro na extração de dados da calculadora:', error);
+    logger.error('Erro na extração de dados da calculadora', error);
     throw error;
   }
 }
@@ -526,6 +576,8 @@ function buildRefinePrompt({
 }: RefineParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template, settings);
+  // Respeita regras de refinamento customizadas no settings
+  const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"`
@@ -554,7 +606,7 @@ INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
 ═══════════════════════════════════════════════════════════════
 ${contextMessage}
 
-${DEFAULT_REFINEMENT_GOLDEN_RULES}
+${refinementRules}
 
 Gere agora o laudo REFINADO completo em HTML puro. 
 NOVA REGRA ABSOLUTA DE FORMATO:
@@ -575,12 +627,13 @@ function buildCopilotPrompt({
   patientPreviousExams = [],
   template,
 }: CopilotParams): BuiltPrompt {
-  const copilotModeOverride = DEFAULT_COPILOT_OVERRIDE;
+  // Respeita override customizado no settings, com fallback para o default do sistema
+  const copilotModeOverride = settings.aiCopilotOverride || DEFAULT_COPILOT_OVERRIDE;
+  const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template, settings, exam.area) + copilotModeOverride;
 
-  const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
@@ -599,7 +652,7 @@ function buildCopilotPrompt({
     examDateMs: exam.createdAt,
   });
 
-  const userMessage = `${DEFAULT_REFINEMENT_GOLDEN_RULES}
+  const userMessage = `${refinementRules}
 
 ═══════════════════════════════════════════════════════════════
 INPUT CLÍNICO:
@@ -614,12 +667,16 @@ ${contextMessage}`;
 export function resolveGeminiModel(rawModel: string | undefined): string {
   if (!rawModel) return 'gemini-3.5-flash';
   const raw = rawModel.toLowerCase();
-  
+
+  // Gemini 2.5 series (new)
+  if (raw.includes('2.5') && raw.includes('pro')) return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('2.5')) return 'gemini-2.5-flash-preview-05-20';
+  // Gemini 3.x series (legacy aliases)
   if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro-preview';
   if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
   if (raw.includes('pro')) return 'gemini-3.1-pro-preview';
-  
-  // Default de máxima segurança
+
   return 'gemini-3.5-flash';
 }
 
@@ -642,7 +699,8 @@ const helpers = {
 
 export { getAnthropicBaseUrl };
 
-// stream deleted
+// Exportar builders internos para uso no Playground com streaming real
+export { buildRefinePrompt, buildCopilotPrompt };
 
 // ─── Detecção de modo e área ─────────────────────────────────────────────────
 
@@ -697,7 +755,8 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       timestamp: Date.now(),
       success: true,
       scratchpad,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
     return text;
   } catch (err) {
@@ -712,7 +771,8 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: false,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
     throw err;
   }
@@ -755,7 +815,8 @@ export async function generateReportStream(
       timestamp: Date.now(),
       success: true,
       scratchpad,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
     return text;
   } catch (err) {
@@ -770,7 +831,8 @@ export async function generateReportStream(
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: false,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
     throw err;
   }

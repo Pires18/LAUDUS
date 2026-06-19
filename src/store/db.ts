@@ -24,6 +24,8 @@ import {
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../modules/ai/prompts/general';
+import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
+import { logger } from '../utils/logger';
 
 // Cache global para evitar múltiplas queries do UID do administrador
 let cachedAdminUid: string | null = null;
@@ -108,14 +110,14 @@ export async function getSettings(): Promise<AppSettings> {
     const snap = await getDoc(docRef);
     const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
     
-    let defaultSettings: AppSettings = { 
+    let defaultSettings: AppSettings = {
       geminiModel: 'gemini-3.5-flash',
-      aiProvider: 'anthropic', 
+      aiProvider: 'anthropic',
       anthropicModel: 'claude-3-5-sonnet-latest',
       dicomSyncEnabled: true,
-      dicomWorklistFolder: isWindows 
-        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-        : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
+      dicomWorklistFolder: isWindows
+        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+        : '',
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
       dicomOrthancAETitle: '',
@@ -170,34 +172,14 @@ export async function getSettings(): Promise<AppSettings> {
       migrated = true;
     }
 
-    // Forçar migração para o novo padrão Tailscale solicitado pelo usuário
-    if (auth.currentUser?.email === 'matheuskpires@gmail.com') {
-      if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8043') {
-      data.dicomViewerUrl = 'http://100.93.111.95:8042';
-      data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net:10443';
-      data.dicomOrthancAETitle = 'ORTHANCPACS';
-      data.dicomWorklistFolder = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-      data.dicomBackupSyncEnabled = true;
-      data.dicomBackupViewerUrl = 'http://100.124.187.11:8043';
-      data.dicomBackupLocalAgentUrl = 'https://servidor-notebook.tail861dda.ts.net:10443';
-      data.dicomBackupOrthancAETitle = 'ORTHANCBACKUP';
-      data.dicomBackupWorklistFolder = 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\';
-      data.dicomUsername = 'admin';
-      data.dicomPassword = '123456789';
-      data.dicomBackupUsername = 'admin';
-      data.dicomBackupPassword = '123456789';
-      migrated = true;
-      }
-    }
-
     if (migrated && snap.exists()) {
-      saveSettings(data).catch(err => console.warn('[DB] Falha ao persistir migração de settings:', err));
+      saveSettings(data).catch(err => logger.warn('[DB] Falha ao persistir migração de settings:', err));
     }
 
     // Se o preset for modificado localmente, a configuração persistirá sem ser sobrescrita.
     
     // Fallback de segurança para buscar prompts oficiais do administrador
-    if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+    if (auth.currentUser?.email !== ADMIN_EMAIL) {
       const adminSettings = await getAdminSettings();
       if (adminSettings) {
         const merged = {
@@ -234,17 +216,17 @@ export async function getSettings(): Promise<AppSettings> {
     }
     return finalData;
   } catch (err) {
-    console.warn('[DB] Erro ao carregar settings:', err);
+    logger.warn('[DB] Erro ao carregar settings:', err);
   }
   const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
-  return { 
+  return {
     geminiModel: 'gemini-3.5-flash',
-    aiProvider: 'anthropic', 
+    aiProvider: 'anthropic',
     anthropicModel: 'claude-3-5-sonnet-latest',
     dicomSyncEnabled: true,
-    dicomWorklistFolder: isWindows 
-      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-      : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
+    dicomWorklistFolder: isWindows
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+      : '',
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
     dicomOrthancAETitle: '',
@@ -273,7 +255,7 @@ export async function getSettings(): Promise<AppSettings> {
 export async function getAdminSettings(): Promise<AppSettings | null> {
   try {
     if (!cachedAdminUid) {
-      cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
+      cachedAdminUid = ADMIN_UID;
     }
     if (cachedAdminUid) {
       const adminDocRef = doc(firestore, `users/${cachedAdminUid}/settings`, SETTINGS_DOC_ID);
@@ -287,7 +269,7 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
       }
     }
   } catch (e) {
-    console.warn('[DB] Erro ao carregar settings do administrador:', e);
+    logger.warn('[DB] Erro ao carregar settings do administrador:', e);
   }
   return null;
 }
@@ -334,7 +316,7 @@ export async function addItemWithId<T extends Record<string, unknown>>(
         });
       }
     } catch (err) {
-      console.warn('[DB] Erro ao salvar versão do template no setDoc:', err);
+      logger.warn('[DB] Erro ao salvar versão do template no setDoc:', err);
     }
   }
 
@@ -379,7 +361,7 @@ export async function updateItem(
         });
       }
     } catch (err) {
-      console.warn('[DB] Erro ao salvar versão do template:', err);
+      logger.warn('[DB] Erro ao salvar versão do template:', err);
     }
   }
 
@@ -428,11 +410,10 @@ export async function getItem<T>(
   }
 
   // Fallback de segurança para buscar templates oficiais do administrador/sistema
-  if (collectionName === 'templates' && auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+  if (collectionName === 'templates' && auth.currentUser?.email !== ADMIN_EMAIL) {
     try {
-      // 1. Usa o UID hardcoded do administrador matheuskpires@gmail.com
       if (!cachedAdminUid) {
-        cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
+        cachedAdminUid = ADMIN_UID;
       }
 
       // 2. Tenta carregar o template na coleção do administrador
@@ -440,11 +421,11 @@ export async function getItem<T>(
         const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, id);
         const adminSnap = await getDoc(adminDocRef);
         if (adminSnap.exists()) {
-          return { id: adminSnap.id, ...adminSnap.data(), isSystem: true } as any;
+          return { id: adminSnap.id, ...adminSnap.data(), isSystem: true } as unknown as T & { id: string };
         }
       }
     } catch (e) {
-      console.warn('[DB] Erro no fallback de template do administrador:', e);
+      logger.warn('[DB] Erro no fallback de template do administrador:', e);
     }
   }
 
@@ -513,20 +494,28 @@ const EXAM_AREAS_SET = new Set([
  * Busca os últimos laudos finalizados do mesmo template ou especialidade (área) para contexto da IA.
  * Garante o escopo multi-tenant do usuário autenticado.
  */
+interface ExamDoc {
+  id: string;
+  area?: string;
+  templateId?: string;
+  reportContent?: string;
+  status?: string;
+  finalizedAt?: number;
+  createdAt?: number;
+}
+
 export async function getRecentFinalizedReports(templateIdOrArea: string, limitCount: number = 3): Promise<string[]> {
   try {
     const isArea = EXAM_AREAS_SET.has(templateIdOrArea);
 
-    // Fetch all finalized exams for this user.
-    // Filtering by status == 'finalizado' is simple equality and doesn't require composite indexes.
     const q = query(
       getCollectionRef('exams'),
       where('status', '==', 'finalizado')
     );
     const snap = await getDocs(q);
-    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ExamDoc));
 
-    let filtered: any[] = [];
+    let filtered: ExamDoc[] = [];
 
     if (isArea) {
       // If templateIdOrArea is an area, filter by area.
@@ -540,7 +529,7 @@ export async function getRecentFinalizedReports(templateIdOrArea: string, limitC
       // If we don't have enough matches for this template, fallback to the same area/specialty
       if (filtered.length < limitCount) {
         // Find the area of the active template
-        const template = await getItem<any>('templates', templateIdOrArea);
+        const template = await getItem<{ area?: string }>('templates', templateIdOrArea);
         const area = template?.area;
         if (area) {
           const areaFallback = docs.filter(d => d.area === area && d.templateId !== templateIdOrArea);
@@ -553,9 +542,9 @@ export async function getRecentFinalizedReports(templateIdOrArea: string, limitC
     return filtered
       .slice(0, limitCount)
       .map(doc => doc.reportContent)
-      .filter(Boolean);
+      .filter((c): c is string => Boolean(c));
   } catch (err) {
-    console.error('Erro ao buscar laudos recentes:', err);
+    logger.error('Erro ao buscar laudos recentes', err);
     return [];
   }
 }
@@ -573,9 +562,8 @@ export async function getPatientPreviousExams(patientId: string, area: string, c
       where('status', '==', 'finalizado')
     );
     const snap = await getDocs(q);
-    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-    
-    // Filtra pela mesma área e exclui o exame atual
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ExamDoc));
+
     const filtered = docs.filter(d => d.area === area && d.id !== currentExamId);
     
     // Ordena do mais recente para o mais antigo
@@ -584,12 +572,12 @@ export async function getPatientPreviousExams(patientId: string, area: string, c
     return filtered
       .slice(0, limitCount)
       .map(doc => {
-        const dateStr = new Date(doc.finalizedAt || doc.createdAt).toLocaleDateString('pt-BR');
+        const dateStr = new Date(doc.finalizedAt ?? doc.createdAt ?? 0).toLocaleDateString('pt-BR');
         return `[EXAME DE ${dateStr}]\n${doc.reportContent}`;
       })
       .filter(Boolean);
   } catch (err) {
-    console.error('Erro ao buscar histórico clínico do paciente:', err);
+    logger.error('Erro ao buscar histórico clínico do paciente', err);
     return [];
   }
 }
@@ -624,7 +612,7 @@ export async function saveVersionSnapshot(
       updatedAt: Date.now()
     });
   } catch (err) {
-    console.error('[DB] Erro ao salvar snapshot de versão do laudo:', err);
+    logger.error('[DB] Erro ao salvar snapshot de versão do laudo', err);
   }
 }
 
@@ -649,7 +637,7 @@ export async function addAuditLog(log: {
       timestamp: Date.now()
     }));
   } catch (err) {
-    console.error('[DB] Erro ao gravar log de auditoria:', err);
+    logger.error('[DB] Erro ao gravar log de auditoria', err);
   }
 }
 
@@ -812,7 +800,7 @@ export async function checkUserLicenseStatus(uid: string): Promise<{
     if (!snap.exists()) return null;
 
     const data = snap.data();
-    if (data.email === 'matheuskpires@gmail.com') {
+    if (ADMIN_EMAIL && data.email === ADMIN_EMAIL) {
       // Super Admin bypass
       return { active: true, expired: false };
     }
@@ -837,7 +825,7 @@ export async function checkUserLicenseStatus(uid: string): Promise<{
       licensePlanName: data.licensePlanName
     };
   } catch (err) {
-    console.error('[License] Erro ao validar licença do usuário:', err);
+    logger.error('[License] Erro ao validar licença do usuário', err);
     return null;
   }
 }
@@ -923,7 +911,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
       localAgentUrl: settings.dicomLocalAgentUrl
     })
   }).catch((err) => {
-    console.warn('[Orthanc Worklist] Falha ao remover entrada primária:', err);
+    logger.warn('[Orthanc Worklist] Falha ao remover entrada primária:', err);
   });
 
   // ── Backup (se configurado) ──
@@ -942,7 +930,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
         localAgentUrl: settings.dicomBackupLocalAgentUrl
       })
     }).catch((err) => {
-      console.warn('[Orthanc Worklist Backup] Falha ao remover entrada de backup:', err);
+      logger.warn('[Orthanc Worklist Backup] Falha ao remover entrada de backup:', err);
     });
   }
 
@@ -963,6 +951,7 @@ export interface AiUsageLog {
   outputTokens: number;
   costUsd: number;
   area: string;
+  promptHash?: string;
 }
 
 export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Promise<void> {
@@ -973,7 +962,7 @@ export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Pr
       timestamp: Date.now()
     }));
   } catch (err) {
-    console.error('[DB] Erro ao gravar uso de IA:', err);
+    logger.error('[DB] Erro ao gravar uso de IA', err);
   }
 }
 
@@ -988,7 +977,7 @@ export async function getAiUsageStats(startDateMs: number, endDateMs: number): P
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as AiUsageLog));
   } catch (err) {
-    console.error('[DB] Erro ao buscar estatísticas de IA:', err);
+    logger.error('[DB] Erro ao buscar estatísticas de IA', err);
     return [];
   }
 }

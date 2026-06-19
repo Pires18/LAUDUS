@@ -50,7 +50,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: P
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: 'spring', duration: 0.4, bounce: 0.2 }}
-            className={`card w-full ${sizeClass} max-h-[90vh] flex flex-col shadow-premium relative z-10 overflow-hidden`}
+            className={`card w-full ${sizeClass} modal-mobile-sheet max-h-[90dvh] md:max-h-[90vh] flex flex-col shadow-premium relative z-10 overflow-hidden`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

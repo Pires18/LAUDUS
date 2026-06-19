@@ -129,8 +129,8 @@ function localOrthancWorklistPlugin() {
                 // Determine output directory based on environment variables or OS fallback
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-                
+                  : '';
+
                 payload.outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
                 
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
@@ -178,7 +178,7 @@ function localOrthancWorklistPlugin() {
                 }
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
+                  : '';
                 let outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
                   outputDir = '/app/pacs-worklist/';
@@ -343,6 +343,31 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Firebase separado (maior vendor)
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          // React core
+          'vendor-react': ['react', 'react-dom'],
+          // UI libs
+          'vendor-ui': ['framer-motion', 'lucide-react'],
+          // Editor Tiptap (ProseMirror = pesado)
+          'vendor-editor': [
+            '@tiptap/react',
+            '@tiptap/starter-kit',
+            '@tiptap/extension-text-align',
+            '@tiptap/extension-underline',
+          ],
+          // IA Gemini SDK
+          'vendor-ai': ['@google/generative-ai'],
+          // Exportação DOCX
+          'vendor-export': ['docx', 'file-saver'],
+        },
+      },
     },
   },
   server: {

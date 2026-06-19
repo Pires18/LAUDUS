@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send, ClipboardPaste, Wand2, Loader2 } from 'lucide-react';
+import { logger } from '../../utils/logger';
 import { CALCULATORS } from './registry';
 
 import { ExamArea } from '../../types';
@@ -124,7 +125,7 @@ interface Props {
         setUpdateKey(prev => prev + 1); // Força o remount do componente para ler o novo value
       }
     } catch (err) {
-      console.error(err);
+      logger.error('Erro ao extrair dados do laudo para calculadora:', err);
       alert('Não foi possível extrair dados do laudo.');
     } finally {
       setIsExtracting(false);
@@ -138,7 +139,7 @@ interface Props {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/65 backdrop-blur-md lg:hidden z-[410]"
+        className="fixed inset-0 bg-ink-900/65 backdrop-blur-md lg:hidden z-[410]"
       />
 
       <motion.div
@@ -146,10 +147,10 @@ interface Props {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 30 }}
         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[420] overflow-hidden"
+        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[420] overflow-hidden"
       >
         {/* ── Header ─────────────────────────────────────────────── */}
-        <div className="relative h-16 shrink-0 overflow-hidden bg-slate-900 border-b border-slate-800">
+        <div className="relative h-16 shrink-0 overflow-hidden bg-ink-900 border-b border-ink-800">
           <div className="absolute inset-0 bg-gradient-to-br from-brand-600/30 via-brand-900/20 to-transparent" />
           <div className="absolute top-[-50%] left-[-10%] w-[120%] h-[200%] bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.15),transparent_50%),radial-gradient(circle_at_70%_70%,rgba(37,99,235,0.15),transparent_50%)] animate-pulse" />
 
@@ -162,7 +163,7 @@ interface Props {
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-black text-white tracking-tight uppercase">Módulos Clínicos</h2>
                 </div>
-                <p className="text-[9px] text-slate-300 font-medium tracking-[0.1em] opacity-80">Assistência Computacional e Rastreamento</p>
+                <p className="text-[9px] text-ink-300 font-medium tracking-[0.1em] opacity-80">Assistência Computacional e Rastreamento</p>
               </div>
             </div>
 
@@ -178,8 +179,8 @@ interface Props {
         <div className="flex-1 flex min-h-0 relative">
           {/* ── Lista de Calculadoras ───────────────────────────── */}
           {!selectedCalcId ? (
-            <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50">
-              <div className="px-5 py-3 bg-white border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
+            <div className="flex-1 flex flex-col min-h-0 bg-ink-50/50">
+              <div className="px-5 py-3 bg-white border-b border-ink-100 flex items-center justify-between gap-3 shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
                     <Filter size={14} className="text-brand-600" />
@@ -188,7 +189,7 @@ interface Props {
                     <span
                       className={classNames(
                         'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-2',
-                        !showAll ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-500/20' : 'bg-slate-100 text-slate-400 border-slate-100'
+                        !showAll ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-500/20' : 'bg-ink-100 text-ink-400 border-ink-100'
                       )}
                       onClick={() => setShowAll(false)}
                     >
@@ -197,7 +198,7 @@ interface Props {
                     <span
                       className={classNames(
                         'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-2',
-                        showAll ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-500/20' : 'bg-slate-100 text-slate-400 border-slate-100'
+                        showAll ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-500/20' : 'bg-ink-100 text-ink-400 border-ink-100'
                       )}
                       onClick={() => setShowAll(true)}
                     >
@@ -213,15 +214,15 @@ interface Props {
                     whileHover={{ y: -2 }}
                     key={calc.id}
                     onClick={() => handleSelectCalc(calc.id)}
-                    className="group flex flex-col text-left p-4 rounded-2xl border border-slate-100 bg-white hover:border-brand-500 hover:shadow-md hover:shadow-brand-500/5 transition-all relative overflow-hidden shadow-sm"
+                    className="group flex flex-col text-left p-4 rounded-2xl border border-ink-100 bg-white hover:border-brand-500 hover:shadow-md hover:shadow-brand-500/5 transition-all relative overflow-hidden shadow-sm"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all shadow-inner border border-slate-100 shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-ink-50 text-ink-500 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all shadow-inner border border-ink-100 shrink-0">
                         <AreaIcon area={showAll ? calc.areas[0] : (area || calc.areas[0])} size={20} />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-black text-slate-800 text-xs mb-1 group-hover:text-brand-700 transition-colors uppercase tracking-tight">{calc.name}</h4>
-                        <p className="text-[10px] text-slate-500 font-semibold line-clamp-2">{calc.description}</p>
+                        <h4 className="font-black text-ink-800 text-xs mb-1 group-hover:text-brand-700 transition-colors uppercase tracking-tight">{calc.name}</h4>
+                        <p className="text-[10px] text-ink-500 font-semibold line-clamp-2">{calc.description}</p>
                       </div>
                     </div>
                   </motion.button>
@@ -230,9 +231,9 @@ interface Props {
             </div>
           ) : (
             /* ── Calculadora Aberta ──────────────────────────────── */
-            <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50">
+            <div className="flex-1 flex flex-col min-h-0 bg-ink-50/50">
               {/* Back Bar */}
-              <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center gap-3 shrink-0">
+              <div className="px-4 py-3 bg-white border-b border-ink-100 flex items-center gap-3 shrink-0">
                 <button
                   onClick={() => handleSelectCalc(null)}
                   className="flex items-center justify-center w-8 h-8 rounded-lg text-brand-600 bg-brand-50 hover:bg-brand-100 transition-colors"
@@ -241,18 +242,18 @@ interface Props {
                 </button>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)] shrink-0" />
-                  <span className="text-[11px] font-black text-slate-800 uppercase tracking-widest truncate">{selectedCalc?.name}</span>
+                  <span className="text-[11px] font-black text-ink-800 uppercase tracking-widest truncate">{selectedCalc?.name}</span>
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="flex bg-slate-50 border-b border-slate-100 p-1.5 shrink-0 gap-1.5">
+              <div className="flex bg-ink-50 border-b border-ink-100 p-1.5 shrink-0 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setActiveTab('params')}
                   className={classNames(
                     'flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2',
-                    activeTab === 'params' ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'
+                    activeTab === 'params' ? 'bg-white text-ink-800 shadow-sm border border-ink-100' : 'text-ink-400 hover:text-ink-600'
                   )}
                 >
                   <Calculator size={14} className={activeTab === 'params' ? 'text-brand-600' : ''} />
@@ -263,7 +264,7 @@ interface Props {
                   onClick={() => setActiveTab('result')}
                   className={classNames(
                     'flex-1 py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 relative',
-                    activeTab === 'result' ? 'bg-white text-slate-800 shadow-sm border border-slate-100' : 'text-slate-400 hover:text-slate-600'
+                    activeTab === 'result' ? 'bg-white text-ink-800 shadow-sm border border-ink-100' : 'text-ink-400 hover:text-ink-600'
                   )}
                 >
                   <Activity size={14} className={activeTab === 'result' ? 'text-brand-600' : ''} />
@@ -304,7 +305,7 @@ interface Props {
                     </button>
                   )}
 
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                  <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-4">
                     {selectedCalc && (
                       <>
                         <selectedCalc.component
@@ -314,7 +315,7 @@ interface Props {
                           examDateMs={examDateMs}
                         />
                         {selectedCalc.reference && (
-                          <div className="mt-4 pt-4 border-t border-slate-100">
+                          <div className="mt-4 pt-4 border-t border-ink-100">
                             <CalculatorReference
                               text={selectedCalc.reference.text}
                               link={selectedCalc.reference.link}
@@ -328,7 +329,7 @@ interface Props {
 
                 {/* Result Panel */}
                 <div className={classNames(
-                  'w-full flex-1 flex flex-col shrink-0 min-h-0 bg-slate-50',
+                  'w-full flex-1 flex flex-col shrink-0 min-h-0 bg-ink-50',
                   activeTab === 'result' ? 'flex' : 'hidden'
                 )}>
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -359,15 +360,15 @@ interface Props {
 
                           {/* Metrics Grid */}
                           {Object.keys(calcResult).filter(k => !k.startsWith('_') && typeof calcResult[k] !== 'object' && calcResult[k] !== '').length > 0 && (
-                            <div className="space-y-2 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Métricas Detalhadas</p>
+                            <div className="space-y-2 bg-white rounded-2xl p-4 border border-ink-100 shadow-sm">
+                              <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Métricas Detalhadas</p>
                               <div className="grid grid-cols-1 gap-1.5">
                                 {Object.entries(calcResult)
                                   .filter(([k, v]) => !k.startsWith('_') && typeof v !== 'object' && v !== '')
                                   .map(([k, v]) => (
-                                    <div key={k} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-tight">{k}</span>
-                                      <span className="text-[10px] font-black text-slate-800 tabular-nums">{String(v)}</span>
+                                    <div key={k} className="flex items-center justify-between py-2 border-b border-ink-50 last:border-0">
+                                      <span className="text-[10px] font-black text-ink-500 uppercase tracking-tight">{k}</span>
+                                      <span className="text-[10px] font-black text-ink-800 tabular-nums">{String(v)}</span>
                                     </div>
                                   ))}
                               </div>
@@ -381,10 +382,10 @@ interface Props {
                           animate={{ opacity: 1 }}
                           className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-40 py-10"
                         >
-                          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shadow-inner border border-slate-200">
+                          <div className="w-12 h-12 rounded-full bg-ink-100 flex items-center justify-center text-ink-400 shadow-inner border border-ink-200">
                             <Zap className="w-6 h-6" />
                           </div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase leading-relaxed max-w-[180px]">
+                          <p className="text-[10px] font-black text-ink-400 uppercase leading-relaxed max-w-[180px]">
                             Preencha os dados do módulo para gerar a conclusão técnica.
                           </p>
                         </motion.div>
@@ -393,7 +394,7 @@ interface Props {
                   </div>
 
                   {/* ── Action Buttons ─────────────────────────────── */}
-                  <div className="p-4 pb-8 sm:pb-4 border-t border-slate-100 bg-white shrink-0 space-y-2.5 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                  <div className="p-4 pb-8 sm:pb-4 border-t border-ink-100 bg-white shrink-0 space-y-2.5 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                     {/* Row 1: Copiar para Formulário + Copiar Técnico */}
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -404,7 +405,7 @@ interface Props {
                           'h-10 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm',
                           copiedForm
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                            : 'bg-ink-50 border-ink-200 text-ink-600 hover:bg-ink-100 hover:border-ink-300'
                         )}
                         title="Copia resultado em texto simples para colar no formulário"
                       >
@@ -429,7 +430,7 @@ interface Props {
                           'h-10 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm',
                           copiedTechnical
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                            : 'bg-ink-50 border-ink-200 text-ink-600 hover:bg-ink-100 hover:border-ink-300'
                         )}
                         title="Copia resultado em formato técnico estruturado"
                       >

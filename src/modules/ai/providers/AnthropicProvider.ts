@@ -1,6 +1,7 @@
 import { AppSettings } from '../../../types';
 import { AiProvider, BuiltPrompt } from '../types';
 import { robustJsonParse } from '../json';
+import { logger } from '../../../utils/logger';
 
 export function getAnthropicBaseUrl(): string {
   const isLocalDev = typeof window !== 'undefined' &&
@@ -11,6 +12,22 @@ export function getAnthropicBaseUrl(): string {
 export class AnthropicProvider implements AiProvider {
   resolveModelName(settings: AppSettings, mode: string, area: string): string {
     return settings.anthropicModel || 'claude-3-5-sonnet-latest';
+  }
+
+  /** Computa o header anthropic-beta correto com base no modelo selecionado */
+  private getBetaHeader(settings: AppSettings): string {
+    const model = settings.anthropicModel || 'claude-3-5-sonnet-latest';
+    const headers = ['prompt-caching-2024-07-31'];
+
+    if (model.includes('3-7') || model.includes('opus-4')) {
+      // Extended Thinking support for claude-3-7 and claude-opus-4
+      headers.push('interleaved-thinking-2025-05-14');
+      headers.push('output-128k-2025-02-19');
+    } else {
+      // Legacy max-tokens for 3-5-sonnet
+      headers.push('max-tokens-3-5-sonnet-2024-07-15');
+    }
+    return headers.join(', ');
   }
 
   async generate(
@@ -41,7 +58,7 @@ export class AnthropicProvider implements AiProvider {
       headers: {
         'x-api-key': settings.anthropicApiKey!,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
+        'anthropic-beta': this.getBetaHeader(settings),
         'content-type': 'application/json'
       },
       body: JSON.stringify({
@@ -94,7 +111,7 @@ export class AnthropicProvider implements AiProvider {
       headers: {
         'x-api-key': settings.anthropicApiKey!,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
+        'anthropic-beta': this.getBetaHeader(settings),
         'content-type': 'application/json'
       },
       body: JSON.stringify({
@@ -120,33 +137,44 @@ export class AnthropicProvider implements AiProvider {
     let fullText = '';
     let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (true) {
+        if (signal?.aborted) break;
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        const cleanLine = line.trim();
-        if (!cleanLine || !cleanLine.startsWith('data:')) continue;
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (!cleanLine || !cleanLine.startsWith('data:')) continue;
 
-        const dataStr = cleanLine.slice(5).trim();
-        if (dataStr === '[DONE]') continue;
+          const dataStr = cleanLine.slice(5).trim();
+          if (dataStr === '[DONE]') continue;
 
-        try {
-          const parsed = JSON.parse(dataStr);
-          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-            fullText += parsed.delta.text;
-            onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)));
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              fullText += parsed.delta.text;
+              onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)));
+            }
+          } catch {
+            // Ignorar eventos SSE não-JSON (ex: event:, ping)
           }
-        } catch {
-          // Ignorar eventos não-JSON
         }
       }
+    } catch (streamErr) {
+      if (signal?.aborted || (streamErr instanceof Error && streamErr.name === 'AbortError')) {
+        throw streamErr;
+      }
+      throw new Error(`Erro durante streaming Anthropic: ${streamErr instanceof Error ? streamErr.message : String(streamErr)}`);
+    } finally {
+      reader.cancel().catch(() => {});
     }
 
+    if (onComplete) onComplete(helpers.extractScratchpad(fullText));
     return helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText));
   }
 
@@ -193,7 +221,7 @@ export class AnthropicProvider implements AiProvider {
     try {
       return robustJsonParse(text);
     } catch (e: any) {
-      console.warn('Auto-healing JSON parsing triggered for Anthropic:', e.message);
+      logger.warn('Auto-healing JSON parsing triggered for Anthropic:', e.message);
       text = await attemptFetch(true, e.message);
       return robustJsonParse(text);
     }

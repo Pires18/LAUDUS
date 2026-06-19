@@ -52,18 +52,18 @@ export function DailyTimeline({
   }, [selectedDate]);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-        <Clock className="text-slate-800" size={18} />
-        <h3 className="font-black text-slate-800 text-xs uppercase tracking-widest leading-none">Visão em Linha do Tempo</h3>
+    <div className="bg-white border border-ink-200 rounded-3xl p-5 shadow-sm space-y-4">
+      <div className="flex items-center gap-2 border-b border-ink-100 pb-3">
+        <Clock className="text-ink-800" size={18} />
+        <h3 className="font-black text-ink-800 text-xs uppercase tracking-widest leading-none">Visão em Linha do Tempo</h3>
       </div>
 
       {slots.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 italic text-xs">
+        <div className="text-center py-12 text-ink-400 italic text-xs">
           Sem expediente ou turnos configurados para este dia da semana.
         </div>
       ) : (
-        <div className="relative border-l border-slate-200 ml-4 pl-6 space-y-6 py-2">
+        <div className="relative border-l border-ink-200 ml-4 pl-6 space-y-6 py-2">
           {slots.map((slot) => {
             const appointment = slot.appointmentId ? appointmentsMap[slot.appointmentId] : null;
             const isNow = nowTimeStr && nowTimeStr >= slot.time && (slots.find(s => s.time > slot.time)?.time || '24:00') > nowTimeStr;
@@ -72,7 +72,7 @@ export function DailyTimeline({
               ? appointment.status === 'confirmado' ? 'border-emerald-250 bg-emerald-50/5' :
                 appointment.status === 'cancelado' ? 'border-rose-200 bg-rose-50/5' :
                 'border-blue-200 bg-blue-50/5'
-              : 'border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50/50';
+              : 'border-dashed border-ink-200 hover:border-ink-300 hover:bg-ink-50/50';
 
             return (
               <div key={slot.time} className="relative group/slot">
@@ -80,14 +80,14 @@ export function DailyTimeline({
                 <div className={classNames(
                   "absolute -left-[31px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 bg-white transition-all z-10",
                   isNow ? "bg-amber-500 border-amber-500 scale-125 ring-4 ring-amber-500/20" :
-                  slot.booked ? "border-slate-900 bg-slate-900" : "border-slate-300"
+                  slot.booked ? "border-ink-900 bg-ink-900" : "border-ink-300"
                 )} />
 
                 {/* Time Text */}
                 <div className="absolute -left-[80px] top-1/2 -translate-y-1/2 w-12 text-right">
                   <span className={classNames(
                     "text-xs font-black",
-                    isNow ? "text-amber-600 font-bold" : "text-slate-600"
+                    isNow ? "text-amber-600 font-bold" : "text-ink-600"
                   )}>
                     {slot.time}
                   </span>
@@ -100,12 +100,12 @@ export function DailyTimeline({
                 )}>
                   {appointment ? (
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-slate-500 bg-slate-100">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-ink-500 bg-ink-100">
                         <AreaIcon area={appointment.area} size={13} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-black text-slate-900 text-xs truncate max-w-[150px] sm:max-w-[200px]">
+                          <span className="font-black text-ink-900 text-xs truncate max-w-[150px] sm:max-w-[200px]">
                             {appointment.patientName}
                           </span>
                           {appointment.priority === 'urgente' && (
@@ -113,23 +113,23 @@ export function DailyTimeline({
                               Urgente
                             </span>
                           )}
-                          <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider shrink-0">
+                          <span className="text-[8px] text-ink-400 font-bold uppercase tracking-wider shrink-0">
                             ({appointment.examType})
                           </span>
                         </div>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                        <p className="text-[8px] text-ink-400 font-bold uppercase tracking-wider mt-0.5">
                           ID: {appointment.patientId} {appointment.patientInsurance ? `• Convênio: ${appointment.patientInsurance}` : ''}
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 text-slate-400">
-                      <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                    <div className="flex items-center gap-3 text-ink-400">
+                      <div className="w-8 h-8 rounded-lg bg-ink-50 border border-ink-200 flex items-center justify-center shrink-0">
                         <Plus size={12} />
                       </div>
                       <div>
-                        <span className="text-xs font-bold text-slate-500">Horário Disponível</span>
-                        <span className="text-[8px] font-bold uppercase tracking-wider block text-slate-400">{slot.shiftName}</span>
+                        <span className="text-xs font-bold text-ink-500">Horário Disponível</span>
+                        <span className="text-[8px] font-bold uppercase tracking-wider block text-ink-400">{slot.shiftName}</span>
                       </div>
                     </div>
                   )}
@@ -142,7 +142,7 @@ export function DailyTimeline({
                           <button
                             type="button"
                             onClick={() => onConfirm(appointment)}
-                            className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[9px] uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-1 active:scale-95 transition-all"
+                            className="h-8 px-3 bg-ink-900 hover:bg-ink-800 text-white font-bold text-[9px] uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-1 active:scale-95 transition-all"
                           >
                             <Check size={10} /> Confirmar
                           </button>
@@ -157,7 +157,7 @@ export function DailyTimeline({
                           <button
                             type="button"
                             onClick={() => onReschedule(appointment)}
-                            className="p-1.5 text-slate-600 hover:text-brand-700 hover:bg-slate-100 border border-slate-200 rounded-lg transition-all active:scale-95"
+                            className="p-1.5 text-ink-600 hover:text-brand-700 hover:bg-ink-100 border border-ink-200 rounded-lg transition-all active:scale-95"
                             title="Reagendar"
                           >
                             <RefreshCw size={12} />
@@ -212,7 +212,7 @@ export function DailyTimeline({
                       <button
                         type="button"
                         onClick={() => onQuickSchedule(slot.time)}
-                        className="h-8 px-3 border border-slate-200 hover:bg-slate-900 hover:text-white hover:border-slate-900 text-slate-700 font-bold text-[9px] uppercase tracking-wider rounded-lg transition-all active:scale-95 flex items-center gap-1"
+                        className="h-8 px-3 border border-ink-200 hover:bg-ink-900 hover:text-white hover:border-ink-900 text-ink-700 font-bold text-[9px] uppercase tracking-wider rounded-lg transition-all active:scale-95 flex items-center gap-1"
                       >
                         <Plus size={10} /> Agendar
                       </button>

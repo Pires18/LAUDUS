@@ -10,6 +10,7 @@ import {
   RotateCcw, Info, CheckCircle2
 } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { logger } from '../../utils/logger';
 import { storage, auth } from '../../lib/firebase';
 import { classNames } from '../../utils/format';
 
@@ -75,6 +76,54 @@ export function ClinicForm({ clinicId }: Props) {
     setDraft((d) => ({ ...d, address: { ...d.address, [key]: value } }));
   }
 
+  function compressLogoFile(file: File): Promise<Blob> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => {
+              resolve(blob || file);
+            },
+            file.type === 'image/gif' ? 'image/gif' : 'image/webp',
+            0.85
+          );
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = () => resolve(file);
+    });
+  }
+
   async function handleLogoUpload(file: File) {
     if (!file.type.startsWith('image/')) {
       showToast('Selecione uma imagem válida', 'error');
@@ -82,15 +131,18 @@ export function ClinicForm({ clinicId }: Props) {
     }
     setUploading(true);
     try {
+      const compressedBlob = await compressLogoFile(file);
       const uid = auth.currentUser?.uid;
-      const path = `users/${uid}/clinic-logos/${Date.now()}_${file.name}`;
+      const fileExtension = file.type === 'image/gif' ? 'gif' : 'webp';
+      const cleanFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      const path = `users/${uid}/clinic-logos/${Date.now()}_${cleanFileName}.${fileExtension}`;
       const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, compressedBlob);
       const url = await getDownloadURL(storageRef);
       u('logoUrl', url);
       showToast('Logo enviado com sucesso', 'success');
     } catch (err: any) {
-      console.error('Erro de upload da logo:', err);
+      logger.error('Erro de upload da logo:', err);
       showToast('Erro de permissão no Storage. Cole a URL do logotipo abaixo como alternativa.', 'error');
     } finally {
       setUploading(false);
@@ -328,7 +380,7 @@ export function ClinicForm({ clinicId }: Props) {
                 <label className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mb-1">Ou Cole a URL Direta</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-brand-500 text-[11px] font-bold text-slate-700 shadow-inner"
+                  className="w-full px-3 py-2 bg-ink-50 border border-ink-100 rounded-xl outline-none focus:border-brand-500 text-[11px] font-bold text-ink-700 shadow-inner"
                   placeholder="https://exemplo.com/logo.png"
                   value={draft.logoUrl || ''}
                   onChange={(e) => u('logoUrl', e.target.value)}

@@ -94,13 +94,13 @@ export function Dashboard() {
   return (
     <div className="module-container">
       {/* Clean & Professional Hero Banner */}
-      <section className="relative overflow-hidden shrink-0 rounded-3xl bg-white p-6 sm:p-10 shadow-sm border border-slate-200 mb-6 sm:mb-10 group">
-        <div className="relative flex flex-col xl:flex-row items-center justify-between gap-10">
+      <section className="relative overflow-hidden shrink-0 rounded-3xl bg-white p-6 sm:p-10 shadow-sm border border-ink-100 mb-6 sm:mb-10 group">
+        <div className="relative flex flex-col lg:flex-row items-center justify-between gap-10">
           <div className="text-center xl:text-left space-y-5">
             <div className="flex flex-wrap items-center justify-center xl:justify-start gap-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ink-50 border border-ink-100">
                 <Sparkles size={14} className="text-brand-500" />
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">LAUD.IA CORE V16.0</span>
+                <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">LAUD.IA CORE V2.0</span>
               </div>
               {selectedClinic ? (
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-100 animate-fade-in">
@@ -108,35 +108,35 @@ export function Dashboard() {
                   <span className="text-[10px] font-black text-brand-700 uppercase tracking-widest">Unidade: {selectedClinic.name}</span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200">
-                  <Building2 size={12} className="text-slate-500" />
-                  <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Multiclínicas Ativo</span>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ink-50 border border-ink-100">
+                  <Building2 size={12} className="text-ink-500" />
+                  <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">Multiclínicas Ativo</span>
                 </div>
               )}
             </div>
 
-            <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+            <h1 className="text-4xl sm:text-5xl font-black text-ink-900 tracking-tight leading-tight">
               {greetingHeader} <br />
               <span className="text-brand-600">
                 {displayName}
               </span>
             </h1>
 
-            <p className="text-slate-500 text-lg max-w-md mx-auto xl:mx-0 font-medium">
-              Você possui <span className="text-slate-800 font-bold">{stats.pending} exames</span> aguardando laudo na fila hoje.
+            <p className="text-ink-500 text-lg max-w-md mx-auto xl:mx-0 font-medium">
+              Você possui <span className="text-ink-800 font-bold">{stats.pending} exames</span> aguardando laudo na fila hoje.
             </p>
 
             <div className="flex flex-wrap items-center justify-center xl:justify-start gap-3 pt-2">
               <button 
                 onClick={() => setShowCreateExamModal(true)}
-                className="h-12 px-6 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-3 active:scale-95 shadow-sm"
+                className="h-12 px-6 rounded-xl bg-ink-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-ink-800 transition-all flex items-center gap-3 active:scale-95 shadow-sm"
               >
                 <FilePlus size={16} />
                 Novo Laudo IA
               </button>
               <button 
                 onClick={() => setView({ name: 'worklist' })}
-                className="h-12 px-6 rounded-xl bg-white text-slate-700 font-bold text-xs uppercase tracking-widest border border-slate-200 hover:bg-slate-50 transition-all flex items-center gap-3 active:scale-95"
+                className="h-12 px-6 rounded-xl bg-white text-ink-700 font-bold text-xs uppercase tracking-widest border border-ink-100 hover:bg-ink-50 transition-all flex items-center gap-3 active:scale-95"
               >
                 <LayoutList size={16} />
                 Worklist
@@ -145,19 +145,19 @@ export function Dashboard() {
           </div>
 
           {/* Quick Metrics Panel */}
-          <div className="hidden xl:flex items-center gap-12 bg-slate-50 p-8 rounded-3xl border border-slate-200">
+          <div className="hidden lg:flex items-center gap-12 bg-ink-50/50 p-8 rounded-3xl border border-ink-100">
             <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hoje</p>
-              <p className="text-4xl font-black text-slate-800 tracking-tight">{stats.today}</p>
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Hoje</p>
+              <p className="text-4xl font-black text-ink-800 tracking-tight">{stats.today}</p>
             </div>
-            <div className="w-px h-12 bg-slate-200" />
+            <div className="w-px h-12 bg-ink-200" />
             <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mês</p>
-              <p className="text-4xl font-black text-slate-800 tracking-tight">{stats.month}</p>
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Mês</p>
+              <p className="text-4xl font-black text-ink-800 tracking-tight">{stats.month}</p>
             </div>
-            <div className="w-px h-12 bg-slate-200" />
+            <div className="w-px h-12 bg-ink-200" />
             <div className="text-center">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Finalização</p>
+              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Finalização</p>
               <p className="text-4xl font-black text-emerald-500 tracking-tight">
                 {stats.total > 0 ? Math.round((stats.finalized / stats.total) * 100) : 0}%
               </p>
@@ -203,21 +203,21 @@ export function Dashboard() {
       </div>
 
       {/* Layout Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-10 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-10 items-start">
         
         {/* Left Column (2 cols) - Charts and Feeds */}
-        <div className="xl:col-span-2 space-y-10">
+        <div className="lg:col-span-2 space-y-10">
           
           {/* Visual Activity Chart Card */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+          <div className="bg-white border border-ink-100 rounded-3xl p-6 sm:p-8 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-4">
                 <div className="p-2.5 rounded-xl bg-brand-50 text-brand-600">
                   <Activity size={20} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-lg leading-none">Distribuição de Exames</h3>
-                  <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mt-1.5">Últimos 7 dias de produção</p>
+                  <h3 className="font-bold text-ink-800 text-lg leading-none">Distribuição de Exames</h3>
+                  <p className="text-[10px] text-ink-400 uppercase font-black tracking-widest mt-1.5">Últimos 7 dias de produção</p>
                 </div>
               </div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
@@ -237,7 +237,7 @@ export function Dashboard() {
                       transition={{ duration: 0.8, delay: i * 0.05, ease: "easeOut" }}
                       className={classNames(
                         "w-full max-w-[40px] rounded-t-lg transition-colors duration-300 relative group-hover/bar:brightness-95 cursor-pointer",
-                        day.count > 0 ? "bg-brand-500" : "bg-slate-100"
+                        day.count > 0 ? "bg-brand-500" : "bg-ink-100"
                       )}
                     >
                       {/* Floating tooltip */}
@@ -245,14 +245,14 @@ export function Dashboard() {
                         <div 
                           role="tooltip"
                           aria-label={`${day.count} exames em ${day.label}`}
-                          className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap pointer-events-none"
+                          className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 bg-ink-800 text-white text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap pointer-events-none"
                         >
                           {day.count} {day.count === 1 ? 'exame' : 'exames'}
                         </div>
                       )}
                     </motion.div>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-bold tracking-widest">{day.label}</span>
+                  <span className="text-[10px] text-ink-500 font-bold tracking-widest">{day.label}</span>
                 </div>
               ))}
             </div>
@@ -386,25 +386,25 @@ export function Dashboard() {
           </div>
 
           {/* Platform Security/Licensing info */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden group">
+          <div className="bg-white border border-ink-100 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden group">
             <div className="relative flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500 border border-slate-200">
+              <div className="w-12 h-12 rounded-xl bg-ink-50 flex items-center justify-center text-ink-500 border border-ink-100">
                 <Briefcase size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-slate-800 text-lg tracking-tight">Resumo da Conta</h4>
+                <h4 className="font-bold text-ink-800 text-lg tracking-tight">Resumo da Conta</h4>
                 <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">Sessão Autenticada</p>
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Total Geral</p>
-                <p className="text-2xl font-black text-slate-800">{exams.length}</p>
+              <div className="bg-ink-50 rounded-2xl p-4 border border-ink-100">
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1.5">Total Geral</p>
+                <p className="text-2xl font-black text-ink-800">{exams.length}</p>
               </div>
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Clínicas</p>
-                <p className="text-2xl font-black text-slate-800">{clinics.length}</p>
+              <div className="bg-ink-50 rounded-2xl p-4 border border-ink-100">
+                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1.5">Clínicas</p>
+                <p className="text-2xl font-black text-ink-800">{clinics.length}</p>
               </div>
             </div>
           </div>
@@ -450,9 +450,9 @@ function StatCard({ label, value, icon, color, loading, onClick }: {
         {loading ? (
           <Skeleton className="h-8 w-16 mb-1.5 rounded-lg" />
         ) : (
-          <p className="text-3xl font-bold text-slate-800 leading-none mb-1.5">{value}</p>
+          <p className="text-3xl font-bold text-ink-800 leading-none mb-1.5">{value}</p>
         )}
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</p>
+        <p className="text-[10px] font-bold text-ink-500 uppercase tracking-widest">{label}</p>
       </div>
     </button>
   );

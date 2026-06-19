@@ -255,7 +255,7 @@ export function Templates() {
                       {template.name}
                     </h4>
                     
-                    <div className="flex items-center justify-between gap-2 mt-auto pt-4 border-t border-slate-50 flex-wrap">
+                    <div className="flex items-center justify-between gap-2 mt-auto pt-4 border-t border-ink-50 flex-wrap">
                       <div className="flex flex-wrap gap-1.5">
                         {template.isSystem && (
                           <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100/50 animate-pulse-subtle">
@@ -288,7 +288,7 @@ export function Templates() {
                                 showToast('Erro ao atualizar vínculo da clínica', 'error');
                               }
                             }}
-                            className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 text-[10px] font-black text-slate-500 rounded-lg outline-none focus:border-brand-500 cursor-pointer"
+                            className="px-2.5 py-1 bg-ink-50 border border-ink-200/60 text-[10px] font-black text-ink-500 rounded-lg outline-none focus:border-brand-500 cursor-pointer"
                           >
                             <option value="">🌐 Todas as Clínicas</option>
                             {clinics.map((c) => (

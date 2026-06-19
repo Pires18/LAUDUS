@@ -259,8 +259,8 @@ html, body, #root {
     page-break-after: always;
     page-break-inside: avoid;
     box-sizing: border-box;
-    height: 275mm;
-    max-height: 275mm;
+    height: 285mm;
+    max-height: 285mm;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -276,47 +276,60 @@ html, body, #root {
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: repeat(2, 1fr);
-    gap: 4mm;
-    margin-top: 4mm;
-    margin-bottom: 4mm;
+    gap: 2mm;
+    margin-top: 2mm;
+    margin-bottom: 2mm;
     flex-grow: 1;
   }
 
-  /* Layout 2 colunas × 2 linhas (4 imagens por página) */
-  .print-images-grid-2x2 {
+  /* Layout 1 coluna × 1 linha (1 imagem por página) */
+  .print-images-grid-1x1 {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 4mm;
-    margin-top: 4mm;
-    margin-bottom: 4mm;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    gap: 0;
+    margin-top: 0;
+    margin-bottom: 0;
     flex-grow: 1;
+    height: 100%;
   }
 
-  .print-images-grid-2x2 .print-image-card {
+  .print-images-grid-1x1 .print-image-card {
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     overflow: hidden;
-    background: #000;
+    background: #fff;
   }
 
-  .print-images-grid-2x2 .print-image-card img {
+  .print-images-grid-1x1 .print-image-card img {
     position: absolute;
-    width: 116%;
-    height: 87%;
-    transform: rotate(270deg);
+    width: 145%;
+    height: 100%;
+    transform: rotate(270deg) scale(1.2);
     object-fit: contain;
   }
+
+  /* Layout 2 colunas × 3 linhas (6 imagens por página) */
+  .print-images-grid-2x3 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 2mm;
+    margin-top: 2mm;
+    margin-bottom: 2mm;
+    flex-grow: 1;
+  }
+
   /* Layout 2 colunas × 4 linhas (8 imagens por página) */
   .print-images-grid-2x4 {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(4, 1fr);
-    gap: 3mm;
-    margin-top: 3mm;
-    margin-bottom: 3mm;
+    gap: 1.5mm;
+    margin-top: 1.5mm;
+    margin-bottom: 1.5mm;
     flex-grow: 1;
   }
 
@@ -325,9 +338,9 @@ html, body, #root {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(4, 1fr);
-    gap: 3mm;
-    margin-top: 3mm;
-    margin-bottom: 3mm;
+    gap: 1.5mm;
+    margin-top: 1.5mm;
+    margin-bottom: 1.5mm;
     flex-grow: 1;
   }
 
@@ -338,7 +351,7 @@ html, body, #root {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #000;
+    background: #fff;
     overflow: hidden;
     height: 100%;
     width: 100%;
@@ -499,9 +512,16 @@ html, body, #root {
   /* ── Sidebar nav tooltip (when collapsed) ── */
   .sidebar-tooltip {
     @apply absolute left-full ml-3 px-3 py-2 bg-ink-900 text-white text-xs font-bold rounded-xl whitespace-nowrap pointer-events-none opacity-0 transition-all duration-200 z-50 shadow-lg;
+    display: none;
   }
   .sidebar-nav-item:hover .sidebar-tooltip {
+    display: block;
     @apply opacity-100;
+  }
+
+  /* ── Sidebar nav (unified module internal sidebar) ── */
+  .sidebar-nav {
+    @apply hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24;
   }
 
   /* ── PACS Status Indicator ── */
@@ -596,7 +616,7 @@ aside {
   * { scrollbar-width: none; }
 }
 
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 0px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-ink-200 rounded-full; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { @apply bg-ink-300; }
@@ -633,27 +653,6 @@ aside {
 /* ═══════════════════════════════════════════
    RESPONSIVE UTILITIES
    ═══════════════════════════════════════════ */
-
-@media (max-width: 474px) {
-  /* XS only: full-width modals bottom sheet */
-  .modal-mobile-sheet {
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: auto !important;
-    max-height: 90dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    animation: slideInUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
-  }
-
-  .module-container {
-    overflow-x: hidden;
-  }
-}
 
 @media (max-width: 767px) {
   .app-main-content {

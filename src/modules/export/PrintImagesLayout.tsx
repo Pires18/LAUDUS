@@ -19,14 +19,18 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
   let rows = 4;
   let chunkSize = 8;
 
-  if (gridType === '1x2') {
+  if (gridType === '1x1') {
+    cols = 1;
+    rows = 1;
+    chunkSize = 1;
+  } else if (gridType === '1x2') {
     cols = 1;
     rows = 2;
     chunkSize = 2;
-  } else if (gridType === '2x2') {
+  } else if (gridType === '2x3') {
     cols = 2;
-    rows = 2;
-    chunkSize = 4;
+    rows = 3;
+    chunkSize = 6;
   } else if (gridType === '2x4') {
     cols = 2;
     rows = 4;
@@ -48,16 +52,16 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
       {pages.map((pageInstances, pageIdx) => (
         <div key={pageIdx} className="print-images-page">
           {/* Header */}
-          <div className="flex items-start justify-between border-b-2 border-slate-900 pb-3 mb-4">
+          <div className="flex items-start justify-between border-b-2 border-black pb-3 mb-4">
             <div className="flex items-center gap-3">
               {clinic?.logoUrl && (
                 <img src={clinic.logoUrl} alt="Logo" className="h-16 object-contain shrink-0" />
               )}
               <div>
                 {!clinic?.logoUrl ? (
-                  <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
+                  <h1 className="text-xl font-bold uppercase tracking-tight text-ink-900">{clinic?.name || settings.clinicName || 'LAUD.US'}</h1>
                 ) : (
-                  <h2 className="text-sm font-bold uppercase text-slate-800 leading-tight">{clinic?.name || settings.clinicName}</h2>
+                  <h2 className="text-sm font-bold uppercase text-ink-800 leading-tight">{clinic?.name || settings.clinicName}</h2>
                 )}
                 <p className="text-[10px] text-gray-500 mt-1 max-w-sm whitespace-pre-wrap leading-tight">
                   {clinic?.address 
@@ -68,17 +72,22 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
               </div>
             </div>
             <div className="text-right text-[11px] space-y-0.5 leading-tight">
-              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest block mb-1">Documentação Fotográfica</span>
+              <span className="text-[10px] font-black text-ink-900 uppercase tracking-widest block mb-1">Documentação Fotográfica</span>
               <p><strong>Paciente:</strong> {patient.name} ({calculateAge(patient.birthDate)})</p>
               <p><strong>Exame:</strong> <span className="uppercase font-bold">{examType}</span></p>
               <p><strong>Data:</strong> {formatDate(examDate)}</p>
-              <p className="text-slate-400 text-[10px] font-medium pt-0.5">Página {pageIdx + 1} de {pages.length}</p>
+              <p className="text-ink-400 text-[10px] font-medium pt-0.5">Página {pageIdx + 1} de {pages.length}</p>
             </div>
           </div>
 
           {/* Grid Layout — classes definidas em index.css para impressão */}
           <div 
-            className={gridType === '1x2' ? 'print-images-grid-1x2 flex-grow' : gridType === '2x2' ? 'print-images-grid-2x2 flex-grow' : 'print-images-grid-2x4 flex-grow'}
+            className={
+              gridType === '1x1' ? 'print-images-grid-1x1 flex-grow' :
+              gridType === '1x2' ? 'print-images-grid-1x2 flex-grow' :
+              gridType === '2x3' ? 'print-images-grid-2x3 flex-grow' :
+              'print-images-grid-2x4 flex-grow'
+            }
           >
             {pageInstances.map((instance, instIdx) => {
               const globalIndex = pageIdx * chunkSize + instIdx + 1;
@@ -106,7 +115,7 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
           </div>
 
           {/* Footer */}
-          <div className="border-t border-slate-200 pt-2 mt-4 text-left text-[9px] text-gray-400 flex justify-between leading-none">
+          <div className="border-t border-black pt-2 mt-4 text-left text-[9px] text-gray-400 flex justify-between leading-none">
             <span>Sincronização PACS Orthanc — LAUD.US</span>
             <span>Gerado automaticamente em {formatDate(Date.now())}</span>
           </div>

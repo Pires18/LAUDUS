@@ -4,6 +4,7 @@ import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types
 import { generateReportStream, generateMockReport } from '../../ai/engine';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
 import { getInitialReportContent } from '../../templates/utils';
+import { logger } from '../../../utils/logger';
 
 interface UseExamActionsProps {
   examId: string;
@@ -31,7 +32,7 @@ export function useExamActions({
   examDateMs
 }: UseExamActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef<string | null>(null);
   const debouncedSave = useCallback(
@@ -54,9 +55,10 @@ export function useExamActions({
           setSaveState('saved');
           setTimeout(() => setSaveState('idle'), 2000);
         } catch (err) {
-          console.error('[useExamActions] Erro ao salvar:', err);
+          logger.error('[useExamActions] Erro ao salvar', err);
           showToast('Erro ao salvar', 'error');
-          setSaveState('idle');
+          setSaveState('error');
+          setTimeout(() => setSaveState('idle'), 3000);
         } finally {
           latestContentRef.current = null;
         }
@@ -73,7 +75,7 @@ export function useExamActions({
         updateItem('exams', examId, {
           reportContent: latestContentRef.current,
           updatedAt: Date.now()
-        }).catch(console.error);
+        }).catch((err) => logger.error('[useExamActions] Erro ao salvar no unmount:', err));
       }
     };
   }, [examId]);
@@ -172,7 +174,7 @@ export function useExamActions({
         await updateItem('exams', examId, { reportContent: html });
       }
     } catch (e: unknown) {
-      console.error('[useExamActions] Erro na geração/refinamento:', e);
+      logger.error('[useExamActions] Erro na geração/refinamento:', e);
       const rawMsg = e instanceof Error ? e.message : String(e) || 'Erro ao processar laudo com IA';
       const message = rawMsg.includes('404') || rawMsg.includes('not found') || rawMsg.includes('models/')
         ? `Modelo de IA não encontrado. Verifique o nome do modelo em Configurações. (${rawMsg.substring(0, 60)})`
@@ -201,7 +203,7 @@ export function useExamActions({
       // Isso garante que o aparelho de imagem (US) não liste mais o exame como pendente.
       if (status === 'finalizado') {
         deleteWorklistEntry(examId, settings).catch((err) => {
-          console.warn('[useExamActions] Falha silenciosa ao remover worklist do PACS:', err);
+          logger.warn('[useExamActions] Falha silenciosa ao remover worklist do PACS:', err);
         });
       }
     } catch (err) {

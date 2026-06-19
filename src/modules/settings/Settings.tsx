@@ -1,5 +1,6 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useApp } from '../../store/app';
+import { logger } from '../../utils/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useCollection } from '../../hooks/useFirestore';
 import { Clinic } from '../../types';
@@ -93,7 +94,7 @@ export function Settings() {
 
       showToast('Foto de perfil atualizada com sucesso!', 'success');
     } catch (err: any) {
-      console.error('Erro de upload da foto:', err);
+      logger.error('Erro de upload da foto:', err);
       showToast('Erro ao atualizar foto de perfil no Storage.', 'error');
     } finally {
       setIsUploadingProfile(false);
@@ -117,7 +118,7 @@ export function Settings() {
       u('signatureImageUrl', url);
       showToast('Imagem de assinatura carregada! Clique em Salvar para gravar.', 'success');
     } catch (err: any) {
-      console.error('Erro de upload da assinatura:', err);
+      logger.error('Erro de upload da assinatura:', err);
       showToast('Erro ao carregar assinatura digitalizada.', 'error');
     } finally {
       setIsUploadingSignature(false);
@@ -238,7 +239,7 @@ export function Settings() {
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Sidebar Navigation */}
-        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
+        <aside className="sidebar-nav">
           <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Menu</p>
           {tabs.map((tab) => (
             <button
@@ -790,10 +791,10 @@ export function Settings() {
                   </div>
 
                   {/* TESTE DE REDE */}
-                  <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="p-5 rounded-2xl bg-ink-900 border border-ink-800 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div>
                       <p className="text-sm font-bold text-white">Validar Conexões de Rede</p>
-                      <p className="text-xs text-slate-400">Verifique se os servidores Orthanc (Principal e Backup) estão respondendo.</p>
+                      <p className="text-xs text-ink-400">Verifique se os servidores Orthanc (Principal e Backup) estão respondendo.</p>
                     </div>
                     <button
                       type="button"
@@ -907,7 +908,7 @@ export function Settings() {
                   {/* CARD 4: CONFIGURAÇÕES GLOBAIS E MANUAL */}
                   <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
                     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-ink-100 text-ink-600 flex items-center justify-center">
                         <Shield size={20} />
                       </div>
                       <div>
@@ -926,31 +927,31 @@ export function Settings() {
                       />
                     </div>
 
-                    <div className="bg-slate-900 text-slate-100 rounded-2xl p-6 border border-slate-800 shadow-inner">
+                    <div className="bg-ink-900 text-ink-100 rounded-2xl p-6 border border-ink-800 shadow-inner">
                       <div className="flex items-center gap-3 mb-4">
                         <Info size={18} className="text-brand-400" />
                         <h4 className="text-sm font-bold text-white">Manual de Conexão no Aparelho</h4>
                       </div>
-                      <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                      <p className="text-xs text-ink-400 mb-4 leading-relaxed">
                         No seu aparelho de Ultrassom, cadastre o Servidor DICOM Worklist utilizando os dados abaixo para puxar a lista de pacientes gerada pelo Laud.us.
                       </p>
-                      <ul className="space-y-2 text-xs font-mono bg-slate-950 p-4 rounded-xl border border-slate-800/50 text-brand-400">
+                      <ul className="space-y-2 text-xs font-mono bg-ink-950 p-4 rounded-xl border border-ink-800/50 text-brand-400">
                         <li>
-                          <span className="text-slate-500">IP do Servidor (Principal):</span> {(() => {
+                          <span className="text-ink-500">IP do Servidor (Principal):</span> {(() => {
                             try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR_PRINCIPAL'; } catch { return 'IP_DO_SERVIDOR_PRINCIPAL'; }
                           })()}
                         </li>
                         {draft.dicomBackupSyncEnabled && (
                           <li>
-                            <span className="text-slate-500">IP do Servidor (Backup):</span> {(() => {
+                            <span className="text-ink-500">IP do Servidor (Backup):</span> {(() => {
                               try { return draft.dicomBackupViewerUrl ? new URL(draft.dicomBackupViewerUrl).hostname : 'IP_DO_SERVIDOR_BACKUP'; } catch { return 'IP_DO_SERVIDOR_BACKUP'; }
                             })()}
                           </li>
                         )}
-                        <li><span className="text-slate-500">Porta DICOM:</span> 4242</li>
-                        <li><span className="text-slate-500">AE Title (Principal):</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
+                        <li><span className="text-ink-500">Porta DICOM:</span> 4242</li>
+                        <li><span className="text-ink-500">AE Title (Principal):</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
                         {draft.dicomBackupSyncEnabled && (
-                          <li><span className="text-slate-500">AE Title (Backup):</span> {draft.dicomBackupOrthancAETitle || 'ORTHANC'}</li>
+                          <li><span className="text-ink-500">AE Title (Backup):</span> {draft.dicomBackupOrthancAETitle || 'ORTHANC'}</li>
                         )}
                       </ul>
                     </div>

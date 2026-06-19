@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { User } from 'firebase/auth';
 import { AppSettings, Patient, ExamStatus } from '../types';
 import { getSettings, saveSettings } from './db';
+import { logger } from '../utils/logger';
 
 type View =
   | { name: 'dashboard' }
@@ -107,7 +108,7 @@ export const useApp = create<AppState>()(
         set({ selectedClinicId: s.defaultClinicId });
       }
     } catch (err) {
-      console.warn('[App] Erro ao carregar settings:', err);
+      logger.warn('[App] Erro ao carregar settings:', err);
     }
   },
   updateSettings: async (patch) => {

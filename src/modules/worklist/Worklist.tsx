@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '../../components/SkeletonLoader';
 import { AreaIcon } from '../../components/AreaIcon';
 import { syncExamToOrthancWorklist } from '../../utils/dicom';
+import { logger } from '../../utils/logger';
 import type { LucideIcon } from 'lucide-react';
 
 const STATUS_META: Record<ExamStatus, { label: string; icon: LucideIcon; class: string; dot: string }> = {
@@ -108,7 +109,7 @@ export function Worklist() {
             osc2.stop(ctx.currentTime + 0.52);
           }
         } catch (err) {
-          console.warn('[Worklist Sound] Falha ao sintetizar áudio:', err);
+          logger.warn('[Worklist Sound] Falha ao sintetizar áudio:', err);
         }
       }
     }
@@ -238,7 +239,7 @@ export function Worklist() {
       // Se o status foi alterado para finalizado, remove da Worklist do Orthanc
       if (editData.status === 'finalizado') {
         deleteWorklistEntry(editExamId, settings).catch((err) => {
-          console.warn('[Worklist] Falha silenciosa ao remover worklist do PACS após edição de status:', err);
+          logger.warn('[Worklist] Falha silenciosa ao remover worklist do PACS após edição de status:', err);
         });
       }
 
@@ -272,16 +273,16 @@ export function Worklist() {
         {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map(s => {
           const isActive = statusFilter === s;
           const sColors = {
-            todos: isActive ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 hover:border-slate-300 text-slate-900',
+            todos: isActive ? 'bg-ink-900 border-ink-900 text-white' : 'bg-white border-ink-200 hover:border-ink-300 text-ink-900',
             pendente: isActive 
               ? 'bg-amber-500 border-amber-500 text-white' 
               : counts.pendente > 5 
                 ? 'bg-red-50 border-red-200 hover:border-red-400 text-red-900 animate-[pulse_3s_ease-in-out_infinite]' 
-                : 'bg-white border-slate-200 hover:border-amber-300 text-slate-900',
-            'em-andamento': isActive ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-slate-200 hover:border-brand-300 text-slate-900',
-            finalizado: isActive ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 hover:border-emerald-300 text-slate-900',
+                : 'bg-white border-ink-200 hover:border-amber-400 text-ink-900',
+            'em-andamento': isActive ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-ink-200 hover:border-brand-300 text-ink-900',
+            finalizado: isActive ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-ink-200 hover:border-emerald-300 text-ink-900',
           };
-          const countBadgeColor = isActive ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-400';
+          const countBadgeColor = isActive ? 'bg-white/20 text-white' : 'bg-ink-50 text-ink-400';
 
           return (
             <button
@@ -439,19 +440,19 @@ export function Worklist() {
                           <div className={classNames("w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border", 
                             patient?.gender === 'F' ? 'bg-pink-50 text-pink-700 border-pink-100' : 
                             patient?.gender === 'M' ? 'bg-blue-50 text-blue-700 border-blue-100' : 
-                            'bg-slate-100 text-slate-700 border-slate-200'
+                            'bg-ink-100 text-ink-700 border-ink-200'
                           )}>
                             {patient?.name?.charAt(0) || '?'}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px] text-sm">{patient?.name || 'Não identificado'}</p>
-                            <p className="text-[10px] font-mono text-slate-400 mt-0.5">ID: {exam.friendlyId || '—'}</p>
+                            <p className="font-semibold text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px] text-sm">{patient?.name || 'Não identificado'}</p>
+                            <p className="text-[10px] font-mono text-ink-400 mt-0.5">ID: {exam.friendlyId || '—'}</p>
                           </div>
                         </div>
                       </td>
                       
                       <td className="px-4 py-4">
-                        <p className="font-semibold text-slate-800 text-sm mb-1 truncate max-w-[200px]">{exam.examType}</p>
+                        <p className="font-semibold text-ink-800 text-sm mb-1 truncate max-w-[200px]">{exam.examType}</p>
                         {area && <span className={classNames("text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border shrink-0", area.color)}>{area.label}</span>}
                       </td>
                       

@@ -38,15 +38,15 @@ export function DicomThumbnail({ src, alt, className, containerClassName, priori
       containerClassName
     )}>
       {loading && !error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/40 backdrop-blur-[1px] gap-2 z-10">
-          <Loader2 className="animate-spin text-slate-400" size={16} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink-900/40 backdrop-blur-[1px] gap-2 z-10">
+          <Loader2 className="animate-spin text-ink-400" size={16} />
         </div>
       )}
       
       {error ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2 bg-slate-900/90 text-center z-10 border border-amber-500/20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2 bg-ink-900/90 text-center z-10 border border-amber-500/20">
           <AlertTriangle className="text-amber-500 shrink-0" size={16} />
-          <span className="text-[9px] text-slate-300 font-black uppercase tracking-wider leading-none">Falha ao carregar</span>
+          <span className="text-[9px] text-ink-300 font-black uppercase tracking-wider leading-none">Falha ao carregar</span>
           <button 
             type="button"
             onClick={handleRetry}

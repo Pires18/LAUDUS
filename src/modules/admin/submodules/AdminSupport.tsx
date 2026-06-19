@@ -89,7 +89,7 @@ export function AdminSupport() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)] bg-white rounded-[2.5rem] border border-ink-100 shadow-premium overflow-hidden animate-fade-in">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)] bg-white rounded-3xl border border-ink-100 shadow-premium overflow-hidden animate-fade-in">
       
       {/* Sidebar: Ticket List */}
       <aside className={classNames(
@@ -176,7 +176,7 @@ export function AdminSupport() {
                       "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border",
                       ticket.priority === 'high' ? "bg-red-900 text-white border-red-900" :
                       ticket.priority === 'medium' ? "bg-blue-50 text-blue-600 border-blue-100" :
-                      "bg-slate-50 text-slate-400 border-slate-100"
+                      "bg-ink-50 text-ink-400 border-ink-100"
                     )}>
                       {ticket.priority}
                    </span>
@@ -237,13 +237,13 @@ export function AdminSupport() {
                </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/30">
+            <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-ink-50/30">
                {/* User Initial Message */}
                <div className="flex gap-5">
                   <div className="w-12 h-12 rounded-2xl bg-white border border-ink-100 shadow-sm flex items-center justify-center shrink-0">
                     <User size={24} className="text-ink-300" />
                   </div>
-                  <div className="bg-white p-6 rounded-[2.5rem] rounded-tl-none border border-ink-100 shadow-premium flex-1 max-w-2xl">
+                  <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-ink-100 shadow-premium flex-1 max-w-2xl">
                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-600 mb-2">Mensagem Inicial</p>
                      <p className="text-sm text-ink-900 leading-relaxed font-medium">{selectedTicket.message}</p>
                      <p className="text-[9px] text-ink-400 mt-4 font-bold uppercase tracking-widest">{new Date(selectedTicket.createdAt).toLocaleString()}</p>
@@ -262,7 +262,7 @@ export function AdminSupport() {
                         {isMe ? 'ADM' : msg.senderName.charAt(0)}
                       </div>
                       <div className={classNames(
-                        "p-6 rounded-[2.5rem] max-w-xl shadow-sm border",
+                        "p-6 rounded-3xl max-w-xl shadow-sm border",
                         isMe ? "bg-brand-600 text-white border-brand-500 rounded-tr-none" : "bg-white text-ink-900 border-ink-100 rounded-tl-none"
                       )}>
                         {!isMe && <p className="text-[9px] font-black uppercase tracking-widest mb-2 text-ink-400">{msg.senderName}</p>}
@@ -286,13 +286,13 @@ export function AdminSupport() {
                       onChange={e => setNewMessage(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
                       placeholder="Digite sua resposta administrativa..."
-                      className="w-full h-16 bg-ink-50 border-none rounded-[2rem] px-8 text-sm focus:ring-2 focus:ring-brand-500 transition-all font-medium"
+                      className="w-full h-16 bg-ink-50 border-none rounded-2xl px-8 text-sm focus:ring-2 focus:ring-brand-500 transition-all font-medium"
                     />
                   </div>
                   <button 
                     onClick={handleSendMessage}
                     disabled={isSending || !newMessage}
-                    className="w-16 h-16 bg-ink-900 text-white rounded-[2rem] flex items-center justify-center hover:bg-brand-600 transition-all shadow-xl disabled:opacity-50"
+                    className="w-16 h-16 bg-ink-900 text-white rounded-2xl flex items-center justify-center hover:bg-brand-600 transition-all shadow-xl disabled:opacity-50"
                   >
                     {isSending ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
                   </button>
@@ -302,7 +302,7 @@ export function AdminSupport() {
           </>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-ink-200 space-y-6">
-             <div className="w-32 h-32 rounded-[3rem] bg-ink-50 flex items-center justify-center border border-ink-50 shadow-inner">
+             <div className="w-32 h-32 rounded-3xl bg-ink-50 flex items-center justify-center border border-ink-50 shadow-inner">
                 <MessageSquare size={64} />
              </div>
              <div className="text-center">

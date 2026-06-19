@@ -86,7 +86,7 @@ export function SupportCenterModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-5xl h-full max-h-[800px] shadow-2xl border border-ink-100 flex overflow-hidden">
+      <div className="bg-white rounded-3xl w-full max-w-5xl h-full max-h-[90dvh] lg:max-h-[800px] shadow-2xl border border-ink-100 flex overflow-hidden">
         
         {/* Sidebar: Tickets List */}
         <aside className={classNames(
@@ -241,7 +241,7 @@ export function SupportCenterModal() {
                   <div className="w-10 h-10 rounded-2xl bg-ink-100 flex items-center justify-center shrink-0">
                     <MessageSquare size={20} className="text-ink-400" />
                   </div>
-                  <div className="bg-ink-50 p-5 rounded-[2rem] rounded-tl-none flex-1">
+                  <div className="bg-ink-50 p-5 rounded-2xl rounded-tl-none flex-1">
                     <p className="text-xs font-black text-ink-900 mb-1">{selectedTicket.userName}</p>
                     <p className="text-sm text-ink-600 leading-relaxed">{selectedTicket.message}</p>
                     <p className="text-[9px] text-ink-400 mt-2 font-bold uppercase tracking-widest">{new Date(selectedTicket.createdAt).toLocaleString()}</p>
@@ -260,7 +260,7 @@ export function SupportCenterModal() {
                         {msg.senderName.charAt(0)}
                       </div>
                       <div className={classNames(
-                        "p-5 rounded-[2rem] max-w-[80%]",
+                        "p-5 rounded-2xl max-w-[80%]",
                         isMe ? "bg-brand-600 text-white rounded-tr-none" : "bg-ink-50 text-ink-900 rounded-tl-none"
                       )}>
                         {!isMe && <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-ink-400">{msg.senderName}</p>}
@@ -276,7 +276,7 @@ export function SupportCenterModal() {
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-ink-200 space-y-4">
-                 <div className="w-24 h-24 rounded-[2.5rem] bg-ink-50 flex items-center justify-center border border-ink-50">
+                 <div className="w-24 h-24 rounded-3xl bg-ink-50 flex items-center justify-center border border-ink-50">
                     <MessageSquare size={48} />
                  </div>
                  <p className="font-black text-lg text-ink-400">Escolha um chamado para visualizar</p>

@@ -20,6 +20,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
 import { classNames } from './utils/format';
+import { logger } from './utils/logger';
 
 // ── Eager loads (critical path) ──
 import { Dashboard } from './modules/dashboard/Dashboard';
@@ -90,8 +91,7 @@ function ViewRenderer() {
   );
 }
 function AuthenticatedApp() {
-  const { showCreateExamModal, setShowCreateExamModal } = useApp();
-  const { loadSettings } = useApp();
+  const { showCreateExamModal, setShowCreateExamModal, view, loadSettings } = useApp();
 
   useEffect(() => {
     loadSettings();
@@ -122,7 +122,7 @@ function AuthenticatedApp() {
         <Sidebar />
         <ViewRenderer />
       </div>
-      <BottomNav />
+      {view.name !== 'exam-editor' && <BottomNav />}
       <Toast />
       <CommandPalette />
       {showCreateExamModal && <CreateExamModal onClose={() => setShowCreateExamModal(false)} />}
@@ -174,7 +174,7 @@ function UserAccessGate({ children }: { children: ReactNode }) {
         // Se o usuário já existir no banco (criado pelo auto-cadastro com licença), tudo certo.
         // Se não existir, ele será barrado a não ser que use a tela de ativação de licença.
         if (!snap.exists()) {
-          console.warn('[AUTH] Usuário autenticado, mas não possui documento no Firestore. Deve ativar licença.');
+          logger.warn('[AUTH] Usuário autenticado, mas não possui documento no Firestore. Deve ativar licença.');
           // Sem documento: Usuário novo real - precisa de ativação por chave
           setIsAllowed(false);
           setIsExpired(false);
@@ -194,7 +194,7 @@ function UserAccessGate({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
-        console.error('[AccessGate] Erro ao validar licença:', err);
+        logger.error('[AccessGate] Erro ao validar licença:', err);
         setIsAllowed(false);
       } finally {
         setChecking(false);

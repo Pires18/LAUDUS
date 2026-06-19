@@ -6,6 +6,7 @@ import { updateItem } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
 import { FileText, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList, Sparkles } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
+import { classNames } from '../../utils/format';
 import { generateTemplateStructure, generateTemplateField } from '../ai/generateTemplate';
 import { auth } from '../../lib/firebase';
 
@@ -87,16 +88,15 @@ export function TemplateEditor({ templateId }: Props) {
           }
         />
 
-        <div className="flex bg-ink-50 p-1.5 rounded-2xl w-fit mt-4 overflow-x-auto border border-ink-100 shadow-sm">
+        <div className="tab-group w-fit mt-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap flex-1 text-center ${
-                activeTab === tab.id
-                  ? 'bg-white text-brand-600 shadow-sm border border-ink-100'
-                  : 'text-ink-500 hover:text-ink-700 hover:bg-ink-100/50'
-              }`}
+              className={classNames(
+                "tab-item",
+                activeTab === tab.id && "tab-item-active"
+              )}
             >
               {tab.label}
             </button>
@@ -280,7 +280,7 @@ export function TemplateEditor({ templateId }: Props) {
                 Insira as diretrizes, protocolos, tabelas e regras específicas que o motor de IA deve seguir estritamente ao laudar ou refinar este exame.
               </p>
               <textarea
-                className="input min-h-[220px] font-mono text-xs p-4 bg-slate-50 border border-slate-250 focus:bg-white transition-all rounded-xl leading-relaxed"
+                className="input min-h-[220px] font-mono text-xs p-4 bg-ink-50 border border-ink-250 focus:bg-white transition-all rounded-xl leading-relaxed"
                 value={draft.aiInstructions || ''}
                 onChange={(e) => u('aiInstructions', e.target.value)}
                 placeholder="Ex: Para a realização deste laudo de Mama, siga estritamente a classificação BI-RADS e a fraseologia descrita no protocolo ACR..."
@@ -328,7 +328,7 @@ export function TemplateEditor({ templateId }: Props) {
                 Defina a estrutura padrão de texto que o médico preencherá na aba "Formulário" do Copiloto para este exame.
               </p>
               <textarea
-                className="input min-h-[180px] font-mono text-xs p-4 bg-slate-50 border border-slate-200 focus:bg-white transition-all rounded-xl"
+                className="input min-h-[180px] font-mono text-xs p-4 bg-ink-50 border border-ink-200 focus:bg-white transition-all rounded-xl"
                 value={draft.customForm || ''}
                 onChange={(e) => u('customForm', e.target.value)}
                 placeholder={"Ex:\nFígado: [Aspecto habitual]\nRins: [Normais, sem dilatação]\nBexiga: [Cheia, com paredes finas]"}
@@ -371,7 +371,7 @@ export function TemplateEditor({ templateId }: Props) {
                 Termo de consentimento informado para este exame específico.
               </p>
               <textarea
-                className="input min-h-[180px] text-xs p-4 bg-slate-50 border border-slate-200 focus:bg-white transition-all rounded-xl"
+                className="input min-h-[180px] text-xs p-4 bg-ink-50 border border-ink-200 focus:bg-white transition-all rounded-xl"
                 value={draft.consentTemplate || ''}
                 onChange={(e) => u('consentTemplate', e.target.value)}
                 placeholder="Ex: Eu, [Nome do Paciente], autorizo a realização do exame..."

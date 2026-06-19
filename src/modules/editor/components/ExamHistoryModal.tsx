@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ExamRequest, ExamArea, EXAM_AREAS, Patient } from '../../../types';
+import { logger } from '../../../utils/logger';
 import { getAll, where, limit } from '../../../store/db';
 import {
   X, History, Clock, FileText, Search, SplitSquareHorizontal,
@@ -24,7 +25,7 @@ const AREA_ACCENT: Record<string, { pill: string; badge: string; dot: string }> 
   'musculoesqueletico':{ pill: 'bg-orange-100 text-orange-700 border-orange-200', badge: 'bg-orange-50 text-orange-600 border-orange-100', dot: 'bg-orange-500' },
   'vascular':          { pill: 'bg-red-100 text-red-700 border-red-200',      badge: 'bg-red-50 text-red-600 border-red-100',      dot: 'bg-red-500'     },
   'pediatria':         { pill: 'bg-cyan-100 text-cyan-700 border-cyan-200',   badge: 'bg-cyan-50 text-cyan-600 border-cyan-100',   dot: 'bg-cyan-500'    },
-  'procedimentos':     { pill: 'bg-slate-100 text-slate-700 border-slate-200',badge: 'bg-slate-50 text-slate-600 border-slate-100',dot: 'bg-slate-500'   },
+  'procedimentos':     { pill: 'bg-ink-100 text-ink-700 border-ink-200',badge: 'bg-ink-50 text-ink-600 border-ink-100',dot: 'bg-ink-500'   },
   'reumatologico':     { pill: 'bg-amber-100 text-amber-700 border-amber-200',badge: 'bg-amber-50 text-amber-600 border-amber-100',dot: 'bg-amber-500'   },
   'mastologia':        { pill: 'bg-rose-100 text-rose-700 border-rose-200',   badge: 'bg-rose-50 text-rose-600 border-rose-100',   dot: 'bg-rose-500'    },
 };
@@ -32,7 +33,7 @@ const AREA_ACCENT: Record<string, { pill: string; badge: string; dot: string }> 
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   'finalizado':    { label: 'Finalizado',    className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   'em-andamento':  { label: 'Em andamento',  className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  'pendente':      { label: 'Pendente',      className: 'bg-slate-50 text-slate-600 border-slate-200' },
+  'pendente':      { label: 'Pendente',      className: 'bg-ink-50 text-ink-600 border-ink-200' },
 };
 
 function groupByMonth(exams: ExamRequest[]): { label: string; exams: ExamRequest[] }[] {
@@ -83,7 +84,7 @@ export function ExamHistoryModal({
         const withReport = past.find(e => !!e.reportContent);
         if (withReport) setSelected(withReport);
       } catch (err) {
-        console.error('[ExamHistoryModal] Erro ao carregar histórico:', err);
+        logger.error('[ExamHistoryModal] Erro ao carregar histórico:', err);
       } finally {
         setLoading(false);
       }
@@ -120,11 +121,11 @@ export function ExamHistoryModal({
     EXAM_AREAS.find(a => a.id === area)?.label || area;
 
   return (
-    <div className="fixed inset-0 z-[110] bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-0 lg:p-6 animate-fade-in">
-      <div className="bg-white w-full h-full lg:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden max-w-[1400px] max-h-[920px] border border-slate-100">
+    <div className="fixed inset-0 z-[110] bg-ink-900/75 backdrop-blur-md flex items-center justify-center p-0 lg:p-6 animate-fade-in">
+      <div className="bg-white w-full h-full lg:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden max-w-[1400px] max-h-[920px] border border-ink-100">
 
         {/* ── Header ── */}
-        <div className="bg-slate-900 px-6 py-4 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="bg-ink-900 px-6 py-4 flex items-center justify-between shrink-0 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-brand-700/20 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex items-center gap-4 z-10">
             <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center shadow-inner">
@@ -134,7 +135,7 @@ export function ExamHistoryModal({
               <h2 className="text-base font-black text-white uppercase tracking-tight leading-tight">
                 Histórico Clínico
               </h2>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+              <p className="text-[11px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">
                 {patient.name} · {allExams.length} exame{allExams.length !== 1 ? 's' : ''} encontrado{allExams.length !== 1 ? 's' : ''}
               </p>
             </div>
@@ -167,18 +168,18 @@ export function ExamHistoryModal({
 
         <div className="flex flex-1 min-h-0">
           {/* ── Sidebar Timeline ── */}
-          <aside className="w-[280px] lg:w-[300px] bg-slate-50 border-r border-slate-100 flex flex-col shrink-0">
+          <aside className="w-[280px] lg:w-[300px] bg-ink-50 border-r border-ink-100 flex flex-col shrink-0">
 
             {/* Search + filter de área */}
-            <div className="p-3 border-b border-slate-100 space-y-2 bg-white">
+            <div className="p-3 border-b border-ink-100 space-y-2 bg-white">
               <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Buscar exame..."
-                  className="w-full pl-8 pr-3 py-2 text-[11px] font-semibold bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-400/10 text-slate-700 placeholder-slate-400 transition-all"
+                  className="w-full pl-8 pr-3 py-2 text-[11px] font-semibold bg-ink-50 border border-ink-100 rounded-xl focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-400/10 text-ink-700 placeholder-ink-400 transition-all"
                 />
               </div>
 
@@ -190,8 +191,8 @@ export function ExamHistoryModal({
                     className={classNames(
                       "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all",
                       areaFilter === 'todas'
-                        ? "bg-slate-900 text-white border-slate-800 shadow-sm"
-                        : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                        ? "bg-ink-900 text-white border-ink-800 shadow-sm"
+                        : "bg-white text-ink-500 border-ink-200 hover:border-ink-300"
                     )}
                   >
                     Todas
@@ -206,7 +207,7 @@ export function ExamHistoryModal({
                           "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border transition-all",
                           areaFilter === area
                             ? (acc?.pill || 'bg-brand-100 text-brand-700 border-brand-200')
-                            : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                            : "bg-white text-ink-500 border-ink-200 hover:border-ink-300"
                         )}
                       >
                         {areaLabel(area).split(' ')[0]}
@@ -222,20 +223,20 @@ export function ExamHistoryModal({
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Loader2 size={20} className="animate-spin text-brand-500" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span className="text-[10px] font-black text-ink-400 uppercase tracking-widest">
                     Carregando histórico...
                   </span>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 px-6 gap-4 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-                    <FileText size={24} className="text-slate-300" />
+                  <div className="w-14 h-14 rounded-2xl bg-ink-100 flex items-center justify-center">
+                    <FileText size={24} className="text-ink-300" />
                   </div>
                   <div>
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                    <p className="text-xs font-black text-ink-500 uppercase tracking-wider">
                       {search || areaFilter !== 'todas' ? 'Nenhum exame encontrado' : 'Sem histórico'}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                    <p className="text-[10px] text-ink-400 font-medium mt-1 leading-relaxed">
                       {search || areaFilter !== 'todas'
                         ? 'Tente ajustar os filtros de busca.'
                         : 'Este paciente não possui exames anteriores no sistema.'}
@@ -248,12 +249,12 @@ export function ExamHistoryModal({
                     <div key={label}>
                       {/* Label do mês */}
                       <div className="flex items-center gap-2 px-2 py-1 mb-1">
-                        <CalendarDays size={11} className="text-slate-400 shrink-0" />
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">
+                        <CalendarDays size={11} className="text-ink-400 shrink-0" />
+                        <span className="text-[9px] font-black text-ink-400 uppercase tracking-[0.15em]">
                           {label}
                         </span>
-                        <div className="flex-1 h-px bg-slate-100" />
-                        <span className="text-[9px] text-slate-300 font-bold">
+                        <div className="flex-1 h-px bg-ink-100" />
+                        <span className="text-[9px] text-ink-300 font-bold">
                           {groupExams.length}
                         </span>
                       </div>
@@ -273,7 +274,7 @@ export function ExamHistoryModal({
                                 "w-full text-left p-3 rounded-xl border transition-all group relative overflow-hidden",
                                 isSelected
                                   ? "bg-white border-brand-200 shadow-md shadow-brand-500/5"
-                                  : "bg-white/60 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm"
+                                  : "bg-white/60 border-transparent hover:bg-white hover:border-ink-200 hover:shadow-sm"
                               )}
                             >
                               {/* Linha de destaque lateral */}
@@ -285,7 +286,7 @@ export function ExamHistoryModal({
                                 {/* Ícone da área */}
                                 <div className={classNames(
                                   "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border",
-                                  isSelected ? acc.badge : "bg-slate-50 text-slate-400 border-slate-100"
+                                  isSelected ? acc.badge : "bg-ink-50 text-ink-400 border-ink-100"
                                 )}>
                                   <AreaIcon area={exam.area} size={15} />
                                 </div>
@@ -293,7 +294,7 @@ export function ExamHistoryModal({
                                 <div className="flex-1 min-w-0">
                                   <p className={classNames(
                                     "text-[11px] font-black leading-tight truncate",
-                                    isSelected ? "text-slate-900" : "text-slate-700"
+                                    isSelected ? "text-ink-900" : "text-ink-700"
                                   )}>
                                     {exam.examType}
                                   </p>
@@ -314,8 +315,8 @@ export function ExamHistoryModal({
                                   </div>
 
                                   <div className="flex items-center gap-1 mt-1.5">
-                                    <Clock size={9} className="text-slate-300 shrink-0" />
-                                    <span className="text-[9px] text-slate-400 font-medium">
+                                    <Clock size={9} className="text-ink-300 shrink-0" />
+                                    <span className="text-[9px] text-ink-400 font-medium">
                                       {formatDateTime(exam.createdAt)}
                                     </span>
                                   </div>
@@ -343,10 +344,10 @@ export function ExamHistoryModal({
 
             {/* Rodapé com contagem */}
             {!loading && filtered.length > 0 && (
-              <div className="px-4 py-2.5 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+              <div className="px-4 py-2.5 border-t border-ink-100 bg-white flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <Filter size={10} className="text-slate-400" />
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  <Filter size={10} className="text-ink-400" />
+                  <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">
                     {filtered.length} de {allExams.length} exames
                   </span>
                 </div>
@@ -363,17 +364,17 @@ export function ExamHistoryModal({
           </aside>
 
           {/* ── Área de conteúdo ── */}
-          <main className="flex-1 flex flex-col min-w-0 bg-slate-50/30">
+          <main className="flex-1 flex flex-col min-w-0 bg-ink-50/30">
             {!selected ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center p-10">
-                <div className="w-20 h-20 rounded-[2rem] bg-slate-100 flex items-center justify-center">
-                  <Eye size={32} className="text-slate-300" />
+                <div className="w-20 h-20 rounded-[2rem] bg-ink-100 flex items-center justify-center">
+                  <Eye size={32} className="text-ink-300" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">
+                  <p className="text-sm font-black text-ink-400 uppercase tracking-widest">
                     Selecione um exame
                   </p>
-                  <p className="text-[11px] text-slate-400 max-w-[260px] mx-auto leading-relaxed font-medium">
+                  <p className="text-[11px] text-ink-400 max-w-[260px] mx-auto leading-relaxed font-medium">
                     Escolha um exame na linha do tempo para visualizar o laudo ou comparar com o atual.
                   </p>
                 </div>
@@ -382,7 +383,7 @@ export function ExamHistoryModal({
               /* ── Modo Comparação: Split view ── */
               <div className="flex-1 flex min-h-0 overflow-hidden">
                 {/* Laudo anterior (esq) */}
-                <div className="flex-1 flex flex-col border-r border-slate-200 min-w-0">
+                <div className="flex-1 flex flex-col border-r border-ink-200 min-w-0">
                   <ReportPanelHeader
                     title="Laudo Anterior"
                     subtitle={`${selected.examType} · ${formatDateTime(selected.createdAt)}`}
@@ -480,13 +481,13 @@ function ReportPanelHeader({ title, subtitle, area, status, accent, isActive, ex
   return (
     <div className={classNames(
       "px-5 py-3 border-b flex items-center justify-between shrink-0 gap-3",
-      isActive ? "bg-white border-brand-100 shadow-sm" : "bg-white border-slate-100"
+      isActive ? "bg-white border-brand-100 shadow-sm" : "bg-white border-ink-100"
     )}>
       <div className="flex items-center gap-3 min-w-0">
         {area && (
           <div className={classNames(
             "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border",
-            accent?.badge || "bg-slate-50 border-slate-100 text-slate-400"
+            accent?.badge || "bg-ink-50 border-ink-100 text-ink-400"
           )}>
             <AreaIcon area={area} size={15} />
           </div>
@@ -495,8 +496,8 @@ function ReportPanelHeader({ title, subtitle, area, status, accent, isActive, ex
           <div className="w-2 h-2 rounded-full bg-brand-500 animate-pulse shrink-0" />
         )}
         <div className="min-w-0">
-          <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight truncate">{title}</p>
-          <p className="text-[9px] text-slate-400 font-medium mt-0.5 truncate">{subtitle}</p>
+          <p className="text-[11px] font-black text-ink-900 uppercase tracking-tight truncate">{title}</p>
+          <p className="text-[9px] text-ink-400 font-medium mt-0.5 truncate">{subtitle}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -515,12 +516,12 @@ function ReportPanelHeader({ title, subtitle, area, status, accent, isActive, ex
 function NoReportPlaceholder() {
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-        <FileText size={24} className="text-slate-200" />
+      <div className="w-16 h-16 rounded-2xl bg-ink-50 border border-ink-100 flex items-center justify-center">
+        <FileText size={24} className="text-ink-200" />
       </div>
       <div>
-        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Laudo não gerado</p>
-        <p className="text-[10px] text-slate-300 font-medium mt-1 max-w-[200px] mx-auto leading-relaxed">
+        <p className="text-xs font-black text-ink-400 uppercase tracking-wider">Laudo não gerado</p>
+        <p className="text-[10px] text-ink-300 font-medium mt-1 max-w-[200px] mx-auto leading-relaxed">
           Este exame não possui um laudo registrado no sistema.
         </p>
       </div>

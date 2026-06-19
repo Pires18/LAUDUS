@@ -156,7 +156,7 @@ export function Sidebar() {
         <button
           onClick={() => setShowCreateExamModal(true)}
           className={classNames(
-            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-slate-900 text-white hover:bg-slate-800 active:scale-95 shadow-sm',
+            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-ink-900 text-white hover:bg-ink-800 active:scale-95 shadow-sm',
             collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
           )}
           title="Novo Laudo"
@@ -238,15 +238,15 @@ export function Sidebar() {
               'sidebar-nav-item w-full flex items-center rounded-2xl transition-all duration-300 relative overflow-hidden group',
               collapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3',
               view.name === 'admin'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                ? 'bg-ink-900 text-white'
+                : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50 hover:border-ink-300 shadow-sm'
             )}
           >
-            <ShieldCheck size={collapsed ? 20 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-slate-300" : "text-slate-500")} />
+            <ShieldCheck size={collapsed ? 20 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-ink-300" : "text-ink-500")} />
             {!collapsed && (
               <div className="flex flex-col items-start leading-none">
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] animate-fade-in">Administração</span>
-                <span className="text-[9px] text-slate-400 font-semibold mt-1 transition-colors uppercase tracking-widest">Master Panel</span>
+                <span className="text-[9px] text-ink-400 font-semibold mt-1 transition-colors uppercase tracking-widest">Master Panel</span>
               </div>
             )}
             {collapsed && (
@@ -329,13 +329,13 @@ export function Sidebar() {
         {!collapsed && (
           <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-2 text-[9px] bg-slate-50 text-slate-600 px-3 py-1.5 rounded-full font-bold border border-slate-200 uppercase tracking-widest">
+              <span className="inline-flex items-center gap-2 text-[9px] bg-ink-50 text-ink-600 px-3 py-1.5 rounded-full font-bold border border-ink-200 uppercase tracking-widest">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Online
               </span>
               <button
                 onClick={() => setShowSupportModal(true)}
-                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full font-bold border border-slate-200 uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-ink-50 text-ink-700 px-3 py-1.5 rounded-full font-bold border border-ink-200 uppercase tracking-widest hover:bg-ink-100 transition-all active:scale-95"
               >
                 <LifeBuoy size={12} />
                 Suporte
@@ -354,7 +354,7 @@ export function Sidebar() {
             {/* Version badge */}
             <div className="text-center pt-1">
               <span className="text-[8px] font-black text-ink-300 uppercase tracking-[0.2em]">
-                LAUD.US v3.0.1 · LAUD.IA
+                LAUD.US v2.0 · LAUD.IA v2.0
               </span>
             </div>
           </div>
