@@ -57,7 +57,7 @@ export function EditorHeader({
     <header className="h-[68px] bg-white border-b border-ink-200 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-[100] shadow-sm">
       
       {/* ── Left: Back + Patient Info ── */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
         
         {/* Back button */}
         <button
@@ -82,21 +82,21 @@ export function EditorHeader({
 
           <div className="min-w-0 space-y-0.5">
             {/* Patient name + age + status */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 min-w-0">
               <h1 className="text-sm font-black text-ink-900 uppercase tracking-tight truncate max-w-[110px] xs:max-w-[160px] sm:max-w-[220px] md:max-w-[320px] lg:max-w-none">
                 {patient.name}
               </h1>
               {onEditPatient && (
                 <button
                   onClick={onEditPatient}
-                  className="p-1 rounded-md text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                  className="p-1 rounded-md text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors shrink-0"
                   title="Editar dados do paciente"
                 >
                   <Edit2 size={12} />
                 </button>
               )}
               {patient.birthDate && (
-                <span className="text-[9px] font-bold text-ink-500 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded-md shrink-0 hidden xs:inline">
+                <span className="text-[9px] font-bold text-ink-500 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded-md shrink-0 hidden lg:inline">
                   Data de Nasc: {formatDate(patient.birthDate)}
                 </span>
               )}
@@ -230,7 +230,7 @@ export function EditorHeader({
             <button
               onClick={onToggleViewer}
               className={classNames(
-                "h-9 w-9 md:w-auto md:px-3.5 rounded-xl transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0 border",
+                "h-9 w-9 lg:w-auto lg:px-3.5 rounded-xl transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0 border",
                 viewerOpen
                   ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
                   : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
@@ -238,16 +238,16 @@ export function EditorHeader({
               title="Visualizador de Imagens DICOM"
             >
               <Play size={14} />
-              <span className="hidden md:inline">Imagens</span>
+              <span className="hidden lg:inline">Imagens</span>
             </button>
           ) : (
             <button
               disabled
-              className="h-9 w-9 md:w-auto md:px-3.5 rounded-xl bg-ink-50 text-ink-400 border border-ink-200 opacity-60 cursor-not-allowed flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+              className="h-9 w-9 lg:w-auto lg:px-3.5 rounded-xl bg-ink-50 text-ink-400 border border-ink-200 opacity-60 cursor-not-allowed flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
               title="Nenhuma imagem disponível neste exame"
             >
               <ScanSearch size={14} />
-              <span className="hidden md:inline">Imagens</span>
+              <span className="hidden lg:inline">Imagens</span>
             </button>
           )
         )}
@@ -255,11 +255,11 @@ export function EditorHeader({
         {/* Ficha & Config */}
         <button
           onClick={onOpenAnamnesisConsent}
-          className="h-9 w-9 md:w-auto md:px-3.5 rounded-xl bg-white text-ink-600 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+          className="h-9 w-9 lg:w-auto lg:px-3.5 rounded-xl bg-white text-ink-600 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
           title="Ficha do Exame, Anamnese e Configurações"
         >
           <Settings size={14} />
-          <span className="hidden md:inline">Ficha & Config</span>
+          <span className="hidden lg:inline">Ficha & Config</span>
         </button>
 
         {/* Divider */}
@@ -270,7 +270,7 @@ export function EditorHeader({
           <div className="flex items-center gap-1.5 shrink-0">
             <div className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-emerald-50 border border-emerald-200">
               <CheckCircle2 size={13} className="text-emerald-600" />
-              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest hidden xs:inline">Finalizado</span>
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest hidden lg:inline">Finalizado</span>
             </div>
             <button
               onClick={onUnlock}
@@ -282,11 +282,11 @@ export function EditorHeader({
         ) : (
           <button
             onClick={() => onStatusChange('finalizado')}
-            className="h-9 px-4 md:px-5 rounded-xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 shadow-sm transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
+            className="h-9 px-3 lg:px-5 rounded-xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 shadow-sm transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95"
           >
             <CheckCircle2 size={14} className="shrink-0" />
-            <span className="hidden md:inline">Finalizar Laudo</span>
-            <span className="md:hidden">Finalizar</span>
+            <span className="hidden lg:inline">Finalizar Laudo</span>
+            <span className="lg:hidden">Finalizar</span>
           </button>
         )}
       </div>

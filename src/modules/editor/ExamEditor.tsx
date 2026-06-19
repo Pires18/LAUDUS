@@ -346,48 +346,71 @@ export function ExamEditor({ examId }: Props) {
   // Grid types: '1x2' = 1 coluna × 2 linhas (2 imagens), '2x4' = 2 colunas × 4 linhas (8 imagens)
   const [selectedGridType, setSelectedGridType] = useState<string>('2x4');
   const [isPrintingImages, setIsPrintingImages] = useState(false);
+  const [printProgress, setPrintProgress] = useState<string>('');
+  const [printLocalUrls, setPrintLocalUrls] = useState<Record<string, string>>({});
 
   const handlePrintImages = async (instances: any[], gridType: string = '2x4') => {
     if (instances.length === 0) return;
     setIsPrintingImages(true);
+    setPrintProgress(`Otimizando imagens (0/${instances.length})...`);
     showToast('Preparando imagens para a impressão...', 'info');
 
-    try {
-      const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-      const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
+    const localUrlsMap: Record<string, string> = {};
+    const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+    const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
 
-      // Fix 15: use correct server credentials (backup vs primary) per instance
-      const urls = instances.map(instance => {
+    try {
+      for (let i = 0; i < instances.length; i++) {
+        const instance = instances[i];
+        setPrintProgress(`Otimizando imagens (${i + 1}/${instances.length})...`);
         const isBackup = instance.serverSource === 'backup';
         const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
         const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
         const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
         const proxyPath = getProxyEndpoint(settings, isBackup);
-        return `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-      });
+        const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
 
-      // Preload all image URLs into browser cache
-      await preloadImages(urls);
+        // Fetch the image as blob
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        localUrlsMap[instance.ID] = blobUrl;
+      }
 
+      setPrintLocalUrls(localUrlsMap);
       setSelectedInstancesForPrint(instances);
       setSelectedGridType(gridType);
       
       document.body.classList.add('print-mode-images');
       
-      // Tiny delay to let DOM render the images loaded from cache
+      // Tiny delay to let DOM render the images loaded from local blob URLs
       setTimeout(() => {
         window.print();
         document.body.classList.remove('print-mode-images');
         setIsPrintingImages(false);
-        // Delay resetting instances to avoid tearing during viewport restore
+        setPrintProgress('');
+        
+        // Delay resetting instances and revoking object URLs to avoid tearing during viewport restore
         setTimeout(() => {
           setSelectedInstancesForPrint([]);
+          // Revoke local object URLs to free up memory
+          Object.values(localUrlsMap).forEach(url => {
+            URL.revokeObjectURL(url);
+          });
+          setPrintLocalUrls({});
         }, 500);
-      }, 150);
+      }, 300);
     } catch (err) {
       logger.error('[PACS Print Preload Error]', err);
       showToast('Erro ao carregar imagens para a impressão.', 'error');
       setIsPrintingImages(false);
+      setPrintProgress('');
+      // Clean up any successfully created blobs in case of partial success / error
+      Object.values(localUrlsMap).forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+      setPrintLocalUrls({});
     }
   };
 
@@ -549,9 +572,9 @@ export function ExamEditor({ examId }: Props) {
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Integrated Dicom Image Viewer Sidebar */}
             {showIntegratedViewer && (
-               <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-ink-850 bg-ink-950 text-ink-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0">
+               <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-zinc-800/80 bg-[#0c0c0e] text-zinc-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0 font-sans">
                 {/* Header */}
-                <div className="px-5 py-4 border-b border-ink-800 flex items-center justify-between shrink-0">
+                <div className="px-5 py-4 border-b border-zinc-800/80 bg-[#09090b] flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-4">
                     {dicomLoading && (
                       <Loader2 size={12} className="animate-spin text-emerald-500" />
@@ -567,7 +590,7 @@ export function ExamEditor({ examId }: Props) {
                               localStorage.setItem('laudus_active_pacs_server', val);
                               setDicomRefreshKey(prev => prev + 1);
                             }}
-                            className="bg-ink-900 border border-ink-800 text-ink-300 text-[10px] font-black uppercase tracking-wider rounded-lg px-2 py-1 focus:outline-none cursor-pointer hover:border-ink-700 transition-colors"
+                            className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-[10px] font-black uppercase tracking-wider rounded-xl px-2 py-1.5 focus:outline-none cursor-pointer hover:border-zinc-700 transition-colors"
                           >
                             <option value="both">Ambos PACS</option>
                             <option value="primary">PACS Principal</option>
@@ -578,7 +601,7 @@ export function ExamEditor({ examId }: Props) {
                               <div 
                                 className={classNames(
                                   "w-1.5 h-1.5 rounded-full",
-                                  pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-ink-500 animate-pulse"
+                                  pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-zinc-650 animate-pulse"
                                 )} 
                                 title={`PACS Principal: ${pacsConnected}`} 
                               />
@@ -587,7 +610,7 @@ export function ExamEditor({ examId }: Props) {
                               <div 
                                 className={classNames(
                                   "w-1.5 h-1.5 rounded-full",
-                                  pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-ink-500 animate-pulse"
+                                  pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-zinc-650 animate-pulse"
                                 )} 
                                 title={`PACS Backup: ${pacsBackupConnected}`} 
                               />
@@ -599,11 +622,11 @@ export function ExamEditor({ examId }: Props) {
                           <div 
                             className={classNames(
                               "w-2 h-2 rounded-full",
-                              pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-ink-500 animate-pulse"
+                              pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-zinc-650 animate-pulse"
                             )} 
                             title={`PACS Principal: ${pacsConnected === 'connected' ? 'Online' : pacsConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
                           />
-                          <span className="font-black text-[9px] uppercase tracking-widest text-ink-450">
+                          <span className="font-black text-[9px] uppercase tracking-widest text-zinc-400">
                             PACS Principal
                           </span>
                         </div>
@@ -617,8 +640,8 @@ export function ExamEditor({ examId }: Props) {
                         className={classNames(
                           "h-8 px-2.5 rounded-xl flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border",
                           showStudySelector
-                            ? "bg-brand-600 text-white border-brand-500"
-                            : "bg-ink-800 text-ink-300 border-ink-700 hover:bg-ink-700 hover:text-white"
+                            ? "bg-brand-600 text-white border-brand-500 shadow-sm"
+                            : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:text-white"
                         )}
                         title="Vários estudos localizados para este paciente"
                       >
@@ -630,7 +653,7 @@ export function ExamEditor({ examId }: Props) {
                       onClick={() => setDicomRefreshKey(prev => prev + 1)}
                       disabled={dicomLoading}
                       className={classNames(
-                        "p-1.5 rounded-lg hover:bg-ink-800 text-ink-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-ink-700",
+                        "p-2 rounded-xl hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-zinc-800",
                         dicomLoading && "animate-spin"
                       )}
                       title="Atualizar Imagens"
@@ -645,7 +668,7 @@ export function ExamEditor({ examId }: Props) {
                           href={extUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="h-8 px-2.5 rounded-xl bg-ink-850 hover:bg-ink-800 text-ink-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-ink-750 hover:border-ink-700 active:scale-95 shadow-sm select-none"
+                          className="h-8 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-zinc-800 active:scale-95 shadow-sm select-none"
                           title="Abrir no Visualizador Orthanc Externo (Stone Viewer, etc.)"
                         >
                           <ExternalLink size={12} className="text-brand-400" />
@@ -655,7 +678,7 @@ export function ExamEditor({ examId }: Props) {
                     })()}
                     <button
                       onClick={() => setShowDicomImages(true)}
-                      className="h-8 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-95 text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all shadow-md border border-brand-500/20"
+                      className="h-8 px-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-95 text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all shadow-md border border-brand-500/20"
                       title="Gerar/Imprimir PDF das Imagens"
                     >
                       <Printer size={12} />
@@ -663,7 +686,7 @@ export function ExamEditor({ examId }: Props) {
                     </button>
                     <button 
                       onClick={() => setShowIntegratedViewer(false)}
-                      className="p-1 rounded-lg hover:bg-ink-800 text-ink-400 hover:text-white transition-all active:scale-95"
+                      className="p-2 rounded-xl hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-zinc-800"
                       title="Fechar Visualizador"
                     >
                       <X size={16} />
@@ -673,9 +696,9 @@ export function ExamEditor({ examId }: Props) {
 
                 {/* Candidate Studies Dropdown Selector Panel */}
                 {showStudySelector && candidateStudies.length > 0 && (
-                  <div className="bg-ink-900 border-b border-ink-850 p-4 space-y-2 shrink-0 animate-slide-down">
-                    <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
-                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
+                  <div className="bg-[#09090b] border-b border-zinc-800/80 p-4 space-y-2 shrink-0 animate-slide-down">
+                    <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
+                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar font-sans">
                       {candidateStudies.map((study) => {
                         const date = study.MainDicomTags?.StudyDate || '';
                         const time = study.MainDicomTags?.StudyTime || '';
@@ -692,10 +715,10 @@ export function ExamEditor({ examId }: Props) {
                               setShowStudySelector(false);
                             }}
                             className={classNames(
-                              "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3",
+                              "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3 cursor-pointer",
                               isCurrent
-                                ? "bg-emerald-950/30 border-emerald-500/50 text-emerald-300"
-                                : "bg-ink-950/50 border-ink-800 text-ink-400 hover:border-ink-700 hover:text-white"
+                                ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-400"
+                                : "bg-[#0c0c0e] border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-white"
                             )}
                           >
                             <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
@@ -723,7 +746,7 @@ export function ExamEditor({ examId }: Props) {
                 )}
 
                 {/* Main Preview Area */}
-                <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-ink-800 bg-ink-900/50">
+                <div className="p-5 flex flex-col items-center justify-center shrink-0 border-b border-zinc-800/80 bg-[#09090b]/40">
                   {(() => {
                     const activeInstance = dicomInstances[activeImageIndex];
                     const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
@@ -731,7 +754,7 @@ export function ExamEditor({ examId }: Props) {
                     if (!activeInstance) {
                       return (
                         <div 
-                          className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-ink-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-ink-650 p-6 text-center"
+                          className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-zinc-850 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-zinc-600 p-6 text-center"
                           onWheel={(e) => {
                             if (e.deltaY < 0) {
                               handlePrevImage();
@@ -741,7 +764,7 @@ export function ExamEditor({ examId }: Props) {
                           }}
                         >
                           <Eye size={32} className="opacity-25 mb-2" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-ink-500">Sem Imagem Selecionada</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Sem Imagem Selecionada</span>
                         </div>
                       );
                     }
@@ -756,7 +779,7 @@ export function ExamEditor({ examId }: Props) {
                     const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
                     return (
-                      <div className="w-full flex flex-col gap-3">
+                      <div className="w-full flex flex-col gap-3 font-sans">
                         <div 
                           onClick={() => setShowFullScreenImage(true)}
                           onWheel={(e) => {
@@ -766,34 +789,34 @@ export function ExamEditor({ examId }: Props) {
                               handleNextImage();
                             }
                           }}
-                          className="relative aspect-square w-full bg-black rounded-2xl border border-ink-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
+                          className="relative aspect-[4/3] w-full bg-black rounded-2xl border border-zinc-800 overflow-hidden flex items-center justify-center group shadow-2xl cursor-zoom-in transition-all duration-300 hover:border-zinc-700"
                         >
                           <DicomThumbnail 
                             src={previewUrl} 
                             alt={`Instance ${instanceNum}`}
-                            className="hover:scale-[1.02]"
+                            className="hover:scale-[1.01] transition-transform duration-500 max-h-full max-w-full object-contain"
                             priority={true}
                           />
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/75 hover:bg-black/90 text-white/80 hover:text-white border border-zinc-800 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20 cursor-pointer"
                             title="Anterior"
                           >
                             <ChevronLeft size={16} />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/75 hover:bg-black/90 text-white/80 hover:text-white border border-zinc-800 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20 cursor-pointer"
                             title="Próxima"
                           >
                             <ChevronRight size={16} />
                           </button>
-                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-ink-300 uppercase shadow-md animate-fade-in z-20">
+                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/80 backdrop-blur-sm border border-zinc-800 text-[8px] font-black tracking-widest text-zinc-300 uppercase shadow-md animate-fade-in z-20">
                             FOTO {activeImageIndex + 1} / {dicomInstances.length}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] font-bold text-ink-400 px-1">
-                          <span>Instância: {instanceNum}</span>
+                        <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 px-1 mt-1">
+                          <span className="font-mono text-[9px] bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-md">Instância: {instanceNum}</span>
                         </div>
                       </div>
                     );
@@ -801,14 +824,14 @@ export function ExamEditor({ examId }: Props) {
                 </div>
 
                 {/* Thumbnails Grid List or Error State */}
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-[#0c0c0e]">
                   {dicomLoading && dicomInstances.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-ink-500 text-center">
+                    <div className="flex flex-col items-center justify-center py-16 text-zinc-500 text-center font-sans">
                       <Loader2 size={24} className="animate-spin text-brand-500 mb-3" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-ink-400">Buscando Exames no PACS...</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">Buscando Exames no PACS...</span>
                     </div>
                   ) : dicomError && dicomInstances.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 flex flex-col items-center text-center gap-2.5 my-4">
+                    <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 flex flex-col items-center text-center gap-2.5 my-4 font-sans">
                       <AlertTriangle className="text-amber-500" size={24} />
                       <p className="text-[10px] text-amber-200/80 font-medium leading-relaxed">
                         {dicomError}
@@ -822,13 +845,13 @@ export function ExamEditor({ examId }: Props) {
                       </button>
                     </div>
                   ) : dicomInstances.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-ink-500 text-center px-4">
-                      <AlertCircle className="text-ink-500 mb-3" size={24} />
-                      <span className="text-[10px] font-black uppercase tracking-wider block text-ink-300">Nenhum Estudo Selecionado</span>
-                      <p className="text-[9px] text-ink-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
+                    <div className="flex flex-col items-center justify-center py-16 text-zinc-500 text-center px-4 font-sans">
+                      <AlertCircle className="text-zinc-500 mb-3" size={24} />
+                      <span className="text-[10px] font-black uppercase tracking-wider block text-zinc-300">Nenhum Estudo Selecionado</span>
+                      <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-2.5 font-sans">
                       {dicomInstances.map((instance, idx) => {
                         const isActive = idx === activeImageIndex;
                         const isBackup = instance.serverSource === 'backup';
@@ -845,13 +868,22 @@ export function ExamEditor({ examId }: Props) {
                             key={instance.ID}
                             onClick={() => setActiveImageIndex(idx)}
                             className={classNames(
-                              "relative aspect-square bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md",
+                              "relative aspect-[4/3] bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md cursor-pointer",
                               isActive 
-                                ? "border-emerald-500 ring-2 ring-emerald-500/25 scale-[0.98]" 
-                                : "border-ink-800 hover:border-ink-600 hover:scale-[1.02]"
+                                ? "border-brand-500 ring-2 ring-brand-500/25 scale-[0.98]" 
+                                : "border-zinc-800 hover:border-zinc-600 hover:scale-[1.02]"
                             )}
                           >
                             <DicomThumbnail src={previewUrl} alt={`Instance ${idx + 1}`} />
+                            {/* Overlay caption */}
+                            <div className={classNames(
+                              "absolute bottom-0 inset-x-0 py-0.5 text-center text-[7px] font-black tracking-widest uppercase border-t z-10 select-none",
+                              isActive 
+                                ? "bg-brand-950/80 text-brand-400 border-brand-800" 
+                                : "bg-zinc-950/80 text-zinc-500 border-zinc-800"
+                            )}>
+                              Foto {idx + 1}
+                            </div>
                           </button>
                         );
                       })}
@@ -1431,6 +1463,7 @@ export function ExamEditor({ examId }: Props) {
           examDate={exam.createdAt}
           selectedInstances={selectedInstancesForPrint}
           gridType={selectedGridType}
+          localUrls={printLocalUrls}
         />
       )}
 
@@ -1505,6 +1538,15 @@ export function ExamEditor({ examId }: Props) {
           })()}
         </div>
       )}
+        </div>
+      )}
+      {isPrintingImages && (
+        <div className="fixed inset-0 z-[9999] bg-zinc-950/80 backdrop-blur-md flex flex-col items-center justify-center gap-4 animate-fade-in text-white font-sans select-none">
+          <Loader2 size={40} className="animate-spin text-emerald-500" />
+          <div className="text-center space-y-1.5">
+            <h3 className="text-sm font-black uppercase tracking-wider text-zinc-100">Otimizando imagens para impressão</h3>
+            <p className="text-xs text-emerald-400 font-black tracking-widest">{printProgress}</p>
+          </div>
         </div>
       )}
     </>

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { getActivePacsUrl, getProxyEndpoint } from '../../store/db';
+import { getProxyEndpoint } from '../../store/db';
 import { Patient, Clinic, AppSettings } from '../../types';
 import { calculateAge, formatDate } from '../../utils/format';
 
@@ -11,9 +11,21 @@ interface Props {
   examDate: number;
   selectedInstances: Array<{ ID: string; MainDicomTags?: { InstanceNumber?: string } }>;
   gridType?: string;
+  localUrls?: Record<string, string>;
+  imageAdjustments?: Record<string, { rotation: number; inverted: boolean }>;
 }
 
-export function PrintImagesLayout({ patient, clinic, settings, examType, examDate, selectedInstances, gridType = '2x4' }: Props) {
+export function PrintImagesLayout({ 
+  patient, 
+  clinic, 
+  settings, 
+  examType, 
+  examDate, 
+  selectedInstances, 
+  gridType = '2x4',
+  localUrls = {},
+  imageAdjustments = {}
+}: Props) {
   // Determine grid dimensions based on gridType
   let cols = 2;
   let rows = 4;
@@ -43,7 +55,8 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
     pages.push(selectedInstances.slice(i, i + chunkSize));
   }
 
-  const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+  const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+  const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
 
   if (typeof document === 'undefined') return null;
 
@@ -80,7 +93,7 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
             </div>
           </div>
 
-          {/* Grid Layout — classes definidas em index.css para impressão */}
+          {/* Grid Layout — classes defined in index.css for printing */}
           <div 
             className={
               gridType === '1x1' ? 'print-images-grid-1x1 flex-grow' :
@@ -94,20 +107,29 @@ export function PrintImagesLayout({ patient, clinic, settings, examType, examDat
               const instanceNum = instance.MainDicomTags?.InstanceNumber || globalIndex;
               
               const isBackup = (instance as any).serverSource === 'backup';
-              const currentBaseUrl = isBackup
-                ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                : (settings.dicomViewerUrl || 'http://localhost:8042');
+              const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
               const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
               const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
               const proxyPath = getProxyEndpoint(settings, isBackup);
-              const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
               
+              // Base fallback URL if local blob doesn't exist
+              const fallbackUrl = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+              
+              const previewUrl = localUrls[instance.ID] || fallbackUrl;
+
+              const imgStyle = {
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain' as const,
+                margin: 'auto'
+              };
+
               return (
-                <div key={instance.ID} className="print-image-card relative">
+                <div key={instance.ID} className="print-image-card relative flex items-center justify-center bg-black overflow-hidden h-full w-full">
                   <img 
                     src={previewUrl} 
                     alt={`Imagem ${instanceNum}`}
-                    className="w-full h-full object-contain"
+                    style={imgStyle}
                   />
                 </div>
               );

@@ -199,16 +199,7 @@ export function Settings() {
     }
   }
 
-  const handleAddDevice = () => {
-    const newDevice = { id: Date.now().toString(), name: 'Novo Aparelho', aeTitle: 'AETITLE', modality: 'US' };
-    setDraft(d => ({ ...d, dicomDevices: [...(d.dicomDevices || []), newDevice] }));
-  };
-  const handleRemoveDevice = (id: string) => {
-    setDraft(d => ({ ...d, dicomDevices: (d.dicomDevices || []).filter(x => x.id !== id) }));
-  };
-  const handleUpdateDevice = (id: string, field: string, value: string) => {
-    setDraft(d => ({ ...d, dicomDevices: (d.dicomDevices || []).map(x => x.id === id ? { ...x, [field]: value } : x) }));
-  };
+
 
   const tabs = [
     { id: 'perfil', label: 'Meu Perfil', icon: User },
@@ -821,89 +812,7 @@ export function Settings() {
                     </div>
                   )}
 
-                  {/* CARD 3: APARELHOS MÉDICOS */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-ink-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
-                          <Monitor size={20} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-ink-900">Aparelhos e Equipamentos</h4>
-                          <p className="text-xs text-ink-500">Cadastre seus aparelhos de ultrassom, ressonância, etc.</p>
-                        </div>
-                      </div>
-                      <button type="button" onClick={handleAddDevice} className="btn-ghost bg-brand-50 hover:bg-brand-100 text-brand-700 h-9 px-3 rounded-xl flex items-center gap-1 text-xs font-bold">
-                        <Plus size={14} /> NOVO
-                      </button>
-                    </div>
 
-                    {(!draft.dicomDevices || draft.dicomDevices.length === 0) ? (
-                      <div className="text-center py-8 bg-ink-50 rounded-xl border border-ink-100 border-dashed">
-                        <Monitor size={32} className="mx-auto text-ink-300 mb-3" />
-                        <p className="text-sm font-bold text-ink-900">Nenhum aparelho cadastrado</p>
-                        <p className="text-xs text-ink-500 max-w-sm mx-auto mt-1">Adicione seus aparelhos para poder selecionar o destino correto ao criar um laudo.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {draft.dicomDevices.map((device, index) => (
-                          <div key={device.id} className="p-4 rounded-xl border border-ink-150 bg-ink-50/50 flex flex-col md:flex-row gap-4 items-start md:items-center relative animate-fade-in group">
-                            {index === 0 && (
-                              <span className="absolute -top-2 -left-2 bg-brand-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
-                                Padrão
-                              </span>
-                            )}
-                            
-                            <div className="flex-1 w-full space-y-3">
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div>
-                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">Nome do Aparelho</label>
-                                  <input 
-                                    className="input h-10 text-xs w-full bg-white" 
-                                    value={device.name} 
-                                    onChange={(e) => handleUpdateDevice(device.id, 'name', e.target.value)} 
-                                    placeholder="Ex: GE Voluson S10"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">AE Title</label>
-                                  <input 
-                                    className="input h-10 text-xs w-full bg-white font-mono" 
-                                    value={device.aeTitle} 
-                                    onChange={(e) => handleUpdateDevice(device.id, 'aeTitle', e.target.value.toUpperCase())} 
-                                    placeholder="Ex: GE_VOLUSON"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">Modalidade</label>
-                                  <select 
-                                    className="input h-10 text-xs w-full bg-white" 
-                                    value={device.modality} 
-                                    onChange={(e) => handleUpdateDevice(device.id, 'modality', e.target.value)}
-                                  >
-                                    <option value="US">US (Ultrassom)</option>
-                                    <option value="CR">CR (Raio-X CR)</option>
-                                    <option value="CT">CT (Tomografia)</option>
-                                    <option value="MR">MR (Ressonância)</option>
-                                    <option value="DX">DX (Raio-X DX)</option>
-                                    <option value="MG">MG (Mamografia)</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <button 
-                              type="button" 
-                              onClick={() => handleRemoveDevice(device.id)}
-                              className="md:mt-5 p-2.5 rounded-lg text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors shrink-0"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
                   {/* CARD 4: CONFIGURAÇÕES GLOBAIS E MANUAL */}
                   <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
@@ -927,33 +836,94 @@ export function Settings() {
                       />
                     </div>
 
-                    <div className="bg-ink-900 text-ink-100 rounded-2xl p-6 border border-ink-800 shadow-inner">
-                      <div className="flex items-center gap-3 mb-4">
-                        <Info size={18} className="text-brand-400" />
-                        <h4 className="text-sm font-bold text-white">Manual de Conexão no Aparelho</h4>
+                    <div className="bg-ink-900 text-ink-100 rounded-3xl p-6 border border-ink-800 shadow-xl space-y-6">
+                      <div className="flex items-center gap-3 pb-4 border-b border-ink-800/80">
+                        <Info size={20} className="text-brand-400 shrink-0" />
+                        <div>
+                          <h4 className="text-sm font-black text-white uppercase tracking-wider">Manual de Integração com o Equipamento</h4>
+                          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tight mt-0.5 font-sans">Siga as etapas abaixo para configurar seu aparelho de ultrassom ou console.</p>
+                        </div>
                       </div>
-                      <p className="text-xs text-ink-400 mb-4 leading-relaxed">
-                        No seu aparelho de Ultrassom, cadastre o Servidor DICOM Worklist utilizando os dados abaixo para puxar a lista de pacientes gerada pelo Laud.us.
-                      </p>
-                      <ul className="space-y-2 text-xs font-mono bg-ink-950 p-4 rounded-xl border border-ink-800/50 text-brand-400">
-                        <li>
-                          <span className="text-ink-500">IP do Servidor (Principal):</span> {(() => {
-                            try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR_PRINCIPAL'; } catch { return 'IP_DO_SERVIDOR_PRINCIPAL'; }
-                          })()}
-                        </li>
-                        {draft.dicomBackupSyncEnabled && (
-                          <li>
-                            <span className="text-ink-500">IP do Servidor (Backup):</span> {(() => {
-                              try { return draft.dicomBackupViewerUrl ? new URL(draft.dicomBackupViewerUrl).hostname : 'IP_DO_SERVIDOR_BACKUP'; } catch { return 'IP_DO_SERVIDOR_BACKUP'; }
-                            })()}
-                          </li>
-                        )}
-                        <li><span className="text-ink-500">Porta DICOM:</span> 4242</li>
-                        <li><span className="text-ink-500">AE Title (Principal):</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
-                        {draft.dicomBackupSyncEnabled && (
-                          <li><span className="text-ink-500">AE Title (Backup):</span> {draft.dicomBackupOrthancAETitle || 'ORTHANC'}</li>
-                        )}
-                      </ul>
+
+                      {/* Dados de Endereçamento DICOM */}
+                      <div className="space-y-3 font-sans">
+                        <span className="text-[10px] font-black text-ink-450 uppercase tracking-widest block">Parâmetros de Conexão DICOM</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono bg-ink-950 p-4 rounded-2xl border border-ink-800/50 text-brand-400">
+                          <div className="space-y-1">
+                            <p><span className="text-ink-500">IP Servidor Principal:</span> <strong className="text-white select-all">{(() => {
+                              try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR'; } catch { return 'IP_DO_SERVIDOR'; }
+                            })()}</strong></p>
+                            {draft.dicomBackupSyncEnabled && (
+                              <p><span className="text-ink-500">IP Servidor Backup:</span> <strong className="text-white select-all">{(() => {
+                                try { return draft.dicomBackupViewerUrl ? new URL(draft.dicomBackupViewerUrl).hostname : 'IP_DO_SERVIDOR_BACKUP'; } catch { return 'IP_DO_SERVIDOR_BACKUP'; }
+                              })()}</strong></p>
+                            )}
+                            <p><span className="text-ink-500">Porta DICOM (Worklist/Store):</span> <strong className="text-white select-all">4242</strong></p>
+                          </div>
+                          <div className="space-y-1">
+                            <p><span className="text-ink-500">AE Title Principal (Orthanc):</span> <strong className="text-white select-all">{draft.dicomOrthancAETitle || 'ORTHANC'}</strong></p>
+                            {draft.dicomBackupSyncEnabled && (
+                              <p><span className="text-ink-500">AE Title Backup (Orthanc):</span> <strong className="text-white select-all">{draft.dicomBackupOrthancAETitle || 'ORTHANC'}</strong></p>
+                            )}
+                            <p><span className="text-ink-500">AE Title Local do Aparelho:</span> <span className="text-ink-400 italic">Livre (ex: US_SALA_01)</span></p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Guia Passo a Passo */}
+                      <div className="space-y-4 font-sans">
+                        <span className="text-[10px] font-black text-ink-450 uppercase tracking-widest block">Guia de Configuração Passo a Passo</span>
+                        
+                        <div className="space-y-3.5 text-xs text-ink-300 leading-relaxed">
+                          <div className="flex gap-3">
+                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">1</span>
+                            <div>
+                              <strong className="text-white block font-bold mb-0.5">Conectividade e Rede Física</strong>
+                              Certifique-se de que o aparelho de ultrassom está conectado à mesma rede local (rede cabeada ou Wi-Fi clínico) em que está hospedado o seu servidor PACS Orthanc local/virtual.
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">2</span>
+                            <div>
+                              <strong className="text-white block font-bold mb-0.5">Configuração do Worklist (MWL - Modality Worklist)</strong>
+                              No painel do equipamento (geralmente em <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">Setup/System Config</code> &gt; <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">DICOM Settings</code> &gt; <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">Worklist</code>), cadastre um novo serviço com o **IP do Servidor**, **Porta 4242** e o **AE Title Principal** acima. Isso habilitará o botão "Worklist" no teclado do aparelho para sincronizar a lista de pacientes em tempo real.
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">3</span>
+                            <div>
+                              <strong className="text-white block font-bold mb-0.5">Configuração do Destino de Imagens (C-STORE / Storage)</strong>
+                              Para que o ultrassom envie as capturas e exames gravados de volta para o visualizador do Laud.us, adicione outro serviço sob a aba <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">Storage/C-STORE</code>. Use exatamente os mesmos parâmetros de IP, Porta 4242 e AE Title configurados no Worklist.
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">4</span>
+                            <div>
+                              <strong className="text-white block font-bold mb-0.5">Autorização de AE Title do Equipamento no Servidor</strong>
+                              O servidor PACS Orthanc requer que os aparelhos conectados sejam previamente autorizados. Informe à equipe técnica ou TI da sua clínica o **AE Title**, **IP local** e **Porta local** do aparelho de ultrassom para que possamos registrá-lo nas regras de roteamento e escuta do servidor central.
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">5</span>
+                            <div>
+                              <strong className="text-white block font-bold mb-0.5">Validação do Link DICOM (C-ECHO / Ping)</strong>
+                              No equipamento de imagem, selecione os perfis de Worklist e Storage salvos e acione a opção **Verify** (ou **DICOM Ping/Echo**). A resposta deve ser "Success" ou "Conexão Estabelecida". A partir disso, o aparelho já estará integrado!
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Suporte Técnico */}
+                      <div className="pt-4 border-t border-ink-800/80 text-[11px] text-ink-400 leading-relaxed font-sans">
+                        <p className="font-bold text-amber-400 mb-1 flex items-center gap-1.5">
+                          <span>⚠️</span> Importante para Administradores de TI:
+                        </p>
+                        Se precisar de suporte com a parametrização de rede, configurações de firewall na porta 4242 ou cadastro de AETitles personalizados no arquivo de configuração do Orthanc, acione o canal de suporte técnico do Laud.us diretamente pelo menu inferior.
+                      </div>
                     </div>
                   </div>
 

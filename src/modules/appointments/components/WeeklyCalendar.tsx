@@ -183,17 +183,26 @@ export function WeeklyCalendar({
                 {day.dayNum}
               </span>
 
-              <div className="flex items-center justify-center gap-0.5 mt-1.5 min-h-[6px]">
-                {day.counts.agendado > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm" title={`${day.counts.agendado} Agendado(s)`} />
-                )}
-                {day.counts.confirmado > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-sm" title={`${day.counts.confirmado} Confirmado(s)`} />
-                )}
-                {day.counts.cancelado > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm" title={`${day.counts.cancelado} Cancelado(s)`} />
-                )}
-              </div>
+              {day.isFull ? (
+                <span className={classNames(
+                  "px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-widest leading-none mt-1.5",
+                  isSelected ? "bg-rose-500/20 text-rose-300" : "bg-rose-50 border border-rose-100 text-rose-600"
+                )}>
+                  CHEIA
+                </span>
+              ) : (
+                <div className="flex items-center justify-center gap-0.5 mt-1.5 min-h-[6px]">
+                  {day.counts.agendado > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm" title={`${day.counts.agendado} Agendado(s)`} />
+                  )}
+                  {day.counts.confirmado > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-sm" title={`${day.counts.confirmado} Confirmado(s)`} />
+                  )}
+                  {day.counts.cancelado > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-sm" title={`${day.counts.cancelado} Cancelado(s)`} />
+                  )}
+                </div>
+              )}
 
               {day.counts.total > 0 && (
                 <span className={classNames(
@@ -201,12 +210,6 @@ export function WeeklyCalendar({
                   isSelected ? "bg-emerald-500 text-white" : "bg-ink-900 text-white"
                 )}>
                   {day.counts.total}
-                </span>
-              )}
-
-              {day.isFull && (
-                <span className="absolute bottom-1 text-[7px] font-black tracking-widest text-rose-500">
-                  CHEIA
                 </span>
               )}
             </button>
