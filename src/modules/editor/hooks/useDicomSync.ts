@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
+import { getProxyEndpoint } from '../../../store/db';
 import { ExamRequest, Patient } from '../../../types';
 import { getStudyInstanceUID } from '../../../utils/dicom';
 import { logger } from '../../../utils/logger';
@@ -110,31 +110,41 @@ const locateStudies = async (
   return Array.from(candidatesMap.values());
 };
 
-const scoreStudies = (candidates: any[], examTime: number): any[] => {
+const scoreStudies = (candidates: any[], examTime: number, modality?: string): any[] => {
+  const refDate = new Date(examTime);
+  const refDay = `${refDate.getFullYear()}${String(refDate.getMonth() + 1).padStart(2, '0')}${String(refDate.getDate()).padStart(2, '0')}`;
+
   const scored = candidates.map((c) => {
     const studyDate = c.MainDicomTags?.StudyDate || ''; // YYYYMMDD
     const studyTime = c.MainDicomTags?.StudyTime || '000000'; // HHMMSS
-    
+    const studyModality = (c.MainDicomTags?.ModalitiesInStudy || c.MainDicomTags?.Modality || '').toUpperCase();
+
     let diffMs = Infinity;
     if (studyDate.length === 8) {
       const year = parseInt(studyDate.substring(0, 4), 10);
       const month = parseInt(studyDate.substring(4, 6), 10) - 1;
       const day = parseInt(studyDate.substring(6, 8), 10);
-      
       let hour = 0, minute = 0, second = 0;
       if (studyTime.length >= 6) {
         hour = parseInt(studyTime.substring(0, 2), 10);
         minute = parseInt(studyTime.substring(2, 4), 10);
         second = parseInt(studyTime.substring(4, 6), 10);
       }
-      
       const sDate = new Date(year, month, day, hour, minute, second);
       diffMs = Math.abs(sDate.getTime() - examTime);
     }
-    return { study: c, diffMs };
+
+    // Same-day studies get a strong boost (treated as within 1 minute)
+    const isSameDay = studyDate === refDay;
+    const adjustedDiff = isSameDay ? Math.min(diffMs, 60_000) : diffMs;
+
+    // Modality match: if exam area implies US, prefer US modality
+    const modalityBonus = modality && studyModality.includes(modality) ? -30_000 : 0;
+
+    return { study: c, score: adjustedDiff + modalityBonus };
   });
 
-  scored.sort((a, b) => a.diffMs - b.diffMs);
+  scored.sort((a, b) => a.score - b.score);
   return scored.map(item => item.study);
 };
 
@@ -366,7 +376,8 @@ export function useDicomSync({
           activeStudy = mergedCandidates.find(c => c.ID === currentSelectedId);
         }
         if (!activeStudy && mergedCandidates.length > 0) {
-          const sorted = scoreStudies(mergedCandidates, exam.createdAt);
+          const refTime = exam.scheduledAt || exam.examDate || exam.createdAt;
+          const sorted = scoreStudies(mergedCandidates, refTime, settings.dicomModalityType || 'US');
           activeStudy = sorted[0];
           if (active) {
             internalChangeSelectedStudy(activeStudy.ID);

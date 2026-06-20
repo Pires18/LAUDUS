@@ -69,45 +69,61 @@ export function TemplateEditor({ templateId }: Props) {
 
   return (
     <div className="module-container">
-      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-6">
-        <div className="shrink-0">
-        <button
-          onClick={() => setView({ name: 'templates' })}
-          className="text-sm text-ink-500 hover:text-ink-800 flex items-center gap-1 mb-3"
-        >
-          <ArrowLeft size={14} /> Voltar
-        </button>
-
-        <PageHeader
-          title={draft.name}
-          subtitle="Edição de Máscara"
-          actions={
-            <button className="btn-primary" onClick={handleSave}>
-              <Save size={15} /> Salvar Máscara
-            </button>
-          }
-        />
-
-        <div className="tab-group w-fit mt-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={classNames(
-                "tab-item",
-                activeTab === tab.id && "tab-item-active"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+      <div className="max-w-6xl mx-auto w-full animate-fade-in space-y-5">
+        
+        {/* ─── COMPACT HEADER ─── */}
+        <div className="bg-white border border-ink-200 rounded-2xl shadow-sm">
+          <div className="px-5 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={() => setView({ name: 'templates' })}
+                className="w-8 h-8 rounded-xl border border-ink-200 hover:bg-ink-50 text-ink-500 hover:text-ink-700 flex items-center justify-center transition-all shrink-0 active:scale-95"
+                title="Voltar"
+              >
+                <ArrowLeft size={14} />
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-ink-900 tracking-tight leading-none truncate max-w-[200px] sm:max-w-md">{draft.name}</h1>
+                <p className="text-[11px] text-ink-500 font-medium mt-0.5">Edição de Máscara</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleSave}
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+              >
+                <Save size={11} />
+                Salvar Máscara
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+
+        {/* ─── PILL TAB BAR ─── */}
+        <div className="flex items-center gap-1.5 bg-ink-100 p-1 rounded-2xl border border-ink-200/50 overflow-x-auto">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={classNames(
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                    : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
 
       <div className="pb-8 space-y-8">
         {activeTab === 'info' && (
           <div className="grid grid-cols-2 gap-6 max-w-4xl">
-            <div className="card p-5 space-y-4 col-span-2">
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4 col-span-2">
               <div>
                 <label className="label">Área *</label>
                 <select
@@ -173,8 +189,8 @@ export function TemplateEditor({ templateId }: Props) {
         )}
 
         {activeTab === 'structure' && (
-          <div className="max-w-4xl space-y-8 pb-12">
-            <div className="card p-5 border-none shadow-medium bg-gradient-to-br from-white to-ink-50/30">
+          <div className="max-w-4xl space-y-6 pb-12">
+            <div className="bg-white rounded-2xl border border-ink-150 shadow-sm p-5 bg-gradient-to-br from-white to-ink-50/30">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
@@ -218,7 +234,7 @@ export function TemplateEditor({ templateId }: Props) {
               </div>
             </div>
 
-            <div className="card p-6 space-y-4 shadow-sm border border-ink-100">
+            <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
               <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
                 <FileText size={12} className="text-brand-500" /> Título do Laudo
               </label>
@@ -272,8 +288,8 @@ export function TemplateEditor({ templateId }: Props) {
               placeholder="Ex: Sugere-se correlação clínica..."
             />
 
-            <div className="card p-6 space-y-4 shadow-sm border border-ink-100">
-              <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
+            <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
+                <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
                 <BrainCircuit size={12} className="text-brand-500" /> Prompt Específico do Exame (LAUD.IA)
               </label>
               <p className="text-xs text-ink-500 leading-relaxed">
@@ -291,8 +307,8 @@ export function TemplateEditor({ templateId }: Props) {
 
 
         {activeTab === 'copilot' && (
-          <div className="max-w-4xl space-y-6">
-            <div className="card p-6 space-y-4">
+          <div className="max-w-4xl space-y-5">
+            <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
                   <ClipboardList size={16} className="text-brand-500" />
@@ -335,7 +351,7 @@ export function TemplateEditor({ templateId }: Props) {
               />
             </div>
 
-            <div className="card p-6 space-y-4">
+            <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
               <div className="flex items-center justify-between gap-4">
                 <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
                   <FileText size={16} className="text-indigo-500" />

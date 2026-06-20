@@ -4,8 +4,7 @@ import { logger } from '../../utils/logger';
 import { getRecentFinalizedReports } from '../../store/db';
 import { resolveGeminiModel, getAnthropicBaseUrl } from './engine';
 import { robustJsonParse } from './json';
-import { 
-  DEFAULT_TEMPLATE_GENERATION_PROMPT,
+import {
   DEFAULT_CUSTOM_FORM_PROMPT,
   DEFAULT_ANAMNESIS_PROMPT,
   DEFAULT_CONSENT_PROMPT

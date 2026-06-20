@@ -16,7 +16,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
   onSnapshot,
   writeBatch,
   QueryConstraint,
@@ -26,6 +25,31 @@ import { AppSettings, SupportTicket, SupportMessage } from '../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../modules/ai/prompts/general';
 import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
+import { encryptPassword, decryptPassword } from '../utils/crypto';
+
+async function decryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
+  settings: T
+): Promise<T> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return settings;
+  const [pw, bkpw] = await Promise.all([
+    settings.dicomPassword ? decryptPassword(settings.dicomPassword, uid) : Promise.resolve(''),
+    settings.dicomBackupPassword ? decryptPassword(settings.dicomBackupPassword, uid) : Promise.resolve(''),
+  ]);
+  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw };
+}
+
+async function encryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
+  settings: T
+): Promise<T> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return settings;
+  const [pw, bkpw] = await Promise.all([
+    settings.dicomPassword ? encryptPassword(settings.dicomPassword, uid) : Promise.resolve(''),
+    settings.dicomBackupPassword ? encryptPassword(settings.dicomBackupPassword, uid) : Promise.resolve(''),
+  ]);
+  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw };
+}
 
 // Cache global para evitar múltiplas queries do UID do administrador
 let cachedAdminUid: string | null = null;
@@ -113,7 +137,7 @@ export async function getSettings(): Promise<AppSettings> {
     let defaultSettings: AppSettings = {
       geminiModel: 'gemini-3.5-flash',
       aiProvider: 'anthropic',
-      anthropicModel: 'claude-3-5-sonnet-latest',
+      anthropicModel: 'claude-sonnet-4-6',
       dicomSyncEnabled: true,
       dicomWorklistFolder: isWindows
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
@@ -143,37 +167,73 @@ export async function getSettings(): Promise<AppSettings> {
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
-    // Realiza a migração automática de caminhos antigos para o novo local no SSD do usuário
-    let migrated = false;
-    if (data.dicomWorklistFolder && data.dicomWorklistFolder.includes('/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase')) {
-      data.dicomWorklistFolder = data.dicomWorklistFolder.replace(
-        '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase',
-        '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase'
-      );
-      migrated = true;
-    }
+    // ── Versioned settings migrations ───────────────────────────────────────
+    // Add new entries at the END. Never change existing version numbers.
+    const SETTINGS_MIGRATIONS: Array<{ version: number; name: string; apply: (s: AppSettings) => void }> = [
+      {
+        version: 1,
+        name: 'worklist-path-to-ssd',
+        apply: (s) => {
+          if (s.dicomWorklistFolder?.includes('/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase')) {
+            s.dicomWorklistFolder = s.dicomWorklistFolder.replace(
+              '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase',
+              '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase'
+            );
+          }
+        }
+      },
+      {
+        version: 2,
+        name: 'dicom-viewer-url-pattern-uid',
+        apply: (s) => {
+          if (s.dicomViewerUrlPattern?.includes('1.2.276.0.7230010.3.1.2.{{examId}}')) {
+            s.dicomViewerUrlPattern = s.dicomViewerUrlPattern.replace('1.2.276.0.7230010.3.1.2.{{examId}}', '{{StudyInstanceUID}}');
+          }
+        }
+      },
+      {
+        version: 3,
+        name: 'dicom-viewer-url-add-port',
+        apply: (s) => {
+          if (s.dicomViewerUrl === 'https://servidor-mac.tail861dda.ts.net/') {
+            s.dicomViewerUrl = 'https://servidor-mac.tail861dda.ts.net:8443/';
+          }
+        }
+      },
+      {
+        version: 4,
+        name: 'dicom-local-agent-url-normalize',
+        apply: (s) => {
+          if (s.dicomLocalAgentUrl?.includes('servidor-mac.tail861dda.ts.net') && s.dicomLocalAgentUrl !== 'https://servidor-mac.tail861dda.ts.net') {
+            s.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net';
+          }
+        }
+      },
+      {
+        version: 5,
+        name: 'anthropic-model-upgrade-to-sonnet-4-6',
+        apply: (s) => {
+          if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
+            s.anthropicModel = 'claude-sonnet-4-6';
+          }
+        }
+      },
+    ];
 
-    if (data.dicomViewerUrlPattern && data.dicomViewerUrlPattern.includes('1.2.276.0.7230010.3.1.2.{{examId}}')) {
-      data.dicomViewerUrlPattern = data.dicomViewerUrlPattern.replace('1.2.276.0.7230010.3.1.2.{{examId}}', '{{StudyInstanceUID}}');
-      migrated = true;
-    }
-
-    if (data.dicomViewerUrl === 'https://servidor-mac.tail861dda.ts.net/') {
-      data.dicomViewerUrl = 'https://servidor-mac.tail861dda.ts.net:8443/';
-      migrated = true;
-    }
-
-    if (
-      data.dicomLocalAgentUrl && 
-      data.dicomLocalAgentUrl.includes('servidor-mac.tail861dda.ts.net') && 
-      data.dicomLocalAgentUrl !== 'https://servidor-mac.tail861dda.ts.net'
-    ) {
-      data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net';
-      migrated = true;
-    }
-
-    if (migrated && snap.exists()) {
-      saveSettings(data).catch(err => logger.warn('[DB] Falha ao persistir migração de settings:', err));
+    const currentVersion: number = (data as any)._settingsMigrationVersion ?? 0;
+    const pendingMigrations = SETTINGS_MIGRATIONS.filter(m => m.version > currentVersion);
+    if (pendingMigrations.length > 0 && snap.exists()) {
+      for (const migration of pendingMigrations) {
+        try {
+          migration.apply(data);
+          logger.info(`[DB] Migration ${migration.version} (${migration.name}) aplicada`);
+        } catch (err) {
+          logger.warn(`[DB] Falha na migration ${migration.version} (${migration.name}):`, err);
+        }
+      }
+      const latestVersion = pendingMigrations[pendingMigrations.length - 1].version;
+      (data as any)._settingsMigrationVersion = latestVersion;
+      saveSettings(data).catch(err => logger.warn('[DB] Falha ao persistir migrations:', err));
     }
 
     // Se o preset for modificado localmente, a configuração persistirá sem ser sobrescrita.
@@ -198,11 +258,11 @@ export async function getSettings(): Promise<AppSettings> {
           geminiApiKey: data.geminiApiKey || '',
           anthropicApiKey: data.anthropicApiKey || '',
         };
-        
+
         if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
-          merged.anthropicModel = 'claude-3-5-sonnet-latest';
+          merged.anthropicModel = 'claude-sonnet-4-6';
         }
-        return merged;
+        return decryptDicomPasswords(merged);
       }
     }
     const finalData = { ...defaultSettings, ...data };
@@ -210,11 +270,11 @@ export async function getSettings(): Promise<AppSettings> {
     finalData.aiGlobalInstructions = finalData.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
     finalData.aiStructurePrompt = finalData.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
     finalData.aiRigidRules = finalData.aiRigidRules || DEFAULT_RIGID_RULES;
-    
+
     if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
-      finalData.anthropicModel = 'claude-3-5-sonnet-latest';
+      finalData.anthropicModel = 'claude-sonnet-4-6';
     }
-    return finalData;
+    return decryptDicomPasswords(finalData);
   } catch (err) {
     logger.warn('[DB] Erro ao carregar settings:', err);
   }
@@ -222,7 +282,7 @@ export async function getSettings(): Promise<AppSettings> {
   return {
     geminiModel: 'gemini-3.5-flash',
     aiProvider: 'anthropic',
-    anthropicModel: 'claude-3-5-sonnet-latest',
+    anthropicModel: 'claude-sonnet-4-6',
     dicomSyncEnabled: true,
     dicomWorklistFolder: isWindows
       ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
@@ -275,8 +335,9 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
+  const encrypted = await encryptDicomPasswords(settings);
   const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
-  await setDoc(docRef, sanitize(settings), { merge: true });
+  await setDoc(docRef, sanitize(encrypted), { merge: true });
 }
 
 // ─── Generic CRUD ───

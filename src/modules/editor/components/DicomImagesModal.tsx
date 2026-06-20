@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Modal } from '../../../components/Modal';
 import { AppSettings, ExamRequest } from '../../../types';
 import { 
-  Loader2, Camera, Printer, CheckSquare, Square, 
-  AlertTriangle, RefreshCw, RotateCw, Contrast, Check
+  Loader2, Camera, Printer, CheckSquare, Square,
+  AlertTriangle, RefreshCw, Check
 } from 'lucide-react';
 import { getProxyEndpoint } from '../../../store/db';
 import { classNames } from '../../../utils/format';

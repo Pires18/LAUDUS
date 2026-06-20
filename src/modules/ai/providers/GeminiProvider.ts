@@ -54,7 +54,7 @@ export class GeminiProvider implements AiProvider {
     settings: AppSettings,
     area: string,
     mode: string,
-    onChunk: (text: string) => void,
+    onChunk: (text: string, rawText?: string) => void,
     signal?: AbortSignal,
     onComplete?: (scratchpad?: string) => void,
     helpers?: any
@@ -80,7 +80,7 @@ export class GeminiProvider implements AiProvider {
       for await (const chunk of result.stream) {
         if (signal?.aborted) break;
         fullText += chunk.text();
-        onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)));
+        onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)), fullText);
       }
     } catch (streamErr) {
       if (signal?.aborted || (streamErr instanceof Error && streamErr.name === 'AbortError')) {

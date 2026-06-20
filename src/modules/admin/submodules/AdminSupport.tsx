@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { onSupportTicketsChange, addSupportMessage, updateGlobalItem, clearAllSupportTickets } from '../../../store/db';
+import { addSupportMessage, updateGlobalItem, clearAllSupportTickets } from '../../../store/db';
 import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
 import { useCollection, orderBy } from '../../../hooks/useFirestore';
-import { SupportTicket, SupportMessage } from '../../../types';
-import { 
-  MessageSquare, AlertCircle, Search, 
+import { SupportTicket } from '../../../types';
+import {
+  MessageSquare, AlertCircle, Search,
   Send, Loader2, User, Box, ArrowLeft, Trash2
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { useConfirm } from '../../../hooks/useConfirm';
 
 export function AdminSupport() {
   const { user: adminUser } = useAuth();
   const { showToast } = useApp();
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'pending' | 'resolved'>('all');
   const { data: tickets, loading, error } = useCollection<SupportTicket>('support_tickets', { 
@@ -26,9 +28,12 @@ export function AdminSupport() {
   const [isClearing, setIsClearing] = useState(false);
 
   async function handleClearAllTickets() {
-    const confirmed = window.confirm(
-      'ATENÇÃO: Você tem certeza absoluta de que deseja excluir DEFINITIVAMENTE todo o histórico de chamados de suporte? Esta ação é irreversível.'
-    );
+    const confirmed = await confirm({
+      title: 'Excluir Todo o Histórico',
+      message: 'Você tem certeza absoluta de que deseja excluir DEFINITIVAMENTE todo o histórico de chamados de suporte? Esta ação é irreversível.',
+      confirmLabel: 'Excluir Tudo',
+      variant: 'danger',
+    });
     if (!confirmed) return;
     
     setIsClearing(true);
@@ -89,14 +94,14 @@ export function AdminSupport() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)] bg-white rounded-3xl border border-ink-100 shadow-premium overflow-hidden animate-fade-in">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)] bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
       
       {/* Sidebar: Ticket List */}
       <aside className={classNames(
         "w-full lg:w-[400px] border-r border-ink-100 flex flex-col transition-all",
         selectedTicketId && "hidden lg:flex"
       )}>
-        <div className="p-8 border-b border-ink-100">
+        <div className="p-5 border-b border-ink-100">
            <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-black text-ink-900">Central de Atendimento</h3>
               {tickets.length > 0 && (
@@ -146,7 +151,7 @@ export function AdminSupport() {
 
         <div className="flex-1 overflow-y-auto divide-y divide-ink-50">
           {loading ? (
-             [1, 2, 3].map(i => <div key={i} className="p-8 animate-pulse"><div className="h-16 bg-ink-50 rounded-2xl" /></div>)
+             [1, 2, 3].map(i => <div key={i} className="p-5 animate-pulse"><div className="h-16 bg-ink-50 rounded-2xl" /></div>)
           ) : error ? (
             <div className="p-12 text-center">
                <AlertCircle size={40} className="mx-auto text-red-400 mb-4" />
@@ -158,7 +163,7 @@ export function AdminSupport() {
               key={ticket.id}
               onClick={() => setSelectedTicketId(ticket.id)}
               className={classNames(
-                "w-full p-8 text-left transition-all hover:bg-ink-50/50 relative group",
+                "w-full p-5 text-left transition-all hover:bg-ink-50/50 relative group",
                 selectedTicketId === ticket.id ? "bg-brand-50/30" : "bg-white"
               )}
             >
@@ -205,7 +210,7 @@ export function AdminSupport() {
       <main className="flex-1 flex flex-col bg-white">
         {selectedTicket ? (
           <>
-            <header className="p-8 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
+            <header className="p-5 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
                <div className="flex items-center gap-4">
                   <button onClick={() => setSelectedTicketId(null)} className="lg:hidden p-2 text-ink-400 hover:bg-ink-100 rounded-xl">
                     <ArrowLeft size={24} />
@@ -237,13 +242,13 @@ export function AdminSupport() {
                </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-ink-50/30">
+            <div className="flex-1 overflow-y-auto p-5 space-y-6 bg-ink-50/30">
                {/* User Initial Message */}
                <div className="flex gap-5">
                   <div className="w-12 h-12 rounded-2xl bg-white border border-ink-100 shadow-sm flex items-center justify-center shrink-0">
                     <User size={24} className="text-ink-300" />
                   </div>
-                  <div className="bg-white p-6 rounded-3xl rounded-tl-none border border-ink-100 shadow-premium flex-1 max-w-2xl">
+                  <div className="bg-white p-5 rounded-2xl rounded-tl-none border border-ink-100 shadow-md flex-1 max-w-2xl">
                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-600 mb-2">Mensagem Inicial</p>
                      <p className="text-sm text-ink-900 leading-relaxed font-medium">{selectedTicket.message}</p>
                      <p className="text-[9px] text-ink-400 mt-4 font-bold uppercase tracking-widest">{new Date(selectedTicket.createdAt).toLocaleString()}</p>
@@ -262,7 +267,7 @@ export function AdminSupport() {
                         {isMe ? 'ADM' : msg.senderName.charAt(0)}
                       </div>
                       <div className={classNames(
-                        "p-6 rounded-3xl max-w-xl shadow-sm border",
+                        "p-5 rounded-2xl max-w-xl shadow-sm border",
                         isMe ? "bg-brand-600 text-white border-brand-500 rounded-tr-none" : "bg-white text-ink-900 border-ink-100 rounded-tl-none"
                       )}>
                         {!isMe && <p className="text-[9px] font-black uppercase tracking-widest mb-2 text-ink-400">{msg.senderName}</p>}
@@ -278,7 +283,7 @@ export function AdminSupport() {
             </div>
 
             {selectedTicket.status !== 'resolved' && (
-              <footer className="p-8 border-t border-ink-100 bg-white">
+              <footer className="p-5 border-t border-ink-100 bg-white font-medium">
                 <div className="flex gap-4">
                   <div className="flex-1 relative">
                     <input 
@@ -302,7 +307,7 @@ export function AdminSupport() {
           </>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-ink-200 space-y-6">
-             <div className="w-32 h-32 rounded-3xl bg-ink-50 flex items-center justify-center border border-ink-50 shadow-inner">
+             <div className="w-32 h-32 rounded-2xl bg-ink-50 flex items-center justify-center border border-ink-50 shadow-inner">
                 <MessageSquare size={64} />
              </div>
              <div className="text-center">

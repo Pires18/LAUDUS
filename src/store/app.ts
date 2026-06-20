@@ -90,17 +90,17 @@ export const useApp = create<AppState>()(
   setSelectedClinic: (id) => set({ selectedClinicId: id }),
 
   // ── Settings ──
-  settings: { 
-    geminiModel: 'gemini-3.5-flash', 
-    aiProvider: 'anthropic', 
-    anthropicModel: 'claude-3-5-sonnet-latest' 
+  settings: {
+    geminiModel: 'gemini-3.5-flash',
+    aiProvider: 'anthropic',
+    anthropicModel: 'claude-sonnet-4-6'
   },
   loadSettings: async () => {
     try {
       const s = await getSettings();
-      // Map legacy anthropic models to correct valid model
+      // Migrate legacy model names to current default
       if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
-        s.anthropicModel = 'claude-3-5-sonnet-latest';
+        s.anthropicModel = 'claude-sonnet-4-6';
       }
       set({ settings: s });
       // Se tem clínica padrão nas settings, seta como selecionada
@@ -146,7 +146,7 @@ export const useApp = create<AppState>()(
   setWorklistStatusFilter: (s) => set({ worklistStatusFilter: s }),
   worklistAreaFilter: 'todas',
   setWorklistAreaFilter: (a) => set({ worklistAreaFilter: a }),
-  worklistDateFilter: 'hoje',
+  worklistDateFilter: 'todos',
   setWorklistDateFilter: (d) => set({ worklistDateFilter: d }),
   worklistSearch: '',
   setWorklistSearch: (s) => set({ worklistSearch: s }),

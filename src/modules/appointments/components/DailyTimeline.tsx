@@ -52,7 +52,7 @@ export function DailyTimeline({
   }, [selectedDate]);
 
   return (
-    <div className="bg-white border border-ink-200 rounded-3xl p-5 shadow-sm space-y-4">
+    <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-center gap-2 border-b border-ink-100 pb-3">
         <Clock className="text-ink-800" size={18} />
         <h3 className="font-black text-ink-800 text-xs uppercase tracking-widest leading-none">Visão em Linha do Tempo</h3>

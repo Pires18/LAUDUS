@@ -3,7 +3,7 @@ import { usePaginatedCollection, orderBy } from '../../../hooks/useFirestore';
 import { AuditLog } from '../../../types';
 import {
   Search, History, Download,
-  Calendar, User, Box, Eye, X, ChevronDown
+  Calendar, User, Box, Eye, ChevronDown
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { Modal } from '../../../components/Modal';
@@ -46,8 +46,8 @@ export function AdminAudit() {
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-ink-100 bg-ink-50/20 flex flex-col md:flex-row gap-4">
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-ink-100 bg-ink-50/20 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
             <input

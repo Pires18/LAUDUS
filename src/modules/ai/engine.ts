@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
@@ -82,11 +81,11 @@ function hashPrompt(built: BuiltPrompt): string {
   return h.toString(16).padStart(8, '0');
 }
 
-let lastCallMetrics: CallMetrics | null = null;
 export const callMetricsHistory: CallMetrics[] = [];
 
 const PRICING: Record<string, { input: number, output: number }> = {
   // Anthropic
+  'claude-sonnet-4-6':           { input: 3.0,   output: 15.0  },
   'claude-3-5-sonnet-latest':    { input: 3.0,   output: 15.0  },
   'claude-3-7-sonnet-latest':    { input: 3.0,   output: 15.0  },
   'claude-opus-4-5':             { input: 15.0,  output: 75.0  },
@@ -99,7 +98,6 @@ const PRICING: Record<string, { input: number, output: number }> = {
 };
 
 function recordMetrics(m: CallMetrics) {
-  lastCallMetrics = m;
   callMetricsHistory.unshift(m);
   if (callMetricsHistory.length > 20) callMetricsHistory.pop();
 
@@ -277,6 +275,16 @@ function buildUniversalContext(settings: AppSettings): string {
   const rules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
 
   const parts = [master, global, skeleton, rules];
+  if (settings.aiFastMode) {
+    parts.push(`═══════════════════════════════════════════
+ATENÇÃO: MODO RÁPIDO ATIVADO (SEM RACIOCÍNIO)
+═══════════════════════════════════════════
+REGRA MÁXIMA DE SAÍDA:
+NÃO use a tag <scratchpad> nem faça nenhum raciocínio interno ou auto-auditoria.
+NÃO comece seu output com <scratchpad> e NUNCA use a tag </scratchpad>.
+Inicie sua resposta DIRETA e IMEDIATAMENTE com o HTML do laudo (iniciando com <h1>) ou com o formato de resposta do Copiloto solicitado.
+Você deve pular as fases de auditoria e raciocínio prévio.`);
+  }
   return parts.join('\n\n');
 }
 
@@ -413,24 +421,51 @@ ${maskHtml}`;
  */
 export function stripScratchpad(text: string, disableHtmlExtraction = false): string {
   if (!text) return '';
+  
+  const lower = text.toLowerCase();
+  
+  // Fast-path bypass check during streaming:
+  // If a scratchpad tag is open but not yet closed, we can assume the AI is still in its reasoning phase
+  // and no actual content has been generated. Returning an empty string avoids executing multiple heavy regex operations.
+  const hasOpenScratch = lower.includes('<scratchpad>') && !lower.includes('</scratchpad>');
+  const hasOpenThink = lower.includes('<think>') && !lower.includes('</think>');
+  const hasOpenThinking = lower.includes('<thinking>') && !lower.includes('</thinking>');
+  const hasOpenThought = lower.includes('<thought>') && !lower.includes('</thought>');
+  
+  if (hasOpenScratch || hasOpenThink || hasOpenThinking || hasOpenThought) {
+    return '';
+  }
+
   let cleaned = text;
 
-  // 1A. Remove complete scratchpad/thinking blocks first. Handles spaces inside tags.
-  cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
-  
-  // 1B. For any remaining unclosed scratchpad tags (e.g., streaming or forgotten closing tag),
-  // remove from the opening tag up to the first valid content marker or end of string.
-  cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?(?====\s*CONVERSA|===\s*PROPOSTA|<h[1-6][\s>]|$)/gi, '');
-  
-  // 2. Remove python/tool_code/code blocks (internal tool calls)
-  cleaned = cleaned.replace(/```(?:tool_code|python|code|javascript|typescript|bash)[\s\S]*?```/gi, '');
+  // Optimize: Only run regexes if corresponding patterns are actually present
+  const hasScratchTags = /<\s*\/?\s*(scratchpad|think|thinking|thought)/i.test(cleaned);
+  const hasCodeBlocks = /```/.test(cleaned);
 
-  // 3. Remove any loose closing/opening tags just in case
-  cleaned = cleaned.replace(/<\s*\/?\s*(scratchpad|think|thinking|thought)\s*>/gi, '');
+  if (hasScratchTags) {
+    // 1A. Remove complete scratchpad/thinking blocks first. Handles spaces inside tags.
+    cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
+    
+    // 1B. For any remaining unclosed scratchpad tags (e.g., streaming or forgotten closing tag),
+    // remove from the opening tag up to the first valid content marker or end of string.
+    cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?(?====\s*CONVERSA|===\s*PROPOSTA|<h[1-6][\s>]|$)/gi, '');
+  }
 
-  // 5. Keep HTML block contents but strip markdown backticks if wrapped in them
-  cleaned = cleaned.replace(/```html\s*([\s\S]*?)\s*```/gi, '$1');
-  cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/gi, '$1');
+  if (hasCodeBlocks) {
+    // 2. Remove python/tool_code/code blocks (internal tool calls)
+    cleaned = cleaned.replace(/```(?:tool_code|python|code|javascript|typescript|bash)[\s\S]*?```/gi, '');
+  }
+
+  if (hasScratchTags) {
+    // 3. Remove any loose closing/opening tags just in case
+    cleaned = cleaned.replace(/<\s*\/?\s*(scratchpad|think|thinking|thought)\s*>/gi, '');
+  }
+
+  if (hasCodeBlocks) {
+    // 5. Keep HTML block contents but strip markdown backticks if wrapped in them
+    cleaned = cleaned.replace(/```html\s*([\s\S]*?)\s*```/gi, '$1');
+    cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/gi, '$1');
+  }
 
   // 6. Clean leading/trailing markdown from the response
   cleaned = cleanMarkdownFromResponse(cleaned);
@@ -601,6 +636,15 @@ function buildRefinePrompt({
     examDateMs,
   });
 
+  const formatRule = settings.aiFastMode
+    ? `REGRA ABSOLUTA DE FORMATO:
+1. O output DEVE começar direta e imediatamente com a tag <h1>.
+2. É ESTRITAMENTE PROIBIDO usar <scratchpad>, <think>, ou qualquer tag de raciocínio.`
+    : `NOVA REGRA ABSOLUTA DE FORMATO:
+1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
+2. APÓS fechar a tag </scratchpad>, o laudo deve começar diretamente com a tag <h1>.
+ZERO texto, avisos ou mensagens de pensamento fora da tag <scratchpad>.`;
+
   const userMessage = `═══════════════════════════════════════════════════════════════
 INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
 ═══════════════════════════════════════════════════════════════
@@ -609,10 +653,7 @@ ${contextMessage}
 ${refinementRules}
 
 Gere agora o laudo REFINADO completo em HTML puro. 
-NOVA REGRA ABSOLUTA DE FORMATO:
-1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
-2. APÓS fechar a tag </scratchpad>, o laudo deve começar diretamente com a tag <h1>.
-ZERO texto, avisos ou mensagens de pensamento fora da tag <scratchpad>.`;
+${formatRule}`;
 
   return { universalContext, areaContext, userMessage };
 }
@@ -628,7 +669,18 @@ function buildCopilotPrompt({
   template,
 }: CopilotParams): BuiltPrompt {
   // Respeita override customizado no settings, com fallback para o default do sistema
-  const copilotModeOverride = settings.aiCopilotOverride || DEFAULT_COPILOT_OVERRIDE;
+  let copilotModeOverride = settings.aiCopilotOverride || DEFAULT_COPILOT_OVERRIDE;
+  if (settings.aiFastMode) {
+    copilotModeOverride = copilotModeOverride
+      .replace(
+        `① Abra <scratchpad> e execute raciocínio completo sobre a instrução recebida e o laudo atual.\n② Feche </scratchpad>.\n③ Gere EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`,
+        `① É ESTRITAMENTE PROIBIDO usar <scratchpad>, <think> ou descrever qualquer raciocínio.\n② Gere DIRETA, IMEDIATA e EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`
+      )
+      .replace(
+        `① Abra <scratchpad> e execute raciocínio completo sobre a instrução recebida e o laudo atual.\r\n② Feche </scratchpad>.\r\n③ Gere EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`,
+        `① É ESTRITAMENTE PROIBIDO usar <scratchpad>, <think> ou descrever qualquer raciocínio.\n② Gere DIRETA, IMEDIATA e EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`
+      );
+  }
   const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
   const universalContext = buildUniversalContext(settings);
@@ -724,8 +776,6 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
-  let success = false;
-
   let built: BuiltPrompt;
   if (mode === 'copilot') {
     built = buildCopilotPrompt(params as CopilotParams);
@@ -742,8 +792,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
     text = await aiProvider.generate(built, settings, area, mode, signal, (sp) => scratchpad = sp, helpers);
 
-    success = true;
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
@@ -760,7 +809,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     });
     return text;
   } catch (err) {
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
@@ -780,7 +829,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
 
 export async function generateReportStream(
   params: GenerateReportParams | CopilotParams | RefineParams,
-  onChunk: (text: string) => void
+  onChunk: (text: string, rawText?: string) => void
 ): Promise<string> {
   const { settings, signal } = params as any;
   const provider = settings.aiProvider || 'anthropic';
@@ -803,7 +852,7 @@ export async function generateReportStream(
     
     const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
     text = await aiProvider.stream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
@@ -820,7 +869,7 @@ export async function generateReportStream(
     });
     return text;
   } catch (err) {
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
+    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],

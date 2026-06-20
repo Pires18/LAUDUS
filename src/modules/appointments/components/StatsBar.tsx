@@ -28,7 +28,7 @@ export function StatsBar({ appointments, selectedDate, clinicId }: StatsBarProps
   }, [counts]);
 
   return (
-    <div className="relative bg-gradient-to-br from-zinc-950 to-zinc-900 text-white border border-zinc-850 rounded-3xl p-5 shadow-xl overflow-hidden flex flex-col md:flex-row items-center justify-between gap-5 font-sans">
+    <div className="relative bg-gradient-to-br from-zinc-950 to-zinc-900 text-white border border-zinc-850 rounded-2xl p-5 shadow-xl overflow-hidden flex flex-col md:flex-row items-center justify-between gap-5 font-sans">
       {/* Decorative Glows */}
       <div className="absolute -right-12 -top-12 w-36 h-36 bg-emerald-550/10 blur-3xl rounded-full pointer-events-none" />
       <div className="absolute -left-12 -bottom-12 w-36 h-36 bg-blue-550/10 blur-3xl rounded-full pointer-events-none" />

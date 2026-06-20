@@ -4,9 +4,9 @@ import { logger } from '../utils/logger';
 import { validateAndActivateLicense } from '../store/db';
 import { useCollection } from '../hooks/useFirestore';
 import { firestore } from '../lib/firebase';
-import { 
-  Key, ShieldCheck, Sparkles, LogOut, 
-  Loader2, AlertTriangle, ChevronRight, Activity, Cpu, CloudLightning,
+import {
+  Key, ShieldCheck, LogOut,
+  Loader2, AlertTriangle, ChevronRight, Cpu, CloudLightning,
   CheckCircle2, ShoppingBag
 } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';

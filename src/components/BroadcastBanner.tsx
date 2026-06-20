@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { onBroadcastChange } from '../store/db';
-import { Megaphone, X, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { X, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { AnimatePresence, motion } from 'framer-motion';
 

@@ -4,8 +4,8 @@ import { Plan } from '../../../types';
 import { useApp } from '../../../store/app';
 import { addItemGlobalWithId, updateGlobalItem, deleteGlobalItem, genId, addAuditLog } from '../../../store/db';
 import { 
-  Plus, Check, DollarSign, Settings2, 
-  Trash2, Activity, Hospital, Loader2, X,
+  Plus, Check, DollarSign, Settings2,
+  Trash2, Activity, Hospital, Loader2,
   Sparkles, HardDrive, Mic, Sliders
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
@@ -89,9 +89,9 @@ export function AdminPlans() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-          [1, 2, 3].map(i => <div key={i} className="h-96 bg-white rounded-3xl border border-ink-100 animate-pulse" />)
+          [1, 2, 3].map(i => <div key={i} className="h-96 bg-white rounded-2xl border border-ink-100 animate-pulse" />)
         ) : plans.length === 0 ? (
-          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-ink-100 border-dashed">
+          <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-ink-100 border-dashed">
             <DollarSign size={48} className="text-ink-200 mx-auto mb-4" />
             <p className="text-ink-400 font-bold">Nenhum plano configurado.</p>
             <button 
@@ -103,7 +103,7 @@ export function AdminPlans() {
           </div>
         ) : (
           plans.map((plan) => (
-            <div key={plan.id} className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 flex flex-col hover:border-brand-300 hover:shadow-premium transition-all group relative overflow-hidden">
+            <div key={plan.id} className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 flex flex-col hover:border-brand-300 hover:shadow-md transition-all group relative overflow-hidden">
               {!plan.active && (
                 <div className="absolute top-4 right-4 px-3 py-1 bg-ink-100 text-ink-500 rounded-full text-[8px] font-black uppercase tracking-widest">
                   Inativo
@@ -299,7 +299,7 @@ export function AdminPlans() {
             </div>
 
             {/* Advanced Clinic Options Toggles */}
-            <div className="space-y-3 p-4 bg-ink-50 rounded-3xl border border-ink-100">
+            <div className="space-y-3 p-4 bg-ink-50 rounded-2xl border border-ink-100">
               <p className="text-[9px] font-black uppercase tracking-widest text-ink-400 mb-1">Permissões Especiais do Sistema</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <label className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-ink-150 cursor-pointer hover:bg-brand-50/50 transition-colors">

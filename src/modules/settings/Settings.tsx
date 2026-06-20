@@ -1,15 +1,14 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useCollection } from '../../hooks/useFirestore';
 import { Clinic } from '../../types';
-import { PageHeader } from '../../components/PageHeader';
-import { 
-  Save, User, LogOut, Sliders, ShieldCheck, 
+import {
+  Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Database, Info, Upload, Loader2,
-  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield, Cloud, Coins
+  Server, Wifi, HardDrive, Shield, Cloud, Coins
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -20,11 +19,11 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
-type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit' | 'financeiro';
+type SettingsTab = 'perfil' | 'assinatura' | 'dicom' | 'audit' | 'financeiro';
 
 export function Settings() {
   const { settings, updateSettings, showToast } = useApp();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { data: clinics } = useCollection<Clinic>('clinics');
   
   const [draft, setDraft] = useState(settings);
@@ -202,79 +201,79 @@ export function Settings() {
 
 
   const tabs = [
-    { id: 'perfil', label: 'Meu Perfil', icon: User },
-    { id: 'assinatura', label: 'Assinatura Médica', icon: Signature },
-    { id: 'sistema', label: 'Preferências', icon: Sliders },
-    { id: 'dicom', label: 'Integração PACS', icon: Database },
-    { id: 'audit', label: 'Auditoria & Saúde', icon: ShieldCheck },
+    { id: 'perfil', label: 'Perfil', icon: User },
+    { id: 'assinatura', label: 'Assinatura', icon: Signature },
+    { id: 'dicom', label: 'PACS / DICOM', icon: Database },
+    { id: 'audit', label: 'Auditoria', icon: ShieldCheck },
     { id: 'financeiro', label: 'Financeiro IA', icon: Coins },
   ] as const;
 
   return (
     <div className="module-container">
-      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
-      <PageHeader
-        title="Meu Perfil"
-        subtitle="Gerencie sua identidade médica, assinatura digital e preferências de sistema."
-        actions={
-          <div className="flex items-center gap-3">
-             <button onClick={() => setDraft(settings)} className="btn-ghost text-ink-400 h-11 px-5 rounded-2xl">
-              <RotateCcw size={16} /> <span className="font-bold text-xs uppercase tracking-widest">Descartar</span>
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-5">
+
+      {/* ─── COMPACT HEADER ─── */}
+      <div className="bg-white border border-ink-200 rounded-2xl shadow-sm">
+        <div className="px-5 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm shrink-0">
+              <User size={18} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-black text-ink-900 tracking-tight leading-none">Configurações</h1>
+              <p className="text-[11px] text-ink-500 font-medium mt-0.5">Perfil médico, assinatura, PACS e preferências</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setDraft(settings)}
+              className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink-500 hover:text-ink-700 bg-ink-100 border border-ink-200 hover:bg-ink-200 transition-all flex items-center gap-1.5"
+            >
+              <RotateCcw size={11} />
+              <span className="hidden sm:inline">Descartar</span>
             </button>
-            <button className="btn-primary h-11 px-6 rounded-2xl shadow-brand" onClick={handleSave} disabled={isSaving}>
-              <Save size={18} /> <span className="font-bold text-xs uppercase tracking-widest">{isSaving ? 'Salvando...' : 'Salvar'}</span>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+            >
+              {isSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+              Salvar
             </button>
           </div>
-        }
-      />
+        </div>
+      </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* Sidebar Navigation */}
-        <aside className="sidebar-nav">
-          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Menu</p>
-          {tabs.map((tab) => (
+      {/* ─── PILL TAB BAR ─── */}
+      <div className="flex items-center gap-1.5 bg-ink-100 p-1 rounded-2xl border border-ink-200/50 overflow-x-auto">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as SettingsTab)}
               className={classNames(
-                "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3",
-                activeTab === tab.id 
-                  ? "bg-brand-50 text-brand-700 shadow-sm border border-brand-100" 
-                  : "text-ink-600 hover:bg-ink-50"
+                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                  : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
               )}
             >
-              <div className={classNames("p-1.5 rounded-lg", activeTab === tab.id ? "bg-brand-100 text-brand-600" : "bg-ink-50 text-ink-400")}>
-                <tab.icon size={16} />
-              </div>
+              <tab.icon size={13} />
               {tab.label}
             </button>
-          ))}
-        </aside>
+          );
+        })}
+      </div>
 
-        <div className="flex-1 w-full space-y-6">
-          {/* Mobile Tabs */}
-          <div className="lg:hidden flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as SettingsTab)}
-                className={classNames(
-                  "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2",
-                  activeTab === tab.id ? "bg-brand-600 text-white border-brand-600" : "bg-white text-ink-600 border-ink-100"
-                )}
-              >
-                <tab.icon size={14} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="w-full space-y-5">
 
           {/* TAB: PERFIL */}
           {activeTab === 'perfil' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                  <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-6">Informações Pessoais</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in">
+              <div className="lg:col-span-2 space-y-5">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-4">Informações Pessoais</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
                       <label className="label">Nome de Exibição</label>
@@ -318,7 +317,7 @@ export function Settings() {
               </div>
 
               <div className="lg:col-span-1">
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden text-center p-8 sticky top-24">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden text-center p-5 sticky top-24">
                   <div className="relative inline-block mb-4">
                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 p-1 shadow-lg overflow-hidden relative">
                       {user?.photoURL ? (
@@ -362,24 +361,79 @@ export function Settings() {
                   </div>
                 </div>
               </div>
+
+              {/* Preferências inline no perfil */}
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 sticky top-36">
+                <div className="flex items-center gap-3 mb-4">
+                  <Sliders size={15} className="text-ink-500" />
+                  <h4 className="text-xs font-black text-ink-700 uppercase tracking-widest">Preferências</h4>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                    <div className="flex items-center gap-2.5">
+                      <Bell size={15} className="text-brand-600" />
+                      <div>
+                        <p className="text-xs font-bold text-ink-900">Notificações Sonoras</p>
+                        <p className="text-[10px] text-ink-500">Alertas ao receber novos exames.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('soundNotifications', draft.soundNotifications === false)}
+                      className={classNames(
+                        "w-10 h-6 rounded-full transition-all relative shrink-0",
+                        draft.soundNotifications !== false ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.soundNotifications !== false ? "left-5" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                    <div className="flex items-center gap-2.5">
+                      <Clock size={15} className="text-indigo-600" />
+                      <div>
+                        <p className="text-xs font-bold text-ink-900">Salvamento Automático</p>
+                        <p className="text-[10px] text-ink-500">Persistir rascunhos no editor.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('autoSave', draft.autoSave === false)}
+                      className={classNames(
+                        "w-10 h-6 rounded-full transition-all relative shrink-0",
+                        draft.autoSave !== false ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.autoSave !== false ? "left-5" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
           {/* TAB: ASSINATURA */}
           {activeTab === 'assinatura' && (
-            <div className="max-w-3xl space-y-6 animate-fade-in">
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                    <Signature size={28} />
+            <div className="max-w-3xl space-y-5 animate-fade-in">
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                    <Signature size={20} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-ink-900">Cédula de Identidade Médica</h3>
-                    <p className="text-sm text-ink-500">Dados usados no rodapé e selo de autenticidade dos laudos.</p>
+                    <h3 className="text-base font-black text-ink-900">Cédula de Identidade Médica</h3>
+                    <p className="text-xs text-ink-500">Dados usados no rodapé e selo de autenticidade dos laudos.</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-2 gap-4 mb-5">
                   <div>
                     <label className="label">Número do CRM</label>
                     <input
@@ -400,7 +454,7 @@ export function Settings() {
                   </div>
                 </div>
 
-                <div className="space-y-4 py-6 border-t border-ink-50">
+                <div className="space-y-3 py-5 border-t border-ink-50">
                   <label className="label">Assinatura Digitalizada (Imagem)</label>
                   <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
                     <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
@@ -451,7 +505,7 @@ export function Settings() {
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-ink-50">
+                <div className="space-y-3 pt-5 border-t border-ink-50">
                   <label className="label">Texto da Assinatura Digital</label>
                   <textarea
                     className="input min-h-[120px] p-6 text-sm leading-relaxed"
@@ -472,84 +526,27 @@ export function Settings() {
             </div>
           )}
 
-          {/* TAB: SISTEMA */}
-          {activeTab === 'sistema' && (
-            <div className="max-w-3xl space-y-6 animate-fade-in">
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-6">Preferências Globais</h3>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-ink-50 border border-ink-100">
-                    <div className="flex items-center gap-3">
-                      <Bell size={20} className="text-brand-600" />
-                      <div>
-                        <p className="text-sm font-bold text-ink-900">Notificações Sonoras</p>
-                        <p className="text-xs text-ink-500">Alertas ao receber novos exames na worklist.</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => u('soundNotifications', draft.soundNotifications === false)}
-                      className={classNames(
-                        "w-12 h-7 rounded-full transition-all relative shrink-0",
-                        draft.soundNotifications !== false ? "bg-emerald-500" : "bg-ink-300"
-                      )}
-                    >
-                      <div className={classNames(
-                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                        draft.soundNotifications !== false ? "left-6" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-ink-50 border border-ink-100">
-                    <div className="flex items-center gap-3">
-                      <Clock size={20} className="text-indigo-600" />
-                      <div>
-                        <p className="text-sm font-bold text-ink-900">Salvamento Automático</p>
-                        <p className="text-xs text-ink-500">Persistir rascunhos automaticamente no editor conforme digitação.</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => u('autoSave', draft.autoSave === false)}
-                      className={classNames(
-                        "w-12 h-7 rounded-full transition-all relative shrink-0",
-                        draft.autoSave !== false ? "bg-emerald-500" : "bg-ink-300"
-                      )}
-                    >
-                      <div className={classNames(
-                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                        draft.autoSave !== false ? "left-6" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* TAB: DICOM/PACS */}
           {activeTab === 'dicom' && (
-            <div className="max-w-4xl space-y-6 animate-fade-in mx-auto">
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Database size={28} />
+            <div className="max-w-4xl space-y-5 animate-fade-in mx-auto">
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Database size={20} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-ink-900">Integração PACS / DICOM</h3>
-                    <p className="text-sm text-ink-500">Gestão de Servidores PACS, Equipamentos Médicos e Envio de Worklist.</p>
+                    <h3 className="text-base font-black text-ink-900">Integração PACS / DICOM</h3>
+                    <p className="text-xs text-ink-500">Gestão de Servidores PACS, Equipamentos Médicos e Envio de Worklist.</p>
                   </div>
                 </div>
 
-                <div className="space-y-8">
+                <div className="space-y-5">
                   
                   {/* CARD 1: SERVIDOR PACS PRINCIPAL */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                        <Server size={20} />
+                  <div className="p-5 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-50">
+                      <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                        <Server size={18} />
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-ink-900">Servidor PACS Principal (Matriz)</h4>
@@ -557,7 +554,7 @@ export function Settings() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-5 rounded-xl bg-ink-50 border border-ink-100 mb-6">
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-ink-50 border border-ink-100 mb-4">
                       <div className="space-y-0.5">
                         <p className="text-sm font-bold text-ink-900">Sincronização de Worklist Local</p>
                         <p className="text-xs text-ink-500">Gerar arquivos .wl na pasta de destino sempre que um exame for criado.</p>
@@ -675,10 +672,10 @@ export function Settings() {
                   </div>
 
                   {/* CARD 2: SERVIDOR PACS DE BACKUP */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                        <HardDrive size={20} />
+                  <div className="p-5 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-50">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <HardDrive size={18} />
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-ink-900">Servidor PACS de Backup (Redundância)</h4>
@@ -686,7 +683,7 @@ export function Settings() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-5 rounded-xl bg-ink-50 border border-ink-100 mb-6">
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-ink-50 border border-ink-100 mb-4">
                       <div className="space-y-0.5">
                         <p className="text-sm font-bold text-ink-900">Habilitar Servidor de Redundância</p>
                         <p className="text-xs text-ink-500">Enviar worklists paralelamente para o servidor de backup.</p>
@@ -815,10 +812,10 @@ export function Settings() {
 
 
                   {/* CARD 4: CONFIGURAÇÕES GLOBAIS E MANUAL */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-ink-100 text-ink-600 flex items-center justify-center">
-                        <Shield size={20} />
+                  <div className="p-5 rounded-2xl border border-ink-150 bg-white shadow-sm">
+                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-50">
+                      <div className="w-9 h-9 rounded-xl bg-ink-100 text-ink-600 flex items-center justify-center">
+                        <Shield size={18} />
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-ink-900">Configurações Globais DICOM</h4>
@@ -826,7 +823,7 @@ export function Settings() {
                       </div>
                     </div>
                     
-                    <div className="mb-8 max-w-sm">
+                    <div className="mb-5 max-w-sm">
                       <label className="label">AE Title do Servidor Orthanc</label>
                       <input
                         className="input h-12 text-sm font-mono"
@@ -836,7 +833,7 @@ export function Settings() {
                       />
                     </div>
 
-                    <div className="bg-ink-900 text-ink-100 rounded-3xl p-6 border border-ink-800 shadow-xl space-y-6">
+                    <div className="bg-ink-900 text-ink-100 rounded-2xl p-5 border border-ink-800 shadow-xl space-y-5">
                       <div className="flex items-center gap-3 pb-4 border-b border-ink-800/80">
                         <Info size={20} className="text-brand-400 shrink-0" />
                         <div>
@@ -940,7 +937,6 @@ export function Settings() {
           )}
 
         </div>
-      </div>
       </div>
     </div>
   );

@@ -32,6 +32,7 @@ export function useExamActions({
   examDateMs
 }: UseExamActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isReasoning, setIsReasoning] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef<string | null>(null);
@@ -92,12 +93,14 @@ export function useExamActions({
     if (!template || !patient) return;
 
     setIsGenerating(true);
+    setIsReasoning(true);
     try {
-      const previousExams = settings.aiTrainingEnabled
-        ? await getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
-        : [];
-        
-      const patientPreviousExams = await getPatientPreviousExams(patient.id, template.area, examId, 2);
+      const [previousExams, patientPreviousExams] = await Promise.all([
+        settings.aiTrainingEnabled
+          ? getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
+          : Promise.resolve([]),
+        getPatientPreviousExams(patient.id, template.area, examId, 2)
+      ]);
 
       const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
       let html: string;
@@ -125,7 +128,10 @@ export function useExamActions({
             previousExams,
             patientPreviousExams,
             examDateMs,
-          }, (chunk) => {
+          }, (chunk, rawText) => {
+            const hasClosedScratch = rawText ? rawText.includes('</scratchpad>') : true;
+            const hasOpenScratch = rawText ? rawText.includes('<scratchpad>') : false;
+            setIsReasoning(hasOpenScratch && !hasClosedScratch);
             if (chunk.trim()) {
               onReportChange(chunk);
             }
@@ -148,7 +154,10 @@ export function useExamActions({
             patientPreviousExams,
             customPrompt,
             examDateMs,
-          }, (chunk) => {
+          }, (chunk, rawText) => {
+            const hasClosedScratch = rawText ? rawText.includes('</scratchpad>') : true;
+            const hasOpenScratch = rawText ? rawText.includes('<scratchpad>') : false;
+            setIsReasoning(hasOpenScratch && !hasClosedScratch);
             if (chunk.trim()) {
               onReportChange(chunk);
             }
@@ -188,6 +197,7 @@ export function useExamActions({
       showToast(message, 'error');
     } finally {
       setIsGenerating(false);
+      setIsReasoning(false);
     }
   }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, examDateMs, onReportChange, showToast]);
 
@@ -213,6 +223,7 @@ export function useExamActions({
 
   return {
     isGenerating,
+    isReasoning,
     saveState,
     debouncedSave,
     handleRefine,

@@ -124,8 +124,8 @@ export function AdminUsers() {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
-        <div className="p-8 border-b border-ink-100 bg-ink-50/10 flex flex-col md:flex-row gap-4">
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-ink-100 bg-ink-50/10 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
             <input

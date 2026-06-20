@@ -222,6 +222,8 @@ export interface AppSettings {
   aiTrainingContextSize?: number;
   /** Se o Refinador Automático deve ser ativado por padrão em todo laudo após as alterações do Copiloto */
   aiAutoRefineEnabled?: boolean;
+  /** Se o Modo Rápido (sem scratchpad) está ativo */
+  aiFastMode?: boolean;
   /** Banco de frases prontas do usuário */
   snippets?: { id: string; title: string; content: string; area?: string }[];
   

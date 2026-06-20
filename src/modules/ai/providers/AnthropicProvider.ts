@@ -2,6 +2,7 @@ import { AppSettings } from '../../../types';
 import { AiProvider, BuiltPrompt } from '../types';
 import { robustJsonParse } from '../json';
 import { logger } from '../../../utils/logger';
+import { auth } from '../../../lib/firebase';
 
 export function getAnthropicBaseUrl(): string {
   const isLocalDev = typeof window !== 'undefined' &&
@@ -49,14 +50,16 @@ export class AnthropicProvider implements AiProvider {
     if (built.areaContext) {
       systemBlocks.push({
         type: 'text',
-        text: built.areaContext
+        text: built.areaContext,
+        cache_control: { type: 'ephemeral' }
       });
     }
 
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey!,
+        'x-api-key': settings.anthropicApiKey || '',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': this.getBetaHeader(settings),
         'content-type': 'application/json'
@@ -87,7 +90,7 @@ export class AnthropicProvider implements AiProvider {
     settings: AppSettings,
     area: string,
     mode: string,
-    onChunk: (text: string) => void,
+    onChunk: (text: string, rawText?: string) => void,
     signal?: AbortSignal,
     onComplete?: (scratchpad?: string) => void,
     helpers?: any
@@ -102,14 +105,16 @@ export class AnthropicProvider implements AiProvider {
     if (built.areaContext) {
       systemBlocks.push({
         type: 'text',
-        text: built.areaContext
+        text: built.areaContext,
+        cache_control: { type: 'ephemeral' }
       });
     }
 
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey!,
+        'x-api-key': settings.anthropicApiKey || '',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': this.getBetaHeader(settings),
         'content-type': 'application/json'
@@ -158,7 +163,7 @@ export class AnthropicProvider implements AiProvider {
             const parsed = JSON.parse(dataStr);
             if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
               fullText += parsed.delta.text;
-              onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)));
+              onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)), fullText);
             }
           } catch {
             // Ignorar eventos SSE não-JSON (ex: event:, ping)
@@ -193,7 +198,8 @@ export class AnthropicProvider implements AiProvider {
       const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
         method: 'POST',
         headers: {
-          'x-api-key': settings.anthropicApiKey!,
+          'x-api-key': settings.anthropicApiKey || '',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json'
         },

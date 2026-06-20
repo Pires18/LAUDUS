@@ -1,13 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { useAuth } from '../../hooks/useAuth';
-import { ExamRequest, Patient, Clinic, EXAM_AREAS } from '../../types';
+import { getAiUsageStats } from '../../store/db';
+import { ExamRequest, Patient, Clinic, EXAM_AREAS, Appointment } from '../../types';
+import { WeeklyCalendar } from '../appointments/components/WeeklyCalendar';
+import { getLocalDateStr } from '../appointments/utils/scheduleUtils';
 import {
   LayoutList, FilePlus, Clock, CheckCircle2, CircleDot, TrendingUp,
   Users, FileText, Activity, Building2, Sparkles,
-  Zap, ChevronRight, Briefcase, Terminal, Loader2
+  ChevronRight, Loader2, BrainCircuit,
+  Timer, BarChart2
 } from 'lucide-react';
+
+const STATUS_LABELS: Record<string, string> = {
+  'pendente': 'Aguardando',
+  'em-andamento': 'Em Andamento',
+  'finalizado': 'Finalizado',
+};
 import { AreaIcon } from '../../components/AreaIcon';
 import { classNames, formatDateTime } from '../../utils/format';
 import { motion } from 'framer-motion';
@@ -15,26 +25,44 @@ import { Skeleton } from '../../components/SkeletonLoader';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const { setView, selectedClinicId, settings, showToast, setShowCreateExamModal } = useApp();
-  const currentRole = settings.currentRole || 'medico';
+  const { setView, selectedClinicId, settings, setShowCreateExamModal } = useApp();
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
-
+  const { data: appointments } = useCollection<Appointment>('appointments');
+ 
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateStr(new Date()));
   const [showAllRecent, setShowAllRecent] = useState(false);
+  const [aiStats, setAiStats] = useState<{ totalCost: number; totalCalls: number; todayCost: number } | null>(null);
+ 
+  const selectedDayAppointments = useMemo(() => {
+    return appointments.filter(app => {
+      if (app.status === 'cancelado') return false;
+      if (selectedClinicId && app.clinicId !== selectedClinicId) return false;
+      return getLocalDateStr(app.scheduledAt) === selectedDate;
+    }).sort((a, b) => a.scheduledAt - b.scheduledAt);
+  }, [appointments, selectedDate, selectedClinicId]);
 
-  // Apply clinic filter
+  useEffect(() => {
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    getAiUsageStats(monthStart.getTime(), Date.now()).then(logs => {
+      const totalCost = logs.reduce((s, l) => s + (l.costUsd || 0), 0);
+      const todayCost = logs.filter(l => l.timestamp >= todayStart.getTime()).reduce((s, l) => s + (l.costUsd || 0), 0);
+      setAiStats({ totalCost, totalCalls: logs.length, todayCost });
+    }).catch(() => {});
+  }, []);
+
   const filteredExams = useMemo(() =>
     selectedClinicId ? exams.filter(e => e.clinicId === selectedClinicId) : exams,
     [exams, selectedClinicId]
   );
 
-  // Stats
   const stats = useMemo(() => {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
     const monthStart = new Date(todayStart); monthStart.setDate(1);
-
+ 
     const today = filteredExams.filter(e => e.createdAt >= todayStart.getTime());
     const week = filteredExams.filter(e => e.createdAt >= weekStart.getTime());
     const month = filteredExams.filter(e => e.createdAt >= monthStart.getTime());
@@ -42,14 +70,10 @@ export function Dashboard() {
     const inProgress = filteredExams.filter(e => e.status === 'em-andamento');
     const finalized = filteredExams.filter(e => e.status === 'finalizado');
     const finalizedToday = today.filter(e => e.status === 'finalizado');
-
-    // Area distribution
+ 
     const areaMap = new Map<string, number>();
-    filteredExams.forEach(e => {
-      areaMap.set(e.area, (areaMap.get(e.area) || 0) + 1);
-    });
-
-    // Last 7 days activity
+    filteredExams.forEach(e => { areaMap.set(e.area, (areaMap.get(e.area) || 0) + 1); });
+ 
     const dailyActivity: { label: string; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(todayStart);
@@ -62,7 +86,20 @@ export function Dashboard() {
       });
     }
     const maxDaily = Math.max(...dailyActivity.map(d => d.count), 1);
-
+ 
+    const finalizedThisMonth = month.filter(e => e.status === 'finalizado' && e.finalizedAt);
+    const avgCompletionMinutes = finalizedThisMonth.length > 0
+      ? finalizedThisMonth.reduce((s, e) => s + (e.finalizedAt! - e.createdAt), 0) / finalizedThisMonth.length / 60_000
+      : null;
+ 
+    const prevWeekStart = new Date(weekStart); prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const prevWeekCount = filteredExams.filter(e => e.createdAt >= prevWeekStart.getTime() && e.createdAt < weekStart.getTime()).length;
+ 
+    const monthFinalized = month.filter(e => e.status === 'finalizado');
+    const monthFinalizedRate = month.length > 0
+      ? Math.round((monthFinalized.length / month.length) * 100)
+      : 0;
+ 
     return {
       total: filteredExams.length,
       today: today.length,
@@ -75,12 +112,18 @@ export function Dashboard() {
       areaMap,
       dailyActivity,
       maxDaily,
+      avgCompletionMinutes,
+      prevWeekCount,
+      monthFinalizedRate,
     };
   }, [filteredExams]);
 
-  // Recent exams
   const recentExams = useMemo(() =>
-    [...filteredExams].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, showAllRecent ? 15 : 5),
+    [...filteredExams].sort((a, b) => {
+      const valA = a.status === 'finalizado' && a.finalizedAt ? a.finalizedAt : (a.updatedAt || a.createdAt);
+      const valB = b.status === 'finalizado' && b.finalizedAt ? b.finalizedAt : (b.updatedAt || b.createdAt);
+      return valB - valA;
+    }).slice(0, showAllRecent ? 15 : 5),
     [filteredExams, showAllRecent]
   );
 
@@ -89,371 +132,397 @@ export function Dashboard() {
 
   const displayName = settings.physicianName || user?.displayName || 'Especialista';
   const hasDrPrefix = /^(dr|dra)\.?\s+/i.test(displayName);
-  const greetingHeader = hasDrPrefix ? "Olá," : "Olá, Dr.";
+  const greetingName = hasDrPrefix ? displayName : `Dr. ${displayName}`;
 
   return (
     <div className="module-container">
-      {/* Clean & Professional Hero Banner */}
-      <section className="relative overflow-hidden shrink-0 rounded-3xl bg-white p-6 sm:p-10 shadow-sm border border-ink-100 mb-6 sm:mb-10 group">
-        <div className="relative flex flex-col lg:flex-row items-center justify-between gap-10">
-          <div className="text-center xl:text-left space-y-5">
-            <div className="flex flex-wrap items-center justify-center xl:justify-start gap-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ink-50 border border-ink-100">
-                <Sparkles size={14} className="text-brand-500" />
-                <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">LAUD.IA CORE V2.0</span>
+
+      {/* ─── COMPACT HERO ─── */}
+      <div className="bg-white border border-ink-200 rounded-2xl mb-5 shadow-sm overflow-hidden">
+        <div className="px-5 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-ink-50 border border-ink-100">
+                <Sparkles size={12} className="text-brand-500" />
+                <span className="text-[9px] font-black text-ink-600 uppercase tracking-widest">LAUD.IA CORE V2.0</span>
               </div>
-              {selectedClinic ? (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-100 animate-fade-in">
-                  <Building2 size={12} className="text-brand-500" />
-                  <span className="text-[10px] font-black text-brand-700 uppercase tracking-widest">Unidade: {selectedClinic.name}</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ink-50 border border-ink-100">
-                  <Building2 size={12} className="text-ink-500" />
-                  <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">Multiclínicas Ativo</span>
+              {selectedClinic && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-50 border border-brand-100">
+                  <Building2 size={11} className="text-brand-500" />
+                  <span className="text-[9px] font-black text-brand-700 uppercase tracking-widest">{selectedClinic.name}</span>
                 </div>
               )}
             </div>
-
-            <h1 className="text-4xl sm:text-5xl font-black text-ink-900 tracking-tight leading-tight">
-              {greetingHeader} <br />
-              <span className="text-brand-600">
-                {displayName}
-              </span>
+            <h1 className="text-xl sm:text-2xl font-black text-ink-900 tracking-tight leading-tight">
+              Olá, <span className="text-brand-600">{greetingName}</span>
             </h1>
-
-            <p className="text-ink-500 text-lg max-w-md mx-auto xl:mx-0 font-medium">
-              Você possui <span className="text-ink-800 font-bold">{stats.pending} exames</span> aguardando laudo na fila hoje.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center xl:justify-start gap-3 pt-2">
-              <button 
-                onClick={() => setShowCreateExamModal(true)}
-                className="h-12 px-6 rounded-xl bg-ink-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-ink-800 transition-all flex items-center gap-3 active:scale-95 shadow-sm"
-              >
-                <FilePlus size={16} />
-                Novo Laudo IA
-              </button>
-              <button 
-                onClick={() => setView({ name: 'worklist' })}
-                className="h-12 px-6 rounded-xl bg-white text-ink-700 font-bold text-xs uppercase tracking-widest border border-ink-100 hover:bg-ink-50 transition-all flex items-center gap-3 active:scale-95"
-              >
-                <LayoutList size={16} />
-                Worklist
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Metrics Panel */}
-          <div className="hidden lg:flex items-center gap-12 bg-ink-50/50 p-8 rounded-3xl border border-ink-100">
-            <div className="text-center">
-              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Hoje</p>
-              <p className="text-4xl font-black text-ink-800 tracking-tight">{stats.today}</p>
-            </div>
-            <div className="w-px h-12 bg-ink-200" />
-            <div className="text-center">
-              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Mês</p>
-              <p className="text-4xl font-black text-ink-800 tracking-tight">{stats.month}</p>
-            </div>
-            <div className="w-px h-12 bg-ink-200" />
-            <div className="text-center">
-              <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-1">Finalização</p>
-              <p className="text-4xl font-black text-emerald-500 tracking-tight">
-                {stats.total > 0 ? Math.round((stats.finalized / stats.total) * 100) : 0}%
+            {stats.pending > 0 && (
+              <p className="text-xs text-ink-500 mt-1 font-medium">
+                <span className="text-amber-600 font-bold">{stats.pending} {stats.pending === 1 ? 'exame aguarda' : 'exames aguardam'}</span> laudo na fila
               </p>
-            </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setView({ name: 'worklist' })}
+              className="h-9 px-4 rounded-xl bg-white text-ink-700 font-bold text-xs uppercase tracking-widest border border-ink-200 hover:bg-ink-50 transition-all flex items-center gap-2 active:scale-95"
+            >
+              <LayoutList size={14} />
+              <span className="hidden sm:inline">Worklist</span>
+            </button>
+            <button
+              onClick={() => setShowCreateExamModal(true)}
+              className="h-9 px-4 rounded-xl bg-ink-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-ink-800 transition-all flex items-center gap-2 active:scale-95 shadow-sm"
+            >
+              <FilePlus size={14} />
+              <span className="hidden sm:inline">Novo Laudo</span>
+            </button>
           </div>
         </div>
-      </section>
 
-      {/* Main Stats Neon Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-10 shrink-0">
-        <StatCard
-          label="Aguardando"
-          value={stats.pending}
-          icon={<Clock size={22} />}
-          color="amber"
-          loading={examsLoading}
-          onClick={() => setView({ name: 'worklist' })}
-        />
-        <StatCard
-          label="Em Andamento"
-          value={stats.inProgress}
-          icon={<CircleDot size={22} />}
-          color="brand"
-          loading={examsLoading}
-          onClick={() => setView({ name: 'worklist' })}
-        />
-        <StatCard
-          label="Laudados Hoje"
-          value={stats.finalizedToday}
-          icon={<CheckCircle2 size={22} />}
-          color="emerald"
-          loading={examsLoading}
-          onClick={() => setView({ name: 'worklist' })}
-        />
-        <StatCard
-          label="Pacientes Ativos"
-          value={patients.length}
-          icon={<Users size={22} />}
-          color="indigo"
-          loading={examsLoading}
-          onClick={() => setView({ name: 'patients' })}
-        />
+        {/* Mini stat strip */}
+        <div className="border-t border-ink-100 grid grid-cols-4 divide-x divide-ink-100">
+          {[
+            { label: 'Aguardando', value: stats.pending, color: 'text-amber-600', action: () => setView({ name: 'worklist' }) },
+            { label: 'Em Andamento', value: stats.inProgress, color: 'text-brand-600', action: () => setView({ name: 'worklist' }) },
+            { label: 'Hoje', value: stats.finalizedToday, color: 'text-emerald-600', action: () => setView({ name: 'worklist' }) },
+            { label: 'Pacientes', value: patients.length, color: 'text-indigo-600', action: () => setView({ name: 'patients' }) },
+          ].map((item, i) => (
+            <button
+              key={i}
+              onClick={item.action}
+              className="py-3 px-4 text-center hover:bg-ink-50 transition-colors group"
+            >
+              {examsLoading ? (
+                <Skeleton className="h-6 w-10 mx-auto mb-1 rounded-lg" />
+              ) : (
+                <p className={classNames('text-xl font-black leading-none', item.color)}>{item.value}</p>
+              )}
+              <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mt-0.5">{item.label}</p>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-10 items-start">
-        
-        {/* Left Column (2 cols) - Charts and Feeds */}
-        <div className="lg:col-span-2 space-y-10">
-          
-          {/* Visual Activity Chart Card */}
-          <div className="bg-white border border-ink-100 rounded-3xl p-6 sm:p-8 shadow-sm">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 rounded-xl bg-brand-50 text-brand-600">
-                  <Activity size={20} />
+      {/* ─── MAIN GRID ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+
+        {/* Left Column (2 cols) */}
+        <div className="lg:col-span-2 space-y-5">
+          {/* Quick Weekly Calendar & Day Appointments */}
+          <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <WeeklyCalendar
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              appointments={appointments}
+              clinicId={selectedClinicId || undefined}
+            />
+            
+            <div className="space-y-3 border-t border-ink-100 pt-4">
+              <h4 className="text-[10px] font-black text-ink-400 uppercase tracking-widest pl-1">
+                Agendamentos do Dia
+              </h4>
+              {selectedDayAppointments.length === 0 ? (
+                <p className="text-xs text-ink-400 text-center py-4 bg-ink-50/20 rounded-xl border border-dashed border-ink-100">
+                  Nenhum agendamento para esta data.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectedDayAppointments.map(app => {
+                    const appTime = new Date(app.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <div key={app.id} className="flex items-center justify-between p-3.5 bg-ink-50/50 rounded-xl border border-ink-100 shadow-sm">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-ink-900 truncate">{app.patientName}</p>
+                          <p className="text-[9px] text-ink-500 font-bold uppercase mt-0.5 truncate">
+                            {appTime} · {app.examType}
+                          </p>
+                        </div>
+                        <span className={classNames(
+                          "px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border shrink-0",
+                          app.status === 'confirmado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                          app.status === 'cancelado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                          'bg-blue-50 text-blue-700 border-blue-100'
+                        )}>
+                          {app.status}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Activity Chart */}
+          <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-brand-50 text-brand-600">
+                  <Activity size={16} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-ink-800 text-lg leading-none">Distribuição de Exames</h3>
-                  <p className="text-[10px] text-ink-400 uppercase font-black tracking-widest mt-1.5">Últimos 7 dias de produção</p>
+                  <h3 className="font-black text-ink-800 text-sm leading-none">Distribuição Semanal</h3>
+                  <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mt-0.5">Últimos 7 dias</p>
                 </div>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[9px] font-bold uppercase tracking-widest">Sincronizado</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-bold uppercase tracking-widest">Ao Vivo</span>
               </div>
             </div>
-
-            {/* Styled Flex Bar Chart */}
-            <div className="flex items-end justify-between gap-3 h-52 pt-4 px-2">
+            <div className="flex items-end justify-between gap-2 h-40 px-1">
               {stats.dailyActivity.map((day, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2 group/bar relative">
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group/bar relative">
                   <div className="w-full flex flex-col items-center">
-                    <motion.div 
+                    <motion.div
                       initial={{ height: 4 }}
-                      animate={{ height: Math.max((day.count / (stats.maxDaily || 1)) * 140, 4) }}
-                      transition={{ duration: 0.8, delay: i * 0.05, ease: "easeOut" }}
+                      animate={{ height: Math.max((day.count / (stats.maxDaily || 1)) * 120, 4) }}
+                      transition={{ duration: 0.7, delay: i * 0.05, ease: 'easeOut' }}
                       className={classNames(
-                        "w-full max-w-[40px] rounded-t-lg transition-colors duration-300 relative group-hover/bar:brightness-95 cursor-pointer",
-                        day.count > 0 ? "bg-brand-500" : "bg-ink-100"
+                        'w-full max-w-[36px] rounded-t-lg transition-colors duration-300 relative cursor-pointer',
+                        day.count > 0 ? 'bg-brand-500 group-hover/bar:bg-brand-400' : 'bg-ink-100'
                       )}
                     >
-                      {/* Floating tooltip */}
                       {day.count > 0 && (
-                        <div 
-                          role="tooltip"
-                          aria-label={`${day.count} exames em ${day.label}`}
-                          className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 bg-ink-800 text-white text-[10px] font-bold px-2 py-1 rounded-md whitespace-nowrap pointer-events-none"
-                        >
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/bar:opacity-100 transition-all duration-200 bg-ink-800 text-white text-[9px] font-bold px-2 py-1 rounded-md whitespace-nowrap pointer-events-none">
                           {day.count} {day.count === 1 ? 'exame' : 'exames'}
                         </div>
                       )}
                     </motion.div>
                   </div>
-                  <span className="text-[10px] text-ink-500 font-bold tracking-widest">{day.label}</span>
+                  <span className="text-[9px] text-ink-400 font-bold tracking-widest">{day.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Premium Recent Exams List Card */}
-          <div className="bg-white border border-ink-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-            <div className="px-8 py-6 border-b border-ink-100 flex items-center justify-between bg-ink-50/10">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-600 shadow-inner">
-                  <LayoutList size={22} />
+          {/* Recent Exams */}
+          <div className="bg-white border border-ink-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-ink-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                  <LayoutList size={16} />
                 </div>
                 <div>
-                  <h3 className="font-black text-ink-900 text-lg leading-none">Atividade Recente</h3>
-                  <p className="text-xs text-ink-400 uppercase font-black tracking-widest mt-1.5">Últimos laudos criados ou alterados</p>
+                  <h3 className="font-black text-ink-900 text-sm leading-none">Atividade Recente</h3>
+                  <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mt-0.5">Últimos laudos</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setView({ name: 'worklist' })}
-                className="h-10 px-4 rounded-xl border border-ink-200 hover:border-brand-300 hover:bg-brand-50/30 text-ink-600 hover:text-brand-700 font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 group"
+                className="flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors group"
               >
-                Ver Worklist
-                <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                Worklist
+                <ChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
 
             <div className="divide-y divide-ink-50">
               {recentExams.length === 0 ? (
-                <div className="p-16 text-center">
-                  <FileText size={44} className="mx-auto text-ink-200 mb-4 animate-bounce" />
-                  <p className="text-ink-500 font-bold italic">Nenhum exame recente registrado.</p>
+                <div className="p-10 text-center">
+                  <FileText size={24} className="mx-auto text-ink-200 mb-3" />
+                  <p className="text-ink-400 font-bold text-sm">Nenhum exame recente.</p>
                 </div>
               ) : (
                 recentExams.map(exam => {
                   const patient = patientMap.get(exam.patientId);
                   const area = EXAM_AREAS.find(a => a.id === exam.area);
-                  const genderGlow = patient?.gender === 'F' 
-                    ? 'ring-2 ring-pink-400/30 bg-pink-50 text-pink-700' 
-                    : patient?.gender === 'M' 
-                    ? 'ring-2 ring-blue-400/30 bg-blue-50 text-blue-700' 
-                    : 'ring-2 ring-brand-400/20 bg-brand-50 text-brand-700';
+                  const genderColor = patient?.gender === 'F'
+                    ? 'bg-pink-50 text-pink-700 border-pink-100'
+                    : patient?.gender === 'M'
+                    ? 'bg-blue-50 text-blue-700 border-blue-100'
+                    : 'bg-brand-50 text-brand-700 border-brand-100';
 
                   return (
                     <button
                       key={exam.id}
                       onClick={() => setView({ name: 'exam-editor', examId: exam.id })}
-                      className="w-full flex items-center gap-5 p-6 hover:bg-ink-50/40 transition-all text-left group"
+                      className="w-full flex items-center gap-3.5 px-5 py-3.5 hover:bg-ink-50/40 transition-all text-left group"
                     >
-                      {/* Safety avatar initial with safe fallback optional chaining */}
-                      <div className={classNames("w-12 h-12 rounded-2xl flex items-center justify-center font-black text-base shrink-0 group-hover:scale-105 transition-transform shadow-inner", genderGlow)}>
+                      <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border', genderColor)}>
                         {patient?.name?.charAt(0) || '?'}
                       </div>
-                      
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-black text-ink-900 truncate group-hover:text-brand-600 transition-colors">{patient?.name || 'Paciente'}</h4>
-                          {area && <span className={classNames("text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter border shrink-0", area.color)}>{area.label}</span>}
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h4 className="font-bold text-ink-900 truncate text-sm group-hover:text-brand-600 transition-colors">{patient?.name || 'Paciente'}</h4>
+                          {area && <span className={classNames('text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter border shrink-0', area.color)}>{area.label}</span>}
                         </div>
-                        <p className="text-xs text-ink-500 flex items-center gap-2 truncate">
-                          <AreaIcon area={exam.area} size={12} className="text-ink-400" />
+                        <p className="text-xs text-ink-500 flex items-center gap-1.5 truncate">
+                          <AreaIcon area={exam.area} size={11} className="text-ink-400 shrink-0" />
                           {exam.examType}
                         </p>
                       </div>
-
-                      <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                         <span className={classNames(
-                           "text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border",
-                           exam.status === 'finalizado' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                           exam.status === 'em-andamento' ? "bg-brand-50 text-brand-700 border-brand-100" :
-                           "bg-amber-50 text-amber-700 border-amber-100 animate-pulse"
-                         )}>
-                           {exam.status}
-                         </span>
-                         <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">{formatDateTime(exam.updatedAt || exam.createdAt)}</p>
+                      <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                        <span className={classNames(
+                          'text-[8px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest border',
+                          exam.status === 'finalizado' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                          exam.status === 'em-andamento' ? 'bg-brand-50 text-brand-700 border-brand-100' :
+                          'bg-amber-50 text-amber-700 border-amber-100'
+                        )}>
+                          {STATUS_LABELS[exam.status] ?? exam.status}
+                        </span>
+                        <p className="text-[9px] text-ink-400 font-bold">
+                          {exam.status === 'finalizado' && exam.finalizedAt
+                            ? formatDateTime(exam.finalizedAt)
+                            : formatDateTime(exam.updatedAt || exam.createdAt)
+                          }
+                        </p>
                       </div>
                     </button>
                   );
                 })
               )}
             </div>
-            
+
             {!showAllRecent && filteredExams.length > 5 && (
-              <div className="px-6 py-4 border-t border-ink-50 bg-ink-50/10 text-center">
-                <button 
+              <div className="px-5 py-3 border-t border-ink-100 text-center">
+                <button
                   onClick={() => setShowAllRecent(true)}
                   className="text-xs font-bold text-brand-600 hover:text-brand-700 uppercase tracking-widest transition-colors"
                 >
-                  Ver Mais Antigos
+                  Ver mais antigos
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Column (1 col) - Sandboxes & Specialties */}
-        <div className="space-y-10">
-          
+        {/* Right Column (1 col) */}
+        <div className="space-y-5">
 
-
-          {/* Specialty Progression Dial Card */}
-          <div className="bg-white rounded-[2.5rem] border border-ink-100 p-8 shadow-sm">
-            <h3 className="font-black text-ink-900 uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
-              <TrendingUp size={14} className="text-brand-500 animate-pulse" /> Produção por Especialidade
+          {/* Specialty Distribution */}
+          <div className="bg-white rounded-2xl border border-ink-200 p-5 shadow-sm">
+            <h3 className="font-black text-ink-900 text-xs uppercase tracking-widest mb-4 flex items-center gap-2">
+              <TrendingUp size={13} className="text-brand-500" />
+              Por Especialidade
             </h3>
-            
-            <div className="space-y-5">
+            <div className="space-y-3.5">
               {EXAM_AREAS.map(area => {
                 const count = stats.areaMap.get(area.id) || 0;
                 if (count === 0 && stats.total > 0) return null;
                 const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                
                 return (
                   <div key={area.id} className="group">
-                    <div className="flex items-center justify-between text-[11px] mb-2">
-                      <span className="font-black text-ink-800 uppercase tracking-tight group-hover:text-brand-600 transition-colors flex items-center gap-2">
-                        <AreaIcon area={area.id} size={12} className="text-ink-400" />
+                    <div className="flex items-center justify-between text-[10px] mb-1.5">
+                      <span className="font-bold text-ink-700 flex items-center gap-1.5 group-hover:text-brand-600 transition-colors">
+                        <AreaIcon area={area.id} size={11} className="text-ink-400" />
                         {area.label}
                       </span>
-                      <span className="text-ink-400 font-bold">{count} {count === 1 ? 'laudo' : 'laudos'}</span>
+                      <span className="text-ink-400 font-bold">{count}</span>
                     </div>
-                    <div className="h-2 bg-ink-50 rounded-full overflow-hidden border border-ink-100/50">
+                    <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
                       <div
-                        className={classNames("h-full rounded-full transition-all duration-1000 ease-out", area.color)}
+                        className={classNames('h-full rounded-full transition-all duration-1000 ease-out', area.color)}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
                   </div>
                 );
               })}
+              {stats.total === 0 && (
+                <p className="text-xs text-ink-400 text-center py-4">Nenhum exame registrado.</p>
+              )}
             </div>
           </div>
 
-          {/* Platform Security/Licensing info */}
-          <div className="bg-white border border-ink-100 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden group">
-            <div className="relative flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-ink-50 flex items-center justify-center text-ink-500 border border-ink-100">
-                <Briefcase size={20} />
+          {/* Productivity */}
+          <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+                <BarChart2 size={15} />
               </div>
               <div>
-                <h4 className="font-bold text-ink-800 text-lg tracking-tight">Resumo da Conta</h4>
-                <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest">Sessão Autenticada</p>
+                <h4 className="font-black text-ink-800 text-sm leading-none">Produtividade</h4>
+                <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">Mês atual</p>
               </div>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-ink-50 rounded-2xl p-4 border border-ink-100">
-                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1.5">Total Geral</p>
-                <p className="text-2xl font-black text-ink-800">{exams.length}</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 col-span-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Timer size={10} className="text-emerald-500" />
+                  <p className="text-[9px] text-emerald-600 font-black uppercase tracking-widest">Tempo Médio</p>
+                </div>
+                {stats.avgCompletionMinutes === null ? (
+                  <p className="text-sm font-bold text-emerald-800">— min</p>
+                ) : stats.avgCompletionMinutes < 60 ? (
+                  <p className="text-lg font-black text-emerald-800">{Math.round(stats.avgCompletionMinutes)} min</p>
+                ) : (
+                  <p className="text-lg font-black text-emerald-800">
+                    {Math.floor(stats.avgCompletionMinutes / 60)}h {Math.round(stats.avgCompletionMinutes % 60)}min
+                  </p>
+                )}
               </div>
-              <div className="bg-ink-50 rounded-2xl p-4 border border-ink-100">
-                <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mb-1.5">Clínicas</p>
-                <p className="text-2xl font-black text-ink-800">{clinics.length}</p>
+              <div className="bg-ink-50 rounded-xl p-3 border border-ink-100">
+                <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mb-0.5">Taxa Mês</p>
+                <p className="text-lg font-black text-ink-800">
+                  {stats.monthFinalizedRate}%
+                </p>
+              </div>
+              <div className="bg-ink-50 rounded-xl p-3 border border-ink-100">
+                <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mb-0.5">Sem. Ant.</p>
+                <p className="text-lg font-black text-ink-800">{stats.prevWeekCount}</p>
+                <p className="text-[8px] mt-0.5">
+                  {stats.week >= stats.prevWeekCount
+                    ? <span className="text-emerald-600 font-bold">↑ {stats.week} esta sem.</span>
+                    : <span className="text-rose-500 font-bold">↓ {stats.week} esta sem.</span>
+                  }
+                </p>
               </div>
             </div>
           </div>
+
+          {/* AI Cost */}
+          <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 border border-violet-100">
+                <BrainCircuit size={15} />
+              </div>
+              <div>
+                <h4 className="font-black text-ink-800 text-sm leading-none">Uso de IA</h4>
+                <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">Custo do mês</p>
+              </div>
+            </div>
+            {aiStats === null ? (
+              <div className="flex items-center gap-2 text-ink-400 py-2">
+                <Loader2 size={13} className="animate-spin" />
+                <span className="text-xs font-medium">Carregando...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-violet-50 rounded-xl p-3 border border-violet-100">
+                  <p className="text-[9px] text-violet-500 font-black uppercase tracking-widest mb-0.5">Mês (BRL)</p>
+                  <p className="text-base font-black text-violet-800">R$ {(aiStats.totalCost * (settings.aiConversionRateBRL || 5.50)).toFixed(2)}</p>
+                </div>
+                <div className="bg-ink-50 rounded-xl p-3 border border-ink-100">
+                  <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mb-0.5">Hoje (BRL)</p>
+                  <p className="text-base font-black text-ink-800">R$ {(aiStats.todayCost * (settings.aiConversionRateBRL || 5.50)).toFixed(2)}</p>
+                </div>
+                <div className="col-span-2 bg-ink-50 rounded-xl p-3 border border-ink-100">
+                  <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mb-0.5">Chamadas</p>
+                  <p className="text-lg font-black text-ink-800">{aiStats.totalCalls}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Account Summary */}
+          <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm">
+            <h4 className="font-black text-ink-800 text-xs uppercase tracking-widest mb-3">Resumo da Conta</h4>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="bg-ink-50 rounded-xl p-3 border border-ink-100">
+                <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mb-0.5">Total</p>
+                <p className="text-lg font-black text-ink-800">{exams.length}</p>
+              </div>
+              <div className="bg-ink-50 rounded-xl p-3 border border-ink-100">
+                <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mb-0.5">Clínicas</p>
+                <p className="text-lg font-black text-ink-800">{clinics.length}</p>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
-  );
-}
-
-function StatCard({ label, value, icon, color, loading, onClick }: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  color: 'amber' | 'brand' | 'emerald' | 'indigo';
-  loading?: boolean;
-  onClick?: () => void;
-}) {
-  const borderColors = {
-    amber: 'border-amber-200 hover:border-amber-400',
-    brand: 'border-brand-200 hover:border-brand-400',
-    emerald: 'border-emerald-200 hover:border-emerald-400',
-    indigo: 'border-indigo-200 hover:border-indigo-400',
-  };
-  const iconColors = {
-    amber: 'bg-amber-50 text-amber-600',
-    brand: 'bg-brand-50 text-brand-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    indigo: 'bg-indigo-50 text-indigo-600',
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={classNames(
-        "p-4 sm:p-5 rounded-2xl border bg-white transition-all text-left shadow-sm hover:shadow active:scale-95",
-        borderColors[color]
-      )}
-    >
-      <div className={classNames("w-10 h-10 rounded-xl flex items-center justify-center mb-3", iconColors[color])}>
-        {icon}
-      </div>
-      <div>
-        {loading ? (
-          <Skeleton className="h-8 w-16 mb-1.5 rounded-lg" />
-        ) : (
-          <p className="text-3xl font-bold text-ink-800 leading-none mb-1.5">{value}</p>
-        )}
-        <p className="text-[10px] font-bold text-ink-500 uppercase tracking-widest">{label}</p>
-      </div>
-    </button>
   );
 }

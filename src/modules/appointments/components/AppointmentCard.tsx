@@ -118,7 +118,7 @@ export function AppointmentCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       className={classNames(
-        "bg-white border rounded-3xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative group overflow-hidden",
+        "bg-white border rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative group overflow-hidden",
         appointment.status === 'confirmado' ? "border-emerald-200/80 bg-emerald-50/5" :
         appointment.status === 'cancelado' ? "border-rose-200/80 bg-rose-50/5" : "border-ink-200/80",
         areaColors.glow

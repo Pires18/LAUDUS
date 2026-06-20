@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
-import { PageHeader } from '../../components/PageHeader';
 import { 
   ShieldCheck, Users, CreditCard, History, 
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
@@ -22,7 +21,7 @@ import { AdminLicenses } from './submodules/AdminLicenses';
 type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'licenses';
 
 export function Admin() {
-  const { view, setView } = useApp();
+  const { view } = useApp();
   const [activeTab, setActiveTab] = useState<AdminTab>((view.name === 'admin' && (view.activeTab as AdminTab)) || 'overview');
 
   const tabs = [
@@ -37,28 +36,42 @@ export function Admin() {
 
   return (
     <div className="module-container">
-      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-8">
-        <PageHeader 
-          title="Painel de Controle Admin" 
-          subtitle="Gerencie toda a infraestrutura, usuários e inteligência do LAUD.US."
-          icon={ShieldCheck}
-        />
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
+        {/* ─── COMPACT HEADER ─── */}
+        <div className="bg-white border border-ink-200 rounded-2xl shadow-sm">
+          <div className="px-5 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-ink-900 flex items-center justify-center shadow-sm shrink-0">
+                <ShieldCheck size={18} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-ink-900 tracking-tight leading-none">Painel de Controle Admin</h1>
+                <p className="text-[11px] text-ink-500 font-medium mt-0.5">Gerencie toda a infraestrutura, usuários e inteligência do LAUD.US.</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Tab Navigation */}
-        <div className="tab-group w-full max-w-full">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={classNames(
-                "tab-item",
-                activeTab === tab.id && "tab-item-active"
-              )}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 bg-ink-100 p-1 rounded-2xl border border-ink-200/50 overflow-x-auto">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={classNames(
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                    : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
+                )}
+              >
+                <tab.icon size={13} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Content Area */}
@@ -140,19 +153,19 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {stats.map((stat) => (
           <button 
             key={stat.label} 
             onClick={() => onNavigate(stat.tab as AdminTab)}
-            className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm hover:shadow-premium hover:border-brand-300 transition-all text-left group"
+            className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm hover:shadow-md hover:border-brand-300 transition-all text-left group"
           >
             <div className="flex justify-between items-start mb-4">
-              <div className={classNames("p-3 rounded-2xl bg-ink-50 transition-colors group-hover:bg-brand-50", stat.color)}>
-                <stat.icon size={24} />
+              <div className={classNames("p-3 rounded-xl bg-ink-50 transition-colors group-hover:bg-brand-50", stat.color)}>
+                <stat.icon size={20} />
               </div>
-              <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase tracking-widest">
+              <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg uppercase tracking-widest">
                 {stat.change}
               </span>
             </div>
@@ -162,9 +175,9 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Broadcast System */}
-        <div className="bg-white p-8 rounded-3xl border border-ink-100 shadow-sm">
+        <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
            <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-2">
             <Megaphone size={20} className="text-brand-600" /> Sistema de Broadcast
           </h4>
@@ -204,7 +217,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-ink-100 shadow-sm">
+        <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
           <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-2">
             <Sparkles size={20} className="text-brand-600" /> Status LAUD.IA
           </h4>

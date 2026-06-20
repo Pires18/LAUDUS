@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { signInWithPopup, signOut as firebaseSignOut, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, signOut as firebaseSignOut, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { useApp } from '../store/app';
 import { storeGoogleAccessToken, clearGoogleAccessToken } from '../lib/googleAuth';
@@ -36,6 +36,34 @@ export function useAuth() {
     }
   }, []);
 
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao entrar com email e senha';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const signUpWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao criar conta';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const signOutUser = useCallback(async () => {
     try {
       await firebaseSignOut(auth);
@@ -51,6 +79,8 @@ export function useAuth() {
     loading,
     error,
     signIn,
+    signInWithEmail,
+    signUpWithEmail,
     signOut: signOutUser,
   };
 }

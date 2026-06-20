@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Activity, Info, Droplets } from 'lucide-react';
+import { Activity, Droplets } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 export function IvcIndexCalculator({ value, onChange }: CalculatorProps) {

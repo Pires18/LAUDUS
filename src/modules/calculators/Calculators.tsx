@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { CALCULATORS } from './registry';
 import { 
-  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, Zap, CheckCircle2, Copy
+  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, CheckCircle2, Copy
 } from 'lucide-react';
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
@@ -33,11 +33,20 @@ export function Calculators() {
   return (
     <div className="module-container">
       <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
-      <PageHeader
-        title="Calculadoras Clínicas"
-        subtitle="Biblioteca de módulos integrados para cálculos especializados."
-        icon={Calculator}
-      />
+        {/* ─── COMPACT HEADER ─── */}
+        <div className="bg-white border border-ink-200 rounded-2xl shadow-sm">
+          <div className="px-5 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm shrink-0">
+                <Calculator size={18} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-ink-900 tracking-tight leading-none">Calculadoras Clínicas</h1>
+                <p className="text-[11px] text-ink-500 font-medium mt-0.5">Biblioteca de módulos integrados para cálculos especializados.</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         {/* Sidebar Áreas (Desktop) */}
@@ -86,7 +95,7 @@ export function Calculators() {
 
         <div className="flex-1 w-full space-y-6">
           {/* Search and Mobile Filters */}
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-3xl border border-ink-100 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-2xl border border-ink-200 shadow-sm">
             <div className="relative flex-1 w-full flex items-center gap-2">
               <div className="relative flex-1">
                 <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
@@ -156,7 +165,7 @@ export function Calculators() {
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: 0.3, type: 'spring', bounce: 0.4 }}
                   onClick={() => setSelectedCalcId(calc.id)}
-                  className="group flex flex-col p-6 bg-white/70 backdrop-blur-2xl rounded-[2.5rem] border border-white hover:border-brand-300 hover:shadow-[0_20px_40px_-15px_rgba(99,102,241,0.2)] transition-all text-left relative overflow-hidden h-full shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+                  className="group flex flex-col p-6 bg-white/70 backdrop-blur-2xl rounded-2xl border border-ink-200 hover:border-brand-300 hover:shadow-[0_20px_40px_-15px_rgba(99,102,241,0.2)] transition-all text-left relative overflow-hidden h-full shadow-sm"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-white/80 via-white/40 to-transparent pointer-events-none" />
                   
@@ -167,7 +176,7 @@ export function Calculators() {
                   </div>
 
                   <div className="relative z-10 flex flex-col gap-5 mb-4 w-full">
-                    <div className="w-16 h-16 rounded-[1.25rem] bg-gradient-to-br from-ink-100/80 to-ink-50/80 text-brand-600 flex items-center justify-center group-hover:from-brand-500 group-hover:to-brand-600 group-hover:text-white transition-all duration-500 shadow-sm border border-white group-hover:shadow-xl group-hover:shadow-brand-500/20">
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-ink-100/80 to-ink-50/80 text-brand-600 flex items-center justify-center group-hover:from-brand-500 group-hover:to-brand-600 group-hover:text-white transition-all duration-500 shadow-sm border border-white group-hover:shadow-xl group-hover:shadow-brand-500/20">
                       <AreaIcon area={calc.areas[0]} size={28} />
                     </div>
                     <div>
@@ -221,7 +230,7 @@ export function Calculators() {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ type: 'spring', bounce: 0.3, duration: 0.5 }}
-            className="bg-white/90 backdrop-blur-2xl rounded-[2.5rem] sm:rounded-[3rem] shadow-2xl shadow-brand-900/10 w-full max-w-5xl my-4 max-h-[90dvh] overflow-hidden flex flex-col border border-white"
+            className="bg-white/90 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-brand-900/10 w-full max-w-5xl my-4 max-h-[90dvh] overflow-hidden flex flex-col border border-ink-200"
           >
             <div className="px-6 py-5 sm:px-10 sm:py-6 border-b border-ink-100 bg-white/50 flex items-center justify-between shrink-0 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-brand-50/50 to-transparent pointer-events-none" />
@@ -243,7 +252,7 @@ export function Calculators() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-5 sm:p-10 custom-scrollbar space-y-8 bg-ink-50/50">
-              <div className="bg-white rounded-[2rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-5 sm:p-8">
+              <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 sm:p-8">
                 {activeCalc && React.createElement(activeCalc.component, {
                   value: calcResult ?? {},
                   onChange: (res: Record<string, unknown>) => setCalcResult(res)
@@ -261,7 +270,7 @@ export function Calculators() {
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-6 sm:p-8 bg-gradient-to-br from-brand-50 to-white rounded-[2.5rem] border border-brand-100 shadow-lg shadow-brand-500/5 space-y-6"
+                  className="p-6 sm:p-8 bg-gradient-to-br from-brand-50 to-white rounded-2xl border border-brand-100 shadow-lg shadow-brand-500/5 space-y-6"
                 >
                   <div className="flex items-center gap-3">
                      <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center">

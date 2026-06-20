@@ -1,4 +1,4 @@
-import { ExamRequest, Patient } from '../types';
+import { Patient } from '../types';
 import { logger } from './logger';
 
 /**

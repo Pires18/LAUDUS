@@ -21,6 +21,8 @@ import { Loader2 } from 'lucide-react';
 
 import { classNames } from './utils/format';
 import { logger } from './utils/logger';
+import { useConfirmStore } from './hooks/useConfirm';
+import { ConfirmDialog } from './components/ConfirmDialog';
 
 // ── Eager loads (critical path) ──
 import { Dashboard } from './modules/dashboard/Dashboard';
@@ -52,22 +54,26 @@ function LazyFallback() {
 function ViewRenderer() {
   const { view } = useApp();
 
+  function lazy(label: string, node: ReactNode) {
+    return <ErrorBoundary inline label={label}><Suspense fallback={<LazyFallback />}>{node}</Suspense></ErrorBoundary>;
+  }
+
   const views: Record<string, ReactNode> = {
     dashboard: <Dashboard />,
     worklist: <Worklist />,
-    patients: <Suspense fallback={<LazyFallback />}><Patients /></Suspense>,
-    appointments: <Suspense fallback={<LazyFallback />}><Appointments /></Suspense>,
-    'patient-detail': view.name === 'patient-detail' ? <Suspense fallback={<LazyFallback />}><PatientDetail key={view.patientId} patientId={view.patientId} /></Suspense> : null,
+    patients: lazy('Pacientes', <Patients />),
+    appointments: lazy('Agenda', <Appointments />),
+    'patient-detail': view.name === 'patient-detail' ? lazy('Paciente', <PatientDetail key={view.patientId} patientId={view.patientId} />) : null,
     'exam-editor': view.name === 'exam-editor' ? <ExamEditor key={view.examId} examId={view.examId} /> : null,
-    templates: <Suspense fallback={<LazyFallback />}><Templates /></Suspense>,
-    'template-editor': view.name === 'template-editor' ? <Suspense fallback={<LazyFallback />}><TemplateEditor key={view.templateId} templateId={view.templateId} /></Suspense> : null,
-    settings: <Suspense fallback={<LazyFallback />}><Settings /></Suspense>,
-    'laud-ia': <Suspense fallback={<LazyFallback />}><LaudIA /></Suspense>,
-    calculators: <Suspense fallback={<LazyFallback />}><Calculators /></Suspense>,
-    clinics: <Suspense fallback={<LazyFallback />}><Clinics /></Suspense>,
-    'clinic-detail': view.name === 'clinic-detail' ? <Suspense fallback={<LazyFallback />}><ClinicDetail key={view.clinicId} clinicId={view.clinicId} /></Suspense> : null,
-    'clinic-form': view.name === 'clinic-form' ? <Suspense fallback={<LazyFallback />}><ClinicForm key={view.clinicId} clinicId={view.clinicId} /></Suspense> : null,
-    admin: <Suspense fallback={<LazyFallback />}><Admin /></Suspense>,
+    templates: lazy('Templates', <Templates />),
+    'template-editor': view.name === 'template-editor' ? lazy('Editor de Template', <TemplateEditor key={view.templateId} templateId={view.templateId} />) : null,
+    settings: lazy('Configurações', <Settings />),
+    'laud-ia': lazy('LAUD.IA', <LaudIA />),
+    calculators: lazy('Calculadoras', <Calculators />),
+    clinics: lazy('Clínicas', <Clinics />),
+    'clinic-detail': view.name === 'clinic-detail' ? lazy('Clínica', <ClinicDetail key={view.clinicId} clinicId={view.clinicId} />) : null,
+    'clinic-form': view.name === 'clinic-form' ? lazy('Formulário de Clínica', <ClinicForm key={view.clinicId} clinicId={view.clinicId} />) : null,
+    admin: lazy('Administração', <Admin />),
   };
 
   const isFullBleed = view.name === 'exam-editor';
@@ -128,7 +134,24 @@ function AuthenticatedApp() {
       {showCreateExamModal && <CreateExamModal onClose={() => setShowCreateExamModal(false)} />}
       <SupportCenterModal />
       <PWAUpdatePrompt />
+      <GlobalConfirmDialog />
     </div>
+  );
+}
+
+function GlobalConfirmDialog() {
+  const { isOpen, options, handleConfirm, handleCancel } = useConfirmStore();
+  return (
+    <ConfirmDialog
+      open={isOpen}
+      title={options.title}
+      message={options.message}
+      confirmLabel={options.confirmLabel}
+      cancelLabel={options.cancelLabel}
+      variant={options.variant}
+      onConfirm={handleConfirm}
+      onCancel={handleCancel}
+    />
   );
 }
 

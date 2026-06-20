@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Ruler, Activity, Info } from 'lucide-react';
+import { Ruler, Info } from 'lucide-react';
 
 export function MsdCalculator({ value, onChange }: CalculatorProps) {
   const [d1, setD1] = useState(value?.d1 || '');

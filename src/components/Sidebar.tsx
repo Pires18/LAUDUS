@@ -6,12 +6,11 @@ import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
-  Calculator, Sparkles, Hospital, Sliders, PanelLeftClose,
+  Calculator, Sparkles, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
   Users, LogOut, CalendarDays
 } from 'lucide-react';
 import { classNames } from '../utils/format';
-import { CreateExamModal } from './CreateExamModal';
 import { LogoIcon } from './LogoIcon';
 
 const items = [

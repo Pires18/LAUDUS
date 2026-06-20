@@ -3,8 +3,8 @@ import { useApp } from '../store/app';
 import { useCollection } from '../hooks/useFirestore';
 import { Patient, ExamRequest, ReportTemplate, EXAM_AREAS } from '../types';
 import {
-  Search, Users, FileText, LayoutList, Activity, Settings,
-  BrainCircuit, ArrowRight, CornerDownLeft, X, FilePlus, LayoutDashboard,
+  Search, Users, FileText, LayoutList, Settings,
+  BrainCircuit, ArrowRight, CornerDownLeft, FilePlus, LayoutDashboard,
   Clock, CheckCircle2, CircleDot
 } from 'lucide-react';
 import { classNames, calculateAge, formatDateTime } from '../utils/format';
@@ -164,7 +164,7 @@ export function CommandPalette() {
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="relative w-full max-w-2xl bg-white rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-ink-100 overflow-hidden"
+            className="relative w-full max-w-2xl bg-white rounded-2xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-ink-100 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Search input */}

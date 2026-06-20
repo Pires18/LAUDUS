@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   Coins, TrendingUp, CalendarDays, Activity, Loader2,
-  Sparkles, BrainCircuit, History, RefreshCw, BarChart3, Zap
+  Sparkles, History, RefreshCw, BarChart3, Zap, Download,
+  ArrowUp, ArrowDown, Minus
 } from 'lucide-react';
 import { getAiUsageStats, AiUsageLog } from '../../store/db';
 import { classNames } from '../../utils/format';
@@ -10,21 +11,46 @@ import { logger } from '../../utils/logger';
 const USD_TO_BRL = 5.50;
 
 const PRICING: Record<string, { input: number; output: number; label: string; color: string }> = {
-  'claude-3-5-sonnet-latest': { input: 3.0, output: 15.0, label: 'Claude 3.5 Sonnet', color: 'amber' },
-  'claude-3-7-sonnet-latest': { input: 3.0, output: 15.0, label: 'Claude 3.7 Sonnet', color: 'amber' },
-  'gemini-3.5-flash':         { input: 0.075, output: 0.30, label: 'Gemini 3.5 Flash', color: 'brand' },
-  'gemini-3.1-pro-preview':   { input: 1.25, output: 5.0,  label: 'Gemini 3.1 Pro',   color: 'violet' },
+  'claude-sonnet-4-6':        { input: 3.0,  output: 15.0, label: 'Claude Sonnet 4.6', color: 'amber' },
+  'claude-3-5-sonnet-latest': { input: 3.0,  output: 15.0, label: 'Claude 3.5 Sonnet', color: 'amber' },
+  'claude-3-7-sonnet-latest': { input: 3.0,  output: 15.0, label: 'Claude 3.7 Sonnet', color: 'amber' },
+  'gemini-3.5-flash':         { input: 0.075, output: 0.30, label: 'Gemini 3.5 Flash',  color: 'brand' },
+  'gemini-3.1-pro-preview':   { input: 1.25, output: 5.0,  label: 'Gemini 3.1 Pro',    color: 'violet' },
 };
 
 function resolveModelName(rawModel: string): string {
   const raw = (rawModel || '').toLowerCase();
+  if (raw.includes('sonnet-4-6') || raw.includes('claude-sonnet-4-6')) return 'claude-sonnet-4-6';
   if (raw.includes('claude-3-7-sonnet')) return 'claude-3-7-sonnet-latest';
   if (raw.includes('claude-3-5-sonnet')) return 'claude-3-5-sonnet-latest';
   if (raw.includes('gemini-3.1-pro') || raw.includes('gemini-3.1-pro-preview')) return 'gemini-3.1-pro-preview';
   if (raw.includes('gemini-3.5-flash') || raw.includes('gemini-2.0-flash') || raw.includes('gemini-1.5-flash')) return 'gemini-3.5-flash';
-  if (raw.includes('claude')) return 'claude-3-5-sonnet-latest';
+  if (raw.includes('claude')) return 'claude-sonnet-4-6';
   if (raw.includes('gemini')) return 'gemini-3.5-flash';
   return rawModel || 'Desconhecido';
+}
+
+function exportCsv(logs: GroupedLog[]) {
+  const rows = [
+    ['Data/Hora', 'Área', 'Motores', 'Requisições', 'Tokens', 'Custo USD', 'Custo BRL'],
+    ...logs.map(l => [
+      new Date(l.timestamp).toLocaleString('pt-BR'),
+      l.area || '',
+      Array.from(l.models).join('; '),
+      l.requests,
+      l.tokens,
+      l.costUsd.toFixed(6),
+      (l.costUsd * USD_TO_BRL).toFixed(4),
+    ]),
+  ];
+  const csv = rows.map(r => r.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `laudus-financeiro-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function calculateCost(model: string, input: number, output: number): number {
@@ -67,6 +93,7 @@ export function FinancialControl() {
   const [dailyStats,   setDailyStats]   = useState({ tokens: 0, costUsd: 0, count: 0 });
   const [weeklyStats,  setWeeklyStats]  = useState({ tokens: 0, costUsd: 0, count: 0 });
   const [monthlyStats, setMonthlyStats] = useState({ tokens: 0, costUsd: 0, count: 0 });
+  const [prevMonthStats, setPrevMonthStats] = useState({ costUsd: 0, count: 0 });
   const [modelBreakdown, setModelBreakdown] = useState<Record<string, { tokens: number; costUsd: number }>>({});
   const [groupedLogs,    setGroupedLogs]    = useState<GroupedLog[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -81,8 +108,18 @@ export function FinancialControl() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
       const endOfRange   = now.getTime();
 
-      const rawLogs = await getAiUsageStats(startOfMonth, endOfRange);
+      const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+      const endOfPrevMonth   = startOfMonth - 1;
+
+      const [rawLogs, prevLogs] = await Promise.all([
+        getAiUsageStats(startOfMonth, endOfRange),
+        getAiUsageStats(startOfPrevMonth, endOfPrevMonth),
+      ]);
       rawLogs.sort((a, b) => b.timestamp - a.timestamp);
+
+      const prevCost  = prevLogs.reduce((s, l) => s + calculateCost(resolveModelName(l.model), l.inputTokens, l.outputTokens), 0);
+      const prevCount = new Set(prevLogs.map(l => l.examId).filter(Boolean)).size || prevLogs.length;
+      setPrevMonthStats({ costUsd: prevCost, count: prevCount });
 
       let dTokens = 0, dCost = 0, dCount = 0;
       let wTokens = 0, wCost = 0, wCount = 0;
@@ -212,15 +249,61 @@ export function FinancialControl() {
               </p>
             </div>
           </div>
-          <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2 bg-ink-50 hover:bg-ink-100 text-ink-600 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
-            title="Atualizar dados"
-          >
-            <RefreshCw size={14} />
-            Atualizar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportCsv(groupedLogs)}
+              disabled={groupedLogs.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Exportar extrato em CSV"
+            >
+              <Download size={14} />
+              CSV
+            </button>
+            <button
+              onClick={loadData}
+              className="flex items-center gap-2 px-4 py-2 bg-ink-50 hover:bg-ink-100 text-ink-600 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
+              title="Atualizar dados"
+            >
+              <RefreshCw size={14} />
+              Atualizar
+            </button>
+          </div>
         </div>
+
+        {/* MoM Comparison + Avg cost */}
+        {(prevMonthStats.costUsd > 0 || monthlyStats.count > 0) && (
+          <div className="flex flex-wrap gap-3 mb-4">
+            {prevMonthStats.costUsd > 0 && (() => {
+              const delta = monthlyStats.costUsd - prevMonthStats.costUsd;
+              const pct = prevMonthStats.costUsd > 0 ? (delta / prevMonthStats.costUsd) * 100 : 0;
+              const up = delta > 0;
+              const neutral = Math.abs(pct) < 1;
+              return (
+                <div className="flex items-center gap-2 bg-ink-50 border border-ink-200 rounded-2xl px-4 py-2.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-ink-500">Vs. Mês Anterior</span>
+                  <span className={classNames(
+                    'flex items-center gap-1 text-xs font-black',
+                    neutral ? 'text-ink-500' : up ? 'text-red-600' : 'text-emerald-600'
+                  )}>
+                    {neutral ? <Minus size={12} /> : up ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                    {neutral ? '~0%' : `${up ? '+' : ''}${pct.toFixed(1)}%`}
+                  </span>
+                  <span className="text-[10px] text-ink-400">
+                    (anterior: R$ {(prevMonthStats.costUsd * USD_TO_BRL).toFixed(2)})
+                  </span>
+                </div>
+              );
+            })()}
+            {monthlyStats.count > 0 && (
+              <div className="flex items-center gap-2 bg-ink-50 border border-ink-200 rounded-2xl px-4 py-2.5">
+                <span className="text-[10px] font-black uppercase tracking-widest text-ink-500">Custo Médio / Laudo</span>
+                <span className="text-xs font-black text-ink-700">
+                  R$ {((monthlyStats.costUsd / monthlyStats.count) * USD_TO_BRL).toFixed(4)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

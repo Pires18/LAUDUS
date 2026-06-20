@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Ruler, Activity, Info, BarChart3, Sparkles } from 'lucide-react';
+import { Ruler, BarChart3, Sparkles } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 import { WHO_COEFFICIENTS } from '../constants/whoCoefficients';
@@ -163,7 +163,7 @@ export function WhoFetalBiometryCalculator({ value, onChange }: CalculatorProps)
       </div>
 
       <div className="space-y-6">
-        <div className="bg-cyan-50/50 p-6 rounded-[2rem] border-2 border-cyan-100/50">
+        <div className="bg-cyan-50/50 p-6 rounded-2xl border-2 border-cyan-100/50">
            <label className="text-[10px] font-black text-cyan-500 uppercase tracking-widest ml-1 mb-3 block">IG de Referência e Sexo</label>
            <div className="flex gap-4">
               <CalculatorInput type="number" placeholder="Sem" value={gaWeeks} onChange={setGaWeeks} suffix="s" />
@@ -264,7 +264,7 @@ export function WhoFetalBiometryCalculator({ value, onChange }: CalculatorProps)
           )}
         </div>
       ) : (
-        <div className="py-12 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center space-y-3">
+        <div className="py-12 border-2 border-dashed border-ink-100 rounded-2xl text-center space-y-3">
           <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200">
              <Ruler size={32} />
           </div>

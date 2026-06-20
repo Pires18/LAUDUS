@@ -26,28 +26,11 @@ export function PrintImagesLayout({
   localUrls = {},
   imageAdjustments = {}
 }: Props) {
-  // Determine grid dimensions based on gridType
-  let cols = 2;
-  let rows = 4;
-  let chunkSize = 8;
-
-  if (gridType === '1x1') {
-    cols = 1;
-    rows = 1;
-    chunkSize = 1;
-  } else if (gridType === '1x2') {
-    cols = 1;
-    rows = 2;
-    chunkSize = 2;
-  } else if (gridType === '2x3') {
-    cols = 2;
-    rows = 3;
-    chunkSize = 6;
-  } else if (gridType === '2x4') {
-    cols = 2;
-    rows = 4;
-    chunkSize = 8;
-  }
+  // Determine chunk size based on gridType
+  const chunkSize =
+    gridType === '1x1' ? 1 :
+    gridType === '1x2' ? 2 :
+    gridType === '2x3' ? 6 : 8;
 
   // Chunk instances into arrays of maximum chunkSize items
   const pages: typeof selectedInstances[] = [];

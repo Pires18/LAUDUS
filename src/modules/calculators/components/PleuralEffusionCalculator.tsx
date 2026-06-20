@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Droplets, Info, AlertCircle } from 'lucide-react';
-import { classNames } from '../../../utils/format';
 
 export function PleuralEffusionCalculator({ value, onChange }: CalculatorProps) {
   const [depth, setDepth] = useState(value?.depth || ''); // mm

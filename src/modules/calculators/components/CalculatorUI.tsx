@@ -1,6 +1,5 @@
-import React from 'react';
 import { classNames } from '../../../utils/format';
-import { CheckCircle2, Info, AlertCircle, HelpCircle } from 'lucide-react';
+import { CheckCircle2, Info } from 'lucide-react';
 
 interface CategoryOption {
   label: string;
@@ -91,7 +90,7 @@ export function ResultCard({ label, value, points, recommendation, variant = 'br
   }[variant];
 
   return (
-    <div className={classNames("rounded-[2rem] border-2 p-6 flex flex-col gap-4 animate-in slide-in-from-bottom-2 duration-300 shadow-sm", styles)}>
+    <div className={classNames("rounded-2xl border-2 p-6 flex flex-col gap-4 animate-in slide-in-from-bottom-2 duration-300 shadow-sm", styles)}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
            <div className={classNames("w-10 h-10 rounded-xl flex items-center justify-center bg-white shadow-sm", variant === 'brand' ? 'text-brand-600' : '')}>

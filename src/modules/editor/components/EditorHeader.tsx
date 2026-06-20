@@ -1,6 +1,6 @@
 import {
-  ChevronLeft, CheckCircle2, Settings, Play, ScanSearch, Edit2,
-  Wifi, WifiOff, Loader2, ExternalLink, FileText, Save, AlertCircle
+  ChevronLeft, CheckCircle2, Settings, Play, ScanSearch,
+  Loader2, AlertCircle, ClipboardList
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDate, classNames } from '../../../utils/format';
@@ -18,7 +18,6 @@ interface EditorHeaderProps {
   hasDicomImages?: boolean;
   onToggleViewer?: () => void;
   viewerOpen?: boolean;
-  onEditPatient?: () => void;
   // New PACS status props
   dicomStatus?: 'idle' | 'searching' | 'found' | 'not-found' | 'error' | 'connecting-backup';
   activeServer?: 'primary' | 'backup' | null;
@@ -40,7 +39,6 @@ export function EditorHeader({
   hasDicomImages = false,
   onToggleViewer,
   viewerOpen = false,
-  onEditPatient,
   dicomStatus,
   activeServer,
   lastErrorMessage,
@@ -86,15 +84,6 @@ export function EditorHeader({
               <h1 className="text-sm font-black text-ink-900 uppercase tracking-tight truncate max-w-[110px] xs:max-w-[160px] sm:max-w-[220px] md:max-w-[320px] lg:max-w-none">
                 {patient.name}
               </h1>
-              {onEditPatient && (
-                <button
-                  onClick={onEditPatient}
-                  className="p-1 rounded-md text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors shrink-0"
-                  title="Editar dados do paciente"
-                >
-                  <Edit2 size={12} />
-                </button>
-              )}
               {patient.birthDate && (
                 <span className="text-[9px] font-bold text-ink-500 bg-ink-50 border border-ink-200 px-1.5 py-0.5 rounded-md shrink-0 hidden lg:inline">
                   Data de Nasc: {formatDate(patient.birthDate)}
@@ -130,6 +119,18 @@ export function EditorHeader({
                 <>
                   <span className="text-ink-300">·</span>
                   <span className="font-semibold text-ink-500 truncate max-w-[80px] hidden lg:inline">{clinic.name}</span>
+                </>
+              )}
+              {(patient.history || patient.notes) && (
+                <>
+                  <span className="text-ink-300 hidden xl:inline">·</span>
+                  <span
+                    className="hidden xl:flex items-center gap-1 text-[9px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md truncate max-w-[180px] cursor-help"
+                    title={[patient.history && `Histórico: ${patient.history}`, patient.notes && `Notas: ${patient.notes}`].filter(Boolean).join('\n\n')}
+                  >
+                    <ClipboardList size={9} className="shrink-0" />
+                    {(patient.history || patient.notes || '').slice(0, 60)}{(patient.history || patient.notes || '').length > 60 ? '…' : ''}
+                  </span>
                 </>
               )}
             </div>

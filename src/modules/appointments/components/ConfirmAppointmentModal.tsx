@@ -38,7 +38,7 @@ export function ConfirmAppointmentModal({
         initial={{ scale: 0.96, opacity: 0, y: 15 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 15 }}
-        className="bg-white rounded-3xl border border-ink-100 shadow-2xl max-w-md w-full overflow-hidden"
+        className="bg-white rounded-2xl border border-ink-100 shadow-2xl max-w-md w-full overflow-hidden"
       >
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-3 border-b border-ink-100 pb-3">

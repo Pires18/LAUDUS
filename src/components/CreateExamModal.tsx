@@ -39,6 +39,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
 
+  const [hoveredTemplate, setHoveredTemplate] = useState<ReportTemplate | null>(null);
   const [anamnesis, setAnamnesis] = useState('');
   const [examDateStr, setExamDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(settings.dicomDevices?.[0]?.id || '');
@@ -225,21 +226,18 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         initial={{ scale: 0.96, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="bg-white rounded-[2rem] shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90dvh] relative modal-mobile-sheet"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90dvh] relative modal-mobile-sheet"
       >
         
-        {/* Premium Header */}
-        <div className="px-6 py-5 border-b border-ink-100 flex items-center justify-between bg-white z-10 relative">
-          <div className="flex items-center gap-4 relative z-10">
-            <div className="relative w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center shadow-sm">
-              <Sparkles size={18} className="animate-pulse relative z-10" />
+        {/* Compact Header */}
+        <div className="px-5 py-4 border-b border-ink-100 flex items-center justify-between bg-white z-10 relative">
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="relative w-9 h-9 rounded-xl bg-ink-900 text-white flex items-center justify-center shadow-sm shrink-0">
+              <Sparkles size={16} className="animate-pulse relative z-10" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-ink-900 leading-tight">Novo Laudo LAUD.IA</h2>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-ink-400 animate-pulse"></span>
-                <p className="text-[9px] text-ink-500 font-bold uppercase tracking-[0.2em]">Fluxo de Alta Performance</p>
-              </div>
+              <h2 className="text-base font-black text-ink-900 leading-tight">Novo Laudo LAUD.IA</h2>
+              <p className="text-[9px] text-ink-500 font-bold uppercase tracking-widest mt-0.5">Fluxo assistido por IA</p>
             </div>
           </div>
           <button 
@@ -247,9 +245,9 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
               setCreateExamDefaultPatient(null);
               onClose();
             }} 
-            className="p-2 hover:bg-ink-100 rounded-xl text-ink-400 hover:text-ink-700 transition-all active:scale-95 relative z-10"
+            className="p-1.5 hover:bg-ink-100 rounded-xl text-ink-400 hover:text-ink-700 transition-all active:scale-95 relative z-10"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
@@ -311,7 +309,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 z-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-5 z-10 custom-scrollbar">
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div 
@@ -609,20 +607,32 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                       />
                     </div>
 
-                    <div className={classNames("grid grid-cols-1 gap-2.5 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar py-1", loading && "pointer-events-none opacity-60")}>
+                    <div
+                      className={classNames("grid grid-cols-1 gap-2.5 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar py-1", loading && "pointer-events-none opacity-60")}
+                      onMouseLeave={() => setHoveredTemplate(null)}
+                    >
                       {filteredTemplates.map(t => (
                         <button
                           key={t.id}
+                          onMouseEnter={() => setHoveredTemplate(t)}
                           onClick={() => {
                             setSelectedTemplate(t);
                             setStep(3);
                             setTemplateSearch('');
                           }}
                           disabled={loading}
-                          className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white border border-ink-200 hover:border-ink-400 hover:bg-ink-50 transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                          className={classNames(
+                            "w-full flex items-center justify-between p-3.5 rounded-2xl bg-white border transition-all duration-300 group shadow-sm hover:shadow-md hover:-translate-y-0.5",
+                            hoveredTemplate?.id === t.id
+                              ? "border-brand-400 bg-brand-50/50 shadow-md -translate-y-0.5"
+                              : "border-ink-200 hover:border-ink-400 hover:bg-ink-50"
+                          )}
                         >
                           <div className="text-left flex items-center gap-4 min-w-0">
-                            <div className="w-10 h-10 rounded-[0.8rem] bg-ink-100 text-ink-400 flex items-center justify-center group-hover:bg-ink-900 group-hover:text-white transition-all duration-300 shrink-0 group-hover:scale-110">
+                            <div className={classNames(
+                              "w-10 h-10 rounded-[0.8rem] flex items-center justify-center transition-all duration-300 shrink-0 group-hover:scale-110",
+                              hoveredTemplate?.id === t.id ? "bg-brand-600 text-white" : "bg-ink-100 text-ink-400 group-hover:bg-ink-900 group-hover:text-white"
+                            )}>
                               <AreaIcon area={t.area} size={16} />
                             </div>
                             <div className="min-w-0">
@@ -642,6 +652,34 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                         </div>
                       )}
                     </div>
+
+                    {/* Template preview on hover */}
+                    <AnimatePresence>
+                      {hoveredTemplate && (hoveredTemplate.aiInstructions || hoveredTemplate.analysisTemplate) && (
+                        <motion.div
+                          key={hoveredTemplate.id}
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.15 }}
+                          className="rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 space-y-1.5"
+                        >
+                          <p className="text-[8px] font-black text-brand-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <Sparkles size={9} /> Prévia — {hoveredTemplate.name}
+                          </p>
+                          {hoveredTemplate.aiInstructions && (
+                            <p className="text-[10px] text-ink-600 font-medium leading-relaxed line-clamp-3">
+                              {hoveredTemplate.aiInstructions}
+                            </p>
+                          )}
+                          {!hoveredTemplate.aiInstructions && hoveredTemplate.analysisTemplate && (
+                            <p className="text-[10px] text-ink-500 font-medium leading-relaxed line-clamp-3 font-mono">
+                              {hoveredTemplate.analysisTemplate.slice(0, 200)}…
+                            </p>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
               </motion.div>
             )}

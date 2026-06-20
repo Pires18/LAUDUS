@@ -1,35 +1,52 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock, Copy, Calculator, ChevronDown, Brain, Cpu, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock, Copy, Calculator, ChevronDown, Brain, AlertCircle } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 
 // Quick calculator shortcuts by exam area
 const AREA_CALC_SHORTCUTS: Record<string, Array<{ label: string; calcId: string }>> = {
   'medicina-fetal': [
-    { label: 'IG / DPP', calcId: 'ig-dpp' },
-    { label: 'Biometria WHO', calcId: 'biometria-fetal' },
-    { label: 'Doppler Fetal', calcId: 'doppler-fetal' },
+    { label: 'IG / DPP (DUM/USG)', calcId: 'gestational-age' },
+    { label: 'Biometria WHO (Hadlock)', calcId: 'who-fetal-biometry' },
+    { label: 'Doppler Fetal (Percentis)', calcId: 'doppler-fetal' },
+    { label: 'Líquido Amniótico', calcId: 'amniotic-fluid' },
   ],
   'ginecologia': [
-    { label: 'Volume Ovariano', calcId: 'volume-ovariano' },
-    { label: 'O-RADS', calcId: 'orads' },
-    { label: 'MUSA', calcId: 'musa' },
+    { label: 'Volume Ovariano', calcId: 'volume-elipsoide' },
+    { label: 'ACR O-RADS', calcId: 'orads-us-2022' },
+    { label: 'Classificação FIGO (Miomas)', calcId: 'figo-myoma' },
   ],
   'vascular': [
-    { label: 'Índice Tornozelo-Braquial', calcId: 'itb' },
-    { label: 'Velocidade Doppler', calcId: 'doppler-vascular' },
-    { label: 'IMT Carótida', calcId: 'imt' },
+    { label: 'Índices Hemodinâmicos', calcId: 'vascular-ratios' },
+    { label: 'IMT Carótidas (ELSA)', calcId: 'imt-elsa-br' },
+    { label: 'Cartografia Venosa', calcId: 'venous-cartography' },
+  ],
+  'mastologia': [
+    { label: 'ACR BI-RADS', calcId: 'birads-us-2013' },
+    { label: 'Volume Nódulo', calcId: 'volume-elipsoide' },
   ],
   'mama': [
-    { label: 'BI-RADS', calcId: 'birads' },
-    { label: 'Volume Nódulo', calcId: 'volume-nodulo' },
+    { label: 'ACR BI-RADS', calcId: 'birads-us-2013' },
+    { label: 'Volume Nódulo', calcId: 'volume-elipsoide' },
+  ],
+  'pequenas-partes': [
+    { label: 'ACR TI-RADS', calcId: 'tirads-2017' },
+    { label: 'Volume Tireoide', calcId: 'volume-elipsoide' },
   ],
   'tireoide': [
-    { label: 'TI-RADS', calcId: 'tirads' },
-    { label: 'Volume Tireóide', calcId: 'volume-tireoide' },
+    { label: 'ACR TI-RADS', calcId: 'tirads-2017' },
+    { label: 'Volume Tireoide', calcId: 'volume-elipsoide' },
+  ],
+  'medicina-interna': [
+    { label: 'Cálculo de Volume', calcId: 'volume-elipsoide' },
+    { label: 'Peso Prostático', calcId: 'prostate-weight' },
+    { label: 'Derrame Pleural (Balik)', calcId: 'pleural-effusion' },
+    { label: 'Índice da Veia Cava', calcId: 'ivc-index' },
   ],
   'abdome': [
-    { label: 'Volume Vesical', calcId: 'volume-vesical' },
-    { label: 'Ascite', calcId: 'ascite' },
+    { label: 'Cálculo de Volume', calcId: 'volume-elipsoide' },
+    { label: 'Peso Prostático', calcId: 'prostate-weight' },
+    { label: 'Derrame Pleural (Balik)', calcId: 'pleural-effusion' },
+    { label: 'Índice da Veia Cava', calcId: 'ivc-index' },
   ],
 };
 
@@ -73,7 +90,7 @@ export function EditorToolbar({
   geminiModel,
   hasGoogleDoc,
   onCopy,
-  onShowCalculators
+  onShowCalculators,
 }: EditorToolbarProps) {
   const refineLabel = isTemplateMask ? 'Gerar com Laud.IA' : 'Refinar';
   const [showCalcMenu, setShowCalcMenu] = useState(false);
@@ -172,6 +189,8 @@ export function EditorToolbar({
             )}
           </div>
         )}
+
+
 
         {/* History */}
         <button

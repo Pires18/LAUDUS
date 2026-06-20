@@ -3,10 +3,10 @@ import { useApp } from '../../store/app';
 import { useCollection, where } from '../../hooks/useFirestore';
 import { ReportTemplate, Clinic, Patient, AuditLog } from '../../types';
 import { 
-  AlertCircle, CheckCircle2, ShieldCheck, Database, Key, Building2, 
-  FileText, Clock, User, Activity, History, Calendar, Eye, X 
+  AlertCircle, CheckCircle2, ShieldCheck, Database, Key, Building2,
+  FileText, Clock, User, Activity, History, Calendar, Eye
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { Modal } from '../../components/Modal';
 

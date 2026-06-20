@@ -13,13 +13,16 @@ interface Props {
 }
 
 export function PrintLayout({ patient, clinic, settings, examType, reportContent, physicianName, examDate }: Props) {
-  const defaultSignature = settings.defaultSignature || (settings.physicianName ? `${settings.physicianName}\nCRM: ${settings.physicianCRM || ''}` : '');
-  const signature = (clinic?.footerHtml?.replace(/<[^>]*>?/gm, '') || '') || defaultSignature;
+  const drName = settings.physicianName || '';
+  const drCRM = settings.physicianCRM || '';
+  const drRQE = settings.physicianRQE || '';
+  const footerText = clinic?.footerHtml ? clinic.footerHtml.replace(/<[^>]*>?/gm, '').trim() : '';
+  const customSignatureText = settings.defaultSignature || footerText;
 
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div id="print-area" className="hidden print:block w-full text-black bg-white min-h-screen text-[14px] leading-relaxed font-sans relative pb-32">
+    <div id="print-area" className="hidden print:block w-full text-black bg-white min-h-screen text-[14px] leading-relaxed font-sans pb-8">
       {/* Header */}
       <div className="flex items-start justify-between border-b-2 border-black pb-4 mb-6">
         <div className="flex items-center gap-4">
@@ -58,14 +61,30 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
         dangerouslySetInnerHTML={{ __html: reportContent }}
       />
 
-      {/* Footer / Signature */}
-      <div className="absolute bottom-8 left-0 right-0 text-center flex flex-col items-center page-break-inside-avoid">
+      {/* Signature Block */}
+      <div className="mt-16 pt-6 border-t border-gray-300 flex flex-col items-center text-center page-break-inside-avoid">
         {settings.signatureImageUrl ? (
-          <img src={settings.signatureImageUrl} alt="Assinatura" className="h-16 object-contain mb-1" />
+          <img
+            src={settings.signatureImageUrl}
+            alt="Assinatura digital"
+            className="h-20 object-contain mb-2"
+            style={{ maxWidth: '240px' }}
+          />
         ) : (
-          <div className="w-64 border-t border-black pt-2 mb-1"></div>
+          <div className="w-56 border-t-2 border-black mb-2 mt-6" />
         )}
-        <div className="text-sm font-bold whitespace-pre-wrap">{signature}</div>
+        {drName && (
+          <p className="text-sm font-bold uppercase tracking-wide">{drName}</p>
+        )}
+        {drCRM && (
+          <p className="text-xs text-gray-700">CRM: {drCRM}</p>
+        )}
+        {drRQE && (
+          <p className="text-xs text-gray-700">RQE: {drRQE}</p>
+        )}
+        {customSignatureText && !drName && (
+          <p className="text-sm font-bold whitespace-pre-wrap">{customSignatureText}</p>
+        )}
       </div>
       
       <style>{`

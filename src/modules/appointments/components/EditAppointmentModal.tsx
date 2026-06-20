@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { 
-  X, Search, Loader2, Sparkles, CalendarDays, AlertCircle, Edit, User, FileText, Check, ChevronRight
+  X, Search, Loader2, CalendarDays, AlertCircle, Edit, User, FileText, Check, ChevronRight
 } from 'lucide-react';
 import { Patient, ReportTemplate, Clinic, EXAM_AREAS, ExamArea, Appointment } from '../../../types';
 import { classNames } from '../../../utils/format';
@@ -167,7 +167,7 @@ export function EditAppointmentModal({
         initial={{ scale: 0.96, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 20 }}
-        className="bg-white rounded-[2rem] shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] relative modal-mobile-sheet"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] relative modal-mobile-sheet"
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-ink-100 flex items-center justify-between bg-white z-10 relative shrink-0">

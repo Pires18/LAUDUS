@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ExamRequest } from '../../../types';
-import { X, Clock, FileText, SplitSquareHorizontal, CheckCircle2, CalendarDays } from 'lucide-react';
+import { X, Clock, FileText, SplitSquareHorizontal, CheckCircle2 } from 'lucide-react';
 import { formatDateTime, classNames } from '../../../utils/format';
+import { useConfirm } from '../../../hooks/useConfirm';
 
 interface ReportVersionsModalProps {
   exam: ExamRequest;
@@ -25,6 +26,7 @@ export function ReportVersionsModal({
   onClose,
   showToast,
 }: ReportVersionsModalProps) {
+  const confirm = useConfirm();
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [compareMode, setCompareMode] = useState(false);
 
@@ -43,9 +45,15 @@ export function ReportVersionsModal({
 
   const selectedVersion = selectedIdx !== null ? versions[selectedIdx] : null;
 
-  const handleRestoreClick = () => {
+  const handleRestoreClick = async () => {
     if (!selectedVersion) return;
-    if (window.confirm('Tem certeza de que deseja restaurar esta versão do laudo? Seu conteúdo atual será arquivado.')) {
+    const ok = await confirm({
+      title: 'Restaurar Versão',
+      message: 'Tem certeza de que deseja restaurar esta versão do laudo? Seu conteúdo atual será arquivado.',
+      confirmLabel: 'Restaurar',
+      variant: 'warning',
+    });
+    if (ok) {
       onRestore(selectedVersion.content);
       showToast('Versão anterior restaurada com sucesso! ✓', 'success');
       onClose();

@@ -4,6 +4,8 @@ import { logger } from '../utils/logger';
 
 interface Props {
   children: ReactNode;
+  inline?: boolean;
+  label?: string;
 }
 
 interface State {
@@ -30,8 +32,31 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   render() {
     if (this.state.hasError) {
+      if (this.props.inline) {
+        return (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 px-8 text-center">
+            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+              <AlertTriangle size={20} className="text-red-500" />
+            </div>
+            <p className="text-sm font-semibold text-ink-700">
+              Erro ao carregar{this.props.label ? ` ${this.props.label}` : ''}
+            </p>
+            <button
+              onClick={this.handleRetry}
+              className="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-1"
+            >
+              <RotateCcw size={12} />
+              Tentar novamente
+            </button>
+          </div>
+        );
+      }
       return (
         <div className="min-h-screen bg-ink-50 flex items-center justify-center p-8">
           <div className="max-w-md w-full bg-white rounded-2xl shadow-medium border border-ink-100 p-8 text-center animate-scale-in">

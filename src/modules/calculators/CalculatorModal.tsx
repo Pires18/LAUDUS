@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send, ClipboardPaste, Wand2, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send } from 'lucide-react';
 import { logger } from '../../utils/logger';
 import { CALCULATORS } from './registry';
 
@@ -8,7 +8,6 @@ import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalculatorReference } from './components/CalculatorUI';
-import { extractCalculatorData } from '../ai/engine';
 import { useApp } from '../../store/app';
 
 interface Props {
@@ -17,14 +16,12 @@ interface Props {
   onSendToCopilot: (result: string) => void;
   onAppendToForm?: (text: string) => void;
   examDateMs?: number;
-  reportContent?: string;
   calculatorData?: Record<string, any>;
   onSaveCalculatorData?: (data: Record<string, any>) => void;
   initialCalcId?: string;
 }
 
-  export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, reportContent, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
-  const settings = useApp((state) => state.settings);
+export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
   
   // O result atual da calculadora selecionada. 
@@ -32,13 +29,19 @@ interface Props {
   const [calcResult, setCalcResult] = useState<any>(
     initialCalcId ? (calculatorData[initialCalcId] || null) : null
   );
+
+  useEffect(() => {
+    if (initialCalcId) {
+      setSelectedCalcId(initialCalcId);
+      setCalcResult(calculatorData[initialCalcId] || null);
+      setActiveTab('params');
+    }
+  }, [initialCalcId]);
   
   const [showAll, setShowAll] = useState(false);
-  const [copiedTechnical, setCopiedTechnical] = useState(false);
   const [copiedForm, setCopiedForm] = useState(false);
   const [sentCopilot, setSentCopilot] = useState(false);
   const [activeTab, setActiveTab] = useState<'params' | 'result'>('params');
-  const [isExtracting, setIsExtracting] = useState(false);
   const [updateKey, setUpdateKey] = useState(0);
 
   const filteredCalculators = CALCULATORS.filter(calc =>
@@ -51,7 +54,6 @@ interface Props {
     setSelectedCalcId(id);
     setCalcResult(id ? (calculatorData[id] || null) : null);
     setActiveTab('params');
-    setCopiedTechnical(false);
     setCopiedForm(false);
     setSentCopilot(false);
   };
@@ -79,23 +81,11 @@ interface Props {
     return calcResult?._summary || '';
   };
 
-  const handleCopyForm = async () => {
+  const handleCopyResult = async () => {
     const text = buildFormMessage();
-    if (onAppendToForm) {
-      onAppendToForm(text);
-      setCopiedForm(true);
-      setTimeout(() => setCopiedForm(false), 2500);
-    } else {
-      await navigator.clipboard.writeText(text);
-      setCopiedForm(true);
-      setTimeout(() => setCopiedForm(false), 2500);
-    }
-  };
-
-  const handleCopyTechnical = async () => {
-    await navigator.clipboard.writeText(buildTechnicalMessage());
-    setCopiedTechnical(true);
-    setTimeout(() => setCopiedTechnical(false), 2500);
+    await navigator.clipboard.writeText(text);
+    setCopiedForm(true);
+    setTimeout(() => setCopiedForm(false), 2500);
   };
 
   const handleSendCopilot = async () => {
@@ -103,33 +93,6 @@ interface Props {
     setSentCopilot(true);
     onSendToCopilot(buildTechnicalMessage());
     setTimeout(() => onClose(), 600);
-  };
-
-  const handleAutoFill = async () => {
-    if (!reportContent || !selectedCalc) return;
-    
-    setIsExtracting(true);
-    try {
-      const data = await extractCalculatorData(
-        reportContent,
-        selectedCalc,
-        settings
-      );
-      // Mantém os dados antigos se o retorno for inválido, senão substitui
-      if (data && typeof data === 'object') {
-        const newData = { ...calcResult, ...data };
-        setCalcResult(newData);
-        if (selectedCalcId && onSaveCalculatorData) {
-          onSaveCalculatorData({ ...calculatorData, [selectedCalcId]: newData });
-        }
-        setUpdateKey(prev => prev + 1); // Força o remount do componente para ler o novo value
-      }
-    } catch (err) {
-      logger.error('Erro ao extrair dados do laudo para calculadora:', err);
-      alert('Não foi possível extrair dados do laudo.');
-    } finally {
-      setIsExtracting(false);
-    }
   };
 
   return (
@@ -141,13 +104,12 @@ interface Props {
         onClick={onClose}
         className="fixed inset-0 bg-ink-900/65 backdrop-blur-md lg:hidden z-[410]"
       />
-
       <motion.div
         initial={{ opacity: 0, scale: 0.94, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 30 }}
         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[420] overflow-hidden"
+        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[420] overflow-hidden"
       >
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="relative h-16 shrink-0 overflow-hidden bg-ink-900 border-b border-ink-800">
@@ -282,29 +244,6 @@ interface Props {
                   'flex-1 overflow-y-auto p-4 custom-scrollbar',
                   activeTab === 'params' ? 'block' : 'hidden'
                 )}>
-                  {/* AI Auto-fill Button */}
-                  {selectedCalc && reportContent && reportContent.trim().length > 50 && (
-                    <button
-                      type="button"
-                      onClick={handleAutoFill}
-                      disabled={isExtracting}
-                      className="w-full mb-4 px-4 py-3 rounded-2xl bg-gradient-to-r from-indigo-50 to-brand-50 border border-indigo-100/50 flex items-center justify-center gap-3 text-brand-700 font-bold text-xs uppercase tracking-wider hover:shadow-md hover:from-indigo-100 hover:to-brand-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden"
-                    >
-                      {isExtracting ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin text-brand-500" />
-                          <span>Analisando Laudo...</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                          <Wand2 size={16} className="text-brand-500" />
-                          <span>✨ Autopreencher com IA</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
                   <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-4">
                     {selectedCalc && (
                       <>
@@ -394,84 +333,56 @@ interface Props {
                   </div>
 
                   {/* ── Action Buttons ─────────────────────────────── */}
-                  <div className="p-4 pb-8 sm:pb-4 border-t border-ink-100 bg-white shrink-0 space-y-2.5 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
-                    {/* Row 1: Copiar para Formulário + Copiar Técnico */}
+                  <div className="p-4 pb-8 sm:pb-4 border-t border-ink-100 bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={handleCopyForm}
+                        onClick={handleCopyResult}
                         disabled={!hasResult}
                         className={classNames(
-                          'h-10 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm',
+                          'h-11 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm',
                           copiedForm
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                             : 'bg-ink-50 border-ink-200 text-ink-600 hover:bg-ink-100 hover:border-ink-300'
                         )}
-                        title="Copia resultado em texto simples para colar no formulário"
                       >
                         {copiedForm ? (
                           <>
-                            <CheckCircle2 size={12} className="text-emerald-600 animate-in zoom-in" />
-                            Inserido!
+                            <CheckCircle2 size={13} className="text-emerald-600 animate-in zoom-in" />
+                            Copiado!
                           </>
                         ) : (
                           <>
-                            <ClipboardPaste size={12} className="group-hover:scale-110 transition-transform" />
-                            {onAppendToForm ? "Formulário" : "Copiar"}
+                            <Copy size={13} />
+                            Copiar Resultado
                           </>
                         )}
                       </button>
 
                       <button
                         type="button"
-                        onClick={handleCopyTechnical}
-                        disabled={!hasResult}
+                        onClick={handleSendCopilot}
+                        disabled={!hasResult || sentCopilot}
                         className={classNames(
-                          'h-10 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shadow-sm',
-                          copiedTechnical
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                            : 'bg-ink-50 border-ink-200 text-ink-600 hover:bg-ink-100 hover:border-ink-300'
+                          'h-11 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md',
+                          sentCopilot
+                            ? 'bg-emerald-600 text-white shadow-emerald-500/20'
+                            : 'bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white shadow-brand-500/25'
                         )}
-                        title="Copia resultado em formato técnico estruturado"
                       >
-                        {copiedTechnical ? (
+                        {sentCopilot ? (
                           <>
-                            <CheckCircle2 size={12} className="text-emerald-600" />
-                            Copiado!
+                            <CheckCircle2 size={13} className="animate-in zoom-in duration-200" />
+                            Enviado!
                           </>
                         ) : (
                           <>
-                            <Copy size={12} />
-                            Técnico
+                            <Send size={12} />
+                            Enviar ao Copiloto
                           </>
                         )}
                       </button>
                     </div>
-
-                    {/* Row 2: Enviar ao Copiloto (destaque principal) */}
-                    <button
-                      type="button"
-                      onClick={handleSendCopilot}
-                      disabled={!hasResult || sentCopilot}
-                      className={classNames(
-                        'w-full h-12 rounded-[1.2rem] font-black text-[10px] uppercase tracking-[0.1em] transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg',
-                        sentCopilot
-                          ? 'bg-emerald-600 text-white shadow-emerald-500/20'
-                          : 'bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white shadow-brand-500/25'
-                      )}
-                    >
-                      {sentCopilot ? (
-                        <>
-                          <CheckCircle2 size={16} className="animate-in zoom-in duration-200" />
-                          Enviado ao Copiloto!
-                        </>
-                      ) : (
-                        <>
-                          <Send size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                          Enviar ao Copiloto
-                        </>
-                      )}
-                    </button>
                   </div>
                 </div>
               </div>

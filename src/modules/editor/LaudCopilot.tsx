@@ -1,18 +1,18 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator,
-  Lightbulb, Zap, Command, ChevronRight, ClipboardList, RotateCcw, CheckCircle2, AlertCircle,
-  X, Trash2, MessageSquare, ChevronDown, StopCircle, Brain, Pencil, ChevronUp
+  Lightbulb, Zap, ClipboardList, RotateCcw, CheckCircle2,
+  Trash2, StopCircle, Brain, Pencil, FileText
 } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
-import { updateItem, saveVersionSnapshot } from '../../store/db';
+import { updateItem, saveVersionSnapshot, getRecentFinalizedReports } from '../../store/db';
 import { logger } from '../../utils/logger';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useVoiceAnalyzer } from './hooks/useVoiceAnalyzer';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const AREA_SUGGESTIONS: Record<string, Array<{ label: string; text: string }>> = {
   'medicina-fetal': [
@@ -169,11 +169,11 @@ export function LaudCopilot({
   isDocked
 }: LaudCopilotProps) {
   const { settings, updateSettings, showToast } = useApp();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
+  const [anamnesisText, setAnamnesisText] = useState(exam.anamnesis ?? '');
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
-  const [structuredValues, setStructuredValues] = useState<Record<string, string>>({});
-  const [useStructuredForm, setUseStructuredForm] = useState(false);
   const [refinePhase, setRefinePhase] = useState<'idle' | 'integrating' | 'refining'>('idle');
   const [genPhase, setGenPhase] = useState<'idle' | 'reasoning' | 'writing'>('idle');
 
@@ -182,12 +182,22 @@ export function LaudCopilot({
     updateSettings({ ...settings, aiAutoRefineEnabled: val });
   };
 
+  const aiFastMode = settings.aiFastMode ?? false;
+  const handleToggleFastMode = (val: boolean) => {
+    updateSettings({ ...settings, aiFastMode: val });
+  };
+
   const isDirtyRef = useRef(false);
   const prevExamIdRef = useRef(exam.id);
   const formSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestValueRef = useRef(formText);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isFormFocusedRef = useRef(false);
+
+  const isAnamnesisDirtyRef = useRef(false);
+  const anamnesisSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestAnamnesisRef = useRef(anamnesisText);
+  const isAnamnesisFocusedRef = useRef(false);
 
   const cancelActiveRequest = () => {
     if (abortControllerRef.current) {
@@ -209,6 +219,9 @@ export function LaudCopilot({
       if (formSaveTimerRef.current) {
         clearTimeout(formSaveTimerRef.current);
       }
+      if (anamnesisSaveTimerRef.current) {
+        clearTimeout(anamnesisSaveTimerRef.current);
+      }
     };
   }, []);
 
@@ -218,28 +231,36 @@ export function LaudCopilot({
         clearTimeout(formSaveTimerRef.current);
         formSaveTimerRef.current = null;
       }
+      if (anamnesisSaveTimerRef.current) {
+        clearTimeout(anamnesisSaveTimerRef.current);
+        anamnesisSaveTimerRef.current = null;
+      }
       const val = exam.customFormValue ?? template?.customForm ?? '';
       setFormText(val);
       latestValueRef.current = val;
       isDirtyRef.current = false;
+
+      const anamVal = exam.anamnesis ?? '';
+      setAnamnesisText(anamVal);
+      latestAnamnesisRef.current = anamVal;
+      isAnamnesisDirtyRef.current = false;
+
       prevExamIdRef.current = exam.id;
-      setStructuredValues({});
     } else {
       if (!isDirtyRef.current && !isFormFocusedRef.current) {
         const val = exam.customFormValue ?? template?.customForm ?? '';
         setFormText(val);
         latestValueRef.current = val;
       }
+      if (!isAnamnesisDirtyRef.current && !isAnamnesisFocusedRef.current) {
+        const anamVal = exam.anamnesis ?? '';
+        setAnamnesisText(anamVal);
+        latestAnamnesisRef.current = anamVal;
+      }
     }
-  }, [exam.id, exam.customFormValue, template?.customForm]);
+  }, [exam.id, exam.customFormValue, exam.anamnesis, template?.customForm]);
 
-  const structuredFields: StructuredField[] | null = useMemo(() => {
-    const area = exam.area || template?.area || '';
-    if (area === 'medicina-fetal') return FETAL_FIELDS;
-    if (area === 'ginecologia') return GYNECO_FIELDS;
-    if (area === 'vascular') return VASCULAR_FIELDS;
-    return null;
-  }, [exam.area, template?.area]);
+
 
   const areaSuggestions = useMemo(() => {
     const area = exam.area || template?.area || '';
@@ -281,9 +302,50 @@ export function LaudCopilot({
     }
   };
 
+  const handleAnamnesisTextChange = (val: string) => {
+    setAnamnesisText(val);
+    latestAnamnesisRef.current = val;
+    isAnamnesisDirtyRef.current = true;
+
+    if (anamnesisSaveTimerRef.current) {
+      clearTimeout(anamnesisSaveTimerRef.current);
+    }
+
+    anamnesisSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await updateItem('exams', exam.id, { anamnesis: val });
+        if (latestAnamnesisRef.current === val) {
+          isAnamnesisDirtyRef.current = false;
+        }
+      } catch (err) {
+        logger.error('Erro ao salvar anamnese', err);
+      }
+    }, 800);
+  };
+
+  const handleBlurAnamnesisText = async (val: string) => {
+    isAnamnesisFocusedRef.current = false;
+    if (isAnamnesisDirtyRef.current) {
+      if (anamnesisSaveTimerRef.current) clearTimeout(anamnesisSaveTimerRef.current);
+      try {
+        await updateItem('exams', exam.id, { anamnesis: val });
+      } finally {
+        if (latestAnamnesisRef.current === val) {
+          isAnamnesisDirtyRef.current = false;
+        }
+      }
+    }
+  };
+
   const handleResetForm = async () => {
     if (!template?.customForm) return;
-    if (window.confirm('Deseja restaurar o formulário padrão da máscara? Isso apagará as alterações locais.')) {
+    const ok = await confirm({
+      title: 'Restaurar Formulário',
+      message: 'Deseja restaurar o formulário padrão da máscara? Isso apagará as alterações locais.',
+      confirmLabel: 'Restaurar',
+      variant: 'warning',
+    });
+    if (ok) {
       if (formSaveTimerRef.current) {
         clearTimeout(formSaveTimerRef.current);
         formSaveTimerRef.current = null;
@@ -292,15 +354,20 @@ export function LaudCopilot({
       setFormText(val);
       latestValueRef.current = val;
       isDirtyRef.current = false;
-      setStructuredValues({});
       await updateItem('exams', exam.id, { customFormValue: val });
       showToast('Formulário restaurado!', 'success');
     }
   };
 
-  const handleClearChat = () => {
+  const handleClearChat = async () => {
     if (chatHistory.length === 0) return;
-    if (window.confirm('Deseja limpar o histórico desta conversa com o copiloto?')) {
+    const ok = await confirm({
+      title: 'Limpar Conversa',
+      message: 'Deseja limpar o histórico desta conversa com o copiloto?',
+      confirmLabel: 'Limpar',
+      variant: 'warning',
+    });
+    if (ok) {
       onChatUpdate([]);
       showToast('Conversa limpa.', 'info');
     }
@@ -607,7 +674,6 @@ export function LaudCopilot({
     onChatUpdate(historyWithAssistant);
 
     try {
-      const { getRecentFinalizedReports } = await import('../../store/db');
       const previousExams = settings.aiTrainingEnabled
         ? await getRecentFinalizedReports(template?.id || '', settings.aiTrainingContextSize || 3)
         : [];
@@ -632,13 +698,14 @@ export function LaudCopilot({
         settings,
         previousExams,
         signal: controller.signal
-      }, (chunk) => {
+      }, (chunk, rawText) => {
         currentResponse = chunk;
+        const textToAnalyze = rawText || chunk;
 
-        if (!hasSwitchedPhase && chunk.includes('</scratchpad>')) {
+        if (!hasSwitchedPhase && textToAnalyze.includes('</scratchpad>')) {
           hasSwitchedPhase = true;
           setGenPhase('writing');
-        } else if (!hasSwitchedPhase && chunk.includes('<scratchpad>')) {
+        } else if (!hasSwitchedPhase && textToAnalyze.includes('<scratchpad>')) {
           setGenPhase('reasoning');
         }
 
@@ -747,33 +814,14 @@ export function LaudCopilot({
 
   handleSendRef.current = handleSend;
 
-  const buildStructuredFormText = (): string => {
-    if (!structuredFields) return '';
-    const lines: string[] = [];
-    for (const field of structuredFields) {
-      const val = structuredValues[field.id];
-      if (val && val.trim()) {
-        lines.push(`${field.label}: ${val.trim()}${field.unit ? ' ' + field.unit : ''}`);
-      }
-    }
-    return lines.join('\n');
-  };
+
 
   const handleCompileForm = () => {
-    let textToSend = '';
+    const textToSend = formText;
 
-    if (useStructuredForm && structuredFields) {
-      textToSend = buildStructuredFormText();
-      if (!textToSend.trim()) {
-        showToast('Preencha pelo menos um campo do formulário.', 'info');
-        return;
-      }
-    } else {
-      textToSend = formText;
-      if (!textToSend.trim()) {
-        showToast('Preencha o formulário antes de compilar.', 'info');
-        return;
-      }
+    if (!textToSend.trim() && !anamnesisText.trim()) {
+      showToast('Preencha a anamnese ou os dados do formulário antes de processar.', 'info');
+      return;
     }
 
     if (formSaveTimerRef.current) {
@@ -781,6 +829,13 @@ export function LaudCopilot({
       formSaveTimerRef.current = null;
       isDirtyRef.current = false;
       updateItem('exams', exam.id, { customFormValue: textToSend });
+    }
+
+    if (anamnesisSaveTimerRef.current) {
+      clearTimeout(anamnesisSaveTimerRef.current);
+      anamnesisSaveTimerRef.current = null;
+      isAnamnesisDirtyRef.current = false;
+      updateItem('exams', exam.id, { anamnesis: anamnesisText });
     }
 
     const templateName = template?.name || exam.examType || 'Formulário';
@@ -797,7 +852,14 @@ export function LaudCopilot({
       areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA:\nInserir cada achado no campo correspondente da ANÁLISE, substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
     }
 
-    const findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${areaInstruction}\n\nDADOS DO FORMULÁRIO:\n${textToSend.trim()}`;
+    let findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${areaInstruction}`;
+    if (anamnesisText.trim()) {
+      findingsSummary += `\n\nANAMNESE DO PACIENTE:\n${anamnesisText.trim()}`;
+    }
+    if (textToSend.trim()) {
+      findingsSummary += `\n\nDADOS DO FORMULÁRIO:\n${textToSend.trim()}`;
+    }
+
     setActiveTab('chat');
     handleSend(findingsSummary);
   };
@@ -1123,6 +1185,32 @@ export function LaudCopilot({
                 })
               )}
             </AnimatePresence>
+            {/* Proactive follow-up suggestions after last AI response */}
+            <AnimatePresence>
+              {!isGenerating && chatHistory.length > 0 && chatHistory[chatHistory.length - 1]?.role === 'assistant' && chatHistory[chatHistory.length - 1]?.content !== '__thinking__' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="px-4 pt-2 pb-1"
+                >
+                  <p className="text-[8px] font-black text-ink-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                    <Lightbulb size={9} className="text-amber-500" /> Próximos passos sugeridos
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {areaSuggestions.slice(0, 3).map((sug, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { onChangePrompt(sug.text); handleSend(sug.text); }}
+                        className="px-2.5 py-1.5 bg-amber-50 border border-amber-200 hover:border-amber-400 hover:bg-amber-100 text-amber-800 rounded-full text-[10px] font-semibold transition-all active:scale-95"
+                      >
+                        {sug.label}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div ref={messagesEndRef} />
           </div>
 
@@ -1185,26 +1273,49 @@ export function LaudCopilot({
             </div>
 
             <div className="flex items-center justify-between px-2">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={autoRefineEnabled}
-                  onChange={(e) => handleToggleAutoRefine(e.target.checked)}
-                />
-                <div className={classNames(
-                  "w-6 h-3.5 rounded-full p-0.5 transition-colors",
-                  autoRefineEnabled ? "bg-brand-500" : "bg-ink-300"
-                )}>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={autoRefineEnabled}
+                    onChange={(e) => handleToggleAutoRefine(e.target.checked)}
+                  />
                   <div className={classNames(
-                    "w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm",
-                    autoRefineEnabled && "translate-x-2.5"
-                  )} />
-                </div>
-                <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-800 transition-colors">
-                  Refino Automático
-                </span>
-              </label>
+                    "w-6 h-3.5 rounded-full p-0.5 transition-colors",
+                    autoRefineEnabled ? "bg-brand-500" : "bg-ink-300"
+                  )}>
+                    <div className={classNames(
+                      "w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm",
+                      autoRefineEnabled && "translate-x-2.5"
+                    )} />
+                  </div>
+                  <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-800 transition-colors">
+                    Refino Automático
+                  </span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={aiFastMode}
+                    onChange={(e) => handleToggleFastMode(e.target.checked)}
+                  />
+                  <div className={classNames(
+                    "w-6 h-3.5 rounded-full p-0.5 transition-colors",
+                    aiFastMode ? "bg-brand-500" : "bg-ink-300"
+                  )}>
+                    <div className={classNames(
+                      "w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm",
+                      aiFastMode && "translate-x-2.5"
+                    )} />
+                  </div>
+                  <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-800 transition-colors">
+                    Modo Rápido
+                  </span>
+                </label>
+              </div>
 
               {chatHistory.length > 0 && (
                 <button
@@ -1223,26 +1334,30 @@ export function LaudCopilot({
 
       {activeTab === 'form' && (
         <div className="flex-1 flex flex-col min-h-0 bg-white animate-fade-in">
-          <div className="flex-1 flex flex-col p-4 space-y-3 min-h-0 overflow-y-auto custom-scrollbar">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 flex flex-col p-4 space-y-4 min-h-0 overflow-y-auto custom-scrollbar">
+            
+            {/* Anamnese section inside Copilot form tab */}
+            <div className="flex flex-col space-y-1.5 shrink-0 bg-indigo-50/20 border border-indigo-100 rounded-xl p-3.5 shadow-sm">
+              <label className="text-[10px] font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                <FileText size={12} />
+                Anamnese / Queixas Clínicas
+              </label>
+              <textarea
+                value={anamnesisText}
+                onFocus={() => isAnamnesisFocusedRef.current = true}
+                onBlur={(e) => handleBlurAnamnesisText(e.target.value)}
+                onChange={(e) => handleAnamnesisTextChange(e.target.value)}
+                placeholder="Histórico clínico rápido, queixas ou sintomas..."
+                className="w-full text-xs font-semibold text-ink-700 bg-white border border-indigo-200 focus:ring-2 focus:ring-indigo-350 focus:border-indigo-350 rounded-lg p-2.5 resize-none shadow-sm outline-none"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-ink-100">
               <span className="text-xs font-semibold text-ink-600">
-                {useStructuredForm && structuredFields ? 'Formulário Estruturado' : 'Anotações Livres'}
+                Formulário Clínico (Texto Livre)
               </span>
               <div className="flex items-center gap-2">
-                {structuredFields && (
-                  <button
-                    onClick={() => setUseStructuredForm(!useStructuredForm)}
-                    className={classNames(
-                      "flex items-center gap-1.5 text-[11px] font-black px-2.5 py-1.5 rounded-lg border transition-all",
-                      useStructuredForm
-                        ? "bg-brand-600 border-brand-600 text-white"
-                        : "bg-white border-ink-200 text-ink-600 hover:border-brand-300 hover:text-brand-600"
-                    )}
-                  >
-                    <ClipboardList size={12} />
-                    {useStructuredForm ? 'Modo Livre' : 'Campos Guiados'}
-                  </button>
-                )}
                 <button
                   onClick={() => onShowCalculators()}
                   className="flex items-center gap-1.5 text-[11px] font-medium text-ink-600 hover:text-brand-600 hover:bg-brand-50 px-2.5 py-1.5 rounded-md transition-colors"
@@ -1250,7 +1365,7 @@ export function LaudCopilot({
                   <Calculator size={14} />
                   Calculadoras
                 </button>
-                {template?.customForm && !useStructuredForm && (
+                {template?.customForm && (
                   <button
                     onClick={handleResetForm}
                     className="flex items-center gap-1.5 text-[11px] font-medium text-ink-600 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-md transition-colors"
@@ -1262,28 +1377,15 @@ export function LaudCopilot({
               </div>
             </div>
 
-            {useStructuredForm && structuredFields ? (
-              <div className="grid grid-cols-2 gap-3">
-                {structuredFields.map(field => (
-                  <StructuredFormField
-                    key={field.id}
-                    field={field}
-                    value={structuredValues[field.id] || ''}
-                    onChange={v => setStructuredValues(prev => ({ ...prev, [field.id]: v }))}
-                  />
-                ))}
-              </div>
-            ) : (
-              <textarea
-                value={formText}
-                onFocus={() => isFormFocusedRef.current = true}
-                onBlur={(e) => handleBlurFormText(e.target.value)}
-                onChange={(e) => handleFormTextChange(e.target.value)}
-                placeholder="Digite de forma livre ou cole os achados para que a IA os organize e integre ao laudo..."
-                className="flex-1 w-full p-4 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-all text-sm font-mono text-ink-700 resize-none shadow-inner"
-                style={{ minHeight: '200px' }}
-              />
-            )}
+            <textarea
+              value={formText}
+              onFocus={() => isFormFocusedRef.current = true}
+              onBlur={(e) => handleBlurFormText(e.target.value)}
+              onChange={(e) => handleFormTextChange(e.target.value)}
+              placeholder="Digite de forma livre ou cole os achados para que a IA os organize e integre ao laudo..."
+              className="flex-1 w-full p-4 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-all text-sm font-mono text-ink-700 resize-none shadow-inner"
+              style={{ minHeight: '180px' }}
+            />
           </div>
 
           <div className="p-4 bg-white border-t border-ink-100 shrink-0">

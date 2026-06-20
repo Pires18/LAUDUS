@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useCollection } from '../../../hooks/useFirestore';
 import { License, Plan } from '../../../types';
 import { useApp } from '../../../store/app';
-import { addItemGlobalWithId, updateGlobalItem, deleteGlobalItem, genId, addAuditLog } from '../../../store/db';
+import { addItemGlobalWithId, updateGlobalItem, deleteGlobalItem, addAuditLog } from '../../../store/db';
 import { 
   Key, Plus, Copy, Check, Trash2, ShieldOff,
-  Search, Filter, Loader2, Calendar, Mail, 
-  User, CheckCircle2, AlertCircle, XCircle, Sparkles
+  Search, Filter, Loader2, Calendar, Mail,
+  User, CheckCircle2, XCircle, Sparkles
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
@@ -180,12 +180,12 @@ export function AdminLicenses() {
   const revokedCount = licenses.filter(l => !l.active && !l.usedByUid).length;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       
       {/* Header and Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-brand-50 text-brand-600 border border-brand-100">
+        <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-brand-50 text-brand-600 border border-brand-100">
             <Key size={20} />
           </div>
           <div>
@@ -193,8 +193,8 @@ export function AdminLicenses() {
             <p className="text-2xl font-black text-ink-900">{totalCount}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+        <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
             <CheckCircle2 size={20} />
           </div>
           <div>
@@ -202,8 +202,8 @@ export function AdminLicenses() {
             <p className="text-2xl font-black text-emerald-600">{activeCount}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100">
+        <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
             <User size={20} />
           </div>
           <div>
@@ -211,8 +211,8 @@ export function AdminLicenses() {
             <p className="text-2xl font-black text-blue-600">{usedCount}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-3xl border border-ink-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-red-50 text-red-600 border border-red-100">
+        <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-red-50 text-red-600 border border-red-100">
             <XCircle size={20} />
           </div>
           <div>
@@ -223,7 +223,7 @@ export function AdminLicenses() {
       </div>
 
       {/* Generator & Configuration Card */}
-      <div className="bg-white p-8 rounded-3xl border border-ink-100 shadow-sm">
+      <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
         <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-2">
           <Plus size={20} className="text-brand-600" /> Gerador de Licenças
         </h4>
@@ -317,8 +317,8 @@ export function AdminLicenses() {
       </div>
 
       {/* Licenses List Filter & Search Table */}
-      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
-        <div className="p-8 border-b border-ink-100 bg-ink-50/10 flex flex-col md:flex-row gap-4">
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-ink-100 bg-ink-50/10 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
             <input

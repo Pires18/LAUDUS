@@ -135,7 +135,7 @@ export function BottomNav() {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl border-t border-ink-100 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl border-t border-ink-100 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
             >
               {/* Drag indicator & Header */}
               <div className="flex flex-col items-center pt-3 pb-2 px-6 border-b border-ink-50 bg-ink-50/5 flex-shrink-0">

@@ -3,12 +3,12 @@ import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
 import { useCollection, where, orderBy } from '../hooks/useFirestore';
 import { 
-  X, MessageSquare, Plus, Send, 
-  CheckCircle2, Clock, AlertCircle, LifeBuoy,
+  X, MessageSquare, Plus, Send,
+  AlertCircle, LifeBuoy,
   ChevronLeft, Loader2
 } from 'lucide-react';
 import { classNames } from '../utils/format';
-import { SupportTicket, SupportMessage } from '../types';
+import { SupportTicket } from '../types';
 import { createSupportTicket, addSupportMessage } from '../store/db';
 
 export function SupportCenterModal() {
@@ -86,7 +86,7 @@ export function SupportCenterModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-5xl h-full max-h-[90dvh] lg:max-h-[800px] shadow-2xl border border-ink-100 flex overflow-hidden">
+      <div className="bg-white rounded-2xl w-full max-w-5xl h-full max-h-[90dvh] lg:max-h-[800px] shadow-2xl border border-ink-100 flex overflow-hidden">
         
         {/* Sidebar: Tickets List */}
         <aside className={classNames(
@@ -276,7 +276,7 @@ export function SupportCenterModal() {
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-ink-200 space-y-4">
-                 <div className="w-24 h-24 rounded-3xl bg-ink-50 flex items-center justify-center border border-ink-50">
+                 <div className="w-24 h-24 rounded-2xl bg-ink-50 flex items-center justify-center border border-ink-50">
                     <MessageSquare size={48} />
                  </div>
                  <p className="font-black text-lg text-ink-400">Escolha um chamado para visualizar</p>

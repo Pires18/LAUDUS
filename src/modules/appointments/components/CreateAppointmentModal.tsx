@@ -222,7 +222,7 @@ export function CreateAppointmentModal({
         initial={{ scale: 0.96, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 20 }}
-        className="bg-white rounded-[2rem] shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh] relative modal-mobile-sheet"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[85vh] relative modal-mobile-sheet"
       >
         {/* Header */}
         <div className="px-6 py-5 border-b border-ink-100 flex items-center justify-between bg-white z-10 relative shrink-0">
@@ -353,7 +353,7 @@ export function CreateAppointmentModal({
                     </div>
 
                     {showQuickPatient ? (
-                      <div className="space-y-4 p-5 rounded-[1.5rem] bg-ink-50 border border-ink-200 shadow-sm">
+                      <div className="space-y-4 p-5 rounded-2xl bg-ink-50 border border-ink-200 shadow-sm">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-ink-700">
                           <div className="sm:col-span-2">
                             <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 mb-1.5 block">Nome Completo *</label>
