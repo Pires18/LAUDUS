@@ -306,6 +306,10 @@ export interface Clinic {
   email?: string;
   /** URL do logo da clínica */
   logoUrl?: string;
+  /** URL do cabeçalho da clínica como imagem */
+  headerImageUrl?: string;
+  /** URL do rodapé da clínica como imagem */
+  footerImageUrl?: string;
   /** ID do documento template do Google Docs para esta clínica */
   googleDocsTemplateId?: string;
   /** ID da pasta no Drive onde os laudos serão salvos */
@@ -369,13 +373,14 @@ export interface AuditLog {
 
 /** Assinatura ativa de um usuário */
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'paused';
-export type SubscriptionAddon = 'pacs' | 'calculators';
+export type SubscriptionAddon = 'pacs' | 'calculators' | 'appointments' | 'clinics';
 
 export interface Subscription {
   id: string;
   userId: string;
   userEmail: string;
-  plan: 'base';
+  plan: string;
+  planId?: string;
   addons: SubscriptionAddon[];
   status: SubscriptionStatus;
   paymentMethod: 'pix' | 'credit_card' | 'manual';
@@ -388,9 +393,23 @@ export interface Subscription {
   reportsUsedThisMonth: number;
   reportsQuota: number;
   clinicsQuota: number;
+  tokenQuotaLite: number;
+  tokenQuotaPro: number;
   lastResetAt: number;
   createdAt: number;
   updatedAt: number;
+}
+/** Configuração de funcionalidades extras (add-ons) */
+export interface SaasAddonsConfig {
+  calculators: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  pacs: { price: number; description: string; enabled: boolean; assisted: boolean; abacatePayProductId?: string; };
+  appointments: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  clinics: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  extraReport: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  extraClinic: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  tokenLite: { price: number; bundleSize: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  tokenPro: { price: number; bundleSize: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  updatedAt?: number;
 }
 
 /** Configuração dos motores de IA (Lite / Pro) definida pelo admin */
@@ -425,38 +444,48 @@ export interface SupportTicket {
   messages: SupportMessage[];
   createdAt: number;
   updatedAt: number;
+  type?: string;
 }
 
-/** Plano de assinatura */
+/** Plano de assinatura SaaS */
 export interface Plan {
   id: string;
   name: string;
+  description: string;
   price: number;
   interval: 'month' | 'year';
-  features: string[];
-  examLimit?: number; // null = ilimitado
-  clinicLimit?: number;
   active: boolean;
-  
-  // Recursos e adequações clínicas do sistema
-  iaLimit?: number;         // Créditos Laud.IA/mês (null = ilimitado)
-  storageLimitGb?: number;  // Armazenamento de Imagens em GB (null = ilimitado)
-  voiceDictation: boolean;  // Permite Ditado por Voz clínico
-  customMasks: boolean;     // Permite criação de máscaras personalizadas
+  featured?: boolean;
+
+  // Quotas
+  reportsQuota: number;       // 0 = ilimitado
+  clinicsQuota: number;       // 0 = ilimitado
+  tokenQuotaLite: number;     // 0 = ilimitado (tokens Lite/mês)
+  tokenQuotaPro: number;      // 0 = ilimitado (tokens Pro/mês)
+  trialDays: number;
+
+  // Funcionalidades incluídas
+  includesCalculators: boolean;
+  includesPacs: boolean;
+  includesAppointments?: boolean;
+  includesClinics?: boolean;
+  motorProDefault: boolean;
+
+  // AbacatePay
+  abacatePayProductId?: string;
+
+  // Legacy compatibility
+  features?: string[];
+  examLimit?: number;
+  clinicLimit?: number;
+  iaLimit?: number;
+  storageLimitGb?: number;
+  voiceDictation?: boolean;
+  customMasks?: boolean;
+
+  createdAt?: number;
+  updatedAt?: number;
 }
 
-/** Código de Licença comercial atrelado a planos */
-export interface License {
-  id: string;             // Ex: LAUD-XXXX-XXXX-XXXX
-  planId: string;         // ID do plano associado
-  planName: string;       // Nome do plano associado
-  durationMonths: number; // Duração (1, 3, 6, 12, 24 meses)
-  active: boolean;        // Se está ativa (não revogada)
-  createdAt: number;      // Data de geração
-  usedAt?: number;        // Data de ativação pelo usuário
-  usedByUid?: string;     // UID do médico que ativou
-  usedByEmail?: string;   // E-mail do médico que ativou
-  expiresAt?: number;     // Timestamp exato do fim do acesso
-}
 
 

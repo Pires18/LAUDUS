@@ -4,11 +4,12 @@ import { useCollection } from '../hooks/useFirestore';
 import { ExamRequest } from '../types';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
+import { useSubscription } from '../hooks/useSubscription';
 import {
   LayoutDashboard, ClipboardList, FilePlus, Users,
   UserCircle, CalendarDays, FileSignature, Sparkles,
   Calculator, Hospital, ShieldCheck, LifeBuoy, LogOut,
-  Menu, X
+  Menu, X, Database
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,7 +17,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function BottomNav() {
   const { view, setView, setShowCreateExamModal, setShowSupportModal, settings } = useApp();
   const { user, signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, role } = useAdmin();
+  const { hasPacs, hasCalculators, hasAppointments, hasClinics } = useSubscription();
   
   const { data: exams } = useCollection<ExamRequest>('exams');
   const pendingCount = exams.filter(e => e.status === 'pendente').length;
@@ -24,7 +26,7 @@ export function BottomNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Active view matches
-  const isMenuViewActive = ['appointments', 'templates', 'laud-ia', 'calculators', 'clinics', 'settings', 'admin', 'template-editor', 'clinic-detail', 'clinic-form'].includes(view.name);
+  const isMenuViewActive = ['appointments', 'templates', 'laud-ia', 'calculators', 'clinics', 'settings', 'admin', 'template-editor', 'clinic-detail', 'clinic-form', 'dicom'].includes(view.name);
   
   const activeKey = isMenuViewActive ? 'menu' :
                     view.name.includes('patient') ? 'patients' :
@@ -48,11 +50,19 @@ export function BottomNav() {
     { key: 'laud-ia', label: 'LaudIA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
     { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
     { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin', 'medico', 'recepcao'] },
+    { key: 'dicom', label: 'PACS / DICOM', icon: Database, view: { name: 'dicom' as const }, roles: ['admin', 'medico'] },
     { key: 'settings', label: 'Meu Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
   ];
 
-  const role = settings.currentRole || 'medico';
-  const allowedMenuItems = menuItems.filter(item => item.roles.includes(role));
+  const allowedMenuItems = menuItems
+    .filter(item => item.roles.includes(role || 'medico'))
+    .filter(item => {
+      if (item.key === 'dicom') return hasPacs;
+      if (item.key === 'calculators') return hasCalculators;
+      if (item.key === 'appointments') return hasAppointments;
+      if (item.key === 'clinics') return hasClinics;
+      return true;
+    });
 
   return (
     <>

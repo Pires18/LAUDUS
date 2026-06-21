@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
+import { useAdmin } from '../../hooks/useAdmin';
 import { PageHeader } from '../../components/PageHeader';
 import { updateItem } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function TemplateEditor({ templateId }: Props) {
+  const { isAdmin } = useAdmin();
   const { setView, showToast, settings } = useApp();
   const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'copilot' | 'prompt'>('info');
   const [draft, setDraft] = useState<ReportTemplate | null>(null);
@@ -57,12 +59,12 @@ export function TemplateEditor({ templateId }: Props) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
   }
 
-  const tabs = [
+  const tabs = ([
     { id: 'info', label: 'Informações Básicas' },
     { id: 'structure', label: 'Estrutura do Laudo' },
     { id: 'copilot', label: 'Formulário & Fichas' },
     { id: 'prompt', label: 'Prompt LAUD.IA' },
-  ] as const;
+  ] as const).filter(t => isAdmin || t.id !== 'prompt');
 
   return (
     <div className="module-container">
@@ -81,18 +83,22 @@ export function TemplateEditor({ templateId }: Props) {
               </button>
               <div className="min-w-0">
                 <h1 className="text-base font-black text-ink-900 tracking-tight leading-none truncate max-w-[200px] sm:max-w-md">{draft.name}</h1>
-                <p className="text-[11px] text-ink-500 font-medium mt-0.5">Edição de Máscara</p>
+                <p className="text-[11px] text-ink-500 font-medium mt-0.5">
+                  {isAdmin ? 'Edição de Máscara' : 'Visualização de Máscara (Apenas Leitura)'}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleSave}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
-              >
-                <Save size={11} />
-                Salvar Máscara
-              </button>
-            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleSave}
+                  className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                >
+                  <Save size={11} />
+                  Salvar Máscara
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -125,6 +131,7 @@ export function TemplateEditor({ templateId }: Props) {
                 <label className="label">Área *</label>
                 <select
                   className="input"
+                  disabled={!isAdmin}
                   value={draft.area}
                   onChange={(e) => {
                     const area = e.target.value as ReportTemplate['area'];
@@ -140,6 +147,7 @@ export function TemplateEditor({ templateId }: Props) {
                 <label className="label">Exame (Nome da Máscara) *</label>
                 <input
                   className="input"
+                  disabled={!isAdmin}
                   value={draft.name}
                   onChange={(e) => u('name', e.target.value)}
                   placeholder="Ex: Abdome Total, Mama, etc."
@@ -149,6 +157,7 @@ export function TemplateEditor({ templateId }: Props) {
                 <label className="label">Descrição (Opcional)</label>
                 <input
                   className="input"
+                  disabled={!isAdmin}
                   value={draft.description || ''}
                   onChange={(e) => u('description', e.target.value)}
                   placeholder="Breve descrição da utilidade desta máscara..."
@@ -162,6 +171,7 @@ export function TemplateEditor({ templateId }: Props) {
                   </label>
                   <select
                     className="input"
+                    disabled={!isAdmin}
                     value={draft.clinicId || ''}
                     onChange={(e) => u('clinicId', e.target.value || undefined)}
                   >
@@ -194,6 +204,7 @@ export function TemplateEditor({ templateId }: Props) {
               </label>
               <input
                 className="input font-black text-lg text-ink-900 border-ink-200 focus:border-brand-500"
+                disabled={!isAdmin}
                 value={draft.title}
                 onChange={(e) => u('title', e.target.value)}
                 placeholder="Ex: ULTRASSONOGRAFIA OBSTÉTRICA"
@@ -260,6 +271,7 @@ export function TemplateEditor({ templateId }: Props) {
               </p>
               <textarea
                 className="input min-h-[180px] font-mono text-xs p-4 bg-ink-50 border border-ink-200 focus:bg-white transition-all rounded-xl"
+                disabled={!isAdmin}
                 value={draft.customForm || ''}
                 onChange={(e) => u('customForm', e.target.value)}
                 placeholder={"Ex:\nFígado: [Aspecto habitual]\nRins: [Normais, sem dilatação]\nBexiga: [Cheia, com paredes finas]"}
@@ -278,6 +290,7 @@ export function TemplateEditor({ templateId }: Props) {
               </p>
               <textarea
                 className="input min-h-[180px] text-xs p-4 bg-ink-50 border border-ink-200 focus:bg-white transition-all rounded-xl"
+                disabled={!isAdmin}
                 value={draft.consentTemplate || ''}
                 onChange={(e) => u('consentTemplate', e.target.value)}
                 placeholder="Ex: Eu, [Nome do Paciente], autorizo a realização do exame..."
@@ -316,11 +329,12 @@ export function TemplateEditor({ templateId }: Props) {
   );
 }
 
-function TemplateTextBlock({ label, value, onChange, placeholder }: {
+function TemplateTextBlock({ label, value, onChange, editable = true, placeholder }: {
   label: string;
   value: string;
   onChange: (val: string) => void;
   rows?: number;
+  editable?: boolean;
   placeholder?: string;
 }) {
   return (
@@ -332,6 +346,7 @@ function TemplateTextBlock({ label, value, onChange, placeholder }: {
         <RichEditor
           content={value}
           onChange={onChange}
+          editable={editable}
         />
       </div>
     </div>

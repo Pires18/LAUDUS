@@ -48,6 +48,7 @@ import { AreaIcon } from '../../components/AreaIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalculatorReference } from './components/CalculatorUI';
 import { useApp } from '../../store/app';
+import { useSubscription } from '../../hooks/useSubscription';
 
 interface Props {
   area?: ExamArea;
@@ -62,6 +63,8 @@ interface Props {
 }
 
 export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
+  const { setView } = useApp();
+  const { hasCalculators } = useSubscription();
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
   
   // O result atual da calculadora selecionada. 
@@ -200,8 +203,28 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
         </div>
 
         <div className="flex-1 flex min-h-0 relative">
-          {/* ── Lista de Calculadoras ───────────────────────────── */}
-          {!selectedCalcId ? (
+          {!hasCalculators ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-white space-y-6 animate-fade-in">
+              <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-500 border border-amber-200 flex items-center justify-center shadow-lg shadow-amber-500/10 animate-bounce">
+                <Zap className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-base font-black text-ink-800 uppercase tracking-wide">Recurso Não Incluso</h3>
+                <p className="text-xs text-ink-500 font-medium max-w-[280px] leading-relaxed">
+                  O módulo de Calculadoras Clínicas (Módulos de Assistência e Rastreamento) não está ativo em seu plano.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setView({ name: 'settings', activeTab: 'assinatura' });
+                  onClose();
+                }}
+                className="w-full max-w-[240px] h-11 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-md shadow-brand-500/25 active:scale-95 transition-all"
+              >
+                Ativar Módulo de Calculadoras
+              </button>
+            </div>
+          ) : !selectedCalcId ? (
             <div className="flex-1 flex flex-col min-h-0 bg-white">
               {/* Filtros e busca */}
               <div className="px-4 py-3 bg-white border-b border-ink-100 flex flex-col gap-2.5 shrink-0">

@@ -1,39 +1,37 @@
 import { useState } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
-import { 
-  ShieldCheck, Users, CreditCard, History, 
+import {
+  ShieldCheck, Users, History,
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
-  Megaphone, Trash2, Loader2, Key
+  Megaphone, Trash2, Loader2, DollarSign, CreditCard
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { setBroadcast } from '../../store/db';
 import { callMetricsHistory } from '../ai/engine';
 
 // Submodules
-import { AdminUsers } from './submodules/AdminUsers';
-import { AdminPlans } from './submodules/AdminPlans';
+import { AdminUsersSubscriptions } from './submodules/AdminUsersSubscriptions';
 import { AdminAudit } from './submodules/AdminAudit';
 import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
-import { AdminLicenses } from './submodules/AdminLicenses';
+import { AdminFinanceiro } from './submodules/AdminFinanceiro';
 import { SharedLaudIA } from '../laud-ia/SharedLaudIA';
 
-type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'licenses' | 'laud-ia';
+type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia';
 
 export function Admin() {
   const { view } = useApp();
   const [activeTab, setActiveTab] = useState<AdminTab>((view.name === 'admin' && (view.activeTab as AdminTab)) || 'overview');
 
   const tabs = [
-    { id: 'overview', label: 'Geral', icon: LayoutDashboard },
-    { id: 'laud-ia', label: 'LAUD.IA', icon: Sparkles },
-    { id: 'users', label: 'Usuários', icon: Users },
-    { id: 'plans', label: 'Planos', icon: CreditCard },
-    { id: 'licenses', label: 'Licenças', icon: Key },
-    { id: 'audit', label: 'Auditoria', icon: History },
-    { id: 'support', label: 'Suporte', icon: LifeBuoy },
-    { id: 'masks', label: 'Máscaras', icon: FileSignature },
+    { id: 'overview',    label: 'Geral',              icon: LayoutDashboard },
+    { id: 'laud-ia',    label: 'LAUD.IA',            icon: Sparkles        },
+    { id: 'users',      label: 'Usuários & Planos',  icon: Users           },
+    { id: 'financeiro', label: 'Financeiro',          icon: DollarSign      },
+    { id: 'audit',      label: 'Auditoria',           icon: History         },
+    { id: 'support',    label: 'Suporte',             icon: LifeBuoy        },
+    { id: 'masks',      label: 'Máscaras',            icon: FileSignature   },
   ] as const;
 
   return (
@@ -78,14 +76,13 @@ export function Admin() {
 
         {/* Content Area */}
         <div className="animate-fade-in-up">
-          {activeTab === 'overview' && <AdminOverview onNavigate={setActiveTab} />}
-          {activeTab === 'laud-ia' && <SharedLaudIA />}
-          {activeTab === 'users' && <AdminUsers />}
-          {activeTab === 'plans' && <AdminPlans />}
-          {activeTab === 'licenses' && <AdminLicenses />}
-          {activeTab === 'audit' && <AdminAudit />}
-          {activeTab === 'support' && <AdminSupport />}
-          {activeTab === 'masks' && <AdminMasks />}
+          {activeTab === 'overview'    && <AdminOverview onNavigate={setActiveTab} />}
+          {activeTab === 'laud-ia'    && <SharedLaudIA />}
+          {activeTab === 'users'      && <AdminUsersSubscriptions />}
+          {activeTab === 'financeiro' && <AdminFinanceiro />}
+          {activeTab === 'audit'      && <AdminAudit />}
+          {activeTab === 'support'    && <AdminSupport />}
+          {activeTab === 'masks'      && <AdminMasks />}
         </div>
       </div>
     </div>
@@ -100,7 +97,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
 
   // Live Metrics
   const { data: users } = useCollection<any>('users', { isGlobal: true });
-  const { data: rawPlans } = useCollection<any>('plans', { isGlobal: true });
+  const { data: rawPlans } = useCollection<any>('saas_plans', { isGlobal: true });
   const plans = rawPlans.filter(p => !p.id.startsWith('LICENSE_'));
   const { data: tickets } = useCollection<any>('support_tickets', { isGlobal: true });
   const { data: auditLogs } = useCollection<any>('audit_logs', { isGlobal: true });
@@ -112,11 +109,11 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
       change: users.filter(u => u.active !== false).length + ' Ativos', 
       icon: Users, color: 'text-blue-600', tab: 'users' 
     },
-    { 
-      label: 'Planos Ativos', 
-      value: plans.filter(p => p.active).length.toString(), 
-      change: plans.length + ' Total', 
-      icon: CreditCard, color: 'text-emerald-600', tab: 'plans' 
+    {
+      label: 'Assinaturas Ativas',
+      value: users.filter(u => u.subscriptionStatus === 'active').length.toString(),
+      change: users.filter(u => u.subscriptionStatus === 'trialing').length + ' Trials',
+      icon: Users, color: 'text-emerald-600', tab: 'users'
     },
     { 
       label: 'Chamados Abertos', 
@@ -227,13 +224,9 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           <div className="space-y-4">
              <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100 flex items-center justify-between">
                 <div>
-                   <p className="text-xs font-bold text-brand-900">
-                     {settings.aiProvider === 'anthropic' ? 'Anthropic Claude' : 'Google Gemini'}
-                   </p>
+                   <p className="text-xs font-bold text-brand-900">Google Gemini</p>
                    <p className="text-[10px] text-brand-600 font-mono">
-                     {settings.aiProvider === 'anthropic'
-                       ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                       : (settings.geminiModel || 'gemini-3.5-flash')}
+                     Lite: gemini-3.5-flash · Pro: gemini-3.1-pro-preview
                    </p>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />

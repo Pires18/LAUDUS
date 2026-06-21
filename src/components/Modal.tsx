@@ -1,4 +1,5 @@
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -34,7 +35,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', the
 
   const isDark = theme === 'dark';
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
@@ -53,9 +54,10 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', the
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: 'spring', duration: 0.4, bounce: 0.2 }}
-            className={`w-full ${sizeClass} modal-mobile-sheet max-h-[90dvh] md:max-h-[90vh] flex flex-col relative z-10 overflow-hidden rounded-3xl border shadow-premium ${
+            className={`w-full ${sizeClass} modal-mobile-sheet flex flex-col relative z-10 overflow-hidden rounded-3xl border shadow-premium ${
               isDark ? 'bg-[#0c0c0e] border-zinc-800' : 'bg-white border-ink-150'
             }`}
+            style={{ maxHeight: 'calc(100dvh - 32px)' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -74,7 +76,11 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', the
             </div>
 
             {/* Body */}
-            <div className={`flex-1 overflow-auto px-6 py-5 ${isDark ? 'bg-[#0c0c0e]' : 'bg-white'}`}>{children}</div>
+            <div 
+              className={`flex-1 min-h-0 overflow-y-auto px-6 py-5 ${isDark ? 'bg-[#0c0c0e]' : 'bg-white'}`}
+            >
+              {children}
+            </div>
 
             {/* Footer */}
             {footer && (
@@ -87,6 +93,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', the
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

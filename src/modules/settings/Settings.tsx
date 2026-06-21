@@ -8,23 +8,38 @@ import {
   Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Database, Info, Upload, Loader2,
-  Server, Wifi, HardDrive, Shield, Cloud, BrainCircuit,
-  Printer
+  Server, Wifi, HardDrive, Shield, Cloud,
+  Printer, Receipt
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
-import { FinancialControl } from './FinancialControl';
+import { SubscriptionCenter } from './SubscriptionCenter';
+import { useSubscription } from '../../hooks/useSubscription';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
-type SettingsTab = 'perfil' | 'pdf' | 'dicom' | 'audit' | 'controle-ia';
+type SettingsTab = 'perfil' | 'pdf' | 'audit' | 'assinatura';
+
+function getFontFamilyFallback(family?: string) {
+  if (!family) return 'Arial, sans-serif';
+  switch (family) {
+    case 'Times New Roman': return '"Times New Roman", Times, serif';
+    case 'Courier New': return '"Courier New", Courier, monospace';
+    case 'Inter': return '"Inter", sans-serif';
+    case 'Calibri': return 'Calibri, Candara, Segoe, "Segoe UI", sans-serif';
+    case 'Georgia': return 'Georgia, serif';
+    case 'Lora': return '"Lora", Georgia, serif';
+    default: return `${family}, sans-serif`;
+  }
+}
 
 export function Settings() {
-  const { settings, updateSettings, showToast } = useApp();
+  const { settings, updateSettings, showToast, view } = useApp();
   const { user } = useAuth();
+  const { hasPacs } = useSubscription();
   const { data: clinics } = useCollection<Clinic>('clinics');
   
   const [draft, setDraft] = useState(settings);
@@ -34,17 +49,17 @@ export function Settings() {
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
 
-  const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [pacsTestResults, setPacsTestResults] = useState<{
-    primaryOk: boolean;
-    backupOk: boolean;
-    primaryMsg?: string;
-    backupMsg?: string;
-  } | null>(null);
+
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
+
+  useEffect(() => {
+    if (view.name === 'settings' && view.activeTab) {
+      setActiveTab(view.activeTab as SettingsTab);
+    }
+  }, [view]);
 
   function u<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -125,88 +140,15 @@ export function Settings() {
     }
   }
 
-  async function handleTestPacsConnection() {
-    setPacsTestState('testing');
-    setPacsTestResults(null);
-    try {
-      const primaryUrl = getActivePacsUrl(draft, false);
-      const primaryAuth = `&username=${encodeURIComponent(draft.dicomUsername || '')}&password=${encodeURIComponent(draft.dicomPassword || '')}`;
-      
-      const backupUrl = draft.dicomBackupViewerUrl ? getActivePacsUrl(draft, true) : null;
-      const backupAuth = backupUrl ? `&username=${encodeURIComponent(draft.dicomBackupUsername || '')}&password=${encodeURIComponent(draft.dicomBackupPassword || '')}` : '';
 
-      // Test Primary
-      const testPrimary = async () => {
-        const pingUrl = `${primaryUrl.replace(/\/$/, '')}/system`;
-        const proxyPath = getProxyEndpoint(draft, false);
-        try {
-          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${primaryAuth}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
-          }
-          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
-        } catch (e: any) {
-          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
-        }
-      };
-
-      // Test Backup
-      const testBackup = async () => {
-        if (!backupUrl) return { ok: false, msg: 'Servidor backup não configurado' };
-        const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
-        const proxyPath = getProxyEndpoint(draft, true);
-        try {
-          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
-          }
-          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
-        } catch (e: any) {
-          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
-        }
-      };
-
-      const [primaryRes, backupRes] = await Promise.all([
-        testPrimary(),
-        backupUrl ? testBackup() : Promise.resolve({ ok: false, msg: 'Nenhum backup configurado' })
-      ]);
-
-      setPacsTestResults({
-        primaryOk: primaryRes.ok,
-        backupOk: backupRes.ok,
-        primaryMsg: primaryRes.msg,
-        backupMsg: backupUrl ? backupRes.msg : undefined
-      });
-      
-      const success = primaryRes.ok && (!backupUrl || backupRes.ok);
-      setPacsTestState(success ? 'success' : 'error');
-      
-      if (primaryRes.ok) {
-        showToast('PACS Principal conectado com sucesso!', 'success');
-      } else {
-        showToast('Erro de conexão com o PACS Principal.', 'error');
-      }
-    } catch (err: any) {
-      setPacsTestState('error');
-      setPacsTestResults({
-        primaryOk: false,
-        backupOk: false,
-        primaryMsg: err.message || 'Falha crítica ao testar conexão.'
-      });
-      showToast('Erro crítico ao testar conexões.', 'error');
-    }
-  }
 
 
 
   const tabs = [
-    { id: 'perfil', label: 'Perfil', icon: User },
-    { id: 'pdf', label: 'Centro de PDF', icon: Printer },
-    { id: 'dicom', label: 'PACS / DICOM', icon: Database },
-    { id: 'audit', label: 'Auditoria', icon: ShieldCheck },
-    { id: 'controle-ia', label: 'Controle IA', icon: BrainCircuit },
+    { id: 'perfil',    label: 'Perfil',        icon: User       },
+    { id: 'pdf',       label: 'Centro de PDF',  icon: Printer    },
+    { id: 'audit',     label: 'Auditoria',      icon: ShieldCheck },
+    { id: 'assinatura',label: 'Assinatura & Faturamento',     icon: Receipt },
   ] as const;
 
   return (
@@ -692,6 +634,120 @@ export function Settings() {
                   </div>
                 </div>
               </div>
+
+              {/* Live Preview (Full width under the two columns) */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-ink-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-center gap-3 mb-2 border-b border-ink-150 pb-3">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-650 flex items-center justify-center">
+                    <Sliders size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-ink-950 uppercase tracking-widest leading-none">Pré-visualização Interativa em Tempo Real</h3>
+                    <p className="text-[11px] text-ink-500 font-medium mt-0.5">Veja como suas configurações de fonte, margens e assinatura impactarão o laudo impresso.</p>
+                  </div>
+                </div>
+
+                <div className="bg-ink-50/50 p-6 rounded-2xl border border-ink-100 flex justify-center overflow-x-auto">
+                  <div 
+                    className="w-full max-w-[210mm] bg-white shadow-lg border border-ink-200 rounded-xl overflow-hidden transition-all text-slate-900 duration-200"
+                    style={{
+                      fontFamily: getFontFamilyFallback(draft.pdfFontFamily),
+                      fontSize: draft.pdfFontSize || '14px',
+                      lineHeight: draft.pdfLineHeight || '1.5',
+                      paddingTop: `${draft.pdfMarginTop ?? 15}px`, // Visually approximated
+                      paddingBottom: `${draft.pdfMarginBottom ?? 15}px`,
+                      paddingLeft: `${draft.pdfMarginLeft ?? 15}px`,
+                      paddingRight: `${draft.pdfMarginRight ?? 15}px`,
+                    }}
+                  >
+                    {/* Visual header approximation */}
+                    {draft.pdfShowHeader !== false && (
+                      <div className="border-b border-slate-300 pb-3 mb-4 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block">CLÍNICA SANTA MARIA</span>
+                          <span className="text-[8px] text-slate-500 block uppercase">Av. Paulista, 1000 · São Paulo/SP · CEP: 01310-100</span>
+                        </div>
+                        <div className="w-14 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-[7px] text-slate-400 font-black uppercase rounded-lg">
+                          LOGO
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Patient Info Approximation */}
+                    <div className="border border-slate-350 p-2.5 rounded-lg mb-4 text-[9px] text-slate-505 bg-slate-50/80 grid grid-cols-4 gap-2 leading-tight">
+                      <div className="col-span-2">
+                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">Paciente</span>
+                        <strong className="text-slate-800 uppercase">Maria da Silva Oliveira</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">CPF</span>
+                        <span className="font-semibold text-slate-700 block">123.456.789-00</span>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">Exame</span>
+                        <span className="font-semibold text-slate-700 block uppercase">USG Abdome</span>
+                      </div>
+                    </div>
+
+                    {/* Mock clinical content */}
+                    <div 
+                      className="text-slate-850 text-[0.95em] space-y-2 leading-relaxed"
+                      style={{
+                        textAlign: draft.pdfTextAlign || 'justify'
+                      }}
+                    >
+                      <h4 className="font-black text-slate-900 border-l-2 border-indigo-500 pl-2 text-[1em] uppercase tracking-wider mt-2 mb-1">Fígado</h4>
+                      <p>
+                        Fígado com dimensões normais, contornos regulares e ecotextura do parênquima homogênea, sem evidências de lesões focais ou difusas. Vias biliares intra e extra-hepáticas de calibre normal. Veia porta e veias hepáticas com trajeto e calibre normais.
+                      </p>
+                      
+                      <h4 className="font-black text-slate-900 border-l-2 border-indigo-500 pl-2 text-[1em] uppercase tracking-wider mt-3 mb-1">Vesícula Biliar</h4>
+                      <p>
+                        Vesícula biliar normodensificada, com paredes finas e regulares, conteúdo anecóico livre de cálculos ou ecos em suspensão.
+                      </p>
+
+                      <h4 className="font-black text-slate-950 text-[1.1em] text-center uppercase tracking-widest mt-6 mb-1">Conclusão</h4>
+                      <p className="font-bold text-slate-900 text-center">
+                        Exame de ultrassonografia de abdome superior sem alterações significativas.
+                      </p>
+                    </div>
+
+                    {/* Visual signature block */}
+                    <div className="mt-8 pt-4 flex flex-col items-center text-center">
+                      {draft.signatureImageUrl ? (
+                        <div className="h-10 flex items-center justify-center mb-1">
+                          <img src={draft.signatureImageUrl} alt="Assinatura" className="max-h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-36 border-t border-dashed border-slate-350 mb-1" />
+                      )}
+                      
+                      <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-none">
+                        {draft.physicianName || 'Dr(a). Nome do Médico'}
+                      </span>
+                      
+                      <div className="text-[7.5px] text-slate-505 font-bold uppercase tracking-wider mt-0.5 space-x-1.5">
+                        {draft.physicianCRM && <span>CRM: {draft.physicianCRM}</span>}
+                        {draft.physicianCRM && draft.physicianRQE && <span>|</span>}
+                        {draft.physicianRQE && <span>RQE: {draft.physicianRQE}</span>}
+                      </div>
+
+                      {draft.defaultSignature && (
+                        <p className="text-[7px] text-slate-400 font-medium whitespace-pre-wrap mt-1 leading-normal max-w-[200px] mx-auto">
+                          {draft.defaultSignature}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Visual footer approximation */}
+                    {draft.pdfShowFooter !== false && (
+                      <div className="border-t border-slate-200 mt-6 pt-2 text-[7px] text-slate-400 text-center uppercase">
+                        LAUD.US · Plataforma de Diagnóstico por Imagem Inteligente
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -702,423 +758,9 @@ export function Settings() {
             </div>
           )}
 
-          {/* TAB: DICOM/PACS */}
-          {activeTab === 'dicom' && (
-            <div className="max-w-4xl space-y-5 animate-fade-in mx-auto">
-              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Database size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-ink-900">Integração PACS / DICOM</h3>
-                    <p className="text-xs text-ink-500">Gestão de Servidores PACS, Equipamentos Médicos e Envio de Worklist.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-5">
-                  
-                  {/* CARD 1: SERVIDOR PACS PRINCIPAL */}
-                  <div className="p-5 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-50">
-                      <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                        <Server size={18} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-ink-900">Servidor PACS Principal (Matriz)</h4>
-                        <p className="text-xs text-ink-500">Configurações do Orthanc e agente local de Worklist principal.</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-ink-50 border border-ink-100 mb-4">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-bold text-ink-900">Sincronização de Worklist Local</p>
-                        <p className="text-xs text-ink-500">Gerar arquivos .wl na pasta de destino sempre que um exame for criado.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => u('dicomSyncEnabled', !draft.dicomSyncEnabled)}
-                        className={classNames(
-                          "w-12 h-7 rounded-full transition-all relative",
-                          draft.dicomSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
-                        )}
-                      >
-                        <div className={classNames(
-                          "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                          draft.dicomSyncEnabled ? "left-6" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="md:col-span-2">
-                        <label className="label text-ink-600">URL do Servidor PACS (IP do Tailscale)</label>
-                        <input
-                          className="input h-11 text-sm bg-white"
-                          value={draft.dicomViewerUrl || ''}
-                          onChange={(e) => u('dicomViewerUrl', e.target.value)}
-                          placeholder="Ex: http://100.93.111.95:8042"
-                        />
-                        <p className="text-[10px] text-ink-400 mt-1">Usado localmente para carregar imagens.</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label text-ink-600">URL Pública Tailscale (Nuvem Vercel)</label>
-                        <div className="relative">
-                          <Cloud size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
-                          <input
-                            className="input h-11 text-sm bg-white pl-9"
-                            value={draft.dicomTailscalePublicUrl || ''}
-                            onChange={(e) => u('dicomTailscalePublicUrl', e.target.value)}
-                            placeholder="Ex: https://servidor-mac.tail861dda.ts.net:8443"
-                          />
-                        </div>
-                        <p className="text-[10px] text-ink-400 mt-1">Obrigatório para que a nuvem consiga acessar o PACS.</p>
-                      </div>
-                      <div>
-                        <label className="label">Usuário Orthanc</label>
-                        <input
-                          className="input h-12 text-sm"
-                          value={draft.dicomUsername || ''}
-                          onChange={(e) => u('dicomUsername', e.target.value)}
-                          placeholder="Ex: admin"
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Senha Orthanc</label>
-                        <input
-                          type="password"
-                          className="input h-12 text-sm"
-                          value={draft.dicomPassword || ''}
-                          onChange={(e) => u('dicomPassword', e.target.value)}
-                          placeholder="••••••••"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label">URL do Agente Local (Proxy Vercel/Tailscale)</label>
-                        <input
-                          className="input h-12 text-sm"
-                          value={draft.dicomLocalAgentUrl || ''}
-                          onChange={(e) => u('dicomLocalAgentUrl', e.target.value)}
-                          placeholder="Ex: https://servidor-mac.tail861dda.ts.net"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label">Diretório da Worklist no Servidor (Caminho Absoluto)</label>
-                        <input
-                          className="input h-12 text-sm"
-                          value={draft.dicomWorklistFolder || ''}
-                          onChange={(e) => u('dicomWorklistFolder', e.target.value)}
-                          placeholder="Ex: C:\OrthancServer\db\WorklistsDatabase\"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label">Tipo de Visualizador DICOM</label>
-                        <select
-                          className="input h-12 text-sm"
-                          value={draft.dicomViewerType || 'stone'}
-                          onChange={(e) => {
-                            const type = e.target.value as any;
-                            u('dicomViewerType', type);
-                            if (type === 'stone') {
-                              u('dicomViewerUrlPattern', '{{baseUrl}}/stone-webviewer/index.html?study={{StudyInstanceUID}}');
-                            } else if (type === 'oe2') {
-                              u('dicomViewerUrlPattern', '{{baseUrl}}/ui/app/retrieve-and-view.html?StudyInstanceUID={{StudyInstanceUID}}');
-                            } else if (type === 'ohif') {
-                              u('dicomViewerUrlPattern', '{{baseUrl}}/viewer?StudyInstanceUIDs={{StudyInstanceUID}}');
-                            }
-                          }}
-                        >
-                          <option value="stone">Stone Web Viewer</option>
-                          <option value="oe2">Orthanc Explorer 2</option>
-                          <option value="ohif">OHIF Viewer</option>
-                          <option value="custom">Personalizado (Padrão de URL)</option>
-                        </select>
-                      </div>
-                      {draft.dicomViewerType === 'custom' && (
-                        <div className="md:col-span-2">
-                          <label className="label">Padrão da URL do Visualizador</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomViewerUrlPattern || ''}
-                            onChange={(e) => u('dicomViewerUrlPattern', e.target.value)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CARD 2: SERVIDOR PACS DE BACKUP */}
-                  <div className="p-5 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-50">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                        <HardDrive size={18} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-ink-900">Servidor PACS de Backup (Redundância)</h4>
-                        <p className="text-xs text-ink-500">Sincronização em tempo real para um servidor Orthanc secundário (ex: Notebook).</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-ink-50 border border-ink-100 mb-4">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-bold text-ink-900">Habilitar Servidor de Redundância</p>
-                        <p className="text-xs text-ink-500">Enviar worklists paralelamente para o servidor de backup.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => u('dicomBackupSyncEnabled', !draft.dicomBackupSyncEnabled)}
-                        className={classNames(
-                          "w-12 h-7 rounded-full transition-all relative",
-                          draft.dicomBackupSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
-                        )}
-                      >
-                        <div className={classNames(
-                          "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                          draft.dicomBackupSyncEnabled ? "left-6" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-
-                    {draft.dicomBackupSyncEnabled && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fade-in">
-                        <div className="md:col-span-2">
-                          <label className="label text-ink-600">URL do Servidor de Backup (IP do Tailscale)</label>
-                          <input
-                            className="input h-11 text-sm bg-white"
-                            value={draft.dicomBackupViewerUrl || ''}
-                            onChange={(e) => u('dicomBackupViewerUrl', e.target.value)}
-                            placeholder="Ex: http://100.124.187.11:8042"
-                          />
-                          <p className="text-[10px] text-ink-400 mt-1">Usado localmente para fallback de imagens.</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label text-ink-600">URL Pública Backup (Nuvem Vercel)</label>
-                          <div className="relative">
-                            <Cloud size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
-                            <input
-                              className="input h-11 text-sm bg-white pl-9"
-                              value={draft.dicomBackupTailscalePublicUrl || ''}
-                              onChange={(e) => u('dicomBackupTailscalePublicUrl', e.target.value)}
-                              placeholder="Ex: https://servidor-notebook.tail861dda.ts.net:8443"
-                            />
-                          </div>
-                          <p className="text-[10px] text-ink-400 mt-1">Obrigatório para que a nuvem consiga acessar o PACS Backup.</p>
-                        </div>
-                        <div>
-                          <label className="label">Usuário Orthanc Backup</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupUsername || ''}
-                            onChange={(e) => u('dicomBackupUsername', e.target.value)}
-                            placeholder="Ex: admin"
-                          />
-                        </div>
-                        <div>
-                          <label className="label">Senha Orthanc Backup</label>
-                          <input
-                            type="password"
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupPassword || ''}
-                            onChange={(e) => u('dicomBackupPassword', e.target.value)}
-                            placeholder="••••••••"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label">AE Title do Servidor Backup</label>
-                          <input
-                            className="input h-12 text-sm font-mono"
-                            value={draft.dicomBackupOrthancAETitle || ''}
-                            onChange={(e) => u('dicomBackupOrthancAETitle', e.target.value.toUpperCase())}
-                            placeholder="Ex: ORTHANC"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label">URL do Agente Local do Backup (Proxy Vercel/Tailscale)</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupLocalAgentUrl || ''}
-                            onChange={(e) => u('dicomBackupLocalAgentUrl', e.target.value)}
-                            placeholder="Ex: https://servidor-notebook.tail861dda.ts.net"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label">Diretório da Worklist do Backup (Caminho Absoluto)</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupWorklistFolder || ''}
-                            onChange={(e) => u('dicomBackupWorklistFolder', e.target.value)}
-                            placeholder="Ex: C:\OrthancServer\db\WorklistsDatabase\"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* TESTE DE REDE */}
-                  <div className="p-5 rounded-2xl bg-ink-900 border border-ink-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-bold text-white">Validar Conexões de Rede</p>
-                      <p className="text-xs text-ink-400">Verifique se os servidores Orthanc (Principal e Backup) estão respondendo.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleTestPacsConnection}
-                      disabled={pacsTestState === 'testing'}
-                      className="py-2.5 px-6 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 text-white font-bold text-xs tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 shrink-0"
-                    >
-                      {pacsTestState === 'testing' ? <Loader2 size={16} className="animate-spin" /> : <Wifi size={16} />}
-                      {pacsTestState === 'testing' ? 'TESTANDO...' : 'TESTAR PACS'}
-                    </button>
-                  </div>
-                  {pacsTestResults && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in -mt-4">
-                      <div className={classNames("p-4 rounded-xl border text-xs", pacsTestResults.primaryOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800")}>
-                        <p className="font-bold mb-1 flex items-center gap-1.5"><span className={classNames("w-2 h-2 rounded-full", pacsTestResults.primaryOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} /> PACS Principal</p>
-                        <p className="mt-1 text-[11px] opacity-80">{pacsTestResults.primaryMsg}</p>
-                      </div>
-                      {draft.dicomBackupViewerUrl && (
-                        <div className={classNames("p-4 rounded-xl border text-xs", pacsTestResults.backupOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800")}>
-                          <p className="font-bold mb-1 flex items-center gap-1.5"><span className={classNames("w-2 h-2 rounded-full", pacsTestResults.backupOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} /> PACS Backup</p>
-                          <p className="mt-1 text-[11px] opacity-80">{pacsTestResults.backupMsg}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-
-
-                  {/* CARD 4: CONFIGURAÇÕES GLOBAIS E MANUAL */}
-                  <div className="p-5 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-ink-50">
-                      <div className="w-9 h-9 rounded-xl bg-ink-100 text-ink-600 flex items-center justify-center">
-                        <Shield size={18} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-ink-900">Configurações Globais DICOM</h4>
-                        <p className="text-xs text-ink-500">AE Title do seu servidor Orthanc.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-5 max-w-sm">
-                      <label className="label">AE Title do Servidor Orthanc</label>
-                      <input
-                        className="input h-12 text-sm font-mono"
-                        value={draft.dicomOrthancAETitle || ''}
-                        onChange={(e) => u('dicomOrthancAETitle', e.target.value.toUpperCase())}
-                        placeholder="Ex: ORTHANC"
-                      />
-                    </div>
-
-                    <div className="bg-ink-900 text-ink-100 rounded-2xl p-5 border border-ink-800 shadow-xl space-y-5">
-                      <div className="flex items-center gap-3 pb-4 border-b border-ink-800/80">
-                        <Info size={20} className="text-brand-400 shrink-0" />
-                        <div>
-                          <h4 className="text-sm font-black text-white uppercase tracking-wider">Manual de Integração com o Equipamento</h4>
-                          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tight mt-0.5 font-sans">Siga as etapas abaixo para configurar seu aparelho de ultrassom ou console.</p>
-                        </div>
-                      </div>
-
-                      {/* Dados de Endereçamento DICOM */}
-                      <div className="space-y-3 font-sans">
-                        <span className="text-[10px] font-black text-ink-450 uppercase tracking-widest block">Parâmetros de Conexão DICOM</span>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono bg-ink-950 p-4 rounded-2xl border border-ink-800/50 text-brand-400">
-                          <div className="space-y-1">
-                            <p><span className="text-ink-500">IP Servidor Principal:</span> <strong className="text-white select-all">{(() => {
-                              try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR'; } catch { return 'IP_DO_SERVIDOR'; }
-                            })()}</strong></p>
-                            {draft.dicomBackupSyncEnabled && (
-                              <p><span className="text-ink-500">IP Servidor Backup:</span> <strong className="text-white select-all">{(() => {
-                                try { return draft.dicomBackupViewerUrl ? new URL(draft.dicomBackupViewerUrl).hostname : 'IP_DO_SERVIDOR_BACKUP'; } catch { return 'IP_DO_SERVIDOR_BACKUP'; }
-                              })()}</strong></p>
-                            )}
-                            <p><span className="text-ink-500">Porta DICOM (Worklist/Store):</span> <strong className="text-white select-all">4242</strong></p>
-                          </div>
-                          <div className="space-y-1">
-                            <p><span className="text-ink-500">AE Title Principal (Orthanc):</span> <strong className="text-white select-all">{draft.dicomOrthancAETitle || 'ORTHANC'}</strong></p>
-                            {draft.dicomBackupSyncEnabled && (
-                              <p><span className="text-ink-500">AE Title Backup (Orthanc):</span> <strong className="text-white select-all">{draft.dicomBackupOrthancAETitle || 'ORTHANC'}</strong></p>
-                            )}
-                            <p><span className="text-ink-500">AE Title Local do Aparelho:</span> <span className="text-ink-400 italic">Livre (ex: US_SALA_01)</span></p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Guia Passo a Passo */}
-                      <div className="space-y-4 font-sans">
-                        <span className="text-[10px] font-black text-ink-450 uppercase tracking-widest block">Guia de Configuração Passo a Passo</span>
-                        
-                        <div className="space-y-3.5 text-xs text-ink-300 leading-relaxed">
-                          <div className="flex gap-3">
-                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">1</span>
-                            <div>
-                              <strong className="text-white block font-bold mb-0.5">Conectividade e Rede Física</strong>
-                              Certifique-se de que o aparelho de ultrassom está conectado à mesma rede local (rede cabeada ou Wi-Fi clínico) em que está hospedado o seu servidor PACS Orthanc local/virtual.
-                            </div>
-                          </div>
-
-                          <div className="flex gap-3">
-                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">2</span>
-                            <div>
-                              <strong className="text-white block font-bold mb-0.5">Configuração do Worklist (MWL - Modality Worklist)</strong>
-                              No painel do equipamento (geralmente em <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">Setup/System Config</code> &gt; <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">DICOM Settings</code> &gt; <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">Worklist</code>), cadastre um novo serviço com o **IP do Servidor**, **Porta 4242** e o **AE Title Principal** acima. Isso habilitará o botão "Worklist" no teclado do aparelho para sincronizar a lista de pacientes em tempo real.
-                            </div>
-                          </div>
-
-                          <div className="flex gap-3">
-                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">3</span>
-                            <div>
-                              <strong className="text-white block font-bold mb-0.5">Configuração do Destino de Imagens (C-STORE / Storage)</strong>
-                              Para que o ultrassom envie as capturas e exames gravados de volta para o visualizador do Laud.us, adicione outro serviço sob a aba <code className="bg-zinc-800 text-zinc-150 px-1 py-0.5 rounded text-[10px]">Storage/C-STORE</code>. Use exatamente os mesmos parâmetros de IP, Porta 4242 e AE Title configurados no Worklist.
-                            </div>
-                          </div>
-
-                          <div className="flex gap-3">
-                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">4</span>
-                            <div>
-                              <strong className="text-white block font-bold mb-0.5">Autorização de AE Title do Equipamento no Servidor</strong>
-                              O servidor PACS Orthanc requer que os aparelhos conectados sejam previamente autorizados. Informe à equipe técnica ou TI da sua clínica o **AE Title**, **IP local** e **Porta local** do aparelho de ultrassom para que possamos registrá-lo nas regras de roteamento e escuta do servidor central.
-                            </div>
-                          </div>
-
-                          <div className="flex gap-3">
-                            <span className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center font-mono font-bold shrink-0">5</span>
-                            <div>
-                              <strong className="text-white block font-bold mb-0.5">Validação do Link DICOM (C-ECHO / Ping)</strong>
-                              No equipamento de imagem, selecione os perfis de Worklist e Storage salvos e acione a opção **Verify** (ou **DICOM Ping/Echo**). A resposta deve ser "Success" ou "Conexão Estabelecida". A partir disso, o aparelho já estará integrado!
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Suporte Técnico */}
-                      <div className="pt-4 border-t border-ink-800/80 text-[11px] text-ink-400 leading-relaxed font-sans">
-                        <p className="font-bold text-amber-400 mb-1 flex items-center gap-1.5">
-                          <span>⚠️</span> Importante para Administradores de TI:
-                        </p>
-                        Se precisar de suporte com a parametrização de rede, configurações de firewall na porta 4242 ou cadastro de AETitles personalizados no arquivo de configuração do Orthanc, acione o canal de suporte técnico do Laud.us diretamente pelo menu inferior.
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: CONTROLE IA */}
-          {activeTab === 'controle-ia' && (
-            <div className="animate-fade-in space-y-5">
-              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                  <BrainCircuit size={16} />
-                </div>
-                <div>
-                  <p className="text-xs font-black text-ink-800">Motor de IA gerenciado pelo Administrador</p>
-                  <p className="text-[11px] text-ink-400 font-medium">Configurações de provedor, chave e modelo são definidas no Painel Admin → LAUD.IA.</p>
-                </div>
-              </div>
-              <FinancialControl />
-            </div>
+          {/* TAB: ASSINATURA */}
+          {activeTab === 'assinatura' && (
+            <SubscriptionCenter />
           )}
 
         </div>

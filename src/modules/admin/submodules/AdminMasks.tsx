@@ -3,7 +3,7 @@ import { useApp } from '../../../store/app';
 import { useCollection } from '../../../hooks/useFirestore';
 import { ReportTemplate, EXAM_AREAS, ExamArea, Clinic } from '../../../types';
 import { genId, addItemWithId, deleteItem, updateItem } from '../../../store/db';
-import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, Download, Upload } from 'lucide-react';
+import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, Download, Upload, Sparkles } from 'lucide-react';
 import { AreaIcon } from '../../../components/AreaIcon';
 import { classNames } from '../../../utils/format';
 
@@ -237,13 +237,25 @@ export function AdminMasks() {
                   </div>
                   <div>
                     <h4 className="font-bold text-ink-900 group-hover:text-brand-700 transition-colors leading-tight">{template.name}</h4>
-                    <p className="text-[9px] text-ink-400 font-black uppercase tracking-widest mt-1">{template.area}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <span className="text-[9px] text-ink-400 font-black uppercase tracking-widest">{template.area}</span>
+                      {template.aiInstructions?.trim() ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-violet-50 text-violet-700 border border-violet-100/50">
+                          <Sparkles size={8} className="fill-violet-400 text-violet-500" />
+                          Prompt IA
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider bg-ink-50 text-ink-400 border border-ink-150">
+                          Cascata Padrão
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   <button
                     title="Duplicar Máscara"
-                    className="p-2 text-ink-400 hover:text-brand-600"
+                    className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                     onClick={async (e) => {
                       e.stopPropagation();
                       const id = genId();
@@ -257,11 +269,11 @@ export function AdminMasks() {
                       showToast('Máscara duplicada com sucesso!', 'success');
                     }}
                   >
-                    <Copy size={16} />
+                    <Copy size={14} />
                   </button>
                   <button
                     title="Excluir Máscara"
-                    className="p-2 text-ink-400 hover:text-red-600"
+                    className="p-1.5 text-ink-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (confirm('Tem certeza de que deseja remover esta máscara definitivamente?')) {
@@ -270,7 +282,7 @@ export function AdminMasks() {
                       }
                     }}
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>

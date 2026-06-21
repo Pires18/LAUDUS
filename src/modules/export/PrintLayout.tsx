@@ -19,6 +19,8 @@ function getFontFamilyFallback(family?: string) {
     case 'Courier New': return '"Courier New", Courier, monospace';
     case 'Inter': return '"Inter", sans-serif';
     case 'Calibri': return 'Calibri, Candara, Segoe, "Segoe UI", sans-serif';
+    case 'Georgia': return 'Georgia, serif';
+    case 'Lora': return '"Lora", Georgia, serif';
     default: return `${family}, sans-serif`;
   }
 }
@@ -59,6 +61,14 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
                     className="clinic-header-html mb-6"
                     dangerouslySetInnerHTML={{ __html: clinic.headerHtml }}
                   />
+                ) : clinic?.headerImageUrl ? (
+                  <div className="clinic-header-image mb-6 w-full">
+                    <img 
+                      src={clinic.headerImageUrl} 
+                      alt="Cabeçalho da Clínica" 
+                      className="w-full h-auto object-contain max-h-[120px]" 
+                    />
+                  </div>
                 ) : (
                   <div className="flex items-center justify-between border-b border-slate-350 pb-5 mb-6">
                     {clinic?.logoUrl && (
@@ -77,23 +87,19 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
                 )
               )}
 
-              {/* Patient Info Bar (Minimalist Clinical Grid - 2 Rows) */}
+              {/* Patient Info Bar (Minimalist Clinical Grid - 3 Rows) */}
               <div className="border-y border-slate-350 py-3.5 mb-6 space-y-3.5 text-xs leading-none">
                 {/* Row 1 */}
                 <div className="grid grid-cols-4 gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 col-span-2">
                     <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">PACIENTE</span>
                     <span className="font-bold text-slate-800 uppercase block truncate">{patient.name}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">IDADE / NASC.</span>
-                    <span className="font-semibold text-slate-700 block uppercase">
-                      {patient.birthDate ? `${calculateAge(patient.birthDate)} (${formatDate(patient.birthDate)})` : '---'}
+                    <span className="font-semibold text-slate-700 block uppercase whitespace-nowrap">
+                      {patient.birthDate ? `${calculateAge(patient.birthDate, examDate)} (${formatDate(patient.birthDate)})` : '---'}
                     </span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CONVÊNIO</span>
-                    <span className="font-semibold text-slate-700 block uppercase truncate">{patient.insurance || 'PARTICULAR'}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">GÊNERO</span>
@@ -105,13 +111,29 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
                 
                 {/* Row 2 */}
                 <div className="grid grid-cols-4 gap-4 pt-3.5 border-t border-slate-100">
-                  <div className="space-y-1 col-span-2">
-                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">MÉDICO SOLICITANTE</span>
-                    <span className="font-semibold text-slate-700 block uppercase truncate">{physicianName || 'NÃO INFORMADO'}</span>
+                  <div className="space-y-1">
+                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CONVÊNIO</span>
+                    <span className="font-semibold text-slate-700 block uppercase truncate">{patient.insurance || 'PARTICULAR'}</span>
                   </div>
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-1">
+                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CARTEIRINHA</span>
+                    <span className="font-semibold text-slate-700 block uppercase truncate">{patient.insuranceNumber || '---'}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CPF</span>
+                    <span className="font-semibold text-slate-700 block uppercase truncate">{patient.cpf || '---'}</span>
+                  </div>
+                  <div className="space-y-1">
                     <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">DATA DO EXAME</span>
                     <span className="font-bold text-slate-800 block uppercase">{formatDate(examDate)}</span>
+                  </div>
+                </div>
+
+                {/* Row 3 */}
+                <div className="grid grid-cols-4 gap-4 pt-3.5 border-t border-slate-100">
+                  <div className="space-y-1 col-span-4">
+                    <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">MÉDICO SOLICITANTE</span>
+                    <span className="font-semibold text-slate-700 block uppercase truncate">{physicianName || 'NÃO INFORMADO'}</span>
                   </div>
                 </div>
               </div>
@@ -160,12 +182,22 @@ export function PrintLayout({ patient, clinic, settings, examType, reportContent
                 )}
               </div>
 
-              {/* Clinic Footer Rich HTML */}
-              {showFooter && clinic?.footerHtml && (
-                <div 
-                  className="mt-12 pt-4 border-t border-slate-200 text-[10px] text-slate-500 text-center clinic-footer-html leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: clinic.footerHtml }}
-                />
+              {/* Clinic Footer Rich HTML or Image */}
+              {showFooter && (
+                clinic?.footerHtml ? (
+                  <div 
+                    className="mt-12 pt-4 border-t border-slate-200 text-[10px] text-slate-500 text-center clinic-footer-html leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: clinic.footerHtml }}
+                  />
+                ) : clinic?.footerImageUrl ? (
+                  <div className="clinic-footer-image mt-12 pt-4 border-t border-slate-200 w-full text-center">
+                    <img 
+                      src={clinic.footerImageUrl} 
+                      alt="Rodapé da Clínica" 
+                      className="w-full h-auto object-contain max-h-[80px] mx-auto" 
+                    />
+                  </div>
+                ) : null
               )}
             </td>
           </tr>

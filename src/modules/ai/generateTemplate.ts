@@ -1,7 +1,6 @@
 import { AppSettings, ExamArea } from '../../types';
 import { logger } from '../../utils/logger';
 import { getRecentFinalizedReports } from '../../store/db';
-import { getAnthropicBaseUrl } from './engine';
 import { robustJsonParse } from './json';
 import { auth } from '../../lib/firebase';
 
@@ -67,9 +66,6 @@ export async function generateTemplateStructure(
   examName: string,
   settings: AppSettings
 ): Promise<GeneratedTemplate> {
-  const provider = settings.aiProvider || 'anthropic';
-  const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
-
   // Busca exemplos de laudos da mesma área para mimetizar o estilo
   // Como é um novo template, buscamos laudos da área em geral
   const examples = await getRecentFinalizedReports(area, 2); 
@@ -139,7 +135,7 @@ ${examples.length > 0 ? `ESTILO DE REFERÊNCIA DO MÉDICO (replique vocabulário
 Gere o JSON da máscara do laudo agora.`;
 
   let text = '';
-  if (provider === 'gemini') {
+  {
     const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.2, settings.geminiApiKey);
     if (!resp.ok) {
       const errText = await resp.text();
@@ -147,38 +143,6 @@ Gere o JSON da máscara do laudo agora.`;
     }
     const result = await resp.json();
     text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  } else {
-    const response = await fetch(`/api/anthropic`, {
-      method: 'POST',
-      headers: {
-        'x-uid': auth.currentUser?.uid || 'anonymous',
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'content-type': 'application/json',
-        'x-api-key': settings.anthropicApiKey || '',
-      },
-      body: JSON.stringify({
-        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-        max_tokens: 8192,
-        system: [
-          {
-            type: 'text',
-            text: systemContext,
-            cache_control: { type: 'ephemeral' }
-          }
-        ],
-        messages: [{ role: 'user', content: userMessage }],
-        temperature: 0.2
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
-    }
-
-    const result = await response.json();
-    text = result.content?.[0]?.text || '';
   }
 
   try {
@@ -209,9 +173,6 @@ export async function generateTemplateField(
   fieldType: 'customForm' | 'anamnesis' | 'consent',
   settings: AppSettings
 ): Promise<string> {
-  const provider = settings.aiProvider || 'anthropic';
-  const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
-
   let systemContext = '';
   let userMessage = '';
 
@@ -226,48 +187,13 @@ export async function generateTemplateField(
     userMessage = `Gere o Termo de Consentimento para o exame de "${examName}" (Área: ${area}).`;
   }
 
-  let text = '';
-  if (provider === 'gemini') {
-    const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.3, settings.geminiApiKey);
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`Erro na API do Gemini (${resp.status}): ${errText}`);
-    }
-    const result = await resp.json();
-    text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  } else {
-    const response = await fetch(`/api/anthropic`, {
-      method: 'POST',
-      headers: {
-        'x-uid': auth.currentUser?.uid || 'anonymous',
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'content-type': 'application/json',
-        'x-api-key': settings.anthropicApiKey || '',
-      },
-      body: JSON.stringify({
-        model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
-        max_tokens: 8192,
-        system: [
-          {
-            type: 'text',
-            text: systemContext,
-            cache_control: { type: 'ephemeral' }
-          }
-        ],
-        messages: [{ role: 'user', content: userMessage }],
-        temperature: 0.3
-      })
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Erro na API da Anthropic (${response.status}): ${errText}`);
-    }
-
-    const result = await response.json();
-    text = result.content?.[0]?.text || '';
+  const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.3, settings.geminiApiKey);
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Erro na API do Gemini (${resp.status}): ${errText}`);
   }
+  const result = await resp.json();
+  let text: string = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
   // Clean markdown code blocks if present
   text = text.replace(/^```[a-zA-Z]*\s*/i, '').replace(/```\s*$/i, '').trim();

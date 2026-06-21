@@ -26,6 +26,7 @@ import { useDicomSync } from './hooks/useDicomSync';
 import { useCopilotSuggestions } from './hooks/useCopilotSuggestions';
 import { getStudyInstanceUID } from '../../utils/dicom';
 
+import { useAdmin } from '../../hooks/useAdmin';
 // Refactored Components
 import { DicomViewerSidebar } from './components/DicomViewerSidebar';
 import { EditorHeader } from './components/EditorHeader';
@@ -82,9 +83,9 @@ interface Props {
 }
 
 export function ExamEditor({ examId }: Props) {
+  const { isAdmin, role: currentRole } = useAdmin();
   const { setView, settings, showToast } = useApp();
   const confirm = useConfirm();
-  const currentRole = settings.currentRole || 'medico';
 
   // Firestore realtime listeners
   const { data: exam } = useDocument<ExamRequest>('exams', examId);
@@ -696,7 +697,7 @@ export function ExamEditor({ examId }: Props) {
               />
 
               {/* ── LAUD.IA Cascade Status Hint ── */}
-              {template && !template.aiInstructions?.trim() && currentRole !== 'recepcao' && (
+              {isAdmin && template && !template.aiInstructions?.trim() && currentRole !== 'recepcao' && (
                 <div className="border-b border-violet-100 bg-violet-50/50 px-4 py-2 shrink-0 flex items-center justify-between gap-3 animate-fade-in">
                   <div className="flex items-center gap-2">
                     <Zap size={12} className="text-violet-400 shrink-0" />
@@ -1061,7 +1062,7 @@ export function ExamEditor({ examId }: Props) {
       )}
 
       {/* Prompt Preview Modal */}
-      {showPromptPreview && template && patient && (
+      {isAdmin && showPromptPreview && template && patient && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowPromptPreview(false)}>
           <div className="absolute inset-0 bg-ink-900/60 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>

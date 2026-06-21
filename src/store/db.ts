@@ -240,7 +240,7 @@ export async function getSettings(): Promise<AppSettings> {
     // Se o preset for modificado localmente, a configuração persistirá sem ser sobrescrita.
     
     // Fallback de segurança para buscar prompts oficiais do administrador
-    const isCurrentUserAdmin = auth.currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const isCurrentUserAdmin = auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
     console.log('[DB] Resolvendo settings. Usuário:', auth.currentUser?.email, 'isAdmin:', isCurrentUserAdmin);
 
     if (!isCurrentUserAdmin) {
@@ -363,7 +363,7 @@ export async function resolveAdminUid(): Promise<string | null> {
     console.warn('[DB] Erro ao buscar UID do admin em global_config:', err);
   }
 
-  const adminEmail = ADMIN_EMAIL || 'matheuskpires@gmail.com';
+  const adminEmail = (ADMIN_EMAIL || 'matheuskpires@gmail.com').trim().toLowerCase();
   console.log('[DB] Buscando UID do admin via query de email na coleção users para:', adminEmail);
   try {
     const q = query(
@@ -417,7 +417,7 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
         cachedAdminUid = globalData.adminUid;
       }
       if (globalData.anthropicModel === 'claude-3-5-sonnet-latest' || globalData.anthropicModel === 'claude-3-7-sonnet-latest' || globalData.anthropicModel === 'claude-3-5-haiku-latest') {
-        globalData.anthropicModel = 'claude-3-5-sonnet-latest';
+        globalData.anthropicModel = 'claude-sonnet-4-6';
       }
       return globalData;
     } else {
@@ -437,7 +437,7 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
           hasAnthropicKey: !!adminData.anthropicApiKey
         });
         if (adminData.anthropicModel === 'claude-3-5-sonnet-latest' || adminData.anthropicModel === 'claude-3-7-sonnet-latest' || adminData.anthropicModel === 'claude-3-5-haiku-latest') {
-          adminData.anthropicModel = 'claude-3-5-sonnet-latest';
+          adminData.anthropicModel = 'claude-sonnet-4-6';
         }
         return adminData;
       } else {
@@ -458,7 +458,7 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   await setDoc(docRef, sanitize(encrypted), { merge: true });
 
   // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
-  const isCurrentUserAdmin = auth.currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isCurrentUserAdmin = auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
   if (isCurrentUserAdmin || settings.currentRole === 'admin') {
     console.log('[DB] Usuário é admin no saveSettings. Sincronizando com global_config/admin_settings...');
     const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
@@ -903,130 +903,6 @@ export function onSupportTicketsChange(userId: string | null, callback: (tickets
 }
 
 /**
- * Valida um código de licença e ativa a assinatura para o usuário logado.
- */
-export async function validateAndActivateLicense(
-  code: string,
-  uid: string,
-  email: string,
-  displayName: string
-): Promise<void> {
-  const normalizedCode = code.trim().toUpperCase();
-  const licenseRef = doc(firestore, 'plans', `LICENSE_${normalizedCode}`);
-  const licenseSnap = await getDoc(licenseRef);
-
-  if (!licenseSnap.exists()) {
-    throw new Error('Código de licença não encontrado ou inválido.');
-  }
-
-  const licenseData = licenseSnap.data();
-  if (!licenseData.active || licenseData.usedByUid) {
-    throw new Error('Esta licença já foi utilizada ou está inativa.');
-  }
-
-  // Busca os dados do plano associado
-  const planRef = doc(firestore, 'plans', licenseData.planId);
-  const planSnap = await getDoc(planRef);
-  const planName = planSnap.exists() ? planSnap.data().name : licenseData.planName || 'Plano Personalizado';
-
-  const durationMonths = licenseData.durationMonths || 12;
-  const now = Date.now();
-  const expiresAt = durationMonths === 9999 ? null : now + durationMonths * 30 * 24 * 60 * 60 * 1000;
-
-  const batch = writeBatch(firestore);
-
-  // 1. Atualiza o status da licença
-  batch.update(licenseRef, {
-    usedByUid: uid,
-    usedByEmail: email,
-    usedAt: now,
-    expiresAt: expiresAt,
-    active: false, // Marca como consumida
-    updatedAt: now
-  });
-
-  // 2. Atualiza ou cria o documento do usuário
-  const userRef = doc(firestore, 'users', uid);
-  const userSnap = await getDoc(userRef);
-
-  const userPayload: Record<string, any> = {
-    name: displayName || userSnap.data()?.name || email.split('@')[0],
-    email: email,
-    role: userSnap.data()?.role || 'medico',
-    active: true,
-    licenseCode: normalizedCode,
-    licensePlanId: licenseData.planId,
-    licensePlanName: planName,
-    licenseExpiresAt: expiresAt,
-    updatedAt: now
-  };
-
-  if (!userSnap.exists()) {
-    userPayload.createdAt = now;
-  }
-
-  batch.set(userRef, userPayload, { merge: true });
-
-  // Commit das escritas atômicas
-  await batch.commit();
-
-  // 3. Grava log de auditoria
-  await addAuditLog({
-    action: 'ATIVAR_LICENCA',
-    details: `Licença ${normalizedCode} ativada para o e-mail ${email}. Plano: ${planName} (${durationMonths} meses).`,
-    module: 'LICENSE_MGR',
-    userId: uid,
-    userName: displayName || email
-  });
-}
-
-/**
- * Helper para verificar o status de expiração da licença do usuário.
- */
-export async function checkUserLicenseStatus(uid: string): Promise<{
-  active: boolean;
-  expired: boolean;
-  licenseExpiresAt?: number;
-  licensePlanName?: string;
-} | null> {
-  try {
-    const userRef = doc(firestore, 'users', uid);
-    const snap = await getDoc(userRef);
-
-    if (!snap.exists()) return null;
-
-    const data = snap.data();
-    if (ADMIN_EMAIL && data.email === ADMIN_EMAIL) {
-      // Super Admin bypass
-      return { active: true, expired: false };
-    }
-
-    if (data.active === false) {
-      return { active: false, expired: false };
-    }
-
-    if (data.licenseExpiresAt && data.licenseExpiresAt < Date.now()) {
-      return {
-        active: false,
-        expired: true,
-        licenseExpiresAt: data.licenseExpiresAt,
-        licensePlanName: data.licensePlanName
-      };
-    }
-
-    return {
-      active: true,
-      expired: false,
-      licenseExpiresAt: data.licenseExpiresAt,
-      licensePlanName: data.licensePlanName
-    };
-  } catch (err) {
-    logger.error('[License] Erro ao validar licença do usuário', err);
-    return null;
-  }
-}
-
-/**
  * Remove permanentemente todo o histórico de chamados de suporte do Firestore.
  */
 export async function clearAllSupportTickets(): Promise<void> {
@@ -1048,12 +924,12 @@ export function getActivePacsUrl(settings: AppSettings, isBackup = false): strin
   if (isBackup) {
     return (isVercel && settings.dicomBackupTailscalePublicUrl) 
       ? settings.dicomBackupTailscalePublicUrl 
-      : (settings.dicomBackupViewerUrl || 'http://100.124.187.11:8043');
+      : (settings.dicomBackupViewerUrl || 'http://localhost:8042');
   }
   
   return (isVercel && settings.dicomTailscalePublicUrl) 
     ? settings.dicomTailscalePublicUrl 
-    : (settings.dicomViewerUrl || 'http://100.93.111.95:8042');
+    : (settings.dicomViewerUrl || 'http://localhost:8042');
 }
 
 

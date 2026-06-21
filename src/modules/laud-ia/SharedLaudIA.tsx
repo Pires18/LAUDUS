@@ -17,7 +17,7 @@ import { classNames } from '../../utils/format';
 import { useConfirm } from '../../hooks/useConfirm';
 import { resolveGeminiModel } from '../ai/engine';
 import { logger } from '../../utils/logger';
-import { generateReport, callMetricsHistory, type CallMetrics, getAnthropicBaseUrl, auditReportQuality } from '../ai/engine';
+import { generateReport, callMetricsHistory, type CallMetrics, auditReportQuality } from '../ai/engine';
 import { EXAM_AREAS, ExamArea, ReportTemplate, Patient } from '../../types';
 import {
   DEFAULT_MASTER_PROMPT,
@@ -29,7 +29,9 @@ import {
   DEFAULT_AREA_PROMPTS,
 } from '../ai/prompts';
 import { useCollection } from '../../hooks/useFirestore';
-import { updateItem } from '../../store/db';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { firestore } from '../../lib/firebase';
+import { updateItem, getAiUsageStats } from '../../store/db';
 
 type TabId = 'prompts' | 'templates' | 'engine' | 'training' | 'status';
 
@@ -339,6 +341,49 @@ function TelemetryDashboard({
         ))}
       </div>
 
+      {/* Motor breakdown */}
+      <div className="px-3 pt-3 pb-2 border-t border-ink-100 bg-ink-50/30">
+        {(() => {
+          const liteModels = ['gemini-3.5-flash', 'gemini-2.5-flash-preview-05-20'];
+          const proModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro-preview-06-05'];
+          const liteCalls = filteredMetrics.filter(m => m.modelName && liteModels.some(lm => m.modelName!.includes(lm.split('-preview')[0].split('-flash')[0])));
+          const proCalls = filteredMetrics.filter(m => m.modelName && proModels.some(pm => m.modelName!.includes(pm.split('-preview')[0].split('-pro')[0]) && m.modelName!.includes('pro')));
+          const liteCount = filteredMetrics.filter(m => m.modelName && (m.modelName.includes('flash') || m.modelName === 'gemini-3.5-flash')).length;
+          const proCount = filteredMetrics.filter(m => m.modelName && (m.modelName.includes('pro'))).length;
+          const total = filteredMetrics.length;
+          const litePct = total > 0 ? Math.round((liteCount / total) * 100) : 0;
+          const proPct = total > 0 ? Math.round((proCount / total) * 100) : 0;
+          return (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[9px] font-black text-ink-500 uppercase tracking-widest">
+                <span>Distribuição por Tier de Motor</span>
+                <span>{total} chamadas</span>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block" /> Lite</span>
+                    <span className="font-black text-indigo-700">{liteCount} ({litePct}%)</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${litePct}%` }} />
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-violet-500 inline-block" /> Pro</span>
+                    <span className="font-black text-violet-700">{proCount} ({proPct}%)</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden">
+                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${proPct}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
       {/* Log das últimas chamadas */}
       <div className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
         {filteredMetrics.slice(0, 15).map((m, i) => {
@@ -404,6 +449,44 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid' | 'refinement' | 'copilot'>('master');
 
+  const [motorConfig, setMotorConfig] = useState<{
+    lite: { model: string; tokensPerReport: number; costPerThousandTokens: number };
+    pro:  { model: string; tokensPerReport: number; costPerThousandTokens: number };
+  }>({
+    lite: { model: 'gemini-3.5-flash',      tokensPerReport: 2000, costPerThousandTokens: 0.075 },
+    pro:  { model: 'gemini-3.1-pro-preview', tokensPerReport: 4000, costPerThousandTokens: 1.25  },
+  });
+  const [loadingMotorConfig, setLoadingMotorConfig] = useState(true);
+
+  useEffect(() => {
+    const fetchMotorConfig = async () => {
+      try {
+        const docRef = doc(firestore, 'global_config', 'motor_config');
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          setMotorConfig({
+            lite: {
+              model: data.lite?.model || 'gemini-3.5-flash',
+              tokensPerReport: data.lite?.tokensPerReport ?? 2000,
+              costPerThousandTokens: data.lite?.costPerThousandTokens ?? 0.075,
+            },
+            pro: {
+              model: data.pro?.model || 'gemini-3.1-pro-preview',
+              tokensPerReport: data.pro?.tokensPerReport ?? 4000,
+              costPerThousandTokens: data.pro?.costPerThousandTokens ?? 1.25,
+            },
+          });
+        }
+      } catch (err) {
+        logger.error('Erro ao buscar motorConfig:', err);
+      } finally {
+        setLoadingMotorConfig(false);
+      }
+    };
+    fetchMotorConfig();
+  }, []);
+
   // ── Versionamento de prompts
   const getPromptVersionKey = (block: string) => `laudia_prompt_versions_${block}`;
   const savePromptVersion = useCallback((block: string, value: string) => {
@@ -426,6 +509,29 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
 
   const [telemetryModeFilter, setTelemetryModeFilter] = useState<string>('all');
   const conversionRate = localSettings.aiConversionRateBRL ?? 5.5;
+
+  // ── Historical AI Usage ──
+  const _nowDate = new Date();
+  const _defaultFrom = new Date(_nowDate.getFullYear(), _nowDate.getMonth(), 1).toISOString().slice(0, 10);
+  const _defaultTo = _nowDate.toISOString().slice(0, 10);
+  const [histFrom, setHistFrom] = useState(_defaultFrom);
+  const [histTo, setHistTo] = useState(_defaultTo);
+  const [historicalLogs, setHistoricalLogs] = useState<any[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+
+  const fetchHistoricalStats = useCallback(async () => {
+    setHistLoading(true);
+    try {
+      const startMs = new Date(histFrom + 'T00:00:00').getTime();
+      const endMs = new Date(histTo + 'T23:59:59').getTime();
+      const logs = await getAiUsageStats(startMs, endMs);
+      setHistoricalLogs(logs);
+    } catch (err) {
+      logger.error('Erro ao buscar histórico IA:', err);
+    } finally {
+      setHistLoading(false);
+    }
+  }, [histFrom, histTo]);
 
   const { data: templates } = useCollection<ReportTemplate>('templates');
   const { data: exams } = useCollection<any>('exams');
@@ -566,9 +672,13 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     setIsSaving(true);
     try {
       await updateSettings(localSettings);
+      
+      const docRef = doc(firestore, 'global_config', 'motor_config');
+      await setDoc(docRef, motorConfig);
+      
       showToast('Configurações da IA salvas com sucesso', 'success');
-    } catch {
-      showToast('Erro ao salvar configurações', 'error');
+    } catch (err: any) {
+      showToast('Erro ao salvar configurações: ' + err.message, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -635,60 +745,21 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   }
 
   async function testConnection() {
-    const provider = localSettings.aiProvider || 'anthropic';
-    const apiKey = (provider === 'anthropic'
-      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey)
-      : (localSettings.geminiApiKey || settings?.geminiApiKey))?.trim();
-
-    if (provider === 'gemini') {
-      if (!apiKey) { showToast('Insira a API Key do Gemini primeiro', 'error'); return; }
-      setTestStatus('testing');
-      try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
-        const result = await model.generateContent('Responda apenas: OK');
-        if (result.response.text()) {
-          setTestStatus('success');
-          showToast('Conexão validada com sucesso com o Gemini!', 'success');
-        }
-      } catch (err: unknown) {
-        setTestStatus('error');
-        showToast('Falha na conexão: ' + (err instanceof Error ? err.message : String(err)), 'error');
+    const apiKey = (localSettings.geminiApiKey || settings?.geminiApiKey)?.trim();
+    if (!apiKey) { showToast('Insira a API Key do Gemini primeiro', 'error'); return; }
+    setTestStatus('testing');
+    try {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const result = await model.generateContent('Responda apenas: OK');
+      if (result.response.text()) {
+        setTestStatus('success');
+        showToast('Conexão com Gemini validada com sucesso!', 'success');
       }
-    } else {
-      if (!apiKey) { showToast('Insira a API Key do Anthropic primeiro', 'error'); return; }
-      setTestStatus('testing');
-      try {
-        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
-            'content-type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-            messages: [{ role: 'user', content: 'Say OK' }],
-            max_tokens: 1
-          })
-        });
-        if (response.status === 401) {
-          setTestStatus('error');
-          showToast('Chave Anthropic Inválida', 'error');
-        } else if (response.status === 200 || response.status === 400) {
-          setTestStatus('success');
-          showToast('Conexão validada com a Anthropic!', 'success');
-        } else {
-          setTestStatus('error');
-          showToast('Erro ao contatar API da Anthropic', 'error');
-        }
-      } catch (err: unknown) {
-        setTestStatus('error');
-        showToast(`Falha na conexão: ${err instanceof Error ? err.message : 'Erro de rede'}`, 'error');
-      }
+    } catch (err: unknown) {
+      setTestStatus('error');
+      showToast('Falha na conexão: ' + (err instanceof Error ? err.message : String(err)), 'error');
     }
   }
 
@@ -835,15 +906,8 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     { id: 'status' as const, label: 'Telemetria', icon: BarChart3, color: 'violet' },
   ];
 
-  const providerName = localSettings.aiProvider === 'anthropic'
-    ? (localSettings.anthropicModel || 'claude-3-5-sonnet-latest')
-        .replace('claude-', 'Claude ').replace('-latest', '').replace('-sonnet', ' Sonnet').replace('-opus', ' Opus')
-    : (localSettings.geminiModel || 'gemini-3.5-flash')
-        .replace('gemini-', 'Gemini ').replace('-preview', '').replace('-flash', ' Flash').replace('-pro', ' Pro');
-
-  const hasApiKey = localSettings.aiProvider === 'anthropic'
-    ? !!localSettings.anthropicApiKey
-    : !!localSettings.geminiApiKey;
+  const providerName = `Google Gemini · Lite: ${motorConfig.lite.model.replace('gemini-', '').replace('-preview', '')} · Pro: ${motorConfig.pro.model.replace('gemini-', '').replace('-preview', '')}`;
+  const hasApiKey = !!localSettings.geminiApiKey;
 
   return (
     <div className="animate-fade-in pb-24" style={{ minHeight: '100vh' }}>
@@ -871,7 +935,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                 )}
               </div>
               <p className="text-xs text-ink-500 mt-0.5 font-medium truncate">
-                {localSettings.aiProvider === 'anthropic' ? '🤖' : '✨'} {providerName}
+                ✨ {providerName}
                 <span className="mx-1.5 text-ink-300">·</span>
                 {templates.length} exames
                 <span className="mx-1.5 text-ink-300">·</span>
@@ -1594,208 +1658,66 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
         {activeTab === 'engine' && (
           <div className="max-w-4xl space-y-5 animate-fade-in">
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-              {/* Left: Provider + API + Model */}
+              {/* Left: API Keys */}
               <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4">
                 <h4 className="text-sm font-black text-ink-900 flex items-center gap-2">
-                  <Key size={15} className="text-brand-600" /> Provedor e API Key
+                  <Key size={15} className="text-brand-600" /> Chaves de API Globais
                 </h4>
+                
                 <div>
-                  <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Provedor de IA</label>
-                  <select
+                  <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Gemini API Key</label>
+                  <input
+                    type="password"
                     disabled={readOnly}
-                    value={localSettings.aiProvider || 'gemini'}
-                    onChange={(e) => setLocalSettings({ ...localSettings, aiProvider: e.target.value as 'gemini' | 'anthropic' })}
-                    className="input h-12"
-                  >
-                    <option value="gemini">Google Gemini (2.5+)</option>
-                    <option value="anthropic">Anthropic Claude (3.5 / 3.7 / 4)</option>
-                  </select>
+                    value={localSettings.geminiApiKey || ''}
+                    onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
+                    placeholder="AIzaSy..."
+                    className="input font-mono text-sm h-12"
+                  />
+                  <p className="text-[10px] text-ink-400 mt-1.5 ml-1">Obtenha em <span className="font-bold text-brand-600">aistudio.google.com/apikey</span></p>
                 </div>
 
-                {(localSettings.aiProvider === 'gemini' || !localSettings.aiProvider) ? (
-                  <>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Gemini API Key</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          disabled={readOnly}
-                          value={localSettings.geminiApiKey || ''}
-                          onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
-                          placeholder="AIzaSy..."
-                          className="input flex-1 font-mono text-sm h-12"
-                        />
-                        <button onClick={testConnection} disabled={readOnly || testStatus === 'testing'}
-                          className={classNames('w-12 h-12 flex items-center justify-center rounded-xl transition-all border',
-                            testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                            testStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
-                            'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
-                          )}
-                        >
-                          {testStatus === 'testing' ? <Loader2 size={18} className="animate-spin" /> :
-                           testStatus === 'success' ? <CheckCircle2 size={18} /> :
-                           testStatus === 'error' ? <AlertCircle size={18} /> : <Zap size={18} />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-ink-400 mt-1.5 ml-1">Obtenha em <span className="font-bold text-brand-600">aistudio.google.com/apikey</span></p>
-                    </div>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Gemini</label>
-                      <select
-                        disabled={readOnly}
-                        value={localSettings.geminiModel || 'gemini-3.5-flash'}
-                        onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
-                        className="input h-12"
+                {!readOnly && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={testConnection}
+                      disabled={testStatus === 'testing'}
+                      className={classNames('flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all border',
+                        testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        testStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                        testStatus === 'testing' ? 'bg-brand-50 text-brand-600 border-brand-200' :
+                        'bg-ink-50 text-ink-700 border-ink-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200'
+                      )}
+                    >
+                      {testStatus === 'testing' ? (<><Loader2 size={12} className="animate-spin" /> Testando...</>) :
+                       testStatus === 'success' ? (<><CheckCircle2 size={12} /> Conexão OK!</>) :
+                       testStatus === 'error' ? (<><AlertCircle size={12} /> Falha</>) :
+                       (<><Zap size={12} /> Testar Conexão</>)}
+                    </button>
+                    {testStatus !== 'idle' && (
+                      <button 
+                        type="button"
+                        onClick={() => setTestStatus('idle')} 
+                        className="text-xs text-ink-400 hover:text-ink-600 font-bold"
                       >
-                        <option value="gemini-3.5-flash">GEMINI 3.5 FLASH (Recomendado)</option>
-                        <option value="gemini-3.1-pro-preview">GEMINI 3.1 PRO</option>
-                        <option value="gemini-2.5-flash-preview-05-20">GEMINI 2.5 FLASH</option>
-                        <option value="gemini-2.5-pro-preview-06-05">GEMINI 2.5 PRO</option>
-                      </select>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        {[
-                          { model: 'gemini-3.5-flash', label: '3.5 FLASH', desc: 'Recomendado' },
-                          { model: 'gemini-3.1-pro-preview', label: '3.1 PRO', desc: 'Mecanismo Avançado' },
-                          { model: 'gemini-2.5-flash-preview-05-20', label: '2.5 FLASH', desc: 'Rápido' },
-                          { model: 'gemini-2.5-pro-preview-06-05', label: '2.5 PRO', desc: 'Raciocínio Clínico' },
-                        ].map(m => (
-                          <button
-                            disabled={readOnly}
-                            key={m.model}
-                            onClick={() => setLocalSettings({ ...localSettings, geminiModel: m.model })}
-                            className={classNames('p-2.5 rounded-xl border text-left transition-all',
-                              (localSettings.geminiModel || 'gemini-3.5-flash') === m.model
-                                ? 'bg-brand-50 border-brand-300 text-brand-800'
-                                : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
-                            )}
-                          >
-                            <span className="text-[10px] font-black uppercase tracking-widest block">{m.label}</span>
-                            <span className="text-[9px] text-ink-500 block">{m.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Anthropic Claude API Key</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          disabled={readOnly}
-                          value={localSettings.anthropicApiKey || ''}
-                          onChange={(e) => setLocalSettings({ ...localSettings, anthropicApiKey: e.target.value })}
-                          placeholder="sk-ant-..."
-                          className="input flex-1 font-mono text-sm h-12"
-                        />
-                        <button onClick={testConnection} disabled={readOnly || testStatus === 'testing'}
-                          className={classNames('w-12 h-12 flex items-center justify-center rounded-xl transition-all border',
-                            testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                            testStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
-                            'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
-                          )}
-                        >
-                          {testStatus === 'testing' ? <Loader2 size={18} className="animate-spin" /> :
-                           testStatus === 'success' ? <CheckCircle2 size={18} /> :
-                           testStatus === 'error' ? <AlertCircle size={18} /> : <Zap size={18} />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-ink-400 mt-1.5 ml-1">Obtenha em <span className="font-bold text-brand-600">console.anthropic.com</span></p>
-                    </div>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Claude</label>
-                      <select
-                        disabled={readOnly}
-                        value={localSettings.anthropicModel || 'claude-sonnet-4-6'}
-                        onChange={(e) => setLocalSettings({ ...localSettings, anthropicModel: e.target.value })}
-                        className="input h-12"
-                      >
-                        <option value="claude-sonnet-4-6">Claude Sonnet (4.6/3.5) — Recomendado</option>
-                        <option value="claude-opus-4-5">Claude Opus (4.5) — Ultra Inteligência</option>
-                      </select>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        {[
-                          { model: 'claude-sonnet-4-6', label: 'Sonnet', desc: 'Recomendado' },
-                          { model: 'claude-opus-4-5', label: 'Opus', desc: 'Ultra Inteligência' },
-                        ].map(m => (
-                          <button
-                            disabled={readOnly}
-                            key={m.model}
-                            onClick={() => setLocalSettings({ ...localSettings, anthropicModel: m.model })}
-                            className={classNames('p-2.5 rounded-xl border text-left transition-all',
-                              (localSettings.anthropicModel || 'claude-sonnet-4-6') === m.model
-                                ? 'bg-brand-50 border-brand-300 text-brand-800'
-                                : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
-                            )}
-                          >
-                            <span className="text-[10px] font-black uppercase tracking-widest block">{m.label}</span>
-                            <span className="text-[9px] text-ink-500 block">{m.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
+                        Resetar
+                      </button>
+                    )}
+                  </div>
                 )}
+
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">
+                  <span className="font-black">Motor Único: Google Gemini</span><br/>
+                  <span className="text-[10px] text-blue-600">Lite = gemini-3.5-flash · Pro = gemini-3.1-pro-preview</span>
+                </div>
               </div>
 
-              {/* Right: Temperature */}
+              {/* Right: Auto Refine and Fast Mode */}
               <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4">
                 <h4 className="text-sm font-black text-ink-900 flex items-center gap-2">
-                  <SlidersHorizontal size={15} className="text-brand-600" /> Temperatura por Modo
+                  <SlidersHorizontal size={15} className="text-brand-600" /> Parâmetros Adicionais
                 </h4>
-                <div className="space-y-3">
-                  {([
-                    { key: 'generation' as const, label: 'Geração', desc: 'Criatividade narrativa do primeiro laudo', default: 0.35, color: 'brand', presets: [{ v: 0.2, l: 'Literal' }, { v: 0.35, l: 'Padrão' }, { v: 0.5, l: 'Criativo' }] },
-                    { key: 'refine' as const, label: 'Refinamento', desc: 'Manter baixo para maior fidelidade', default: 0.10, color: 'amber', presets: [{ v: 0.05, l: 'Cirúrgico' }, { v: 0.10, l: 'Padrão' }, { v: 0.20, l: 'Flexível' }] },
-                    { key: 'copilot' as const, label: 'Copiloto', desc: 'Balanceia criatividade e precisão', default: 0.20, color: 'violet', presets: [{ v: 0.10, l: 'Preciso' }, { v: 0.20, l: 'Padrão' }, { v: 0.35, l: 'Criativo' }] },
-                    { key: 'template' as const, label: 'Templates', desc: 'Consistente e estruturado', default: 0.20, color: 'teal', presets: [{ v: 0.10, l: 'Estruturado' }, { v: 0.20, l: 'Padrão' }, { v: 0.35, l: 'Flexível' }] },
-                  ]).map(mode => {
-                    const byMode = localSettings.aiTemperatureByMode || {};
-                    const currentVal = byMode[mode.key] ?? mode.default;
-                    return (
-                      <div key={mode.key} className="p-3 bg-ink-50/50 border border-ink-100 rounded-xl">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <span className="text-xs font-black text-ink-900">{mode.label}</span>
-                            <p className="text-[9px] text-ink-400">{mode.desc}</p>
-                          </div>
-                          <div className={`text-xl font-black text-${mode.color}-600`}>{currentVal.toFixed(2)}</div>
-                        </div>
-                        <input
-                          type="range" min="0" max="1" step="0.05"
-                          disabled={readOnly}
-                          value={currentVal}
-                          onChange={e => setLocalSettings(prev => ({
-                            ...prev,
-                            aiTemperatureByMode: { ...(prev.aiTemperatureByMode || {}), [mode.key]: parseFloat(e.target.value) },
-                          }))}
-                          className={`w-full h-2 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-${mode.color}-600`}
-                        />
-                        <div className="flex gap-1.5 mt-2">
-                          {mode.presets.map(preset => (
-                            <button
-                              disabled={readOnly}
-                              key={preset.v}
-                              onClick={() => setLocalSettings(prev => ({
-                                ...prev,
-                                aiTemperatureByMode: { ...(prev.aiTemperatureByMode || {}), [mode.key]: preset.v },
-                              }))}
-                              className={classNames(
-                                'flex-1 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border',
-                                currentVal === preset.v
-                                  ? `bg-${mode.color}-50 border-${mode.color}-300 text-${mode.color}-700`
-                                  : 'bg-white border-ink-100 text-ink-500 hover:border-ink-300'
-                              )}
-                            >
-                              {preset.l}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
 
                 {/* Auto Refine */}
                 <div className="p-3 bg-ink-50/50 border border-ink-100 rounded-xl flex items-center justify-between gap-3">
@@ -1834,6 +1756,73 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     )} />
                   </button>
                 </div>
+              </div>
+
+              {/* Tiers de Motores */}
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-6 col-span-1 xl:col-span-2">
+                <h4 className="text-sm font-black text-ink-900 flex items-center gap-2">
+                  <Cpu size={15} className="text-brand-600" /> Tiers de Motores de IA (Lite e Pro)
+                </h4>
+                {loadingMotorConfig ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 size={18} className="animate-spin text-brand-500" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(['lite', 'pro'] as const).map((tier) => {
+                      const cfg = motorConfig[tier];
+                      const isLite = tier === 'lite';
+                      return (
+                        <div key={tier} className={`p-4 rounded-xl border space-y-4 ${isLite ? 'border-indigo-200 bg-indigo-50/20' : 'border-brand-200 bg-brand-50/20'}`}>
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-xs font-black text-ink-900 uppercase tracking-wider flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${isLite ? 'bg-indigo-500' : 'bg-brand-500'}`} />
+                              Motor {isLite ? 'Lite' : 'Pro'} · Google Gemini
+                            </h5>
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-lg bg-white border border-ink-100 text-ink-500">
+                              {cfg.model}
+                            </span>
+                          </div>
+                          <div>
+                            <label className="label text-[10px] uppercase font-bold text-ink-500">Modelo Gemini</label>
+                            <select
+                              disabled={readOnly}
+                              value={cfg.model}
+                              onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, model: e.target.value } })}
+                              className="input h-10 text-xs"
+                            >
+                              <option value="gemini-3.5-flash">gemini-3.5-flash (rápido, econômico)</option>
+                              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (alta qualidade)</option>
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="label text-[10px] uppercase font-bold text-ink-500">Tokens/Laudo (est.)</label>
+                              <input
+                                type="number"
+                                disabled={readOnly}
+                                value={cfg.tokensPerReport}
+                                onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, tokensPerReport: parseInt(e.target.value, 10) || 0 } })}
+                                className="input h-10 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="label text-[10px] uppercase font-bold text-ink-500">Custo/1k Tok (USD)</label>
+                              <input
+                                type="number"
+                                step="0.001"
+                                disabled={readOnly}
+                                value={cfg.costPerThousandTokens}
+                                onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, costPerThousandTokens: parseFloat(e.target.value) || 0 } })}
+                                className="input h-10 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1960,6 +1949,129 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
               </div>
             </div>
 
+            {/* ── Histórico do Sistema ── */}
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+              <h4 className="text-sm font-black text-ink-900 flex items-center gap-2 mb-4">
+                <Database size={15} className="text-violet-600" /> Histórico do Sistema
+              </h4>
+              <div className="flex items-center gap-3 flex-wrap mb-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-black uppercase text-ink-500 tracking-widest">De</label>
+                  <input
+                    type="date"
+                    value={histFrom}
+                    onChange={e => setHistFrom(e.target.value)}
+                    className="h-8 px-3 border border-ink-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-brand-400 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-black uppercase text-ink-500 tracking-widest">Até</label>
+                  <input
+                    type="date"
+                    value={histTo}
+                    onChange={e => setHistTo(e.target.value)}
+                    className="h-8 px-3 border border-ink-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-brand-400 outline-none"
+                  />
+                </div>
+                <button
+                  onClick={fetchHistoricalStats}
+                  disabled={histLoading}
+                  className="flex items-center gap-1.5 h-8 px-4 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all"
+                >
+                  {histLoading ? <Loader2 size={11} className="animate-spin" /> : null}
+                  Buscar
+                </button>
+              </div>
+
+              {historicalLogs.length > 0 && (() => {
+                const htotalCalls = historicalLogs.length;
+                const htotalIn = historicalLogs.reduce((s, l) => s + (l.inputTokens || 0), 0);
+                const htotalOut = historicalLogs.reduce((s, l) => s + (l.outputTokens || 0), 0);
+                const htotalUsd = historicalLogs.reduce((s, l) => s + (l.costUsd || 0), 0);
+                const htotalBrl = htotalUsd * conversionRate;
+
+                // Group by model
+                const byModel: Record<string, { calls: number; tokIn: number; tokOut: number; usd: number }> = {};
+                historicalLogs.forEach(l => {
+                  const m = l.model || 'unknown';
+                  if (!byModel[m]) byModel[m] = { calls: 0, tokIn: 0, tokOut: 0, usd: 0 };
+                  byModel[m].calls++;
+                  byModel[m].tokIn += l.inputTokens || 0;
+                  byModel[m].tokOut += l.outputTokens || 0;
+                  byModel[m].usd += l.costUsd || 0;
+                });
+
+                const liteLogs = historicalLogs.filter(l => (l.model || '').toLowerCase().includes('flash'));
+                const proLogs = historicalLogs.filter(l => (l.model || '').toLowerCase().includes('pro'));
+
+                return (
+                  <div className="space-y-4">
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { label: 'Chamadas', v: htotalCalls.toLocaleString('pt-BR') },
+                        { label: 'Tokens IN', v: htotalIn.toLocaleString('pt-BR') },
+                        { label: 'Tokens OUT', v: htotalOut.toLocaleString('pt-BR') },
+                        { label: 'Custo USD', v: `$${htotalUsd.toFixed(4)}` },
+                        { label: 'Custo BRL', v: `R$ ${htotalBrl.toFixed(2)}` },
+                      ].map(c => (
+                        <div key={c.label} className="bg-ink-50 rounded-xl p-3 text-center">
+                          <div className="text-[9px] font-black uppercase text-ink-500 tracking-widest mb-0.5">{c.label}</div>
+                          <div className="text-sm font-black text-ink-900">{c.v}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Per model table */}
+                    <div className="overflow-x-auto rounded-xl border border-ink-100">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-ink-50/50 border-b border-ink-100 text-[9px] font-black uppercase text-ink-500 tracking-wider">
+                            <th className="px-4 py-2.5">Modelo</th>
+                            <th className="px-4 py-2.5 text-right">Chamadas</th>
+                            <th className="px-4 py-2.5 text-right">Tokens IN</th>
+                            <th className="px-4 py-2.5 text-right">Tokens OUT</th>
+                            <th className="px-4 py-2.5 text-right">USD</th>
+                            <th className="px-4 py-2.5 text-right">BRL</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink-50">
+                          {Object.entries(byModel).map(([model, d]) => (
+                            <tr key={model} className="hover:bg-ink-50/30">
+                              <td className="px-4 py-2.5 font-mono text-[10px] text-zinc-700">{model}</td>
+                              <td className="px-4 py-2.5 text-right font-bold">{d.calls}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-ink-600">{d.tokIn.toLocaleString('pt-BR')}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-ink-600">{d.tokOut.toLocaleString('pt-BR')}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">${d.usd.toFixed(4)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-emerald-700">R$ {(d.usd * conversionRate).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Lite vs Pro breakdown */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-indigo-50/50 border border-indigo-200/50">
+                        <div className="text-[9px] font-black uppercase text-indigo-700 tracking-widest mb-1">Lite (Flash)</div>
+                        <div className="text-xs font-bold text-ink-900">{liteLogs.length} chamadas</div>
+                        <div className="text-[10px] text-ink-500">R$ {(liteLogs.reduce((s, l) => s + (l.costUsd || 0), 0) * conversionRate).toFixed(2)}</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-violet-50/50 border border-violet-200/50">
+                        <div className="text-[9px] font-black uppercase text-violet-700 tracking-widest mb-1">Pro</div>
+                        <div className="text-xs font-bold text-ink-900">{proLogs.length} chamadas</div>
+                        <div className="text-[10px] text-ink-500">R$ {(proLogs.reduce((s, l) => s + (l.costUsd || 0), 0) * conversionRate).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!histLoading && historicalLogs.length === 0 && (
+                <p className="text-xs text-ink-400 text-center py-4">Nenhum dado encontrado. Clique em "Buscar" para carregar o histórico.</p>
+              )}
+            </div>
+
             <TelemetryDashboard modeFilter={telemetryModeFilter} conversionRate={conversionRate} />
 
             {/* Connection Status */}
@@ -1968,45 +2080,46 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                 <Activity size={15} className="text-brand-600" /> Status da IA
               </h4>
               <div className="space-y-2.5 mb-5">
-                {[
-                  { name: 'Google Gemini', provider: 'gemini', icon: Cpu, hasKey: !!localSettings.geminiApiKey, model: localSettings.geminiModel || 'gemini-3.5-flash', isActive: (localSettings.aiProvider || 'anthropic') === 'gemini' },
-                  { name: 'Anthropic Claude', provider: 'anthropic', icon: BrainCircuit, hasKey: !!localSettings.anthropicApiKey, model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest', isActive: localSettings.aiProvider === 'anthropic' },
-                ].map((prov) => (
-                  <div
-                    key={prov.provider}
-                    className={classNames('p-4 rounded-xl border flex items-center justify-between',
-                      prov.isActive ? 'bg-brand-50/50 border-brand-200/50' : 'bg-ink-50/30 border-ink-100'
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center',
-                        prov.isActive ? 'bg-brand-100 text-brand-600' : 'bg-ink-100 text-ink-400'
-                      )}>
-                        <prov.icon size={18} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-sm text-ink-900">{prov.name}</span>
-                          {prov.isActive && <span className="px-1.5 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full">Ativo</span>}
-                        </div>
-                        <span className="text-[10px] text-ink-500 font-mono">{prov.model}</span>
-                      </div>
+                {/* Main provider status */}
+                <div className="p-4 rounded-xl border bg-brand-50/50 border-brand-200/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <Cpu size={18} />
                     </div>
                     <div>
-                      {prov.hasKey ? (
-                        <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
-                          <Wifi size={11} className="text-emerald-600" />
-                          <span className="text-[9px] font-black text-emerald-700 uppercase">OK</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
-                          <WifiOff size={11} className="text-red-500" />
-                          <span className="text-[9px] font-black text-red-600 uppercase">Sem Key</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-ink-900">Google Gemini</span>
+                        <span className="px-1.5 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full">Motor Único</span>
+                      </div>
+                      <span className="text-[10px] text-ink-500">Lite: {motorConfig.lite.model} · Pro: {motorConfig.pro.model}</span>
                     </div>
                   </div>
-                ))}
+                  {localSettings.geminiApiKey ? (
+                    <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <Wifi size={11} className="text-emerald-600" />
+                      <span className="text-[9px] font-black text-emerald-700 uppercase">OK</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
+                      <WifiOff size={11} className="text-red-500" />
+                      <span className="text-[9px] font-black text-red-600 uppercase">Sem Key</span>
+                    </div>
+                  )}
+                </div>
+                {/* Motor tiers */}
+                <div className="grid grid-cols-2 gap-2">
+                  {(['lite', 'pro'] as const).map((tier) => (
+                    <div key={tier} className={`p-3 rounded-xl border flex items-center gap-2.5 ${tier === 'lite' ? 'bg-indigo-50/50 border-indigo-200/50' : 'bg-violet-50/50 border-violet-200/50'}`}>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${tier === 'lite' ? 'bg-indigo-500' : 'bg-violet-500'}`} />
+                      <div className="min-w-0">
+                        <div className={`text-[10px] font-black uppercase tracking-widest ${tier === 'lite' ? 'text-indigo-700' : 'text-violet-700'}`}>
+                          Motor {tier === 'lite' ? 'Lite' : 'Pro'}
+                        </div>
+                        <div className="text-[9px] font-mono text-ink-500 truncate">{motorConfig[tier].model}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {!readOnly && (
@@ -2040,9 +2153,11 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
               <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-4">Resumo de Configuração</h5>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Motor', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
-                  { label: 'Modelo', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-3-5-sonnet-latest'), icon: BrainCircuit },
+                  { label: 'Provedor', value: 'Google Gemini', icon: Cpu },
+                  { label: 'Motor Lite', value: motorConfig.lite.model, icon: BrainCircuit },
+                  { label: 'Motor Pro', value: motorConfig.pro.model, icon: Sparkles },
                   { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
+                  { label: 'API Key', value: localSettings.geminiApiKey ? 'Configurada' : 'Não configurada', icon: Key },
                   { label: 'Laud.IA Core', value: 'v2.0 PROD', icon: ShieldCheck },
                 ].map(item => (
                   <div key={item.label} className="p-3 bg-ink-50 rounded-xl border border-ink-100">
@@ -2050,7 +2165,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                       <item.icon size={12} className="text-ink-400" />
                       <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">{item.label}</span>
                     </div>
-                    <span className="text-xs font-bold text-ink-800 leading-tight">{item.value}</span>
+                    <span className="text-xs font-bold text-ink-800 leading-tight truncate block">{item.value}</span>
                   </div>
                 ))}
               </div>

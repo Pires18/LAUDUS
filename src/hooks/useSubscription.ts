@@ -13,7 +13,10 @@ export interface SubscriptionState {
   isCanceled: boolean;
   hasCalculators: boolean;
   hasPacs: boolean;
+  hasAppointments: boolean;
+  hasClinics: boolean;
   motorProEnabled: boolean;
+  motorOptions: ('lite' | 'pro')[];
   reportsUsed: number;
   reportsQuota: number;
   reportsRemaining: number;
@@ -31,7 +34,10 @@ const DEFAULT_STATE: SubscriptionState = {
   isCanceled: false,
   hasCalculators: false,
   hasPacs: false,
+  hasAppointments: false,
+  hasClinics: false,
   motorProEnabled: false,
+  motorOptions: ['lite'],
   reportsUsed: 0,
   reportsQuota: 100,
   reportsRemaining: 100,
@@ -45,6 +51,11 @@ function deriveState(
   motorProEnabled: boolean,
   isAdmin: boolean
 ): Omit<SubscriptionState, 'loading' | 'subscription'> {
+  const now = Date.now();
+  const isTrialing = sub ? (sub.status === 'trialing' && !!sub.trialEndsAt && sub.trialEndsAt > now) : false;
+  const proEnabled = motorProEnabled || isTrialing;
+  const motorOptions: ('lite' | 'pro')[] = (isAdmin || proEnabled) ? ['lite', 'pro'] : ['lite'];
+
   if (isAdmin) {
     return {
       isActive: true,
@@ -53,7 +64,10 @@ function deriveState(
       isCanceled: false,
       hasCalculators: true,
       hasPacs: true,
+      hasAppointments: true,
+      hasClinics: true,
       motorProEnabled: true,
+      motorOptions,
       reportsUsed: 0,
       reportsQuota: 9999,
       reportsRemaining: 9999,
@@ -71,7 +85,10 @@ function deriveState(
       isCanceled: false,
       hasCalculators: false,
       hasPacs: false,
-      motorProEnabled: false,
+      hasAppointments: false,
+      hasClinics: false,
+      motorProEnabled: proEnabled,
+      motorOptions,
       reportsUsed: 0,
       reportsQuota: 100,
       reportsRemaining: 0,
@@ -81,8 +98,6 @@ function deriveState(
     };
   }
 
-  const now = Date.now();
-  const isTrialing = sub.status === 'trialing' && !!sub.trialEndsAt && sub.trialEndsAt > now;
   const isActive = sub.status === 'active' || isTrialing;
   const isPastDue = sub.status === 'past_due';
   const isCanceled = sub.status === 'canceled' || sub.status === 'paused';
@@ -90,6 +105,8 @@ function deriveState(
   const addons: SubscriptionAddon[] = sub.addons || [];
   const hasCalculators = addons.includes('calculators');
   const hasPacs = addons.includes('pacs');
+  const hasAppointments = addons.includes('appointments');
+  const hasClinics = addons.includes('clinics');
 
   const reportsUsed = sub.reportsUsedThisMonth ?? 0;
   const reportsQuota = sub.reportsQuota ?? 100;
@@ -107,7 +124,10 @@ function deriveState(
     isCanceled,
     hasCalculators,
     hasPacs,
-    motorProEnabled,
+    hasAppointments,
+    hasClinics,
+    motorProEnabled: proEnabled,
+    motorOptions,
     reportsUsed,
     reportsQuota,
     reportsRemaining,
@@ -181,6 +201,8 @@ export function useSubscription(): SubscriptionState {
               reportsUsedThisMonth: userData.reportsUsedThisMonth ?? 0,
               reportsQuota: 100,
               clinicsQuota: 5,
+              tokenQuotaLite: 0,
+              tokenQuotaPro: 0,
               lastResetAt: createdAt,
               createdAt,
               updatedAt: createdAt,
@@ -205,6 +227,17 @@ export function useSubscription(): SubscriptionState {
           return;
         }
         const sub = { id: subSnap.id, ...subSnap.data() } as Subscription;
+
+        // Reset check
+        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+        if (sub.lastResetAt && Date.now() > sub.lastResetAt + thirtyDays) {
+          fetch('/api/reset-monthly-reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: uid, subscriptionId: sub.id }),
+          }).catch((err) => console.error('Erro ao resetar laudos mensais:', err));
+        }
+
         setState({
           loading: false,
           subscription: sub,

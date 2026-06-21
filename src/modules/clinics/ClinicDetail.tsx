@@ -242,6 +242,31 @@ export function ClinicDetail({ clinicId }: Props) {
               </div>
             </div>
 
+            {/* Visual Banners */}
+            {(clinic.headerImageUrl || clinic.footerImageUrl) && (
+              <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 space-y-4">
+                <h3 className="text-xs font-black text-ink-900 uppercase tracking-widest">Banners de Impressão (PDF)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {clinic.headerImageUrl && (
+                    <div className="p-3 bg-ink-50 rounded-xl border border-ink-150 flex flex-col gap-2">
+                      <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Cabeçalho</span>
+                      <div className="h-16 w-full bg-white rounded-lg border border-ink-200 flex items-center justify-center overflow-hidden">
+                        <img src={clinic.headerImageUrl} alt="Cabeçalho" className="max-h-full max-w-full object-contain" />
+                      </div>
+                    </div>
+                  )}
+                  {clinic.footerImageUrl && (
+                    <div className="p-3 bg-ink-50 rounded-xl border border-ink-150 flex flex-col gap-2">
+                      <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Rodapé</span>
+                      <div className="h-16 w-full bg-white rounded-lg border border-ink-200 flex items-center justify-center overflow-hidden">
+                        <img src={clinic.footerImageUrl} alt="Rodapé" className="max-h-full max-w-full object-contain" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Address & Info */}
             <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 space-y-4">
               <h3 className="text-xs font-black text-ink-900 uppercase tracking-widest">Localização da Unidade</h3>

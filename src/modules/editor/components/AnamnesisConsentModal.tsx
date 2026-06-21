@@ -6,6 +6,7 @@ import { ShieldCheck, Printer, RotateCcw, Check, UserCog, Loader2, Users } from 
 import { useCollection } from '../../../hooks/useFirestore';
 import { useApp } from '../../../store/app';
 import { useConfirm } from '../../../hooks/useConfirm';
+import { useAdmin } from '../../../hooks/useAdmin';
 import { getInitialReportContent } from '../../templates/utils';
 import { PatientForm } from '../../patients/PatientForm';
 
@@ -28,7 +29,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const confirm = useConfirm();
   const { data: clinics } = useCollection<Clinic>('clinics');
   const { data: allTemplates } = useCollection<ReportTemplate>('templates');
-  const currentRole = settings?.currentRole || 'medico';
+  const { role: currentRole } = useAdmin();
   const isEditable = exam.status !== 'finalizado' && currentRole !== 'recepcao';
 
   // Local state for fields

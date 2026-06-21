@@ -1,5 +1,6 @@
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
+import { useAdmin } from '../../hooks/useAdmin';
 import { PageHeader } from '../../components/PageHeader';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ReportTemplate, EXAM_AREAS, Clinic, ExamArea } from '../../types';
@@ -7,7 +8,7 @@ import { addItemWithId, deleteItem, genId, countWhere, updateItem } from '../../
 import { useState } from 'react';
 import { 
   Plus, Search, FileSignature, Trash2, Copy,
-  RotateCcw, LayoutGrid, X
+  RotateCcw, LayoutGrid, X, ShieldAlert
 } from 'lucide-react';
 
 import { AreaIcon } from '../../components/AreaIcon';
@@ -17,6 +18,7 @@ import { classNames } from '../../utils/format';
 
 
 export function Templates() {
+  const { isAdmin } = useAdmin();
   const { 
     setView, 
     showToast, 
@@ -111,13 +113,19 @@ export function Templates() {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleCreateNew}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
-              >
-                <Plus size={11} />
-                Nova Máscara
-              </button>
+              {isAdmin ? (
+                <button
+                  onClick={handleCreateNew}
+                  className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                >
+                  <Plus size={11} />
+                  Nova Máscara
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider bg-ink-50 text-ink-500 border border-ink-200/50">
+                  Apenas Leitura
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -183,6 +191,20 @@ export function Templates() {
           )}
         </div>
 
+        {!isAdmin && (
+          <div className="bg-amber-50/40 border border-amber-200/60 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+            <div className="p-2 rounded-xl bg-amber-100/80 text-amber-700 shrink-0">
+              <ShieldAlert size={16} />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-amber-900 leading-none">Modelos de Laudo do Sistema</h4>
+              <p className="text-[11px] text-amber-700 font-medium mt-1.5 leading-relaxed">
+                Você está visualizando as máscaras e modelos de laudo disponibilizados pela administração. Modificações ou novos modelos de exames devem ser requisitados aos administradores da clínica.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ─── TEMPLATES GRID ─── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {loading ? (
@@ -193,15 +215,17 @@ export function Templates() {
                 <FileSignature size={20} className="text-ink-300" />
               </div>
               <p className="text-sm font-bold text-ink-400">Nenhuma máscara encontrada.</p>
-              <button onClick={handleCreateNew} className="text-brand-600 font-black text-[10px] uppercase tracking-widest mt-4 hover:underline">
-                + Criar Modelo Base
-              </button>
+              {isAdmin && (
+                <button onClick={handleCreateNew} className="text-brand-600 font-black text-[10px] uppercase tracking-widest mt-4 hover:underline">
+                  + Criar Modelo Base
+                </button>
+              )}
             </div>
           ) : (
             sorted.map((template: any) => {
               const area = EXAM_AREAS.find(a => a.id === template.area);
               async function handleTemplateClick() {
-                if (template.isSystem) {
+                if (template.isSystem && isAdmin) {
                   showToast('Duplicando máscara oficial para sua biblioteca...', 'info');
                   const id = genId();
                   const { id: _, createdAt, updatedAt, isSystem, ...rest } = template;
@@ -234,24 +258,26 @@ export function Templates() {
                     <div className={classNames("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border shadow-inner", area?.color || "bg-ink-100 text-ink-400")}>
                       <AreaIcon area={template.area} size={16} />
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <button
-                        onClick={(e) => handleDuplicate(template, e)}
-                        className="p-1.5 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
-                        title="Duplicar"
-                      >
-                        <Copy size={14} />
-                      </button>
-                      {!template.isSystem && (
+                    {isAdmin && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         <button
-                          onClick={(e) => handleRequestDelete(template.id, template.name, e)}
-                          className="p-1.5 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="Excluir"
+                          onClick={(e) => handleDuplicate(template, e)}
+                          className="p-1.5 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                          title="Duplicar"
                         >
-                          <Trash2 size={14} />
+                          <Copy size={14} />
                         </button>
-                      )}
-                    </div>
+                        {!template.isSystem && (
+                          <button
+                            onClick={(e) => handleRequestDelete(template.id, template.name, e)}
+                            className="p-1.5 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <h4 className="font-black text-ink-900 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand-700 transition-colors text-sm">
@@ -279,24 +305,34 @@ export function Templates() {
 
                     {!template.isSystem && (
                       <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
-                        <select
-                          value={template.clinicId || ''}
-                          onChange={async (e) => {
-                            const newClinicId = e.target.value || null;
-                            try {
-                              await updateItem('templates', template.id, { clinicId: newClinicId });
-                              showToast(newClinicId ? 'Máscara vinculada à clínica!' : 'Máscara disponível em todas as clínicas!', 'success');
-                            } catch {
-                              showToast('Erro ao atualizar vínculo da clínica', 'error');
-                            }
-                          }}
-                          className="px-2 py-1 bg-ink-50 border border-ink-200 text-[10px] font-black text-ink-500 rounded-lg outline-none focus:border-brand-500 cursor-pointer"
-                        >
-                          <option value="">🌐 Global</option>
-                          {clinics.map((c) => (
-                            <option key={c.id} value={c.id}>🏢 {c.name}</option>
-                          ))}
-                        </select>
+                        {isAdmin ? (
+                          <select
+                            value={template.clinicId || ''}
+                            onChange={async (e) => {
+                              const newClinicId = e.target.value || null;
+                              try {
+                                await updateItem('templates', template.id, { clinicId: newClinicId });
+                                showToast(newClinicId ? 'Máscara vinculada à clínica!' : 'Máscara disponível em todas as clínicas!', 'success');
+                              } catch {
+                                showToast('Erro ao atualizar vínculo da clínica', 'error');
+                              }
+                            }}
+                            className="px-2 py-1 bg-ink-50 border border-ink-200 text-[10px] font-black text-ink-500 rounded-lg outline-none focus:border-brand-500 cursor-pointer"
+                          >
+                            <option value="">🌐 Global</option>
+                            {clinics.map((c) => (
+                              <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                            ))}
+                          </select>
+                        ) : template.clinicId ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/50">
+                            🏢 {clinics.find(c => c.id === template.clinicId)?.name || 'Clínica'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100/50">
+                            🌐 Global
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

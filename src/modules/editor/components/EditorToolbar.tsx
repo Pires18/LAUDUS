@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock, Copy, Calculator, ChevronDown, Brain, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, Eye, CheckCircle2, Cloud, RotateCcw, History, BookOpen, Clock, Copy, Calculator, ChevronDown, Brain, AlertCircle, Zap, Lock } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { useApp } from '../../../store/app';
+import { useSubscription } from '../../../hooks/useSubscription';
+import { useAdmin } from '../../../hooks/useAdmin';
 
 // Quick calculator shortcuts by exam area
 const AREA_CALC_SHORTCUTS: Record<string, Array<{ label: string; calcId: string }>> = {
@@ -95,6 +98,20 @@ export function EditorToolbar({
   const refineLabel = isTemplateMask ? 'Gerar com Laud.IA' : 'Refinar';
   const [showCalcMenu, setShowCalcMenu] = useState(false);
 
+  const { isAdmin } = useAdmin();
+  const { settings, updateSettings, setView } = useApp();
+  const { reportsUsed, reportsQuota, motorProEnabled } = useSubscription();
+
+  const usagePercentage = reportsQuota > 0 ? (reportsUsed / reportsQuota) * 100 : 0;
+  let usageBadgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (usagePercentage >= 90) {
+    usageBadgeColor = "bg-rose-50 text-rose-700 border-rose-200 animate-pulse";
+  } else if (usagePercentage >= 70) {
+    usageBadgeColor = "bg-amber-50 text-amber-700 border-amber-200";
+  }
+
+  const selectedMotor = settings.selectedMotor || 'lite';
+
   const calcShortcuts = examArea ? (AREA_CALC_SHORTCUTS[examArea] || []) : [];
 
   return (
@@ -134,14 +151,16 @@ export function EditorToolbar({
         </button>
 
         {/* Prompt preview */}
-        <button
-          onClick={onShowPrompt}
-          className="h-9 px-2.5 bg-white border border-ink-200 text-ink-500 hover:bg-ink-50 hover:border-ink-300 rounded-lg border shadow-sm transition-all flex items-center gap-1.5 text-xs"
-          title="Ver prompt enviado à IA"
-        >
-          <Eye size={13} />
-          <span className="hidden lg:inline text-[11px] font-medium">Prompt</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={onShowPrompt}
+            className="h-9 px-2.5 bg-white border border-ink-200 text-ink-500 hover:bg-ink-50 hover:border-ink-300 rounded-lg border shadow-sm transition-all flex items-center gap-1.5 text-xs"
+            title="Ver prompt enviado à IA"
+          >
+            <Eye size={13} />
+            <span className="hidden lg:inline text-[11px] font-medium">Prompt</span>
+          </button>
+        )}
       </div>
 
       <div className="w-px h-5 bg-ink-200 shrink-0" />
@@ -289,13 +308,45 @@ export function EditorToolbar({
           </>
         )}
 
-        {/* AI Model badge */}
-        {geminiModel && (
-          <div className="hidden sm:flex items-center gap-1 bg-ink-50 border border-ink-200 px-2 py-0.5 rounded-lg">
-            <Brain size={10} className="text-brand-500" />
-            <span className="text-[10px] font-medium text-ink-500 max-w-[80px] truncate">{geminiModel}</span>
-          </div>
-        )}
+        {/* Quota Progress Indicator — clicável → settings/assinatura */}
+        <button
+          onClick={() => setView({ name: 'settings', activeTab: 'assinatura' })}
+          className={classNames(
+            "hidden md:flex items-center gap-1 border px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0 transition-all hover:opacity-80 active:scale-95",
+            usageBadgeColor
+          )}
+          title="Ver detalhes da assinatura"
+        >
+          <span>{reportsUsed} / {reportsQuota === 9999 ? '∞' : reportsQuota} laudos</span>
+        </button>
+
+        {/* AI Motor toggle */}
+        <div className="flex items-center gap-0.5 bg-ink-100 border border-ink-200 rounded-xl p-0.5 shrink-0">
+          <button
+            onClick={() => updateSettings({ selectedMotor: 'lite' })}
+            className={classNames(
+              'flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+              selectedMotor === 'lite' ? 'bg-indigo-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-700'
+            )}
+          >
+            <Zap size={9} />
+            Lite
+          </button>
+          <button
+            disabled={!motorProEnabled}
+            onClick={() => { if (motorProEnabled) updateSettings({ selectedMotor: 'pro' }); }}
+            className={classNames(
+              'flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+              !motorProEnabled ? 'text-ink-300 cursor-not-allowed' :
+              selectedMotor === 'pro' ? 'bg-violet-600 text-white shadow-sm' :
+              'text-ink-500 hover:text-ink-700'
+            )}
+          >
+            <Sparkles size={9} />
+            Pro
+            {!motorProEnabled && <Lock size={8} />}
+          </button>
+        </div>
       </div>
 
       {/* Overlay to close calc menu */}

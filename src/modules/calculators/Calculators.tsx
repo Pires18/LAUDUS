@@ -1,16 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { CALCULATORS } from './registry';
-import { 
-  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, CheckCircle2, Copy
+import {
+  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, CheckCircle2, Copy, LayoutGrid, Lock
 } from 'lucide-react';
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
 import { CalculatorReference } from './components/CalculatorUI';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSubscription } from '../../hooks/useSubscription';
+import { useApp } from '../../store/app';
 
 export function Calculators() {
+  const { hasCalculators } = useSubscription();
+  const { setView } = useApp();
   const [areaFilter, setAreaFilter] = useState<ExamArea | 'todas'>('todas');
   const [search, setSearch] = useState('');
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
@@ -30,6 +34,30 @@ export function Calculators() {
     });
   }, [areaFilter, search]);
 
+  if (!hasCalculators) {
+    return (
+      <div className="module-container">
+        <div className="max-w-7xl mx-auto w-full animate-fade-in">
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-indigo-50 text-indigo-400 flex items-center justify-center mb-6 shadow-sm border border-indigo-100">
+              <Lock size={36} />
+            </div>
+            <h2 className="text-xl font-black text-ink-900 mb-2">Calculadoras Clínicas</h2>
+            <p className="text-sm text-ink-500 max-w-sm mb-8 leading-relaxed">
+              Este módulo requer o add-on <strong className="text-ink-700">Calculadoras Clínicas</strong>. Ative-o na sua assinatura para liberar biometria fetal, volumes, doppler e mais de 20 calculadores especializados.
+            </p>
+            <button
+              onClick={() => setView({ name: 'settings', activeTab: 'assinatura' })}
+              className="h-11 px-8 rounded-xl text-xs font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all cursor-pointer active:scale-95"
+            >
+              Ativar Add-on Calculadoras
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="module-container">
       <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
@@ -48,111 +76,72 @@ export function Calculators() {
           </div>
         </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* Sidebar Áreas (Desktop) */}
-        <aside className="sidebar-nav">
-          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-5 py-4 flex items-center gap-2">
-            <LayoutList size={14} /> Filtros Clínicos
-          </p>
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={() => setAreaFilter('todas')}
-              className={classNames(
-                "w-full px-5 py-4 rounded-2xl text-sm font-black transition-all flex items-center gap-4 uppercase tracking-widest",
-                areaFilter === 'todas' 
-                  ? "bg-ink-900 text-white shadow-lg" 
-                  : "text-ink-600 hover:bg-ink-50"
-              )}
-            >
-              <LayoutList size={18} />
-              Todas
-            </button>
-            {EXAM_AREAS.map((area) => {
-              const isActive = areaFilter === area.id;
-              return (
-                <button
-                  key={area.id}
-                  onClick={() => setAreaFilter(area.id as ExamArea)}
-                  className={classNames(
-                    "w-full px-5 py-4 rounded-2xl text-sm font-black transition-all flex items-center gap-4 uppercase tracking-widest group",
-                    isActive 
-                      ? "bg-brand-50 text-brand-700 border border-brand-100 shadow-sm" 
-                      : "text-ink-600 hover:bg-ink-50"
-                  )}
-                >
-                  <div className={classNames(
-                    "p-2 rounded-xl transition-all shadow-inner", 
-                    isActive ? area.color : "bg-ink-50 text-ink-400 group-hover:bg-ink-100"
-                  )}>
-                    <AreaIcon area={area.id} size={18} />
-                  </div>
-                  <span className="truncate">{area.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        <div className="flex-1 w-full space-y-6">
-          {/* Search and Mobile Filters */}
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center bg-white p-4 rounded-2xl border border-ink-200 shadow-sm">
-            <div className="relative flex-1 w-full flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
-                <input
-                  type="text"
-                  placeholder="Pesquisar calculadora..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-14 pl-12 pr-4 bg-ink-50 border border-ink-100 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium text-sm"
-                />
-              </div>
-              {(search || areaFilter !== 'todas') && (
-                <button 
-                  onClick={() => { setSearch(''); setAreaFilter('todas'); }}
-                  className="p-3 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-2xl transition-all border border-ink-100 h-14 w-14 flex items-center justify-center shrink-0"
-                  title="Limpar Filtros"
-                >
-                  <RotateCcw size={20} />
-                </button>
-              )}
-            </div>
-            
-            <div className="lg:hidden flex gap-1.5 overflow-x-auto w-full pb-1 scrollbar-hide">
+        {/* ─── PILL TAB BAR ─── */}
+        <div className="flex items-center gap-1.5 bg-ink-100 p-1 rounded-2xl border border-ink-200/50 overflow-x-auto">
+          <button
+            onClick={() => setAreaFilter('todas')}
+            className={classNames(
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+              areaFilter === 'todas'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
+            )}
+          >
+            <LayoutGrid size={13} />
+            Todas
+          </button>
+          {EXAM_AREAS.map((area) => {
+            const isActive = areaFilter === area.id;
+            return (
               <button
-                onClick={() => setAreaFilter('todas')}
+                key={area.id}
+                onClick={() => setAreaFilter(area.id as ExamArea)}
                 className={classNames(
-                  "px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap uppercase tracking-wider transition-all border",
-                  areaFilter === 'todas'
-                    ? "bg-ink-900 border-ink-900 text-white shadow-sm"
-                    : "bg-ink-50 border-ink-200 text-ink-500 hover:bg-ink-100"
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+                    : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
                 )}
               >
-                Todas
+                <AreaIcon area={area.id} size={13} />
+                {area.label}
               </button>
-              {EXAM_AREAS.map(area => (
-                <button
-                  key={area.id}
-                  onClick={() => setAreaFilter(area.id as ExamArea)}
-                  className={classNames(
-                    "px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap flex items-center gap-2 uppercase tracking-wider transition-all border",
-                    areaFilter === area.id
-                      ? "bg-brand-50 border border-brand-100 text-brand-700 shadow-sm"
-                      : "bg-ink-50 border-ink-200 text-ink-500 hover:bg-ink-100"
-                  )}
-                >
-                  <AreaIcon area={area.id} size={12} />
-                  {area.label}
-                </button>
-              ))}
-            </div>
-          </div>
+            );
+          })}
+        </div>
 
-          {/* Grid de Calculadoras */}
-          <motion.div 
-            layout 
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
+        {/* ─── SEARCH & FILTER SUMMARY ─── */}
+        <div className="bg-white border border-ink-200 rounded-2xl shadow-sm p-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Pesquisar calculadora por nome..."
+              className="w-full h-9 pl-9 pr-3 bg-ink-50 border border-ink-200 focus:border-brand-400 rounded-xl focus:ring-2 focus:ring-brand-400/10 outline-none transition-all text-sm text-ink-800 placeholder-ink-400"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          {(search || areaFilter !== 'todas') && (
+            <button
+              onClick={() => { setSearch(''); setAreaFilter('todas'); }}
+              className="h-9 px-3 rounded-xl border border-ink-200 text-ink-500 hover:bg-ink-50 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
+            >
+              <RotateCcw size={12} />
+              Limpar Filtros
+            </button>
+          )}
+        </div>
+
+        {/* Grid de Calculadoras */}
+        <motion.div 
+          layout 
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
             <AnimatePresence>
               {filtered.map(calc => (
                 <motion.button
@@ -213,8 +202,6 @@ export function Calculators() {
               <p className="text-sm text-ink-400">Tente ajustar sua busca ou filtros.</p>
             </div>
           )}
-        </div>
-      </div>
 
       {/* Modal da Calculadora */}
       <AnimatePresence>

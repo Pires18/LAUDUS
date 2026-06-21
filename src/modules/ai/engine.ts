@@ -1,6 +1,8 @@
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
+import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
 
@@ -509,7 +511,7 @@ export async function extractCalculatorData(
   settings: AppSettings,
   signal?: AbortSignal
 ): Promise<any> {
-  const aiProvider = settings.aiProvider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
+  const aiProvider = new GeminiProvider();
   const systemContext = `Você é um assistente médico especialista em ultrassonografia e radiologia.
 Sua tarefa é ler um texto (laudo médico) e extrair os dados necessários para preencher a calculadora clínica chamada "${calcDef.name}".
 A calculadora faz o seguinte: "${calcDef.description}".
@@ -736,7 +738,6 @@ function getModelForMode(settings: AppSettings, mode: string, area: string): str
 }
 
 import { GeminiProvider } from './providers/GeminiProvider';
-import { AnthropicProvider, getAnthropicBaseUrl } from './providers/AnthropicProvider';
 
 const helpers = {
   getModeTemperature,
@@ -746,8 +747,6 @@ const helpers = {
   cleanMarkdownFromResponse,
   stripScratchpad,
 };
-
-export { getAnthropicBaseUrl };
 
 // Exportar builders internos para uso no Playground com streaming real
 export { buildRefinePrompt, buildCopilotPrompt };
@@ -766,14 +765,115 @@ function detectArea(params: GenerateReportParams | CopilotParams | RefineParams)
   return '';
 }
 
+// ─── Helpers para Controle de Motor (Lite/Pro) e Quota de Laudos ─────────────
+
+async function resolveMotorConfigAndCheckQuota(
+  settings: AppSettings,
+  mode: string
+): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; uid?: string }> {
+  const uid = auth.currentUser?.uid;
+  let resolvedModelName = 'gemini-3.5-flash';
+
+  if (!uid) {
+    return { resolvedProvider: 'gemini', resolvedModelName };
+  }
+
+  try {
+    const userRef = doc(firestore, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
+
+      // 1. Validar cota mensal antes da geração inicial
+      if (mode === 'generation' && !isAdmin) {
+        const reportsUsed = userData.reportsUsedThisMonth ?? 0;
+        const reportsQuota = userData.reportsQuota ?? 100;
+        if (reportsUsed >= reportsQuota) {
+          throw new Error('Sua cota mensal de laudos foi atingida. Faça um upgrade ou aguarde o reset mensal.');
+        }
+      }
+
+      // 2. Resolver configuração dos motores (sempre Gemini)
+      const isTrialing = !userData.subscriptionId && userData.createdAt && (Date.now() < userData.createdAt + 14 * 24 * 60 * 60 * 1000);
+      const motorProEnabled = isAdmin || userData.motorProEnabled === true || isTrialing || userData.subscriptionStatus === 'trialing';
+      let chosenMotor = settings.selectedMotor || 'lite';
+      if (chosenMotor === 'pro' && !motorProEnabled) {
+        chosenMotor = 'lite';
+      }
+
+      const motorConfigRef = doc(firestore, 'global_config', 'motor_config');
+      const motorConfigSnap = await getDoc(motorConfigRef);
+      const motorConfig = {
+        lite: { model: 'gemini-3.5-flash' },
+        pro:  { model: 'gemini-3.1-pro-preview' }
+      };
+
+      if (motorConfigSnap.exists()) {
+        const configData = motorConfigSnap.data();
+        if (configData.lite?.model) motorConfig.lite.model = configData.lite.model;
+        if (configData.pro?.model)  motorConfig.pro.model  = configData.pro.model;
+      }
+
+      resolvedModelName = motorConfig[chosenMotor].model;
+    }
+  } catch (err: any) {
+    if (err.message && err.message.includes('cota mensal')) {
+      throw err;
+    }
+    logger.error('Erro ao resolver motor e cota:', err);
+  }
+
+  return { resolvedProvider: 'gemini', resolvedModelName, uid };
+}
+
+async function incrementReportUsage(uid: string) {
+  try {
+    const userRef = doc(firestore, 'users', uid);
+    await runTransaction(firestore, async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists()) return;
+      const userData = userSnap.data();
+      const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
+      if (isAdmin) return;
+
+      const newUsed = (userData.reportsUsedThisMonth ?? 0) + 1;
+      transaction.update(userRef, {
+        reportsUsedThisMonth: newUsed,
+        updatedAt: Date.now()
+      });
+
+      const subscriptionId = userData.subscriptionId;
+      if (subscriptionId) {
+        const subRef = doc(firestore, 'subscriptions', subscriptionId);
+        transaction.update(subRef, {
+          reportsUsedThisMonth: newUsed,
+          updatedAt: Date.now()
+        });
+      }
+    });
+  } catch (err) {
+    logger.error('Erro ao incrementar uso de laudo:', err);
+  }
+}
+
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
   const { settings, signal } = params as any;
-  const provider = settings.aiProvider || 'anthropic';
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
+
+  const { resolvedModelName, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+
+  const callSettings = {
+    ...settings,
+    aiProvider: 'gemini' as const,
+    geminiModel: resolvedModelName,
+  };
+
   let built: BuiltPrompt;
   if (mode === 'copilot') {
     built = buildCopilotPrompt(params as CopilotParams);
@@ -786,15 +886,13 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
   try {
     let text: string;
     let scratchpad: string | undefined;
-    
-    const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
-    text = await aiProvider.generate(built, settings, area, mode, signal, (sp) => scratchpad = sp, helpers);
 
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
+    text = await new GeminiProvider().generate(built, callSettings, area, mode, signal, (sp) => scratchpad = sp, helpers);
+
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: Math.round(text.length / 4),
@@ -805,13 +903,17 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       modelName: resolvedModelName,
       promptHash: hashPrompt(built)
     });
+
+    if (mode === 'generation' && uid) {
+      await incrementReportUsage(uid);
+    }
+
     return text;
   } catch (err) {
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: 0,
@@ -830,10 +932,17 @@ export async function generateReportStream(
   onChunk: (text: string, rawText?: string) => void
 ): Promise<string> {
   const { settings, signal } = params as any;
-  const provider = settings.aiProvider || 'anthropic';
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
+
+  const { resolvedModelName, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+
+  const callSettings = {
+    ...settings,
+    aiProvider: 'gemini' as const,
+    geminiModel: resolvedModelName,
+  };
 
   let built: BuiltPrompt;
   if (mode === 'copilot') {
@@ -847,14 +956,13 @@ export async function generateReportStream(
   try {
     let text: string;
     let scratchpad: string | undefined;
-    
-    const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
-    text = await aiProvider.stream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
+
+    text = await new GeminiProvider().stream(built, callSettings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
+
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: Math.round(text.length / 4),
@@ -865,13 +973,17 @@ export async function generateReportStream(
       modelName: resolvedModelName,
       promptHash: hashPrompt(built)
     });
+
+    if (mode === 'generation' && uid) {
+      await incrementReportUsage(uid);
+    }
+
     return text;
   } catch (err) {
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-sonnet-4-6');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: 0,

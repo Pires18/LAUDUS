@@ -14,7 +14,8 @@ type View =
   | { name: 'exam-editor'; examId: string }
   | { name: 'templates' }
   | { name: 'template-editor'; templateId?: string }
-  | { name: 'settings' }
+  | { name: 'settings'; activeTab?: string }
+  | { name: 'dicom' }
   | { name: 'laud-ia' }
   | { name: 'calculators' }
   | { name: 'clinics' }
@@ -26,6 +27,8 @@ interface AppState {
   // ── Auth ──
   user: User | null;
   setUser: (u: User | null) => void;
+  profile: any | null;
+  setProfile: (p: any | null) => void;
 
   // ── Navigation ──
   view: View;
@@ -80,6 +83,8 @@ export const useApp = create<AppState>()(
   // ── Auth ──
   user: null,
   setUser: (u) => set({ user: u }),
+  profile: null,
+  setProfile: (p) => set({ profile: p }),
 
   // ── Navigation ──
   view: { name: 'dashboard' },

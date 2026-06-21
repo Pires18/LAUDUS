@@ -1,11 +1,11 @@
 import { useEffect, useState, ReactNode, lazy, Suspense } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, firestore } from './lib/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { useApp } from './store/app';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginScreen } from './components/LoginScreen';
-import { LicenseActivationScreen } from './components/LicenseActivationScreen';
+import { OnboardingScreen } from './components/OnboardingScreen';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { PageTransition } from './components/PageTransition';
@@ -22,6 +22,7 @@ import { Loader2 } from 'lucide-react';
 import { classNames } from './utils/format';
 import { logger } from './utils/logger';
 import { useConfirmStore } from './hooks/useConfirm';
+import { useSubscription } from './hooks/useSubscription';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
 // ── Eager loads (critical path) ──
@@ -36,6 +37,7 @@ const Appointments = lazy(() => import('./modules/appointments/Appointments').th
 const Templates = lazy(() => import('./modules/templates/Templates').then(m => ({ default: m.Templates })));
 const TemplateEditor = lazy(() => import('./modules/templates/TemplateEditor').then(m => ({ default: m.TemplateEditor })));
 const Settings = lazy(() => import('./modules/settings/Settings').then(m => ({ default: m.Settings })));
+const DicomControlCenter = lazy(() => import('./modules/dicom/DicomControlCenter').then(m => ({ default: m.DicomControlCenter })));
 const LaudIA = lazy(() => import('./modules/laud-ia/LaudIA').then(m => ({ default: m.LaudIA })));
 const Calculators = lazy(() => import('./modules/calculators/Calculators').then(m => ({ default: m.Calculators })));
 const Clinics = lazy(() => import('./modules/clinics/Clinics').then(m => ({ default: m.Clinics })));
@@ -68,6 +70,7 @@ function ViewRenderer() {
     templates: lazy('Templates', <Templates />),
     'template-editor': view.name === 'template-editor' ? lazy('Editor de Template', <TemplateEditor key={view.templateId} templateId={view.templateId} />) : null,
     settings: lazy('Configurações', <Settings />),
+    dicom: lazy('PACS / DICOM', <DicomControlCenter />),
     'laud-ia': lazy('LAUD.IA', <LaudIA />),
     calculators: lazy('Calculadoras', <Calculators />),
     clinics: lazy('Clínicas', <Clinics />),
@@ -97,7 +100,8 @@ function ViewRenderer() {
   );
 }
 function AuthenticatedApp() {
-  const { showCreateExamModal, setShowCreateExamModal, view, loadSettings } = useApp();
+  const { showCreateExamModal, setShowCreateExamModal, view, loadSettings, setView } = useApp();
+  const { isTrialing, isPastDue, trialDaysLeft } = useSubscription();
 
   useEffect(() => {
     loadSettings();
@@ -124,6 +128,36 @@ function AuthenticatedApp() {
     >
       <OfflineBanner />
       <BroadcastBanner />
+      
+      {isPastDue && (
+        <div className="bg-rose-600 text-white px-4 py-2.5 text-xs font-bold flex items-center justify-between shadow-md border-b border-rose-700 animate-pulse shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-black shrink-0">Atraso</span>
+            <span>Houve um problema com a cobrança da sua assinatura. Regularize seus dados de pagamento para evitar a suspensão dos serviços IA e adicionais.</span>
+          </div>
+          <button 
+            onClick={() => setView({ name: 'settings', activeTab: 'assinatura' })}
+            className="bg-white text-rose-700 hover:bg-rose-50 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+          >
+            Regularizar Assinatura
+          </button>
+        </div>
+      )}
+      {isTrialing && (
+        <div className="bg-brand-600 text-white px-4 py-2.5 text-xs font-bold flex items-center justify-between shadow-md border-b border-brand-700 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-black shrink-0">Trial</span>
+            <span>Você está no Período de Testes. Restam <strong>{trialDaysLeft} dias</strong> de acesso gratuito.</span>
+          </div>
+          <button 
+            onClick={() => setView({ name: 'settings', activeTab: 'assinatura' })}
+            className="bg-white text-brand-600 hover:bg-brand-50 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shrink-0 cursor-pointer"
+          >
+            Ativar Assinatura
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-1 min-h-0 flex-col md:flex-row overflow-hidden">
         <Sidebar />
         <ViewRenderer />
@@ -155,77 +189,101 @@ function GlobalConfirmDialog() {
   );
 }
 
-/**
- * Barreira de controle de acesso por licença ativa.
- * Impede a entrada de usuários inativos ou com licença expirada.
- */
 function UserAccessGate({ children }: { children: ReactNode }) {
   const { user } = useApp();
   const [checking, setChecking] = useState(true);
   const [isAllowed, setIsAllowed] = useState(false);
-  const [isExpired, setIsExpired] = useState(false);
-  const [expiredPlanName, setExpiredPlanName] = useState<string | undefined>(undefined);
-  const [reloadTrigger, setReloadTrigger] = useState(0);
 
   useEffect(() => {
-    const checkAccess = async () => {
-      if (!user) {
-        setIsAllowed(false);
-        setChecking(false);
-        return;
-      }
+    if (!user) {
+      setIsAllowed(false);
+      setChecking(false);
+      useApp.getState().setProfile(null);
+      return;
+    }
 
+    const userRef = doc(firestore, 'users', user.uid);
+
+    const unsub = onSnapshot(userRef, async (snap) => {
       try {
-        const userRef = doc(firestore, 'users', user.uid);
-        const snap = await getDoc(userRef);
+        let userData = snap.exists() ? snap.data() : null;
 
-        // Se o usuário existir e for admin (Super Admin Bypass baseado em role, não em email hardcoded)
-        if (snap.exists() && snap.data().role === 'admin') {
-          setIsAllowed(true);
-          setChecking(false);
-          return;
+        const SUPER_ADMIN_EMAIL = 'matheuskpires@gmail.com';
+        const isSuperAdminEmail = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+
+        if (!userData) {
+          logger.info('[AUTH] Novo usuário detectado. Provisionando perfil de testes (Trial)...');
+          const now = Date.now();
+          userData = {
+            name: user.displayName || user.email?.split('@')[0] || 'Médico',
+            email: user.email,
+            role: isSuperAdminEmail ? 'admin' : 'medico',
+            active: true,
+            subscriptionStatus: 'trialing',
+            createdAt: now,
+            updatedAt: now,
+            reportsUsedThisMonth: 0,
+            reportsQuota: 100,
+            clinicsQuota: 5,
+          };
+          await setDoc(userRef, userData);
+        } else if (isSuperAdminEmail && userData.role !== 'admin') {
+          logger.info('[AUTH] Promovendo Super Admin no Firestore...');
+          try {
+            userData.role = 'admin';
+            await setDoc(userRef, { role: 'admin' }, { merge: true });
+          } catch (clientErr) {
+            logger.warn('[AUTH] Falha ao promover via client-side (regras de segurança). Tentando via API...', clientErr);
+            try {
+              const idToken = await user.getIdToken();
+              const response = await fetch('/api/promote-admin', {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ userId: user.uid, email: user.email }),
+              });
+              if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Erro na API de promoção.');
+              }
+              logger.info('[AUTH] Promoção via API concluída.');
+            } catch (apiErr) {
+              logger.error('[AUTH] Falha crítica ao promover Super Admin via API:', apiErr);
+            }
+          }
         }
 
-        // Acesso para desenvolvimento (Bypass DEV)
-        if (import.meta.env.DEV && user.uid === 'dev-admin-uid') {
-          setIsAllowed(true);
-          setChecking(false);
-          return;
-        }
+        // Sincroniza o perfil do usuário no Zustand store
+        useApp.getState().setProfile(userData);
 
-        // O sistema não usa mais pré-cadastro manual (que causaria Permission Denied no Firebase)
-        // Se o usuário já existir no banco (criado pelo auto-cadastro com licença), tudo certo.
-        // Se não existir, ele será barrado a não ser que use a tela de ativação de licença.
-        if (!snap.exists()) {
-          logger.warn('[AUTH] Usuário autenticado, mas não possui documento no Firestore. Deve ativar licença.');
-          // Sem documento: Usuário novo real - precisa de ativação por chave
+        if (userData.role === 'admin') {
+          setIsAllowed(true);
+        } else if (import.meta.env.DEV && user.uid === 'dev-admin-uid') {
+          setIsAllowed(true);
+        } else if (userData.active === false) {
           setIsAllowed(false);
-          setIsExpired(false);
         } else {
-          const data = snap.data();
-          if (data.active === false) {
-            setIsAllowed(false);
-            setIsExpired(false);
-          } else if (data.licenseExpiresAt && data.licenseExpiresAt < Date.now()) {
-            // Licença expirada
-            setIsAllowed(false);
-            setIsExpired(true);
-            setExpiredPlanName(data.licensePlanName);
-          } else {
-            // Licença ativa e acesso liberado
+          const hasLegacyLicense = userData.licenseExpiresAt && userData.licenseExpiresAt > Date.now();
+          const isAllowedStatus = ['trialing', 'active', 'past_due'].includes(userData.subscriptionStatus);
+          
+          if (isAllowedStatus || hasLegacyLicense) {
             setIsAllowed(true);
+          } else {
+            setIsAllowed(false);
           }
         }
       } catch (err) {
-        logger.error('[AccessGate] Erro ao validar licença:', err);
+        logger.error('[AccessGate] Erro ao validar acesso:', err);
         setIsAllowed(false);
       } finally {
         setChecking(false);
       }
-    };
+    });
 
-    checkAccess();
-  }, [user, reloadTrigger]);
+    return () => unsub();
+  }, [user]);
 
   if (checking) {
     return (
@@ -239,13 +297,7 @@ function UserAccessGate({ children }: { children: ReactNode }) {
   }
 
   if (!isAllowed) {
-    return (
-      <LicenseActivationScreen
-        isExpired={isExpired}
-        expiredPlanName={expiredPlanName}
-        onActivated={() => setReloadTrigger(prev => prev + 1)}
-      />
-    );
+    return <OnboardingScreen />;
   }
 
   return <>{children}</>;

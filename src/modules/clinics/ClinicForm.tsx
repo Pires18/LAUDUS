@@ -32,6 +32,8 @@ const emptyClinic: Omit<Clinic, 'id' | 'createdAt' | 'updatedAt'> = {
   phone: '',
   email: '',
   logoUrl: '',
+  headerImageUrl: '',
+  footerImageUrl: '',
   googleDocsTemplateId: '',
   googleDriveFolderId: '',
   headerHtml: '',
@@ -47,6 +49,8 @@ export function ClinicForm({ clinicId }: Props) {
 
   const [draft, setDraft] = useState<Omit<Clinic, 'id' | 'createdAt' | 'updatedAt'>>({ ...emptyClinic });
   const [uploading, setUploading] = useState(false);
+  const [uploadingHeader, setUploadingHeader] = useState(false);
+  const [uploadingFooter, setUploadingFooter] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -58,6 +62,8 @@ export function ClinicForm({ clinicId }: Props) {
         phone: existing.phone || '',
         email: existing.email || '',
         logoUrl: existing.logoUrl || '',
+        headerImageUrl: existing.headerImageUrl || '',
+        footerImageUrl: existing.footerImageUrl || '',
         googleDocsTemplateId: existing.googleDocsTemplateId || '',
         googleDriveFolderId: existing.googleDriveFolderId || '',
         headerHtml: existing.headerHtml || '',
@@ -145,6 +151,56 @@ export function ClinicForm({ clinicId }: Props) {
       showToast('Erro de permissão no Storage. Cole a URL do logotipo abaixo como alternativa.', 'error');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleHeaderUpload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      showToast('Selecione uma imagem válida', 'error');
+      return;
+    }
+    setUploadingHeader(true);
+    try {
+      const compressedBlob = await compressLogoFile(file);
+      const uid = auth.currentUser?.uid;
+      const fileExtension = file.type === 'image/gif' ? 'gif' : 'webp';
+      const cleanFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      const path = `users/${uid}/clinic-headers/${Date.now()}_${cleanFileName}.${fileExtension}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, compressedBlob);
+      const url = await getDownloadURL(storageRef);
+      u('headerImageUrl', url);
+      showToast('Imagem de cabeçalho enviada com sucesso', 'success');
+    } catch (err: any) {
+      logger.error('Erro de upload do cabeçalho:', err);
+      showToast('Erro de permissão no Storage. Cole a URL do cabeçalho abaixo como alternativa.', 'error');
+    } finally {
+      setUploadingHeader(false);
+    }
+  }
+
+  async function handleFooterUpload(file: File) {
+    if (!file.type.startsWith('image/')) {
+      showToast('Selecione uma imagem válida', 'error');
+      return;
+    }
+    setUploadingFooter(true);
+    try {
+      const compressedBlob = await compressLogoFile(file);
+      const uid = auth.currentUser?.uid;
+      const fileExtension = file.type === 'image/gif' ? 'gif' : 'webp';
+      const cleanFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      const path = `users/${uid}/clinic-footers/${Date.now()}_${cleanFileName}.${fileExtension}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, compressedBlob);
+      const url = await getDownloadURL(storageRef);
+      u('footerImageUrl', url);
+      showToast('Imagem de rodapé enviada com sucesso', 'success');
+    } catch (err: any) {
+      logger.error('Erro de upload do rodapé:', err);
+      showToast('Erro de permissão no Storage. Cole a URL do rodapé abaixo como alternativa.', 'error');
+    } finally {
+      setUploadingFooter(false);
     }
   }
 
@@ -409,6 +465,110 @@ export function ClinicForm({ clinicId }: Props) {
                     placeholder="https://exemplo.com/logo.png"
                     value={draft.logoUrl || ''}
                     onChange={(e) => u('logoUrl', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Header Image Card */}
+            <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 text-center space-y-4">
+              <h3 className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Cabeçalho da Unidade (Banner Imagem)</h3>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative group w-full">
+                  <div className="w-full h-16 bg-ink-50 border-2 border-dashed border-ink-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-brand-400 rounded-xl">
+                    {draft.headerImageUrl ? (
+                      <img src={draft.headerImageUrl} alt="Cabeçalho Banner" className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-ink-300 font-bold uppercase">Sem imagem de cabeçalho</span>
+                    )}
+                    {uploadingHeader && (
+                      <div className="absolute inset-0 bg-white/85 flex items-center justify-center">
+                        <Loader2 size={16} className="animate-spin text-brand-650" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 w-full">
+                  <label className="flex-1 py-2 rounded-xl bg-ink-50 text-ink-600 border border-ink-200 font-bold text-xs hover:bg-ink-100 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Upload size={13} />
+                    {uploadingHeader ? 'Enviando...' : 'Carregar Imagem'}
+                    <input type="file" accept="image/*" className="hidden" disabled={uploadingHeader} onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleHeaderUpload(file);
+                    }} />
+                  </label>
+                  {draft.headerImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => u('headerImageUrl', '')}
+                      className="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 transition-all text-xs font-bold"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+
+                <div className="w-full text-left">
+                  <label className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mb-1">Ou URL do Cabeçalho</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-1.5 bg-ink-50 border border-ink-250 rounded-lg outline-none focus:border-brand-500 text-[11px] font-bold text-ink-700 shadow-inner"
+                    placeholder="https://exemplo.com/cabecalho.png"
+                    value={draft.headerImageUrl || ''}
+                    onChange={(e) => u('headerImageUrl', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Image Card */}
+            <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 text-center space-y-4">
+              <h3 className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Rodapé da Unidade (Banner Imagem)</h3>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative group w-full">
+                  <div className="w-full h-12 bg-ink-50 border-2 border-dashed border-ink-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-brand-400 rounded-xl">
+                    {draft.footerImageUrl ? (
+                      <img src={draft.footerImageUrl} alt="Rodapé Banner" className="w-full h-full object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-ink-300 font-bold uppercase">Sem imagem de rodapé</span>
+                    )}
+                    {uploadingFooter && (
+                      <div className="absolute inset-0 bg-white/85 flex items-center justify-center">
+                        <Loader2 size={16} className="animate-spin text-brand-650" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 w-full">
+                  <label className="flex-1 py-2 rounded-xl bg-ink-50 text-ink-600 border border-ink-200 font-bold text-xs hover:bg-ink-100 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                    <Upload size={13} />
+                    {uploadingFooter ? 'Enviando...' : 'Carregar Imagem'}
+                    <input type="file" accept="image/*" className="hidden" disabled={uploadingFooter} onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFooterUpload(file);
+                    }} />
+                  </label>
+                  {draft.footerImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => u('footerImageUrl', '')}
+                      className="px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-650 border border-red-200 transition-all text-xs font-bold"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+
+                <div className="w-full text-left">
+                  <label className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mb-1">Ou URL do Rodapé</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-1.5 bg-ink-50 border border-ink-250 rounded-lg outline-none focus:border-brand-500 text-[11px] font-bold text-ink-700 shadow-inner"
+                    placeholder="https://exemplo.com/rodape.png"
+                    value={draft.footerImageUrl || ''}
+                    onChange={(e) => u('footerImageUrl', e.target.value)}
                   />
                 </div>
               </div>

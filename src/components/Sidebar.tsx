@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
+import { useSubscription } from '../hooks/useSubscription';
 import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
   Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
-  Users, LogOut, CalendarDays
+  Users, LogOut, CalendarDays, Database
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { LogoIcon } from './LogoIcon';
@@ -21,6 +22,7 @@ const items = [
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'dicom', label: 'PACS / DICOM', icon: Database, view: { name: 'dicom' as const }, roles: ['admin', 'medico'] },
   { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 
@@ -43,7 +45,8 @@ export function Sidebar() {
     showToast, setShowCreateExamModal, setShowSupportModal, settings
   } = useApp();
   const { user, signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, role } = useAdmin();
+  const { hasPacs, hasCalculators, hasAppointments, hasClinics } = useSubscription();
   const isTablet = useIsTablet();
 
   // Auto-collapse on tablet, expanded on desktop
@@ -163,7 +166,16 @@ export function Sidebar() {
           {!collapsed && <span className="animate-fade-in">Novo Laudo</span>}
         </button>
 
-        {items.filter(item => item.roles.includes(settings.currentRole || 'medico')).map(item => {
+        {items
+          .filter(item => item.roles.includes(role || 'medico'))
+          .filter(item => {
+            if (item.key === 'dicom') return hasPacs;
+            if (item.key === 'calculators') return hasCalculators;
+            if (item.key === 'appointments') return hasAppointments;
+            if (item.key === 'clinics') return hasClinics;
+            return true;
+          })
+          .map(item => {
           const isActive = view.name === item.key ||
             (item.key === 'patients' && view.name === 'patient-detail') ||
             (item.key === 'templates' && view.name === 'template-editor') ||

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator,
   Lightbulb, Zap, ClipboardList, RotateCcw, CheckCircle2,
-  Trash2, StopCircle, Brain, Pencil, FileText
+  Trash2, StopCircle, Brain, Pencil, FileText, Lock
 } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
@@ -13,6 +13,7 @@ import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useSubscription } from '../../hooks/useSubscription';
 
 const AREA_SUGGESTIONS: Record<string, Array<{ label: string; text: string }>> = {
   'medicina-fetal': [
@@ -185,6 +186,13 @@ export function LaudCopilot({
   const aiFastMode = settings.aiFastMode ?? false;
   const handleToggleFastMode = (val: boolean) => {
     updateSettings({ ...settings, aiFastMode: val });
+  };
+
+  const { reportsUsed, reportsQuota, motorProEnabled } = useSubscription();
+  const selectedMotor = settings.selectedMotor || 'lite';
+  const handleMotorChange = (val: 'lite' | 'pro') => {
+    if (val === 'pro' && !motorProEnabled) return;
+    updateSettings({ ...settings, selectedMotor: val });
   };
 
   const isDirtyRef = useRef(false);
@@ -1297,10 +1305,10 @@ export function LaudCopilot({
 
             {/* Toggles row */}
             <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   onClick={() => handleToggleAutoRefine(!autoRefineEnabled)}
-                  className="flex items-center gap-1.5 group"
+                  className="flex items-center gap-1.5 group animate-fade-in"
                 >
                   <div className={classNames(
                     "w-7 h-4 rounded-full transition-colors relative shrink-0",
@@ -1318,7 +1326,7 @@ export function LaudCopilot({
 
                 <button
                   onClick={() => handleToggleFastMode(!aiFastMode)}
-                  className="flex items-center gap-1.5 group"
+                  className="flex items-center gap-1.5 group animate-fade-in"
                 >
                   <div className={classNames(
                     "w-7 h-4 rounded-full transition-colors relative shrink-0",
@@ -1333,6 +1341,39 @@ export function LaudCopilot({
                     Modo Rápido
                   </span>
                 </button>
+
+                {/* AI Motor toggle */}
+                <div className="flex items-center gap-0.5 bg-ink-100 border border-ink-200 rounded-xl p-0.5 shrink-0">
+                  <button
+                    onClick={() => handleMotorChange('lite')}
+                    className={classNames(
+                      'flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all',
+                      selectedMotor === 'lite' ? 'bg-indigo-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-700'
+                    )}
+                  >
+                    <Zap size={8} />
+                    Lite
+                  </button>
+                  <button
+                    disabled={!motorProEnabled}
+                    onClick={() => handleMotorChange('pro')}
+                    className={classNames(
+                      'flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all',
+                      !motorProEnabled ? 'text-ink-300 cursor-not-allowed' :
+                      selectedMotor === 'pro' ? 'bg-violet-600 text-white shadow-sm' :
+                      'text-ink-500 hover:text-ink-700'
+                    )}
+                  >
+                    <Sparkles size={8} />
+                    Pro
+                    {!motorProEnabled && <Lock size={8} />}
+                  </button>
+                </div>
+
+                {/* Quota Progress */}
+                <span className="text-[9px] text-ink-400 font-black tracking-wider uppercase shrink-0">
+                  {reportsUsed}/{reportsQuota === 9999 ? '∞' : reportsQuota} laudos
+                </span>
               </div>
 
               {chatHistory.length > 0 && (
