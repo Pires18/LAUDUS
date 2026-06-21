@@ -2,16 +2,18 @@ import { createRequire } from 'module';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
-const _require = createRequire(import.meta.url);
+// CJS (Vercel): `require` exists globally. ESM (Vite SSR): must use createRequire.
+declare const require: any;
+const _require: (id: string) => any =
+  typeof require !== 'undefined' ? require : createRequire(import.meta.url);
 
-// Vite SSR (ssrLoadModule) does not inject non-VITE_ env vars into process.env.
-// Load .env manually so FIREBASE_* credentials are available to API handlers.
+// Vite SSR does not inject non-VITE_ vars into process.env — load .env manually.
+// On Vercel the file won't exist, so this is a no-op there.
 function loadDotEnv() {
   const envPath = resolve(process.cwd(), '.env');
   if (!existsSync(envPath)) return;
   try {
-    const lines = readFileSync(envPath, 'utf-8').split('\n');
-    for (const raw of lines) {
+    for (const raw of readFileSync(envPath, 'utf-8').split('\n')) {
       const line = raw.trim();
       if (!line || line.startsWith('#')) continue;
       const eqIdx = line.indexOf('=');
@@ -24,9 +26,7 @@ function loadDotEnv() {
       val = val.replace(/\\n/g, '\n');
       if (process.env[key] === undefined) process.env[key] = val;
     }
-  } catch {
-    // silently ignore
-  }
+  } catch { /* ignore */ }
 }
 
 loadDotEnv();
@@ -43,7 +43,7 @@ function initApp() {
     if (projectId && clientEmail && privateKey) {
       initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
     } else {
-      console.error('[FIREBASE] Credenciais ausentes. PROJECT_ID:', projectId, '| CLIENT_EMAIL:', !!clientEmail, '| PRIVATE_KEY:', !!privateKey);
+      console.error('[FIREBASE] Credenciais ausentes:', { projectId, hasEmail: !!clientEmail, hasKey: !!privateKey });
       initializeApp({ projectId });
     }
   }
