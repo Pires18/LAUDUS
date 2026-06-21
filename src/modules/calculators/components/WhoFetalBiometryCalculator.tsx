@@ -128,7 +128,7 @@ export function WhoFetalBiometryCalculator({ value, onChange }: CalculatorProps)
     if (hlP !== null) parts.push(`Úmero: ${hl}mm (OMS p${hlP}%)`);
 
     const summary = parts.length > 0
-      ? `[Biometria Fetal Calculada (OMS)]\n- ${parts.join('\n- ')}`
+      ? `Biometria fetal (OMS/Hadlock): ${parts.join('; ')}.`
       : null;
 
     onChange({

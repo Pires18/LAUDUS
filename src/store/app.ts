@@ -98,7 +98,7 @@ export const useApp = create<AppState>()(
   loadSettings: async () => {
     try {
       const s = await getSettings();
-      // Migrate legacy model names to current default
+      // Migrate legacy Anthropic model names to current default
       if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
         s.anthropicModel = 'claude-sonnet-4-6';
       }

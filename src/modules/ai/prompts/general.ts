@@ -310,9 +310,10 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 
 4.7 ÍNDICE DE LÍQUIDO AMNIÓTICO (ILA / AFI):
     AFI = soma dos maiores bolsões nos 4 quadrantes abdominais maternos (cm).
-    Valores de referência: Normal: 5,0–24,0 cm | Oligoâmnio: ≤5,0 cm | Maior bolsão vertical (MBV) normal: 2,0–8,0 cm.
+    Valores de referência: Normal: 8,0–24,0 cm | Limítrofe (oligoâmnio marginal): 5,1–7,9 cm | Oligoâmnio: ≤5,0 cm | Polihidrâmnio: ≥25,0 cm.
+    Maior bolsão vertical (MBV): normal 2,0–8,0 cm | Reduzido: 1,0–1,9 cm | Oligoâmnio grave: <1,0 cm.
     Quando fornecido via MBV único: reporte como "maior bolsão vertical de X,X cm".
-    Reporte: "ILA estimado em XX,X cm" ou "Maior bolsão vertical de XX,X cm — [oligoâmnio / normal / poliidrâmnio]".
+    Reporte: "ILA estimado em XX,X cm — [limítrofe / normal / polihidrâmnio]" ou "Maior bolsão vertical de XX,X cm — [oligoâmnio / reduzido / normal]".
 
 4.8 ESTENOSE CAROTÍDEA — CRITÉRIO NASCET (velocidade sistólica):
     VPS ACI > 125 cm/s → estenose ≥50% (NASCET) — investigar;

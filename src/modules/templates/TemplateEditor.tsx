@@ -4,10 +4,9 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { PageHeader } from '../../components/PageHeader';
 import { updateItem } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
-import { FileText, Wand2, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList, Sparkles } from 'lucide-react';
+import { FileText, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
 import { classNames } from '../../utils/format';
-import { generateTemplateStructure, generateTemplateField } from '../ai/generateTemplate';
 import { auth } from '../../lib/firebase';
 
 interface Props {
@@ -16,11 +15,8 @@ interface Props {
 
 export function TemplateEditor({ templateId }: Props) {
   const { setView, showToast, settings } = useApp();
-  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'copilot'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'copilot' | 'prompt'>('info');
   const [draft, setDraft] = useState<ReportTemplate | null>(null);
-  const [isGeneratingStructure, setIsGeneratingStructure] = useState(false);
-  const [isGeneratingCustomForm, setIsGeneratingCustomForm] = useState(false);
-  const [isGeneratingConsent, setIsGeneratingConsent] = useState(false);
 
   const { data: template, loading } = useDocument<ReportTemplate>('templates', templateId);
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -65,6 +61,7 @@ export function TemplateEditor({ templateId }: Props) {
     { id: 'info', label: 'Informações Básicas' },
     { id: 'structure', label: 'Estrutura do Laudo' },
     { id: 'copilot', label: 'Formulário & Fichas' },
+    { id: 'prompt', label: 'Prompt LAUD.IA' },
   ] as const;
 
   return (
@@ -190,49 +187,6 @@ export function TemplateEditor({ templateId }: Props) {
 
         {activeTab === 'structure' && (
           <div className="max-w-4xl space-y-6 pb-12">
-            <div className="bg-white rounded-2xl border border-ink-150 shadow-sm p-5 bg-gradient-to-br from-white to-ink-50/30">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                    <BrainCircuit size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-ink-900 leading-tight">Geração Assistida por IA</h3>
-                    <p className="text-xs text-ink-500">Crie a estrutura da máscara automaticamente</p>
-                  </div>
-                </div>
-                <button
-                  onClick={async () => {
-                    if ((draft.title || draft.analysisTemplate) && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
-                    setIsGeneratingStructure(true);
-                    try {
-                      const result = await generateTemplateStructure(draft.area, draft.name, settings);
-                      u('title', result.title);
-                      u('technique', result.technique);
-                      u('analysisTemplate', result.analysisTemplate);
-                      u('conclusionTemplate', result.conclusionTemplate);
-                      u('recommendationsTemplate', result.recommendationsTemplate);
-                      if (result.observationsTemplate) {
-                        u('observationsTemplate', result.observationsTemplate);
-                      }
-                      if (result.classificationTemplate) {
-                        u('classificationTemplate', result.classificationTemplate);
-                      }
-                      showToast('Estrutura gerada!', 'success');
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : 'Erro ao gerar estrutura';
-                      showToast(message, 'error');
-                    } finally {
-                      setIsGeneratingStructure(false);
-                    }
-                  }}
-                  className="btn bg-brand-600 text-white border-none hover:bg-brand-700 shadow-md h-10"
-                >
-                  {isGeneratingStructure ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
-                  Gerar Estrutura
-                </button>
-              </div>
-            </div>
 
             <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
               <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
@@ -288,20 +242,6 @@ export function TemplateEditor({ templateId }: Props) {
               placeholder="Ex: Sugere-se correlação clínica..."
             />
 
-            <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
-                <label className="text-xs font-bold uppercase tracking-wider text-ink-500 flex items-center gap-2">
-                <BrainCircuit size={12} className="text-brand-500" /> Prompt Específico do Exame (LAUD.IA)
-              </label>
-              <p className="text-xs text-ink-500 leading-relaxed">
-                Insira as diretrizes, protocolos, tabelas e regras específicas que o motor de IA deve seguir estritamente ao laudar ou refinar este exame.
-              </p>
-              <textarea
-                className="input min-h-[220px] font-mono text-xs p-4 bg-ink-50 border border-ink-250 focus:bg-white transition-all rounded-xl leading-relaxed"
-                value={draft.aiInstructions || ''}
-                onChange={(e) => u('aiInstructions', e.target.value)}
-                placeholder="Ex: Para a realização deste laudo de Mama, siga estritamente a classificação BI-RADS e a fraseologia descrita no protocolo ACR..."
-              />
-            </div>
           </div>
         )}
 
@@ -309,36 +249,11 @@ export function TemplateEditor({ templateId }: Props) {
         {activeTab === 'copilot' && (
           <div className="max-w-4xl space-y-5">
             <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
                 <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
                   <ClipboardList size={16} className="text-brand-500" />
                   Formulário do Copiloto (Caixa de Texto)
                 </h3>
-                <button
-                  onClick={async () => {
-                    if (draft.customForm && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
-                    setIsGeneratingCustomForm(true);
-                    try {
-                      const result = await generateTemplateField(draft.area, draft.name, 'customForm', settings);
-                      u('customForm', result);
-                      showToast('Formulário gerado!', 'success');
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : 'Erro ao gerar formulário';
-                      showToast(message, 'error');
-                    } finally {
-                      setIsGeneratingCustomForm(false);
-                    }
-                  }}
-                  disabled={isGeneratingCustomForm}
-                  className="btn btn-secondary h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
-                >
-                  {isGeneratingCustomForm ? (
-                    <Loader2 size={12} className="animate-spin text-brand-600" />
-                  ) : (
-                    <Sparkles size={12} className="text-brand-500" />
-                  )}
-                  Gerar com LAUD.IA
-                </button>
               </div>
               <p className="text-xs text-ink-500 leading-relaxed">
                 Defina a estrutura padrão de texto que o médico preencherá na aba "Formulário" do Copiloto para este exame.
@@ -352,36 +267,11 @@ export function TemplateEditor({ templateId }: Props) {
             </div>
 
             <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
                 <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
                   <FileText size={16} className="text-indigo-500" />
                   Termo de Consentimento Padrão
                 </h3>
-                <button
-                  onClick={async () => {
-                    if (draft.consentTemplate && !confirm('Isso substituirá o texto atual. Deseja continuar?')) return;
-                    setIsGeneratingConsent(true);
-                    try {
-                      const result = await generateTemplateField(draft.area, draft.name, 'consent', settings);
-                      u('consentTemplate', result);
-                      showToast('Termo de consentimento gerado!', 'success');
-                    } catch (err: unknown) {
-                      const message = err instanceof Error ? err.message : 'Erro ao gerar termo';
-                      showToast(message, 'error');
-                    } finally {
-                      setIsGeneratingConsent(false);
-                    }
-                  }}
-                  disabled={isGeneratingConsent}
-                  className="btn btn-secondary h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all"
-                >
-                  {isGeneratingConsent ? (
-                    <Loader2 size={12} className="animate-spin text-brand-600" />
-                  ) : (
-                    <Sparkles size={12} className="text-brand-500" />
-                  )}
-                  Gerar com LAUD.IA
-                </button>
               </div>
               <p className="text-xs text-ink-500 leading-relaxed">
                 Termo de consentimento informado para este exame específico.
@@ -391,6 +281,31 @@ export function TemplateEditor({ templateId }: Props) {
                 value={draft.consentTemplate || ''}
                 onChange={(e) => u('consentTemplate', e.target.value)}
                 placeholder="Ex: Eu, [Nome do Paciente], autorizo a realização do exame..."
+              />
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'prompt' && (
+          <div className="max-w-4xl space-y-5 pb-12">
+            <div className="bg-white rounded-2xl border border-ink-100 p-5 space-y-4 shadow-sm">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
+                  <BrainCircuit size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-ink-900 text-sm uppercase tracking-widest leading-tight">Prompt Específico do Exame</h3>
+                  <p className="text-[10px] text-ink-400 font-medium mt-0.5">Diretrizes clínicas exclusivas para este tipo de exame</p>
+                </div>
+              </div>
+              <p className="text-xs text-ink-500 leading-relaxed">
+                Insira as diretrizes, protocolos, tabelas e regras específicas que o motor de IA deve seguir estritamente ao laudar ou refinar este exame. Este campo é injetado no contexto da IA a cada geração e refinamento.
+              </p>
+              <textarea
+                className="input min-h-[320px] font-mono text-xs p-4 bg-ink-50 border border-ink-200 focus:bg-white transition-all rounded-xl leading-relaxed"
+                value={draft.aiInstructions || ''}
+                onChange={(e) => u('aiInstructions', e.target.value)}
+                placeholder={`Ex: Para a realização deste laudo, siga estritamente:\n\n• Classificação BI-RADS (ACR 5ª edição):\n  - Categoria 0: avaliação incompleta\n  - Categoria 1: normal\n  - Categoria 2: achado benigno\n  ...\n\n• Fraseologia obrigatória para nódulos:\n  Descrever: localização, tamanho, forma, margem, ecogenicidade, sombra acústica, vascularização ao Doppler.`}
               />
             </div>
           </div>

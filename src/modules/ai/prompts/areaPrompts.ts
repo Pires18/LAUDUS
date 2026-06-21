@@ -511,7 +511,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
 8. DOPPLER OBSTÉTRICO — Parâmetros e interpretação
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ARTÉRIA UTERINA (AUT) — bilateralmente, ao nível do OI:
-     IP médio → FASE 4.3 de general.ts. Normal 2T: IP <1,00; 3T: <0,80.
+     IP médio → FASE 4.3 de general.ts. Normal 2T (20–24 sem): IP médio <1,45 (P95 FMF); 3T (28–34 sem): IP médio <0,90 (P95).
      Notch bilateral persistente >24 sem = risco de pré-eclâmpsia/CIR.
      IP >P95 bilateral = ATIVAR N3 (medicina fetal).
 

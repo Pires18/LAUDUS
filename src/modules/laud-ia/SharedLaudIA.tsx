@@ -224,10 +224,13 @@ function TelemetryDashboard({
       ['Modo','Provider','Modelo','Area','Tokens In','Tokens Out','Latência (ms)','Custo USD','Custo BRL','Sucesso','Timestamp'],
       ...filteredMetrics.map(m => {
         const PRICING_REF: Record<string, { input: number; output: number }> = {
+          'claude-sonnet-4-6':           { input: 3.0, output: 15.0 },
           'claude-3-5-sonnet-latest':    { input: 3.0, output: 15.0 },
           'claude-3-7-sonnet-latest':    { input: 3.0, output: 15.0 },
           'claude-opus-4-5':             { input: 15.0, output: 75.0 },
+          'claude-3-haiku-20240307':     { input: 0.25, output: 1.25 },
           'gemini-3.5-flash':            { input: 0.075, output: 0.30 },
+          'gemini-3.1-pro-preview':      { input: 1.25, output: 5.0 },
           'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
           'gemini-2.5-pro-preview-06-05':   { input: 1.25, output: 10.0 },
         };
@@ -269,10 +272,13 @@ function TelemetryDashboard({
   const successRate = filteredMetrics.length > 0 ? Math.round((filteredMetrics.filter(m => m.success).length / filteredMetrics.length) * 100) : 0;
 
   const PRICING_REF: Record<string, { input: number; output: number }> = {
-    'claude-3-5-sonnet-latest': { input: 3.0, output: 15.0 },
-    'claude-3-7-sonnet-latest': { input: 3.0, output: 15.0 },
-    'claude-opus-4-5': { input: 15.0, output: 75.0 },
-    'gemini-3.5-flash': { input: 0.075, output: 0.30 },
+    'claude-sonnet-4-6':           { input: 3.0, output: 15.0 },
+    'claude-3-5-sonnet-latest':    { input: 3.0, output: 15.0 },
+    'claude-3-7-sonnet-latest':    { input: 3.0, output: 15.0 },
+    'claude-opus-4-5':             { input: 15.0, output: 75.0 },
+    'claude-3-haiku-20240307':     { input: 0.25, output: 1.25 },
+    'gemini-3.5-flash':            { input: 0.075, output: 0.30 },
+    'gemini-3.1-pro-preview':      { input: 1.25, output: 5.0 },
     'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
     'gemini-2.5-pro-preview-06-05': { input: 1.25, output: 10.0 },
   };
@@ -1596,6 +1602,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                 <div>
                   <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Provedor de IA</label>
                   <select
+                    disabled={readOnly}
                     value={localSettings.aiProvider || 'gemini'}
                     onChange={(e) => setLocalSettings({ ...localSettings, aiProvider: e.target.value as 'gemini' | 'anthropic' })}
                     className="input h-12"
@@ -1612,12 +1619,13 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                       <div className="flex gap-2">
                         <input
                           type="password"
+                          disabled={readOnly}
                           value={localSettings.geminiApiKey || ''}
                           onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
                           placeholder="AIzaSy..."
                           className="input flex-1 font-mono text-sm h-12"
                         />
-                        <button onClick={testConnection} disabled={testStatus === 'testing'}
+                        <button onClick={testConnection} disabled={readOnly || testStatus === 'testing'}
                           className={classNames('w-12 h-12 flex items-center justify-center rounded-xl transition-all border',
                             testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                             testStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -1634,28 +1642,29 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     <div>
                       <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Gemini</label>
                       <select
+                        disabled={readOnly}
                         value={localSettings.geminiModel || 'gemini-3.5-flash'}
                         onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
                         className="input h-12"
                       >
-                        <optgroup label="Gemini 2.5 (Novo)">
-                          <option value="gemini-2.5-flash">GEMINI 2.5 FLASH — Rápido e Preciso (Recomendado)</option>
-                          <option value="gemini-2.5-pro">GEMINI 2.5 PRO — Máxima Inteligência</option>
-                        </optgroup>
-                        <optgroup label="Legacy">
-                          <option value="gemini-3.5-flash">GEMINI 3.5 FLASH (Legacy)</option>
-                        </optgroup>
+                        <option value="gemini-3.5-flash">GEMINI 3.5 FLASH (Recomendado)</option>
+                        <option value="gemini-3.1-pro-preview">GEMINI 3.1 PRO</option>
+                        <option value="gemini-2.5-flash-preview-05-20">GEMINI 2.5 FLASH</option>
+                        <option value="gemini-2.5-pro-preview-06-05">GEMINI 2.5 PRO</option>
                       </select>
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         {[
-                          { model: 'gemini-2.5-flash', label: '2.5 FLASH', desc: 'Velocidade + Precisão' },
-                          { model: 'gemini-2.5-pro', label: '2.5 PRO', desc: 'Raciocínio Clínico' },
+                          { model: 'gemini-3.5-flash', label: '3.5 FLASH', desc: 'Recomendado' },
+                          { model: 'gemini-3.1-pro-preview', label: '3.1 PRO', desc: 'Mecanismo Avançado' },
+                          { model: 'gemini-2.5-flash-preview-05-20', label: '2.5 FLASH', desc: 'Rápido' },
+                          { model: 'gemini-2.5-pro-preview-06-05', label: '2.5 PRO', desc: 'Raciocínio Clínico' },
                         ].map(m => (
                           <button
+                            disabled={readOnly}
                             key={m.model}
                             onClick={() => setLocalSettings({ ...localSettings, geminiModel: m.model })}
                             className={classNames('p-2.5 rounded-xl border text-left transition-all',
-                              (localSettings.geminiModel || 'gemini-2.5-flash') === m.model
+                              (localSettings.geminiModel || 'gemini-3.5-flash') === m.model
                                 ? 'bg-brand-50 border-brand-300 text-brand-800'
                                 : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
                             )}
@@ -1674,12 +1683,13 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                       <div className="flex gap-2">
                         <input
                           type="password"
+                          disabled={readOnly}
                           value={localSettings.anthropicApiKey || ''}
                           onChange={(e) => setLocalSettings({ ...localSettings, anthropicApiKey: e.target.value })}
                           placeholder="sk-ant-..."
                           className="input flex-1 font-mono text-sm h-12"
                         />
-                        <button onClick={testConnection} disabled={testStatus === 'testing'}
+                        <button onClick={testConnection} disabled={readOnly || testStatus === 'testing'}
                           className={classNames('w-12 h-12 flex items-center justify-center rounded-xl transition-all border',
                             testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                             testStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -1696,32 +1706,25 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     <div>
                       <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Claude</label>
                       <select
-                        value={localSettings.anthropicModel || 'claude-3-5-sonnet-latest'}
+                        disabled={readOnly}
+                        value={localSettings.anthropicModel || 'claude-sonnet-4-6'}
                         onChange={(e) => setLocalSettings({ ...localSettings, anthropicModel: e.target.value })}
                         className="input h-12"
                       >
-                        <optgroup label="Claude 4">
-                          <option value="claude-opus-4-5">Claude Opus 4.5 — Ultra Intelligence</option>
-                        </optgroup>
-                        <optgroup label="Claude 3.7">
-                          <option value="claude-3-7-sonnet-latest">Claude 3.7 Sonnet — Extended Thinking</option>
-                        </optgroup>
-                        <optgroup label="Claude 3.5">
-                          <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet — Alta Qualidade (Recomendado)</option>
-                          <option value="claude-3-haiku-20240307">Claude 3 Haiku — Mais Rápido</option>
-                        </optgroup>
+                        <option value="claude-sonnet-4-6">Claude Sonnet (4.6/3.5) — Recomendado</option>
+                        <option value="claude-opus-4-5">Claude Opus (4.5) — Ultra Inteligência</option>
                       </select>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
+                      <div className="mt-2 grid grid-cols-2 gap-2">
                         {[
-                          { model: 'claude-3-5-sonnet-latest', label: '3.5 Sonnet', desc: 'Recomendado' },
-                          { model: 'claude-3-7-sonnet-latest', label: '3.7 Sonnet', desc: 'Thinking' },
-                          { model: 'claude-opus-4-5', label: 'Opus 4.5', desc: 'Ultra' },
+                          { model: 'claude-sonnet-4-6', label: 'Sonnet', desc: 'Recomendado' },
+                          { model: 'claude-opus-4-5', label: 'Opus', desc: 'Ultra Inteligência' },
                         ].map(m => (
                           <button
+                            disabled={readOnly}
                             key={m.model}
                             onClick={() => setLocalSettings({ ...localSettings, anthropicModel: m.model })}
                             className={classNames('p-2.5 rounded-xl border text-left transition-all',
-                              (localSettings.anthropicModel || 'claude-3-5-sonnet-latest') === m.model
+                              (localSettings.anthropicModel || 'claude-sonnet-4-6') === m.model
                                 ? 'bg-brand-50 border-brand-300 text-brand-800'
                                 : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
                             )}
@@ -1761,6 +1764,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                         </div>
                         <input
                           type="range" min="0" max="1" step="0.05"
+                          disabled={readOnly}
                           value={currentVal}
                           onChange={e => setLocalSettings(prev => ({
                             ...prev,
@@ -1771,6 +1775,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                         <div className="flex gap-1.5 mt-2">
                           {mode.presets.map(preset => (
                             <button
+                              disabled={readOnly}
                               key={preset.v}
                               onClick={() => setLocalSettings(prev => ({
                                 ...prev,
@@ -1799,6 +1804,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     <p className="text-[9px] text-ink-400 mt-0.5">Ciclo extra de higienização após propostas do Copiloto.</p>
                   </div>
                   <button
+                    disabled={readOnly}
                     onClick={() => setLocalSettings({ ...localSettings, aiAutoRefineEnabled: !localSettings.aiAutoRefineEnabled })}
                     className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
                       localSettings.aiAutoRefineEnabled ? 'bg-brand-600' : 'bg-ink-200'
@@ -1817,6 +1823,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     <p className="text-[9px] text-ink-400 mt-0.5">Ignora a auto-auditoria/scratchpad do modelo para obter laudos mais rapidamente.</p>
                   </div>
                   <button
+                    disabled={readOnly}
                     onClick={() => setLocalSettings({ ...localSettings, aiFastMode: !localSettings.aiFastMode })}
                     className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
                       localSettings.aiFastMode ? 'bg-brand-600' : 'bg-ink-200'

@@ -19,6 +19,7 @@ import {
   onSnapshot,
   writeBatch,
   QueryConstraint,
+  limit,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
@@ -239,9 +240,14 @@ export async function getSettings(): Promise<AppSettings> {
     // Se o preset for modificado localmente, a configuração persistirá sem ser sobrescrita.
     
     // Fallback de segurança para buscar prompts oficiais do administrador
-    if (auth.currentUser?.email !== ADMIN_EMAIL) {
+    const isCurrentUserAdmin = auth.currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    console.log('[DB] Resolvendo settings. Usuário:', auth.currentUser?.email, 'isAdmin:', isCurrentUserAdmin);
+
+    if (!isCurrentUserAdmin) {
+      console.log('[DB] Buscando configurações globais do administrador...');
       const adminSettings = await getAdminSettings();
       if (adminSettings) {
+        console.log('[DB] Configurações globais do administrador carregadas com sucesso. Mesclando com configurações locais...');
         const merged = {
           ...defaultSettings,
           ...data, // Configurações locais do médico (Motor, PACS, CRM, RQE, etc) prevalecem
@@ -254,15 +260,22 @@ export async function getSettings(): Promise<AppSettings> {
           normalDoctrine: adminSettings.normalDoctrine || defaultSettings.normalDoctrine,
           aiAreaPrompts: adminSettings.aiAreaPrompts || defaultSettings.aiAreaPrompts,
           
-          // Chaves de API estritamente isoladas por usuário (sem fallback do admin)
-          geminiApiKey: data.geminiApiKey || '',
-          anthropicApiKey: data.anthropicApiKey || '',
+          // Chaves de API, provedor, modelo e temperaturas herdados do administrador:
+          aiProvider: adminSettings.aiProvider || data.aiProvider || defaultSettings.aiProvider,
+          geminiModel: adminSettings.geminiModel || data.geminiModel || defaultSettings.geminiModel,
+          anthropicModel: adminSettings.anthropicModel || data.anthropicModel || defaultSettings.anthropicModel,
+          geminiApiKey: adminSettings.geminiApiKey || data.geminiApiKey || '',
+          anthropicApiKey: adminSettings.anthropicApiKey || data.anthropicApiKey || '',
+          aiTemperatureByMode: adminSettings.aiTemperatureByMode || data.aiTemperatureByMode || {},
+          aiTemperature: adminSettings.aiTemperature ?? data.aiTemperature ?? defaultSettings.aiTemperature,
         };
 
         if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
           merged.anthropicModel = 'claude-sonnet-4-6';
         }
         return decryptDicomPasswords(merged);
+      } else {
+        console.warn('[DB] getAdminSettings retornou null. O médico não pôde herdar as chaves e prompts do admin.');
       }
     }
     const finalData = { ...defaultSettings, ...data };
@@ -274,6 +287,21 @@ export async function getSettings(): Promise<AppSettings> {
     if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
       finalData.anthropicModel = 'claude-sonnet-4-6';
     }
+
+    // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
+    if (isCurrentUserAdmin || finalData.currentRole === 'admin') {
+      console.log('[DB] Usuário é administrador. Publicando/sincronizando configurações na coleção global (global_config/admin_settings)...');
+      const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+      setDoc(globalDocRef, sanitize({
+        ...finalData,
+        adminUid: auth.currentUser?.uid,
+        adminEmail: auth.currentUser?.email || '',
+        updatedAt: Date.now()
+      }), { merge: true })
+        .then(() => console.log('[DB] Sincronização global concluída.'))
+        .catch(err => console.error('[DB] Erro ao sincronizar global settings do admin:', err));
+    }
+
     return decryptDicomPasswords(finalData);
   } catch (err) {
     logger.warn('[DB] Erro ao carregar settings:', err);
@@ -312,24 +340,114 @@ export async function getSettings(): Promise<AppSettings> {
   };
 }
 
-export async function getAdminSettings(): Promise<AppSettings | null> {
+export async function resolveAdminUid(): Promise<string | null> {
+  if (cachedAdminUid) return cachedAdminUid;
+  if (ADMIN_UID) {
+    cachedAdminUid = ADMIN_UID;
+    return cachedAdminUid;
+  }
+  
+  // Tenta carregar o UID a partir do documento global compartilhado
   try {
-    if (!cachedAdminUid) {
-      cachedAdminUid = ADMIN_UID;
+    const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+    const globalSnap = await getDoc(globalDocRef);
+    if (globalSnap.exists()) {
+      const globalData = globalSnap.data();
+      if (globalData && globalData.adminUid) {
+        console.log('[DB] UID do administrador resolvido do global_config:', globalData.adminUid);
+        cachedAdminUid = globalData.adminUid;
+        return cachedAdminUid;
+      }
     }
-    if (cachedAdminUid) {
-      const adminDocRef = doc(firestore, `users/${cachedAdminUid}/settings`, SETTINGS_DOC_ID);
+  } catch (err) {
+    console.warn('[DB] Erro ao buscar UID do admin em global_config:', err);
+  }
+
+  const adminEmail = ADMIN_EMAIL || 'matheuskpires@gmail.com';
+  console.log('[DB] Buscando UID do admin via query de email na coleção users para:', adminEmail);
+  try {
+    const q = query(
+      collection(firestore, 'users'),
+      where('email', '==', adminEmail),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      cachedAdminUid = snap.docs[0].id;
+      console.log('[DB] UID do administrador resolvido por email na coleção users:', cachedAdminUid);
+      return cachedAdminUid;
+    }
+  } catch (err) {
+    console.warn('[DB] Falha ao buscar UID do administrador por email (provável restrição de regras do Firestore):', err);
+  }
+  
+  console.log('[DB] Buscando UID do admin via query de role na coleção users...');
+  try {
+    const q = query(
+      collection(firestore, 'users'),
+      where('role', '==', 'admin'),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      cachedAdminUid = snap.docs[0].id;
+      console.log('[DB] UID do administrador resolvido por role na coleção users:', cachedAdminUid);
+      return cachedAdminUid;
+    }
+  } catch (err) {
+    console.warn('[DB] Falha ao buscar UID do administrador por role (provável restrição de regras do Firestore):', err);
+  }
+  
+  return null;
+}
+
+export async function getAdminSettings(): Promise<AppSettings | null> {
+  console.log('[DB] getAdminSettings iniciada...');
+  try {
+    // 1. Tenta carregar primeiro do global_config para evitar queries bloqueadas na coleção de users
+    const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+    const globalSnap = await getDoc(globalDocRef);
+    if (globalSnap.exists()) {
+      const globalData = globalSnap.data() as AppSettings & { adminUid?: string };
+      console.log('[DB] Documento global_config/admin_settings encontrado com sucesso. Chaves configuradas:', {
+        hasGeminiKey: !!globalData.geminiApiKey,
+        hasAnthropicKey: !!globalData.anthropicApiKey
+      });
+      if (globalData.adminUid) {
+        cachedAdminUid = globalData.adminUid;
+      }
+      if (globalData.anthropicModel === 'claude-3-5-sonnet-latest' || globalData.anthropicModel === 'claude-3-7-sonnet-latest' || globalData.anthropicModel === 'claude-3-5-haiku-latest') {
+        globalData.anthropicModel = 'claude-3-5-sonnet-latest';
+      }
+      return globalData;
+    } else {
+      console.warn('[DB] Documento global_config/admin_settings NÃO existe no Firestore.');
+    }
+
+    // 2. Fallback para carregar do documento de usuário se o global ainda não existir
+    console.log('[DB] Tentando carregar settings diretamente do documento do usuário administrador como fallback...');
+    const adminUid = await resolveAdminUid();
+    if (adminUid) {
+      const adminDocRef = doc(firestore, `users/${adminUid}/settings`, SETTINGS_DOC_ID);
       const adminSnap = await getDoc(adminDocRef);
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AppSettings;
+        console.log('[DB] Settings carregadas do fallback (documento do admin). Chaves:', {
+          hasGeminiKey: !!adminData.geminiApiKey,
+          hasAnthropicKey: !!adminData.anthropicApiKey
+        });
         if (adminData.anthropicModel === 'claude-3-5-sonnet-latest' || adminData.anthropicModel === 'claude-3-7-sonnet-latest' || adminData.anthropicModel === 'claude-3-5-haiku-latest') {
           adminData.anthropicModel = 'claude-3-5-sonnet-latest';
         }
         return adminData;
+      } else {
+        console.warn(`[DB] Documento de settings do admin (users/${adminUid}/settings/app) não existe.`);
       }
+    } else {
+      console.warn('[DB] Não foi possível resolver o adminUid para o fallback.');
     }
-  } catch (e) {
-    logger.warn('[DB] Erro ao carregar settings do administrador:', e);
+  } catch (e: any) {
+    console.error('[DB] Erro crítico ao carregar settings do administrador:', e);
   }
   return null;
 }
@@ -338,6 +456,25 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   const encrypted = await encryptDicomPasswords(settings);
   const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
   await setDoc(docRef, sanitize(encrypted), { merge: true });
+
+  // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
+  const isCurrentUserAdmin = auth.currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  if (isCurrentUserAdmin || settings.currentRole === 'admin') {
+    console.log('[DB] Usuário é admin no saveSettings. Sincronizando com global_config/admin_settings...');
+    const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+    try {
+      await setDoc(globalDocRef, sanitize({
+        ...encrypted,
+        adminUid: auth.currentUser?.uid,
+        adminEmail: auth.currentUser?.email || '',
+        updatedAt: Date.now()
+      }), { merge: true });
+      console.log('[DB] Sincronização global de settings efetuada no salvamento.');
+    } catch (err) {
+      console.error('[DB] Falha crítica ao salvar global settings no Firestore:', err);
+      throw err;
+    }
+  }
 }
 
 // ─── Generic CRUD ───
@@ -473,13 +610,11 @@ export async function getItem<T>(
   // Fallback de segurança para buscar templates oficiais do administrador/sistema
   if (collectionName === 'templates' && auth.currentUser?.email !== ADMIN_EMAIL) {
     try {
-      if (!cachedAdminUid) {
-        cachedAdminUid = ADMIN_UID;
-      }
+      const adminUid = await resolveAdminUid();
 
       // 2. Tenta carregar o template na coleção do administrador
-      if (cachedAdminUid) {
-        const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, id);
+      if (adminUid) {
+        const adminDocRef = doc(firestore, `users/${adminUid}/templates`, id);
         const adminSnap = await getDoc(adminDocRef);
         if (adminSnap.exists()) {
           return { id: adminSnap.id, ...adminSnap.data(), isSystem: true } as unknown as T & { id: string };

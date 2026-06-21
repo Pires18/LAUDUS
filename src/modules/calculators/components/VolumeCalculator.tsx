@@ -25,7 +25,7 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
       structureName, d1, d2, d3, unit,
       volume: displayVol ? parseFloat(displayVol) : null,
       _summary: displayVol
-        ? `[Volume Calculado] ${name}: ${d1} × ${d2} × ${d3} ${unit} (Vol. Aprox.: ${displayVol} cm³ / mL).`
+        ? `Volume estimado (${name}): ${displayVol} cm³/mL — dimensões ${d1}×${d2}×${d3} ${unit}.`
         : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,9 +1,47 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AppSettings, ExamArea } from '../../types';
 import { logger } from '../../utils/logger';
 import { getRecentFinalizedReports } from '../../store/db';
-import { resolveGeminiModel, getAnthropicBaseUrl } from './engine';
+import { getAnthropicBaseUrl } from './engine';
 import { robustJsonParse } from './json';
+import { auth } from '../../lib/firebase';
+
+function geminiProxyFetch(
+  model: string,
+  systemContext: string,
+  userMessage: string,
+  temperature: number,
+  apiKey?: string
+): Promise<Response> {
+  return fetch('/api/gemini', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-uid': auth.currentUser?.uid || 'anonymous',
+      'x-gemini-model': model,
+      'x-gemini-stream': 'false',
+      'x-api-key': apiKey || '',
+    },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemContext }] },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      generationConfig: { temperature, topP: 0.9, maxOutputTokens: 8192 },
+    }),
+  });
+}
+
+function resolveGeminiModel(rawModel?: string): string {
+  const raw = (rawModel || '').toLowerCase();
+
+  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
+  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
+  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
+  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
+
+  return 'gemini-3.5-flash';
+}
 import {
   DEFAULT_CUSTOM_FORM_PROMPT,
   DEFAULT_ANAMNESIS_PROMPT,
@@ -30,10 +68,7 @@ export async function generateTemplateStructure(
   settings: AppSettings
 ): Promise<GeneratedTemplate> {
   const provider = settings.aiProvider || 'anthropic';
-  const hasKey = provider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
-  if (!hasKey) {
-    throw new Error(`API Key do ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada. Vá em Configurações para adicionar.`);
-  }
+  const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
 
   // Busca exemplos de laudos da mesma área para mimetizar o estilo
   // Como é um novo template, buscamos laudos da área em geral
@@ -105,27 +140,22 @@ Gere o JSON da máscara do laudo agora.`;
 
   let text = '';
   if (provider === 'gemini') {
-    const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
-    const model = genAI.getGenerativeModel({
-      model: resolveGeminiModel(settings.geminiModel),
-      systemInstruction: systemContext,
-      generationConfig: {
-        temperature: 0.2,
-        topP: 0.9,
-        maxOutputTokens: 8192,
-      }
-    });
-
-    const result = await model.generateContent(userMessage);
-    text = result.response.text();
+    const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.2, settings.geminiApiKey);
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Erro na API do Gemini (${resp.status}): ${errText}`);
+    }
+    const result = await resp.json();
+    text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } else {
-    const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
+    const response = await fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey || '',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'x-api-key': settings.anthropicApiKey || '',
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',
@@ -180,10 +210,7 @@ export async function generateTemplateField(
   settings: AppSettings
 ): Promise<string> {
   const provider = settings.aiProvider || 'anthropic';
-  const hasKey = provider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
-  if (!hasKey) {
-    throw new Error(`API Key do ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada. Vá em Configurações para adicionar.`);
-  }
+  const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
 
   let systemContext = '';
   let userMessage = '';
@@ -201,27 +228,22 @@ export async function generateTemplateField(
 
   let text = '';
   if (provider === 'gemini') {
-    const genAI = new GoogleGenerativeAI(settings.geminiApiKey || '');
-    const model = genAI.getGenerativeModel({
-      model: resolveGeminiModel(settings.geminiModel),
-      systemInstruction: systemContext,
-      generationConfig: {
-        temperature: 0.3,
-        topP: 0.9,
-        maxOutputTokens: 8192,
-      }
-    });
-
-    const result = await model.generateContent(userMessage);
-    text = result.response.text();
+    const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.3, settings.geminiApiKey);
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`Erro na API do Gemini (${resp.status}): ${errText}`);
+    }
+    const result = await resp.json();
+    text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
   } else {
-    const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
+    const response = await fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey || '',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'x-api-key': settings.anthropicApiKey || '',
       },
       body: JSON.stringify({
         model: settings.anthropicModel || 'claude-3-5-sonnet-latest',

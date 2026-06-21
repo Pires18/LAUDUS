@@ -2,10 +2,8 @@ export const config = {
   runtime: 'edge',
 };
 
-// In-memory rate limiter — resets per Edge instance restart.
-// For distributed rate limiting, replace with Vercel KV.
-const RATE_LIMIT = 20;         // max requests
-const RATE_WINDOW_MS = 60_000; // per 60 seconds
+const RATE_LIMIT = 20;
+const RATE_WINDOW_MS = 60_000;
 
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 
@@ -28,7 +26,7 @@ export default async function handler(req: Request) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-uid, anthropic-version, anthropic-beta',
+        'Access-Control-Allow-Headers': 'Content-Type, x-uid, x-gemini-model, x-gemini-stream',
       },
     });
   }
@@ -38,7 +36,6 @@ export default async function handler(req: Request) {
   }
 
   try {
-    // Rate limiting per uid
     const uid = (req.headers.get('x-uid') || 'anonymous').slice(0, 64);
     if (!checkRateLimit(uid)) {
       return new Response(
@@ -47,29 +44,25 @@ export default async function handler(req: Request) {
       );
     }
 
-    const headers = new Headers();
-    headers.set('content-type', 'application/json');
-
-    let apiKey = (req.headers.get('x-api-key') || req.headers.get('x-anthropic-key') || '').trim();
+    let apiKey = (req.headers.get('x-api-key') || req.headers.get('x-gemini-key') || '').trim();
     if (!apiKey) {
-      apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+      apiKey = (process.env.GOOGLE_API_KEY || '').trim();
     }
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API key not configured on server' }), { status: 503 });
+      return new Response(JSON.stringify({ error: 'Gemini API key not configured on server' }), { status: 503 });
     }
-    headers.set('x-api-key', apiKey);
 
-    const anthropicVersion = req.headers.get('anthropic-version');
-    if (anthropicVersion) headers.set('anthropic-version', anthropicVersion);
-
-    const anthropicBeta = req.headers.get('anthropic-beta');
-    if (anthropicBeta) headers.set('anthropic-beta', anthropicBeta);
-
+    const model = req.headers.get('x-gemini-model') || 'gemini-3.5-flash';
+    const isStream = req.headers.get('x-gemini-stream') === 'true';
     const body = await req.text();
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const endpoint = isStream
+      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`
+      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body,
     });
 

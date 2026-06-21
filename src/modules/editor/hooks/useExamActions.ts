@@ -102,7 +102,7 @@ export function useExamActions({
         getPatientPreviousExams(patient.id, template.area, examId, 2)
       ]);
 
-      const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+      const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
       let html: string;
 
       if (hasKey) {
@@ -190,7 +190,7 @@ export function useExamActions({
         : rawMsg.includes('403') || rawMsg.includes('unauthorized') || rawMsg.includes('Unauthorized')
           ? 'API Key inválida ou sem permissão. Verifique em Configurações.'
           : rawMsg.includes('API Key') || rawMsg.includes('api key')
-            ? 'Chave de API não configurada. Acesse Configurações para adicionar.'
+            ? `Chave de API não configurada. Acesse Configurações para adicionar. (Detalhe: ${rawMsg})`
             : rawMsg.includes('429') || rawMsg.includes('quota') || rawMsg.includes('RESOURCE_EXHAUSTED')
               ? 'Limite de requisições da API atingido. Aguarde alguns segundos.'
               : rawMsg;

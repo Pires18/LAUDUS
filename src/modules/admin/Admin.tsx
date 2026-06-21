@@ -17,8 +17,9 @@ import { AdminAudit } from './submodules/AdminAudit';
 import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
 import { AdminLicenses } from './submodules/AdminLicenses';
+import { SharedLaudIA } from '../laud-ia/SharedLaudIA';
 
-type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'licenses';
+type AdminTab = 'overview' | 'users' | 'plans' | 'audit' | 'support' | 'masks' | 'licenses' | 'laud-ia';
 
 export function Admin() {
   const { view } = useApp();
@@ -26,6 +27,7 @@ export function Admin() {
 
   const tabs = [
     { id: 'overview', label: 'Geral', icon: LayoutDashboard },
+    { id: 'laud-ia', label: 'LAUD.IA', icon: Sparkles },
     { id: 'users', label: 'Usuários', icon: Users },
     { id: 'plans', label: 'Planos', icon: CreditCard },
     { id: 'licenses', label: 'Licenças', icon: Key },
@@ -77,6 +79,7 @@ export function Admin() {
         {/* Content Area */}
         <div className="animate-fade-in-up">
           {activeTab === 'overview' && <AdminOverview onNavigate={setActiveTab} />}
+          {activeTab === 'laud-ia' && <SharedLaudIA />}
           {activeTab === 'users' && <AdminUsers />}
           {activeTab === 'plans' && <AdminPlans />}
           {activeTab === 'licenses' && <AdminLicenses />}
@@ -248,7 +251,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
                  return `Motor operando normalmente. Latência média: ${avgLatency} · Taxa de sucesso: ${successRate} nas últimas requisições.`;
                })()}
              </p>
-             <p className="text-[10px] text-ink-400 font-semibold">Personalizações disponíveis para cada usuário via sidebar → LAUD.IA.</p>
+             <p className="text-[10px] text-ink-400 font-semibold">Configurações avançadas disponíveis na aba LAUD.IA acima.</p>
           </div>
         </div>
       </div>

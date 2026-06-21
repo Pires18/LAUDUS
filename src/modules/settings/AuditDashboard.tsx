@@ -44,27 +44,15 @@ export function AuditDashboard() {
   useEffect(() => {
     const newResults: AuditResult[] = [];
 
-    // 1. API Key Check
-    const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
-    if (!hasKey) {
-      newResults.push({
-        id: 'api-key',
-        category: 'security',
-        status: 'error',
-        title: `API Key do ${settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} Ausente`,
-        message: 'O sistema está operando em modo demo. Configure a API Key para habilitar a IA.',
-        icon: <Key size={18} />
-      });
-    } else {
-      newResults.push({
-        id: 'api-key',
-        category: 'security',
-        status: 'ok',
-        title: 'IA Conectada',
-        message: `API Key configurada e motor ${settings.aiProvider === 'anthropic' ? 'Claude' : 'Gemini'} pronto para uso.`,
-        icon: <Key size={18} />
-      });
-    }
+    // 1. API Key Check (Anthropic and Gemini are managed globally by the Admin or server-side)
+    newResults.push({
+      id: 'api-key',
+      category: 'security',
+      status: 'ok',
+      title: 'IA Conectada',
+      message: `Motor ${settings.aiProvider === 'anthropic' ? 'Claude' : 'Gemini'} pronto para uso (utilizando chaves globais do administrador/servidor).`,
+      icon: <Key size={18} />
+    });
 
     // 2. Templates Health
     const templatesWithoutContent = templates.filter(t => !t.analysisTemplate);

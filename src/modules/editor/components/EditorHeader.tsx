@@ -1,6 +1,6 @@
 import {
   ChevronLeft, CheckCircle2, Settings, Play, ScanSearch,
-  Loader2, AlertCircle, ClipboardList
+  Loader2, AlertCircle, ClipboardList, Printer
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDate, classNames } from '../../../utils/format';
@@ -273,6 +273,16 @@ export function EditorHeader({
               <CheckCircle2 size={13} className="text-emerald-600" />
               <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest hidden lg:inline">Finalizado</span>
             </div>
+            
+            {/* Botão de imprimir PDF */}
+            <button
+              onClick={() => window.print()}
+              className="h-9 px-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 shadow-sm flex items-center gap-1.5 active:scale-95"
+            >
+              <Printer size={13} />
+              <span>Imprimir PDF</span>
+            </button>
+
             <button
               onClick={onUnlock}
               className="h-9 px-3 rounded-xl bg-white text-ink-500 hover:text-ink-800 hover:bg-ink-50 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 border border-ink-200 shadow-sm"

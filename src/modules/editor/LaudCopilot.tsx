@@ -653,11 +653,7 @@ export function LaudCopilot({
     }
     lastCallRef.current = now;
 
-    const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
-    if (!hasKey) {
-      showToast(`Configure a API do ${settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'}`, 'error');
-      return;
-    }
+    const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
 
     cancelActiveRequest();
     const controller = new AbortController();
@@ -795,7 +791,7 @@ export function LaudCopilot({
       logger.error('[LaudCopilot] handleSend error', error);
       const msg = error instanceof Error ? error.message : String(error) || 'Erro desconhecido';
       const friendlyMsg = msg.includes('API Key') || msg.includes('api key') || msg.includes('apiKey')
-        ? 'Chave de API não configurada. Acesse Configurações para adicionar.'
+        ? `Chave de API não configurada. Acesse Configurações para adicionar. (Detalhe: ${msg})`
         : msg.includes('403') || msg.includes('unauthorized') || msg.includes('Unauthorized')
           ? 'API Key inválida ou sem permissão. Verifique em Configurações.'
           : msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')
@@ -804,7 +800,7 @@ export function LaudCopilot({
               ? 'Erro de conexão com a API. Verifique sua internet e a chave configurada.'
               : msg.includes('404') || msg.includes('not found') || msg.includes('models/')
                 ? `Modelo de IA não encontrado. Verifique o nome do modelo em Configurações.`
-                : `Erro na IA: ${msg.substring(0, 100)}`;
+                : `Erro na IA: ${msg.substring(0, 150)}`;
       showToast(friendlyMsg, 'error');
       onChatUpdate([...chatHistory, { role: 'assistant', content: `❌ ${friendlyMsg}` }]);
     } finally {
@@ -872,43 +868,54 @@ export function LaudCopilot({
 
   return (
     <div className={classNames(
-      "flex flex-col h-full min-h-0 bg-ink-50 relative overflow-hidden",
-      isDocked ? "shadow-none" : "rounded-none md:rounded-b-[2.5rem]"
+      "flex flex-col h-full min-h-0 bg-white relative overflow-hidden",
+      isDocked ? "" : ""
     )}>
-      <div className="flex border-b border-ink-100 bg-white p-1.5 shrink-0 select-none z-10 shadow-sm">
+
+      {/* ── Tab Bar ── */}
+      <div className="flex border-b border-ink-100 bg-white shrink-0 select-none z-10">
         <button
           onClick={() => setActiveTab('chat')}
           className={classNames(
-            "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all",
-            activeTab === 'chat'
-              ? "bg-ink-900 text-white shadow-md shadow-ink-900/10"
-              : "text-ink-500 hover:text-ink-800 hover:bg-ink-50"
+            "flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-[11px] font-black uppercase tracking-widest transition-all relative",
+            activeTab === 'chat' ? "text-brand-700" : "text-ink-400 hover:text-ink-700"
           )}
         >
-          <Sparkles size={14} className={classNames(activeTab === 'chat' && "animate-pulse")} />
+          <Sparkles size={12} className={activeTab === 'chat' ? "text-brand-500" : ""} />
           Chat Laud.IA
           {chatHistory.filter(m => m.role === 'user').length > 0 && (
-            <span className="text-[9px] bg-brand-500 text-white rounded-full px-1.5 py-0.5 font-black ml-0.5">
+            <span className="w-4 h-4 bg-brand-500 text-white text-[8px] font-black rounded-full flex items-center justify-center ml-0.5">
               {chatHistory.filter(m => m.role === 'user').length}
             </span>
+          )}
+          {activeTab === 'chat' && (
+            <motion.div
+              layoutId="copilot-tab-indicator"
+              className="absolute bottom-0 left-4 right-4 h-0.5 bg-brand-600 rounded-full"
+            />
           )}
         </button>
         <button
           onClick={() => setActiveTab('form')}
           className={classNames(
-            "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all",
-            activeTab === 'form'
-              ? "bg-ink-900 text-white shadow-md shadow-ink-900/10"
-              : "text-ink-500 hover:text-ink-800 hover:bg-ink-50"
+            "flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-[11px] font-black uppercase tracking-widest transition-all relative",
+            activeTab === 'form' ? "text-brand-700" : "text-ink-400 hover:text-ink-700"
           )}
         >
-          <ClipboardList size={14} />
-          Formulário Rápido
+          <ClipboardList size={12} className={activeTab === 'form' ? "text-brand-500" : ""} />
+          Formulário
+          {activeTab === 'form' && (
+            <motion.div
+              layoutId="copilot-tab-indicator"
+              className="absolute bottom-0 left-4 right-4 h-0.5 bg-brand-600 rounded-full"
+            />
+          )}
         </button>
       </div>
 
       {activeTab === 'chat' && (
         <>
+          {/* Refine phase banner */}
           <AnimatePresence>
             {refinePhase !== 'idle' && (
               <motion.div
@@ -917,59 +924,56 @@ export function LaudCopilot({
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden shrink-0"
               >
-                <div className="bg-violet-50 border-b border-violet-100 px-4 py-2 flex items-center gap-3">
+                <div className="bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100 px-4 py-2.5 flex items-center gap-3">
                   <div className="flex gap-1 items-center">
                     <div className={classNames(
-                      "w-2 h-2 rounded-full",
+                      "w-2 h-2 rounded-full transition-all",
                       refinePhase === 'integrating' ? 'bg-violet-500 animate-pulse' : 'bg-emerald-500'
                     )} />
                     <div className={classNames(
-                      "w-2 h-2 rounded-full",
+                      "w-2 h-2 rounded-full transition-all",
                       refinePhase === 'refining' ? 'bg-violet-500 animate-pulse' : 'bg-ink-200'
                     )} />
                   </div>
                   <span className="text-[10px] font-black text-violet-700 uppercase tracking-widest">
-                    {refinePhase === 'integrating' ? 'Etapa 1/2 — Integrando alteração...' : 'Etapa 2/2 — Refinando e padronizando...'}
+                    {refinePhase === 'integrating' ? 'Etapa 1/2 — Integrando...' : 'Etapa 2/2 — Refinando...'}
                   </span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 scroll-smooth bg-gradient-to-b from-white/40 to-ink-50/60 custom-scrollbar">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth custom-scrollbar bg-ink-50/40">
             <AnimatePresence mode="popLayout">
               {chatHistory.length === 0 ? (
                 <motion.div
                   key="empty"
-                  initial={{ opacity: 0, y: 5 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  className="h-full flex flex-col items-center justify-center py-10"
+                  exit={{ opacity: 0 }}
+                  className="h-full flex flex-col items-center justify-center py-12 px-4"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-ink-100/80 text-brand-600 flex items-center justify-center mx-auto mb-6 shadow-inner border border-white">
-                    <Sparkles size={24} />
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-100 to-brand-200/80 flex items-center justify-center mb-5 shadow-sm">
+                    <Sparkles size={26} className="text-brand-600" />
                   </div>
-                  <h4 className="font-semibold text-lg text-ink-800 tracking-tight mb-2">Como posso ajudar?</h4>
-                  <p className="text-xs text-ink-500 max-w-[260px] text-center mb-6">
-                    Descreva alterações, solicite refinos ou clique nas sugestões abaixo.
+                  <h4 className="font-bold text-base text-ink-800 mb-1.5 tracking-tight">Como posso ajudar?</h4>
+                  <p className="text-xs text-ink-500 max-w-[240px] text-center mb-6 leading-relaxed">
+                    Descreva os achados, solicite um refino ou use as sugestões abaixo.
                   </p>
-
-                  <div className="flex flex-wrap justify-center gap-2 max-w-[320px]">
+                  <div className="flex flex-wrap justify-center gap-2 max-w-[300px]">
                     <button
                       onClick={() => onShowCalculators()}
-                      className="px-3 py-2 bg-gradient-to-r from-brand-50 to-brand-100 border border-brand-200 hover:border-brand-400 text-brand-700 rounded-full text-[11px] font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 border border-amber-200 hover:border-amber-300 hover:bg-amber-100 text-amber-700 rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-sm"
                     >
-                      <Calculator size={14} />
+                      <Calculator size={13} />
                       Calculadoras
                     </button>
                     {areaSuggestions.map((sug, i) => (
                       <button
                         key={i}
-                        onClick={() => {
-                          onChangePrompt(sug.text);
-                          handleSend(sug.text);
-                        }}
-                        className="px-3 py-2 bg-white border border-ink-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 rounded-full text-[11px] font-medium text-ink-600 transition-colors shadow-sm active:scale-95"
+                        onClick={() => { onChangePrompt(sug.text); handleSend(sug.text); }}
+                        className="px-3 py-2 bg-white border border-ink-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 rounded-xl text-[11px] font-medium text-ink-600 transition-all shadow-sm active:scale-95"
                       >
                         {sug.label}
                       </button>
@@ -984,32 +988,35 @@ export function LaudCopilot({
                     return (
                       <motion.div
                         key={idx}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex gap-3"
+                        className="flex gap-2.5 items-start"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center border border-brand-100 shadow-sm shrink-0">
-                          <Loader2 size={18} className="animate-spin text-brand-500" />
+                        <div className="w-7 h-7 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center border border-brand-100 shrink-0 mt-0.5">
+                          <Bot size={14} />
                         </div>
-                        <div className="bg-white border border-ink-100 px-5 py-3.5 rounded-2xl rounded-tl-none text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-sm">
+                        <div className="bg-white border border-ink-100 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2.5">
                           {genPhase === 'reasoning'
-                            ? <Brain size={14} className="text-violet-500 shrink-0" />
+                            ? <Brain size={13} className="text-violet-500 shrink-0" />
                             : genPhase === 'writing'
-                            ? <Pencil size={14} className="text-brand-500 shrink-0" />
-                            : <Loader2 size={14} className="animate-spin text-brand-500 shrink-0" />
+                            ? <Pencil size={13} className="text-brand-500 shrink-0" />
+                            : <Loader2 size={13} className="animate-spin text-brand-400 shrink-0" />
                           }
-                          <span className={genPhase === 'reasoning' ? 'text-violet-700' : 'text-brand-700'}>
+                          <span className={classNames(
+                            "text-[10px] font-black uppercase tracking-widest",
+                            genPhase === 'reasoning' ? 'text-violet-700' : 'text-brand-700'
+                          )}>
                             {phaseLabel}
                           </span>
-                          <div className="flex gap-1 items-center h-4 ml-1">
-                            {[0, 1, 2].map((i) => (
+                          <div className="flex gap-0.5 items-center h-3 ml-1">
+                            {[0, 1, 2].map(i => (
                               <motion.div
                                 key={i}
-                                animate={{ scaleY: [1, 2, 1], opacity: [0.4, 1, 0.4] }}
-                                transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }}
+                                animate={{ scaleY: [1, 2.5, 1], opacity: [0.3, 1, 0.3] }}
+                                transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.2 }}
                                 className={classNames(
-                                  "w-0.5 h-3 rounded-full",
-                                  genPhase === 'reasoning' ? 'bg-violet-500' : 'bg-brand-500'
+                                  "w-0.5 h-2.5 rounded-full",
+                                  genPhase === 'reasoning' ? 'bg-violet-400' : 'bg-brand-400'
                                 )}
                               />
                             ))}
@@ -1025,35 +1032,35 @@ export function LaudCopilot({
                       return (
                         <motion.div
                           key={idx}
-                          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          className="flex gap-3 w-full flex-row-reverse"
+                          className="flex gap-2.5 flex-row-reverse items-start"
                         >
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm border-2 bg-brand-600 text-white border-brand-500 shadow-brand-500/10">
-                            <User size={18} />
+                          <div className="w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center shrink-0 mt-0.5">
+                            <User size={13} />
                           </div>
-                          <div className="flex flex-col gap-2 max-w-[82%]">
-                            <div className="bg-white border border-brand-100 rounded-2xl rounded-tr-none p-4 shadow-sm space-y-4 relative overflow-hidden">
-                              <div className="flex items-center gap-2.5 relative z-10">
-                                <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 border border-brand-100 flex items-center justify-center shadow-sm">
-                                  <Calculator size={16} />
+                          <div className="flex flex-col gap-2 max-w-[85%]">
+                            <div className="bg-white border border-ink-100 rounded-2xl rounded-tr-none p-4 shadow-sm space-y-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
+                                  <Calculator size={14} />
                                 </div>
                                 <div>
-                                  <span className="text-[9px] font-black uppercase tracking-widest block text-ink-400">Calculadora</span>
-                                  <span className="text-[11px] text-ink-800 font-bold uppercase tracking-tight block">{calcData.title}</span>
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-ink-400 block">Calculadora</span>
+                                  <span className="text-xs text-ink-800 font-bold block">{calcData.title}</span>
                                 </div>
                               </div>
                               {calcData.conclusion && (
-                                <div className="p-3 bg-ink-50 border border-ink-100 rounded-xl relative z-10">
-                                  <p className="text-[11px] font-bold text-ink-700 leading-relaxed">{calcData.conclusion}</p>
+                                <div className="p-3 bg-ink-50 rounded-xl border border-ink-100">
+                                  <p className="text-xs font-medium text-ink-700 leading-relaxed">{calcData.conclusion}</p>
                                 </div>
                               )}
                               {calcData.metrics.length > 0 && (
-                                <div className="grid grid-cols-2 gap-2 relative z-10">
+                                <div className="grid grid-cols-2 gap-1.5">
                                   {calcData.metrics.map((m, i) => (
                                     <div key={i} className="p-2.5 bg-white border border-ink-100 rounded-xl flex flex-col shadow-sm">
                                       <span className="text-[8px] font-black text-ink-400 uppercase tracking-widest">{m.key}</span>
-                                      <span className="text-[11px] font-bold text-ink-800 mt-1">{m.value}</span>
+                                      <span className="text-xs font-bold text-ink-800 mt-0.5">{m.value}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -1061,9 +1068,9 @@ export function LaudCopilot({
                               {calcData.calcId && (
                                 <button
                                   onClick={() => onShowCalculators(calcData.calcId)}
-                                  className="mt-2 w-full py-2 bg-white border border-brand-200 hover:border-brand-400 hover:bg-brand-50 text-brand-600 rounded-xl text-[10px] font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+                                  className="w-full h-8 rounded-xl bg-ink-50 border border-ink-200 hover:border-brand-300 hover:bg-brand-50 text-ink-500 hover:text-brand-600 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <RotateCcw size={12} />
+                                  <RotateCcw size={11} />
                                   Reabrir Calculadora
                                 </button>
                               )}
@@ -1080,26 +1087,26 @@ export function LaudCopilot({
                       return (
                         <motion.div
                           key={idx}
-                          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          className="flex gap-3 w-full flex-row-reverse"
+                          className="flex gap-2.5 flex-row-reverse items-start"
                         >
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm border-2 bg-brand-600 text-white border-brand-500 shadow-brand-500/10">
-                            <User size={18} />
+                          <div className="w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center shrink-0 mt-0.5">
+                            <User size={13} />
                           </div>
-                          <div className="flex flex-col gap-2 max-w-[82%]">
-                            <div className="bg-white border border-brand-100 rounded-2xl rounded-tr-none p-4 shadow-sm space-y-4 relative overflow-hidden">
-                              <div className="flex items-center gap-2.5 relative z-10">
-                                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-sm">
-                                  <ClipboardList size={16} />
+                          <div className="flex flex-col gap-2 max-w-[85%]">
+                            <div className="bg-white border border-ink-100 rounded-2xl rounded-tr-none p-4 shadow-sm space-y-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                                  <ClipboardList size={14} />
                                 </div>
                                 <div>
-                                  <span className="text-[9px] font-black uppercase tracking-widest block text-ink-400">Achados do Formulário</span>
-                                  <span className="text-[11px] text-ink-800 font-bold uppercase tracking-tight block">{formData.title}</span>
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-ink-400 block">Formulário</span>
+                                  <span className="text-xs text-ink-800 font-bold block">{formData.title}</span>
                                 </div>
                               </div>
-                              <div className="relative z-10 p-4 bg-ink-50 border border-ink-100 rounded-xl max-h-[220px] overflow-y-auto custom-scrollbar">
-                                <p className="text-[11px] font-medium text-ink-700 whitespace-pre-wrap leading-relaxed">{formData.body}</p>
+                              <div className="p-3 bg-ink-50 rounded-xl border border-ink-100 max-h-[180px] overflow-y-auto custom-scrollbar">
+                                <p className="text-xs font-medium text-ink-700 whitespace-pre-wrap leading-relaxed">{formData.body}</p>
                               </div>
                             </div>
                           </div>
@@ -1113,41 +1120,52 @@ export function LaudCopilot({
                   return (
                     <motion.div
                       key={idx}
-                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       className={classNames(
-                        "flex gap-3 w-full",
-                        isUser ? "flex-row-reverse" : "flex-row"
+                        "flex gap-2.5 items-start",
+                        isUser ? "flex-row-reverse" : ""
                       )}
                     >
                       <div className={classNames(
-                        "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm border-2",
-                        isUser ? "bg-ink-900 text-white border-ink-800 shadow-ink-900/10" : "bg-white border-ink-100 text-brand-600 shadow-sm"
+                        "w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 border",
+                        isUser
+                          ? "bg-ink-900 text-white border-ink-800"
+                          : "bg-brand-50 text-brand-600 border-brand-100"
                       )}>
-                        {isUser ? <User size={18} /> : <Bot size={18} />}
+                        {isUser ? <User size={13} /> : <Bot size={14} />}
                       </div>
 
-                      <div className="flex flex-col gap-2 max-w-[82%]">
+                      <div className={classNames(
+                        "flex flex-col gap-2",
+                        isUser ? "items-end max-w-[84%]" : "items-start max-w-[88%]"
+                      )}>
                         <div className={classNames(
-                          "p-4 rounded-2xl text-xs leading-relaxed shadow-sm border transition-all hover:shadow-md",
+                          "px-4 py-3 rounded-2xl text-xs leading-relaxed shadow-sm",
                           isUser
-                            ? "bg-brand-50 text-brand-900 border-brand-100 rounded-tr-none shadow-md shadow-brand-500/5"
-                            : "bg-white border-ink-200 text-ink-800 rounded-tl-none shadow-sm"
+                            ? "bg-ink-900 text-white rounded-tr-none"
+                            : "bg-white border border-ink-100 text-ink-800 rounded-tl-none"
                         )}>
-                          {renderRichClinicalContent(conversation, isUser)}
+                          {isUser
+                            ? <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap">{conversation}</p>
+                            : renderRichClinicalContent(conversation, false)
+                          }
                         </div>
 
                         {!isUser && proposal && (
                           <motion.div
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-brand-50 border border-brand-200/60 rounded-2xl p-3 flex flex-col gap-2 shadow-sm relative mt-1"
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="w-full bg-gradient-to-br from-brand-50 to-brand-100/40 border border-brand-200/70 rounded-2xl p-3.5 flex flex-col gap-2.5 shadow-sm"
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-brand-800 flex items-center gap-1.5">
-                                <Sparkles size={12} className="text-brand-500" />
-                                {appliedIndices.includes(idx) ? 'Laudo Modificado' : 'Sugestão Pronta'}
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles size={11} className="text-brand-500" />
+                              <span className="text-[10px] font-black text-brand-800 uppercase tracking-widest">
+                                {appliedIndices.includes(idx) ? 'Laudo Atualizado' : 'Proposta Pronta'}
                               </span>
+                              {appliedIndices.includes(idx) && (
+                                <CheckCircle2 size={11} className="text-emerald-500 ml-auto" />
+                              )}
                             </div>
                             <button
                               disabled={isGenerating}
@@ -1161,21 +1179,20 @@ export function LaudCopilot({
                                 showToast('Alterações aplicadas com sucesso.', 'success');
                               }}
                               className={classNames(
-                                "h-8 px-3 rounded-xl text-[11px] font-semibold transition-all flex items-center justify-center gap-2 group",
+                                "h-9 w-full rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98]",
                                 isGenerating
-                                  ? "bg-ink-200 text-ink-500 cursor-not-allowed"
+                                  ? "bg-ink-100 text-ink-400 cursor-not-allowed"
                                   : appliedIndices.includes(idx)
                                     ? "bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                    : "bg-ink-900 hover:bg-ink-800 text-white shadow-sm hover:shadow active:scale-95"
+                                    : "bg-ink-900 hover:bg-ink-700 text-white shadow-sm"
                               )}
                             >
-                              {isGenerating ? (
-                                <><Loader2 size={14} className="animate-spin" /> Processando...</>
-                              ) : appliedIndices.includes(idx) ? (
-                                <><CheckCircle2 size={14} /> Aplicado (Clique para reaplicar)</>
-                              ) : (
-                                <><Zap size={14} /> Aplicar ao Laudo</>
-                              )}
+                              {isGenerating
+                                ? <><Loader2 size={13} className="animate-spin" /> Processando...</>
+                                : appliedIndices.includes(idx)
+                                  ? <><RotateCcw size={13} /> Reaplicar ao Laudo</>
+                                  : <><Zap size={13} /> Aplicar ao Laudo</>
+                              }
                             </button>
                           </motion.div>
                         )}
@@ -1185,24 +1202,26 @@ export function LaudCopilot({
                 })
               )}
             </AnimatePresence>
-            {/* Proactive follow-up suggestions after last AI response */}
+
+            {/* Follow-up suggestions after last AI response */}
             <AnimatePresence>
               {!isGenerating && chatHistory.length > 0 && chatHistory[chatHistory.length - 1]?.role === 'assistant' && chatHistory[chatHistory.length - 1]?.content !== '__thinking__' && (
                 <motion.div
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="px-4 pt-2 pb-1"
+                  className="px-1 pt-1 pb-1"
                 >
-                  <p className="text-[8px] font-black text-ink-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                    <Lightbulb size={9} className="text-amber-500" /> Próximos passos sugeridos
+                  <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <Lightbulb size={9} className="text-amber-500" />
+                    Próximos passos
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {areaSuggestions.slice(0, 3).map((sug, i) => (
                       <button
                         key={i}
                         onClick={() => { onChangePrompt(sug.text); handleSend(sug.text); }}
-                        className="px-2.5 py-1.5 bg-amber-50 border border-amber-200 hover:border-amber-400 hover:bg-amber-100 text-amber-800 rounded-full text-[10px] font-semibold transition-all active:scale-95"
+                        className="px-2.5 py-1.5 bg-white border border-ink-200 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 text-ink-600 rounded-full text-[10px] font-semibold transition-all active:scale-95 shadow-sm"
                       >
                         {sug.label}
                       </button>
@@ -1211,17 +1230,19 @@ export function LaudCopilot({
                 </motion.div>
               )}
             </AnimatePresence>
+
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 pb-8 sm:pb-4 bg-white border-t border-ink-100 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] shrink-0 flex flex-col gap-3">
-            <div className="flex items-end gap-2 bg-ink-50 border border-ink-200 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/10 rounded-2xl p-1.5 transition-all">
+          {/* Input area */}
+          <div className="p-3 pb-4 bg-white border-t border-ink-100 shrink-0 flex flex-col gap-2.5">
+            <div className="flex items-end gap-1.5 bg-ink-50 border border-ink-200 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/10 rounded-2xl px-2 py-1.5 transition-all">
               <button
                 onClick={() => onShowCalculators()}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-ink-400 hover:bg-ink-200/50 hover:text-ink-700 transition-colors shrink-0"
-                title="Calculadoras Clínicas"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-ink-400 hover:bg-white hover:text-amber-600 hover:shadow-sm transition-all shrink-0"
+                title="Calculadoras"
               >
-                <Calculator size={18} />
+                <Calculator size={16} />
               </button>
 
               <textarea
@@ -1233,97 +1254,93 @@ export function LaudCopilot({
                     handleSend();
                   }
                 }}
-                placeholder={isGenerating ? 'IA processando...' : 'Ex: cisto de 15 mm no rim direito...'}
+                placeholder={isGenerating ? 'IA processando...' : 'Descreva achados ou peça um ajuste...'}
                 disabled={isGenerating}
-                className="flex-1 w-full bg-transparent outline-none text-sm font-medium text-ink-800 placeholder-ink-400 resize-none max-h-32 min-h-[36px] py-2 px-1 disabled:opacity-50"
+                className="flex-1 bg-transparent outline-none text-sm font-medium text-ink-800 placeholder-ink-400 resize-none max-h-28 min-h-[34px] py-1.5 px-1 disabled:opacity-50"
                 rows={prompt.split('\n').length > 1 ? Math.min(prompt.split('\n').length, 4) : 1}
               />
 
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={toggleListening}
+                  title={isListening ? 'Parar ditado' : 'Ditado por voz'}
                   className={classNames(
-                    "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                    "w-8 h-8 rounded-xl flex items-center justify-center transition-all",
                     isListening
-                      ? "bg-red-50 text-red-600"
-                      : "text-ink-400 hover:bg-ink-200/50 hover:text-ink-700"
+                      ? "bg-red-500 text-white shadow-sm animate-pulse"
+                      : "text-ink-400 hover:bg-white hover:text-ink-700 hover:shadow-sm"
                   )}
                 >
-                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                  {isListening ? <MicOff size={15} /> : <Mic size={15} />}
                 </button>
 
                 {isGenerating ? (
                   <button
                     onClick={handleCancelGeneration}
-                    className="w-9 h-9 rounded-xl bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-sm active:scale-95"
-                    title="Cancelar geração"
+                    className="w-8 h-8 rounded-xl bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                    title="Cancelar"
                   >
-                    <StopCircle size={16} />
+                    <StopCircle size={15} />
                   </button>
                 ) : (
                   <button
                     onClick={() => handleSend()}
                     disabled={!prompt.trim() || isGenerating}
-                    className="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center hover:bg-brand-700 disabled:opacity-50 transition-all shadow-sm active:scale-95"
+                    className="w-8 h-8 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                    title="Enviar (Enter)"
                   >
-                    <Send size={16} />
+                    <Send size={15} />
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={autoRefineEnabled}
-                    onChange={(e) => handleToggleAutoRefine(e.target.checked)}
-                  />
+            {/* Toggles row */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => handleToggleAutoRefine(!autoRefineEnabled)}
+                  className="flex items-center gap-1.5 group"
+                >
                   <div className={classNames(
-                    "w-6 h-3.5 rounded-full p-0.5 transition-colors",
-                    autoRefineEnabled ? "bg-brand-500" : "bg-ink-300"
+                    "w-7 h-4 rounded-full transition-colors relative shrink-0",
+                    autoRefineEnabled ? "bg-brand-500" : "bg-ink-200"
                   )}>
                     <div className={classNames(
-                      "w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm",
-                      autoRefineEnabled && "translate-x-2.5"
+                      "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform",
+                      autoRefineEnabled ? "translate-x-3.5" : "translate-x-0.5"
                     )} />
                   </div>
-                  <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-800 transition-colors">
-                    Refino Automático
+                  <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-700 transition-colors select-none">
+                    Refino Auto
                   </span>
-                </label>
+                </button>
 
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={aiFastMode}
-                    onChange={(e) => handleToggleFastMode(e.target.checked)}
-                  />
+                <button
+                  onClick={() => handleToggleFastMode(!aiFastMode)}
+                  className="flex items-center gap-1.5 group"
+                >
                   <div className={classNames(
-                    "w-6 h-3.5 rounded-full p-0.5 transition-colors",
-                    aiFastMode ? "bg-brand-500" : "bg-ink-300"
+                    "w-7 h-4 rounded-full transition-colors relative shrink-0",
+                    aiFastMode ? "bg-brand-500" : "bg-ink-200"
                   )}>
                     <div className={classNames(
-                      "w-2.5 h-2.5 rounded-full bg-white transition-transform shadow-sm",
-                      aiFastMode && "translate-x-2.5"
+                      "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform",
+                      aiFastMode ? "translate-x-3.5" : "translate-x-0.5"
                     )} />
                   </div>
-                  <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-800 transition-colors">
+                  <span className="text-[10px] text-ink-500 font-medium group-hover:text-ink-700 transition-colors select-none">
                     Modo Rápido
                   </span>
-                </label>
+                </button>
               </div>
 
               {chatHistory.length > 0 && (
                 <button
                   onClick={handleClearChat}
                   className="flex items-center gap-1 text-[10px] text-ink-400 hover:text-red-500 transition-colors font-medium"
-                  title="Limpar conversa"
                 >
-                  <Trash2 size={11} />
+                  <Trash2 size={10} />
                   Limpar
                 </button>
               )}
@@ -1333,69 +1350,82 @@ export function LaudCopilot({
       )}
 
       {activeTab === 'form' && (
-        <div className="flex-1 flex flex-col min-h-0 bg-white animate-fade-in">
-          <div className="flex-1 flex flex-col p-4 space-y-4 min-h-0 overflow-y-auto custom-scrollbar">
-            
-            {/* Anamnese section inside Copilot form tab */}
-            <div className="flex flex-col space-y-1.5 shrink-0 bg-indigo-50/20 border border-indigo-100 rounded-xl p-3.5 shadow-sm">
-              <label className="text-[10px] font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
-                <FileText size={12} />
-                Anamnese / Queixas Clínicas
-              </label>
-              <textarea
-                value={anamnesisText}
-                onFocus={() => isAnamnesisFocusedRef.current = true}
-                onBlur={(e) => handleBlurAnamnesisText(e.target.value)}
-                onChange={(e) => handleAnamnesisTextChange(e.target.value)}
-                placeholder="Histórico clínico rápido, queixas ou sintomas..."
-                className="w-full text-xs font-semibold text-ink-700 bg-white border border-indigo-200 focus:ring-2 focus:ring-indigo-350 focus:border-indigo-350 rounded-lg p-2.5 resize-none shadow-sm outline-none"
-                rows={3}
-              />
-            </div>
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
 
-            <div className="flex items-center justify-between pt-2 border-t border-ink-100">
-              <span className="text-xs font-semibold text-ink-600">
-                Formulário Clínico (Texto Livre)
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => onShowCalculators()}
-                  className="flex items-center gap-1.5 text-[11px] font-medium text-ink-600 hover:text-brand-600 hover:bg-brand-50 px-2.5 py-1.5 rounded-md transition-colors"
-                >
-                  <Calculator size={14} />
-                  Calculadoras
-                </button>
-                {template?.customForm && (
-                  <button
-                    onClick={handleResetForm}
-                    className="flex items-center gap-1.5 text-[11px] font-medium text-ink-600 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-md transition-colors"
-                  >
-                    <RotateCcw size={14} />
-                    Restaurar
-                  </button>
-                )}
+            {/* Anamnese section */}
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/30 overflow-hidden shadow-sm shrink-0">
+              <div className="px-3.5 pt-3 pb-2.5 flex items-center gap-2 border-b border-indigo-100/60">
+                <div className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                  <FileText size={12} />
+                </div>
+                <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Anamnese / Clínica</span>
+              </div>
+              <div className="p-3">
+                <textarea
+                  value={anamnesisText}
+                  onFocus={() => isAnamnesisFocusedRef.current = true}
+                  onBlur={(e) => handleBlurAnamnesisText(e.target.value)}
+                  onChange={(e) => handleAnamnesisTextChange(e.target.value)}
+                  placeholder="Histórico clínico, queixas ou sintomas do paciente..."
+                  className="w-full text-xs font-medium text-ink-700 bg-white border border-indigo-100 focus:ring-2 focus:ring-indigo-300/50 focus:border-indigo-300 rounded-xl p-3 resize-none outline-none transition-all leading-relaxed"
+                  rows={3}
+                />
               </div>
             </div>
 
-            <textarea
-              value={formText}
-              onFocus={() => isFormFocusedRef.current = true}
-              onBlur={(e) => handleBlurFormText(e.target.value)}
-              onChange={(e) => handleFormTextChange(e.target.value)}
-              placeholder="Digite de forma livre ou cole os achados para que a IA os organize e integre ao laudo..."
-              className="flex-1 w-full p-4 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-all text-sm font-mono text-ink-700 resize-none shadow-inner"
-              style={{ minHeight: '180px' }}
-            />
+            {/* Findings / Form text */}
+            <div className="rounded-2xl border border-ink-200 bg-white overflow-hidden shadow-sm">
+              <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-ink-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-ink-100 text-ink-600 flex items-center justify-center shrink-0">
+                    <ClipboardList size={12} />
+                  </div>
+                  <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">Achados Clínicos</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => onShowCalculators()}
+                    className="h-6 px-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 active:scale-95"
+                  >
+                    <Calculator size={10} />
+                    Calc.
+                  </button>
+                  {template?.customForm && (
+                    <button
+                      onClick={handleResetForm}
+                      className="h-6 px-2 rounded-lg bg-ink-50 border border-ink-200 text-ink-500 text-[9px] font-bold hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 transition-colors flex items-center gap-1 active:scale-95"
+                    >
+                      <RotateCcw size={10} />
+                      Restaurar
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="p-3">
+                <textarea
+                  value={formText}
+                  onFocus={() => isFormFocusedRef.current = true}
+                  onBlur={(e) => handleBlurFormText(e.target.value)}
+                  onChange={(e) => handleFormTextChange(e.target.value)}
+                  placeholder="Digite de forma livre ou cole os achados para que a IA integre ao laudo..."
+                  className="w-full p-3 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-all text-xs font-mono text-ink-700 resize-none leading-relaxed"
+                  style={{ minHeight: '160px' }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 bg-white border-t border-ink-100 shrink-0">
+          <div className="p-3 pb-4 bg-white border-t border-ink-100 shrink-0">
             <button
               onClick={handleCompileForm}
               disabled={isGenerating}
-              className="w-full h-11 rounded-xl bg-ink-900 hover:bg-ink-800 disabled:opacity-50 text-white font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+              className="w-full h-11 rounded-2xl bg-ink-900 hover:bg-ink-700 disabled:opacity-50 text-white font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
             >
-              {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {isGenerating ? 'Processando...' : 'Processar e Atualizar Laudo'}
+              {isGenerating
+                ? <><Loader2 size={15} className="animate-spin" /> Processando...</>
+                : <><Sparkles size={15} /> Processar e Integrar ao Laudo</>
+              }
             </button>
           </div>
         </div>

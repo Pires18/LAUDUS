@@ -1,7 +1,46 @@
 import { useState, useEffect } from 'react';
-import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send } from 'lucide-react';
+import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send, Search } from 'lucide-react';
 import { logger } from '../../utils/logger';
 import { CALCULATORS } from './registry';
+
+const FIELD_LABELS: Record<string, string> = {
+  // Volume
+  structureName: 'Estrutura', volume: 'Volume (cm³)', unit: 'Unidade',
+  d1: 'D1', d2: 'D2', d3: 'D3',
+  // IG
+  method: 'Método', referenceDate: 'Data do exame',
+  dumDate: 'DUM', prevUsgDate: 'Data USG anterior',
+  prevUsgWeeks: 'IG USG (sem)', prevUsgDays: 'IG USG (dias)',
+  currentGa: 'IG Atual', edd: 'DDP',
+  // Biometria fetal
+  gaWeeks: 'IG (semanas)', gaDays: 'IG (dias)', sex: 'Sexo',
+  bpd: 'DBP (mm)', hc: 'CC (mm)', ac: 'CA (mm)', fl: 'CF (mm)', hl: 'Úmero (mm)',
+  efw: 'PFE (g)', percentile: 'Percentil OMS (%)', pDescription: 'Classificação',
+  bpdPercentile: 'DBP p%', hcPercentile: 'CC p%', acPercentile: 'CA p%',
+  flPercentile: 'CF p%', hlPercentile: 'Úmero p%',
+  // Doppler
+  auPi: 'IP Art. Umbilical', acmPi: 'IP ACM', utaPi: 'IP Uterinas (média)', dvPi: 'PIV Ducto Venoso',
+  auFlow: 'Fluxo diastólico (AU)', dvWave: 'Onda A (Ducto Venoso)', efwPercentile: 'PFE Percentil',
+  rcp: 'RCP (ACM/AU)', rcpP: 'RCP p%',
+  stage: 'Estadio Barcelona', stageDesc: 'Estadiamento', rec: 'Conduta sugerida',
+  auP: 'AU p%', acmP: 'ACM p%', utaP: 'UtA p%', dvP: 'DV p%',
+  // Vascular
+  psv: 'Vel. Sistólica (cm/s)', edv: 'Vel. Diastólica (cm/s)', tamv: 'TAMV (cm/s)',
+  ri: 'IR (Resistência)', pi: 'IP (Pulsatilidade)', sd: 'Rel. S/D',
+  // IMT
+  age: 'Idade (anos)', imtRight: 'EIM Direita (mm)', imtLeft: 'EIM Esquerda (mm)',
+  maxImt: 'EIM Máxima (mm)', classification: 'Classificação',
+  // Próstata
+  weight: 'Peso Estimado (g)',
+  // Líquido amniótico
+  result: 'Resultado (mm)', q1: 'Q1 (mm)', q2: 'Q2 (mm)', q3: 'Q3 (mm)', q4: 'Q4 (mm)',
+  // IVC
+  ivcimax: 'VCI Inspir. (mm)', ivcmax: 'VCI Expir. (mm)', ivci: 'Índice Colapsabilidade (%)',
+  // Pleural
+  thickness: 'Espessura lâmina (mm)',
+  // CRL / MSD
+  crl: 'CCN (mm)', msd: 'DMSG (mm)',
+};
 
 import { ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
@@ -15,13 +54,14 @@ interface Props {
   onClose: () => void;
   onSendToCopilot: (result: string) => void;
   onAppendToForm?: (text: string) => void;
+  onInsertToReport?: (html: string) => void;
   examDateMs?: number;
   calculatorData?: Record<string, any>;
   onSaveCalculatorData?: (data: Record<string, any>) => void;
   initialCalcId?: string;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
+export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
   
   // O result atual da calculadora selecionada. 
@@ -39,13 +79,16 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
   }, [initialCalcId]);
   
   const [showAll, setShowAll] = useState(false);
+  const [search, setSearch] = useState('');
   const [copiedForm, setCopiedForm] = useState(false);
   const [sentCopilot, setSentCopilot] = useState(false);
+  const [insertedReport, setInsertedReport] = useState(false);
   const [activeTab, setActiveTab] = useState<'params' | 'result'>('params');
   const [updateKey, setUpdateKey] = useState(0);
 
   const filteredCalculators = CALCULATORS.filter(calc =>
-    showAll || !area || calc.areas.includes(area)
+    (showAll || !area || calc.areas.includes(area)) &&
+    (!search || calc.name.toLowerCase().includes(search.toLowerCase()) || calc.description.toLowerCase().includes(search.toLowerCase()))
   );
 
   const selectedCalc = CALCULATORS.find(c => c.id === selectedCalcId);
@@ -63,6 +106,9 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
     if (selectedCalcId && onSaveCalculatorData) {
       onSaveCalculatorData({ ...calculatorData, [selectedCalcId]: val });
     }
+    if (val?._summary && !calcResult?._summary) {
+      setActiveTab('result');
+    }
   };
 
   const hasResult = !!calcResult?._summary;
@@ -70,10 +116,17 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
   /** Formato técnico: prefixo para o Copiloto processar como resultado de calculadora */
   const buildTechnicalMessage = () => {
     if (!calcResult || !selectedCalc) return '';
-    return `[RESULTADO TÉCNICO: ${selectedCalc.name} | ID: ${selectedCalcId}]\n\nCONCLUSÃO:\n${calcResult._summary || ''}\n\nMÉTRICAS COLETADAS:\n${Object.entries(calcResult)
-      .filter(([k, v]) => !k.startsWith('_') && typeof v !== 'object' && v !== '')
-      .map(([k, v]) => `- ${k}: ${v}`)
-      .join('\n')}`;
+    const metricsText = Object.entries(calcResult)
+      .filter(([k, v]) =>
+        !k.startsWith('_') &&
+        typeof v !== 'object' &&
+        v !== '' &&
+        v !== null &&
+        v !== undefined
+      )
+      .map(([k, v]) => `- ${FIELD_LABELS[k] || k}: ${v}`)
+      .join('\n');
+    return `[RESULTADO TÉCNICO: ${selectedCalc.name} | ID: ${selectedCalcId}]\n\nCONCLUSÃO:\n${calcResult._summary || ''}\n\nMÉTRICAS COLETADAS:\n${metricsText}`;
   };
 
   /** Formato limpo para colar no formulário / clipboard simples */
@@ -93,6 +146,14 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
     setSentCopilot(true);
     onSendToCopilot(buildTechnicalMessage());
     setTimeout(() => onClose(), 600);
+  };
+
+  const handleInsertToReport = () => {
+    if (!onInsertToReport || !calcResult?._summary) return;
+    const html = `<p><strong>${selectedCalc?.name || 'Calculadora'}:</strong> ${calcResult._summary}</p>`;
+    onInsertToReport(html);
+    setInsertedReport(true);
+    setTimeout(() => { setInsertedReport(false); onClose(); }, 800);
   };
 
   return (
@@ -141,51 +202,64 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
         <div className="flex-1 flex min-h-0 relative">
           {/* ── Lista de Calculadoras ───────────────────────────── */}
           {!selectedCalcId ? (
-            <div className="flex-1 flex flex-col min-h-0 bg-ink-50/50">
-              <div className="px-5 py-3 bg-white border-b border-ink-100 flex items-center justify-between gap-3 shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Filter size={14} className="text-brand-600" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={classNames(
-                        'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-2',
-                        !showAll ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-500/20' : 'bg-ink-100 text-ink-400 border-ink-100'
-                      )}
-                      onClick={() => setShowAll(false)}
-                    >
-                      {area || 'Geral'}
-                    </span>
-                    <span
-                      className={classNames(
-                        'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border-2',
-                        showAll ? 'bg-brand-600 text-white border-brand-500 shadow-md shadow-brand-500/20' : 'bg-ink-100 text-ink-400 border-ink-100'
-                      )}
-                      onClick={() => setShowAll(true)}
-                    >
-                      Todas
-                    </span>
-                  </div>
+            <div className="flex-1 flex flex-col min-h-0 bg-white">
+              {/* Filtros e busca */}
+              <div className="px-4 py-3 bg-white border-b border-ink-100 flex flex-col gap-2.5 shrink-0">
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Buscar calculadora..."
+                    className="w-full h-8 pl-8 pr-3 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/10 rounded-xl text-xs font-medium text-ink-800 placeholder-ink-400 outline-none transition-all"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter size={11} className="text-ink-400" />
+                  <button
+                    onClick={() => setShowAll(false)}
+                    className={classNames(
+                      'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border',
+                      !showAll ? 'bg-brand-600 text-white border-brand-500' : 'bg-ink-50 text-ink-500 border-ink-200 hover:bg-ink-100'
+                    )}
+                  >
+                    {area ? area.replace(/-/g, ' ') : 'Geral'}
+                  </button>
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className={classNames(
+                      'px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border',
+                      showAll ? 'bg-brand-600 text-white border-brand-500' : 'bg-ink-50 text-ink-500 border-ink-200 hover:bg-ink-100'
+                    )}
+                  >
+                    Todas
+                  </button>
+                  <span className="ml-auto text-[9px] text-ink-400 font-bold">{filteredCalculators.length} módulo{filteredCalculators.length !== 1 ? 's' : ''}</span>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
-                {filteredCalculators.map(calc => (
+              <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2 custom-scrollbar">
+                {filteredCalculators.length === 0 ? (
+                  <div className="py-10 text-center">
+                    <p className="text-xs font-bold text-ink-400">Nenhuma calculadora encontrada.</p>
+                  </div>
+                ) : filteredCalculators.map(calc => (
                   <motion.button
-                    whileHover={{ y: -2 }}
+                    whileHover={{ x: 2 }}
                     key={calc.id}
                     onClick={() => handleSelectCalc(calc.id)}
-                    className="group flex flex-col text-left p-4 rounded-2xl border border-ink-100 bg-white hover:border-brand-500 hover:shadow-md hover:shadow-brand-500/5 transition-all relative overflow-hidden shadow-sm"
+                    className="group flex items-center gap-3 text-left px-3 py-3 rounded-xl border border-ink-100 bg-white hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-sm transition-all"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-ink-50 text-ink-500 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all shadow-inner border border-ink-100 shrink-0">
-                        <AreaIcon area={showAll ? calc.areas[0] : (area || calc.areas[0])} size={20} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-black text-ink-800 text-xs mb-1 group-hover:text-brand-700 transition-colors uppercase tracking-tight">{calc.name}</h4>
-                        <p className="text-[10px] text-ink-500 font-semibold line-clamp-2">{calc.description}</p>
-                      </div>
+                    <div className="w-9 h-9 rounded-xl bg-ink-50 text-ink-400 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all border border-ink-100 shrink-0">
+                      <AreaIcon area={showAll ? calc.areas[0] : (area || calc.areas[0])} size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-black text-ink-800 text-xs group-hover:text-brand-700 transition-colors truncate">{calc.name}</h4>
+                      <p className="text-[10px] text-ink-400 font-medium line-clamp-1 mt-0.5">{calc.description}</p>
+                    </div>
+                    <div className="text-ink-300 group-hover:text-brand-400 transition-colors shrink-0">
+                      <ArrowLeft size={14} className="rotate-180" />
                     </div>
                   </motion.button>
                 ))}
@@ -303,10 +377,10 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
                               <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Métricas Detalhadas</p>
                               <div className="grid grid-cols-1 gap-1.5">
                                 {Object.entries(calcResult)
-                                  .filter(([k, v]) => !k.startsWith('_') && typeof v !== 'object' && v !== '')
+                                  .filter(([k, v]) => !k.startsWith('_') && typeof v !== 'object' && v !== '' && v !== null && v !== undefined)
                                   .map(([k, v]) => (
-                                    <div key={k} className="flex items-center justify-between py-2 border-b border-ink-50 last:border-0">
-                                      <span className="text-[10px] font-black text-ink-500 uppercase tracking-tight">{k}</span>
+                                    <div key={k} className="flex items-center justify-between py-1.5 border-b border-ink-50 last:border-0">
+                                      <span className="text-[10px] font-bold text-ink-400">{FIELD_LABELS[k] || k}</span>
                                       <span className="text-[10px] font-black text-ink-800 tabular-nums">{String(v)}</span>
                                     </div>
                                   ))}
@@ -383,6 +457,32 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
                         )}
                       </button>
                     </div>
+
+                    {onInsertToReport && (
+                      <button
+                        type="button"
+                        onClick={handleInsertToReport}
+                        disabled={!hasResult || insertedReport}
+                        className={classNames(
+                          'w-full mt-2 h-10 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 border active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm',
+                          insertedReport
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : 'bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100 hover:border-teal-300'
+                        )}
+                      >
+                        {insertedReport ? (
+                          <>
+                            <CheckCircle2 size={13} className="text-emerald-600 animate-in zoom-in" />
+                            Inserido no laudo!
+                          </>
+                        ) : (
+                          <>
+                            <Zap size={13} />
+                            Inserir no Laudo
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -378,11 +378,36 @@ export default defineConfig({
     open: process.env.RUNNING_IN_DOCKER === 'true' ? false : true,
     proxy: {
       '/api/anthropic': {
-        target: 'https://api.anthropic.com/v1/messages',
+        target: 'https://api.anthropic.com',
         changeOrigin: true,
-        rewrite: (path) => '',
+        rewrite: () => '/v1/messages',
         secure: true,
-      }
+        configure: (proxy: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            const key = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY || '';
+            if (key) proxyReq.setHeader('x-api-key', key);
+          });
+        },
+      },
+      '/api/gemini': {
+        target: 'https://generativelanguage.googleapis.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path: string) => {
+          // Strip /api/gemini — actual URL is built in configure
+          return path.replace('/api/gemini', '');
+        },
+        configure: (proxy: any, _options: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            const key = req.headers['x-api-key'] || process.env.GOOGLE_API_KEY || '';
+            const model = req.headers['x-gemini-model'] || 'gemini-3.5-flash';
+            const isStream = req.headers['x-gemini-stream'] === 'true';
+            const action = isStream ? 'streamGenerateContent' : 'generateContent';
+            const url = `/v1beta/models/${model}:${action}?key=${key}${isStream ? '&alt=sse' : ''}`;
+            proxyReq.path = url;
+          });
+        },
+      },
     }
   }
 })

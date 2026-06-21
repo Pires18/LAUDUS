@@ -21,7 +21,7 @@ export function MsdCalculator({ value, onChange }: CalculatorProps) {
     }
 
     const summary = msd 
-      ? `[DMSG / IG Calculada]\nDMSG (Média): ${msd.toFixed(1)}mm\nIG estimada: ${ga}`
+      ? `Diâmetro médio do saco gestacional: ${msd.toFixed(1)}mm — IG estimada: ${ga}.`
       : null;
 
     onChange({

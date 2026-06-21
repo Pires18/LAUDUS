@@ -267,10 +267,25 @@ export interface AppSettings {
   /** Taxa de conversão USD → BRL para exibição de custos (default: 5.50) */
   aiConversionRateBRL?: number;
 
+  // Motor de IA selecionado pelo usuário (Lite ou Pro)
+  selectedMotor?: 'lite' | 'pro';
+
   // Preferências do Sistema
   soundNotifications?: boolean;
   autoSave?: boolean;
   signatureImageUrl?: string;
+
+  // Configurações de Layout de Laudo PDF
+  pdfFontFamily?: string;
+  pdfFontSize?: string;
+  pdfLineHeight?: string;
+  pdfTextAlign?: 'justify' | 'left';
+  pdfMarginTop?: number;
+  pdfMarginBottom?: number;
+  pdfMarginLeft?: number;
+  pdfMarginRight?: number;
+  pdfShowHeader?: boolean;
+  pdfShowFooter?: boolean;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */
@@ -352,22 +367,43 @@ export interface AuditLog {
   timestamp: number;
 }
 
-/** Plano de assinatura */
-export interface Plan {
+/** Assinatura ativa de um usuário */
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'paused';
+export type SubscriptionAddon = 'pacs' | 'calculators';
+
+export interface Subscription {
   id: string;
-  name: string;
-  price: number;
-  interval: 'month' | 'year';
-  features: string[];
-  examLimit?: number; // null = ilimitado
-  clinicLimit?: number;
-  active: boolean;
-  
-  // Recursos e adequações clínicas do sistema
-  iaLimit?: number;         // Créditos Laud.IA/mês (null = ilimitado)
-  storageLimitGb?: number;  // Armazenamento de Imagens em GB (null = ilimitado)
-  voiceDictation: boolean;  // Permite Ditado por Voz clínico
-  customMasks: boolean;     // Permite criação de máscaras personalizadas
+  userId: string;
+  userEmail: string;
+  plan: 'base';
+  addons: SubscriptionAddon[];
+  status: SubscriptionStatus;
+  paymentMethod: 'pix' | 'credit_card' | 'manual';
+  abacatePayCustomerId?: string;
+  abacatePaySubscriptionId?: string;
+  currentPeriodStart: number;
+  currentPeriodEnd: number;
+  trialEndsAt?: number;
+  canceledAt?: number;
+  reportsUsedThisMonth: number;
+  reportsQuota: number;
+  clinicsQuota: number;
+  lastResetAt: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Configuração dos motores de IA (Lite / Pro) definida pelo admin */
+export interface MotorTierConfig {
+  provider: 'gemini' | 'anthropic';
+  model: string;
+  tokensPerReport: number;
+  costPerThousandTokens: number;
+}
+
+export interface MotorConfig {
+  lite: MotorTierConfig;
+  pro: MotorTierConfig;
 }
 
 export interface SupportMessage {
@@ -391,6 +427,24 @@ export interface SupportTicket {
   updatedAt: number;
 }
 
+/** Plano de assinatura */
+export interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  interval: 'month' | 'year';
+  features: string[];
+  examLimit?: number; // null = ilimitado
+  clinicLimit?: number;
+  active: boolean;
+  
+  // Recursos e adequações clínicas do sistema
+  iaLimit?: number;         // Créditos Laud.IA/mês (null = ilimitado)
+  storageLimitGb?: number;  // Armazenamento de Imagens em GB (null = ilimitado)
+  voiceDictation: boolean;  // Permite Ditado por Voz clínico
+  customMasks: boolean;     // Permite criação de máscaras personalizadas
+}
+
 /** Código de Licença comercial atrelado a planos */
 export interface License {
   id: string;             // Ex: LAUD-XXXX-XXXX-XXXX
@@ -404,4 +458,5 @@ export interface License {
   usedByEmail?: string;   // E-mail do médico que ativou
   expiresAt?: number;     // Timestamp exato do fim do acesso
 }
+
 

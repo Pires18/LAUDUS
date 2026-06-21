@@ -12,16 +12,19 @@ export function getAnthropicBaseUrl(): string {
 
 export class AnthropicProvider implements AiProvider {
   resolveModelName(settings: AppSettings, mode: string, area: string): string {
-    return settings.anthropicModel || 'claude-3-5-sonnet-latest';
+    const raw = settings.anthropicModel || 'claude-3-5-sonnet-latest';
+    if (raw === 'claude-sonnet-4-6') return 'claude-3-5-sonnet-latest';
+    if (raw === 'claude-opus-4-5') return 'claude-3-opus-20240229';
+    return raw;
   }
 
   /** Computa o header anthropic-beta correto com base no modelo selecionado */
   private getBetaHeader(settings: AppSettings): string {
-    const model = settings.anthropicModel || 'claude-3-5-sonnet-latest';
+    const model = this.resolveModelName(settings, 'geral', 'geral');
     const headers = ['prompt-caching-2024-07-31'];
 
-    if (model.includes('3-7') || model.includes('opus-4')) {
-      // Extended Thinking support for claude-3-7 and claude-opus-4
+    if (model.includes('3-7') || model.includes('opus')) {
+      // Extended Thinking support for claude-3-7 and claude-opus
       headers.push('interleaved-thinking-2025-05-14');
       headers.push('output-128k-2025-02-19');
     } else {
@@ -58,11 +61,11 @@ export class AnthropicProvider implements AiProvider {
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey || '',
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': this.getBetaHeader(settings),
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'x-api-key': settings.anthropicApiKey || ''
       },
       body: JSON.stringify({
         model: this.resolveModelName(settings, mode, area),
@@ -113,11 +116,11 @@ export class AnthropicProvider implements AiProvider {
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey || '',
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
         'anthropic-beta': this.getBetaHeader(settings),
-        'content-type': 'application/json'
+        'content-type': 'application/json',
+        'x-api-key': settings.anthropicApiKey || ''
       },
       body: JSON.stringify({
         model: this.resolveModelName(settings, mode, area),
@@ -198,13 +201,13 @@ export class AnthropicProvider implements AiProvider {
       const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
         method: 'POST',
         headers: {
-          'x-api-key': settings.anthropicApiKey || '',
-        'x-uid': auth.currentUser?.uid || 'anonymous',
+          'x-uid': auth.currentUser?.uid || 'anonymous',
           'anthropic-version': '2023-06-01',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
+          'x-api-key': settings.anthropicApiKey || ''
         },
         body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
+          model: this.resolveModelName(settings, 'geral', 'geral'),
           max_tokens: 2048,
           system: built.universalContext,
           messages: [{ role: 'user', content: prompt }],

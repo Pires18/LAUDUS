@@ -23,6 +23,7 @@ import { DicomThumbnail } from './components/DicomThumbnail';
 import { useExamActions } from './hooks/useExamActions';
 import { useGoogleDocs } from './hooks/useGoogleDocs';
 import { useDicomSync } from './hooks/useDicomSync';
+import { useCopilotSuggestions } from './hooks/useCopilotSuggestions';
 import { getStudyInstanceUID } from '../../utils/dicom';
 
 // Refactored Components
@@ -37,6 +38,44 @@ import { ReportVersionsModal } from './components/ReportVersionsModal';
 
 
 
+
+function PatientHistoryPanel({ patient }: { patient: Patient }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-emerald-100 bg-emerald-50/20 shrink-0">
+      <button
+        onClick={() => setOpen(s => !s)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <UserCog size={13} className="text-emerald-600" />
+          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Histórico do Paciente</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        </div>
+        <ChevronDown size={13} className={classNames("text-emerald-500 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-2 space-y-2 animate-in fade-in duration-150 border-t border-emerald-100/30">
+          {patient.history && (
+            <div>
+              <p className="text-[9px] font-black uppercase text-emerald-500 tracking-wider mb-1">Histórico Clínico</p>
+              <p className="text-xs text-ink-700 leading-relaxed bg-white border border-emerald-100 rounded-xl p-3 whitespace-pre-wrap">{patient.history}</p>
+            </div>
+          )}
+          {patient.notes && (
+            <div>
+              <p className="text-[9px] font-black uppercase text-emerald-500 tracking-wider mb-1">Observações</p>
+              <p className="text-xs text-ink-600 leading-relaxed bg-white border border-emerald-100 rounded-xl p-3 whitespace-pre-wrap">{patient.notes}</p>
+            </div>
+          )}
+          {patient.insurance && (
+            <p className="text-[10px] text-emerald-600 font-semibold">Convênio: {patient.insurance}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   examId: string;
@@ -244,7 +283,9 @@ export function ExamEditor({ examId }: Props) {
     examId,
     settings,
     showToast,
-    onReportChange: (html) => setReportContent(html),
+    onReportChange: (html) => {
+      setReportContent(html);
+    },
     patient,
     template,
     clinicalIndication: exam?.clinicalIndication,
@@ -252,6 +293,18 @@ export function ExamEditor({ examId }: Props) {
     anamnesis: exam?.anamnesis,
     examDateMs: exam?.createdAt
   });
+
+  const { suggestions: copilotSuggestions, generateSuggestions, clearSuggestions } = useCopilotSuggestions(settings);
+
+  // After report generation completes, quietly generate contextual Copilot suggestions
+  const prevIsGenerating = useRef(false);
+  useEffect(() => {
+    if (prevIsGenerating.current && !isGenerating && reportContent && template?.area) {
+      clearSuggestions();
+      generateSuggestions(reportContent, template.area);
+    }
+    prevIsGenerating.current = isGenerating;
+  }, [isGenerating]);
 
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
 
@@ -545,12 +598,11 @@ export function ExamEditor({ examId }: Props) {
             saveState={saveState}
           />
 
-          {/* AVISO API KEY */}
-          {(((settings.aiProvider === 'anthropic' || !settings.aiProvider) && !settings.anthropicApiKey) || 
-            ((settings.aiProvider === 'gemini') && !settings.geminiApiKey)) && (
+          {/* AVISO API KEY — apenas para Gemini (Anthropic é gerenciado server-side) */}
+          {settings.aiProvider === 'gemini' && !settings.geminiApiKey && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
               <AlertCircle size={12} />
-              <span>API Key do {settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada — geração em <strong>modo demo</strong>.</span>
+              <span>API Key do Gemini não configurada — geração em <strong>modo demo</strong>.</span>
               <button className="underline ml-1 font-medium" onClick={() => setView({ name: 'settings' })}>Configurar</button>
             </div>
           )}
@@ -764,6 +816,11 @@ export function ExamEditor({ examId }: Props) {
                 )}
               </div>
 
+              {/* ── Histórico Clínico do Paciente (C2) ── */}
+              {patient && (patient.history || patient.notes || patient.insurance) && (
+                <PatientHistoryPanel patient={patient} />
+              )}
+
           <div className="flex-1 overflow-hidden relative flex flex-col">
             <AnimatePresence>
               {isGenerating && (
@@ -898,14 +955,39 @@ export function ExamEditor({ examId }: Props) {
           )}
         </AnimatePresence>
 
+        {/* Suggestion chips from B6 proactive AI — appear above FAB after generation */}
+        <AnimatePresence>
+          {!showCopilot && copilotSuggestions.length > 0 && exam.status !== 'finalizado' && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              className="fixed bottom-44 md:bottom-28 right-6 md:right-8 z-[79] flex flex-col gap-1.5 items-end"
+            >
+              {copilotSuggestions.map((sug, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setCopilotPrompt(sug.text);
+                    setShowCopilot(true);
+                  }}
+                  className="max-w-[220px] px-3 py-1.5 bg-white/95 backdrop-blur-sm border border-brand-200 text-brand-800 rounded-full text-[11px] font-semibold shadow-md hover:bg-brand-50 hover:border-brand-400 transition-all active:scale-95 text-right"
+                >
+                  {sug.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* FAB Toggle Copilot — oculto e fechado ao finalizar */}
         {exam.status !== 'finalizado' ? (
           <button
-            onClick={() => setShowCopilot(!showCopilot)}
+            onClick={() => { setShowCopilot(!showCopilot); if (!showCopilot) clearSuggestions(); }}
             className={classNames(
               "fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2",
-              showCopilot 
-                ? "bg-white text-ink-900 border-ink-100" 
+              showCopilot
+                ? "bg-white text-ink-900 border-ink-100"
                 : "bg-brand-600 text-white border-brand-500 shadow-brand-500/30"
             )}
           >
@@ -1077,19 +1159,22 @@ export function ExamEditor({ examId }: Props) {
 
       <AnimatePresence>
           {showCalculators && (
-          <CalculatorModal 
+          <CalculatorModal
             initialCalcId={calcModalInitialId || undefined}
-            area={exam.area} 
+            area={exam.area}
             examDateMs={exam.createdAt}
-            onClose={() => setShowCalculators(false)} 
+            onClose={() => setShowCalculators(false)}
             onSendToCopilot={(text) => {
               setCopilotPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
               setShowCalculators(false);
               if (!showCopilot) setShowCopilot(true);
             }}
+            onInsertToReport={(html) => {
+              editorRef.current?.insertContent(html);
+              setShowCalculators(false);
+            }}
             calculatorData={exam.calculatorData}
             onSaveCalculatorData={async (data) => {
-              // Fix 17: only write to Firestore — useDocument hook propagates reactively, no direct mutation
               await updateItem('exams', exam.id, { calculatorData: data });
             }}
           />

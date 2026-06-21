@@ -8,7 +8,7 @@
  */
 
 export const ADMIN_UID: string = import.meta.env.VITE_ADMIN_UID || '';
-export const ADMIN_EMAIL: string = import.meta.env.VITE_ADMIN_EMAIL || '';
+export const ADMIN_EMAIL: string = import.meta.env.VITE_ADMIN_EMAIL || 'matheuskpires@gmail.com';
 
 export const IS_DEV = import.meta.env.DEV;
 export const IS_PROD = import.meta.env.PROD;

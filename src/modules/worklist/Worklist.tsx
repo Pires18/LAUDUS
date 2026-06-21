@@ -1,5 +1,5 @@
 import { useApp } from '../../store/app';
-import { useCollection, orderBy, where } from '../../hooks/useFirestore';
+import { useCollection, usePaginatedCollection, orderBy, where } from '../../hooks/useFirestore';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
@@ -31,10 +31,9 @@ export function Worklist() {
     worklistSearch: search, setWorklistSearch: setSearch
   } = useApp();
   
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 100;
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showAreaFilter, setShowAreaFilter] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [editExamId, setEditExamId] = useState<string | null>(null);
   const [editData, setEditData] = useState({
     requestingPhysician: '',
@@ -45,11 +44,12 @@ export function Worklist() {
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [syncingExamId, setSyncingExamId] = useState<string | null>(null);
 
-  const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams', {
+  const { data: exams, loading: examsLoading, hasMore: hasMoreFromServer, loadMore } = usePaginatedCollection<ExamRequest>('exams', {
     constraints: [
       ...(selectedClinicId ? [where('clinicId', '==', selectedClinicId)] : []),
       orderBy('createdAt', 'desc')
-    ]
+    ],
+    initialLimit: PAGE_SIZE
   });
 
   const { data: patients } = useCollection<Patient>('patients');
@@ -131,10 +131,8 @@ export function Worklist() {
     return result.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [filteredWithoutStatus, statusFilter]);
 
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [statusFilter, areaFilter, dateFilter, search, selectedClinicId]);
-
-  const visibleExams = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
-  const hasMore = filtered.length > visibleCount;
+  const visibleExams = filtered;
+  const hasMore = hasMoreFromServer;
 
   const counts = {
     todos:         filteredWithoutStatus.length,
@@ -513,10 +511,10 @@ export function Worklist() {
         {hasMore && (
           <div className="hidden md:flex justify-center py-3 border-t border-ink-100">
             <button
-              onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+              onClick={loadMore}
               className="h-9 px-5 rounded-xl border border-ink-200 hover:bg-ink-50 text-ink-600 font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2"
             >
-              Ver mais ({filtered.length - visibleCount} restantes)
+              Carregar mais exames
             </button>
           </div>
         )}
@@ -618,10 +616,10 @@ export function Worklist() {
           {hasMore && (
             <div className="flex justify-center py-3 px-4 border-t border-ink-100">
               <button
-                onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                onClick={loadMore}
                 className="w-full h-10 rounded-xl border border-ink-200 hover:bg-ink-50 text-ink-600 font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
               >
-                Ver mais ({filtered.length - visibleCount} restantes)
+                Carregar mais exames
               </button>
             </div>
           )}

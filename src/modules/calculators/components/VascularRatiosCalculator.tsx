@@ -45,7 +45,7 @@ export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
       ri: calculatedRi,
       pi: calculatedPi,
       sd: calculatedSd,
-      _summary: summaryParts.length > 0 ? `[Índices Hemodinâmicos / Doppler Calculados]\n${summaryParts.join(' | ')}` : null
+      _summary: summaryParts.length > 0 ? `Índices Doppler: ${summaryParts.join(' | ')}.` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [psv, edv, tamv]);

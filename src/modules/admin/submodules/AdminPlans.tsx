@@ -189,7 +189,7 @@ export function AdminPlans() {
                 </div>
 
                 <div className="space-y-2 pt-2">
-                   {plan.features?.map((feature, idx) => (
+                   {plan.features?.map((feature: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-2.5 text-xs text-ink-600 font-medium">
                       <div className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                         <Check size={10} strokeWidth={4} />

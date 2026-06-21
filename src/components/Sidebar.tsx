@@ -6,7 +6,7 @@ import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
-  Calculator, Sparkles, Hospital, PanelLeftClose,
+  Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
   Users, LogOut, CalendarDays
 } from 'lucide-react';
@@ -19,7 +19,6 @@ const items = [
   { key: 'appointments', label: 'Agendamentos', icon: CalendarDays, view: { name: 'appointments' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
-  { key: 'laud-ia', label: 'LaudIA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
@@ -171,7 +170,6 @@ export function Sidebar() {
             (item.key === 'worklist' && view.name === 'exam-editor') ||
             (item.key === 'clinics' && (view.name === 'clinic-detail' || view.name === 'clinic-form'));
           const Icon = item.icon;
-          const isLaudIA = item.key === 'laud-ia';
 
           return (
             <button
@@ -182,18 +180,10 @@ export function Sidebar() {
                 collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
                 isActive
                   ? 'bg-brand-50 text-brand-700 shadow-soft border border-brand-100/50'
-                  : isLaudIA
-                    ? 'text-violet-600 hover:bg-violet-50 hover:text-violet-700'
-                    : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900'
+                  : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900'
               )}
             >
-              <Icon
-                size={collapsed ? 18 : 16}
-                className={classNames(
-                  "shrink-0 transition-transform duration-200 group-hover:scale-110",
-                  isLaudIA && !isActive ? "text-violet-500" : ""
-                )}
-              />
+              <Icon size={collapsed ? 18 : 16} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
               {!collapsed && (
                 <span className="animate-fade-in flex-1 text-left">{item.label}</span>
               )}
@@ -206,11 +196,6 @@ export function Sidebar() {
               )}
               {collapsed && item.key === 'worklist' && pendingCount > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white shadow-sm" />
-              )}
-
-              {/* LaudIA sparkle badge */}
-              {!collapsed && isLaudIA && (
-                <span className="ml-auto text-[9px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider animate-fade-in">IA</span>
               )}
 
               {/* Tooltip for collapsed state */}

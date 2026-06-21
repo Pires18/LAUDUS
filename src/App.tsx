@@ -59,12 +59,12 @@ function ViewRenderer() {
   }
 
   const views: Record<string, ReactNode> = {
-    dashboard: <Dashboard />,
-    worklist: <Worklist />,
+    dashboard: <ErrorBoundary inline label="Dashboard"><Dashboard /></ErrorBoundary>,
+    worklist: <ErrorBoundary inline label="Worklist"><Worklist /></ErrorBoundary>,
     patients: lazy('Pacientes', <Patients />),
     appointments: lazy('Agenda', <Appointments />),
     'patient-detail': view.name === 'patient-detail' ? lazy('Paciente', <PatientDetail key={view.patientId} patientId={view.patientId} />) : null,
-    'exam-editor': view.name === 'exam-editor' ? <ExamEditor key={view.examId} examId={view.examId} /> : null,
+    'exam-editor': view.name === 'exam-editor' ? <ErrorBoundary inline label="Editor de Laudo"><ExamEditor key={view.examId} examId={view.examId} /></ErrorBoundary> : null,
     templates: lazy('Templates', <Templates />),
     'template-editor': view.name === 'template-editor' ? lazy('Editor de Template', <TemplateEditor key={view.templateId} templateId={view.templateId} />) : null,
     settings: lazy('Configurações', <Settings />),

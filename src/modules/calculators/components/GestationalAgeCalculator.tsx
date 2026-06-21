@@ -68,8 +68,8 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
       }
     }
 
-    const summary = currentGa 
-      ? `[Idade Gestacional Calculada]\nIG: ${currentGa} (Base: ${method === 'dum' ? 'DUM' : 'USG Anterior'})\nDDP: ${eddStr || '---'}`
+    const summary = currentGa
+      ? `Idade gestacional: ${currentGa} (calculada pela ${method === 'dum' ? 'DUM' : 'USG anterior'}). DDP: ${eddStr || '---'}.`
       : null;
 
     onChange({

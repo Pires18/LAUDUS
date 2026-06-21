@@ -8,7 +8,8 @@ import {
   Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Database, Info, Upload, Loader2,
-  Server, Wifi, HardDrive, Shield, Cloud, Coins
+  Server, Wifi, HardDrive, Shield, Cloud, BrainCircuit,
+  Printer
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -19,7 +20,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
-type SettingsTab = 'perfil' | 'assinatura' | 'dicom' | 'audit' | 'financeiro';
+type SettingsTab = 'perfil' | 'pdf' | 'dicom' | 'audit' | 'controle-ia';
 
 export function Settings() {
   const { settings, updateSettings, showToast } = useApp();
@@ -202,10 +203,10 @@ export function Settings() {
 
   const tabs = [
     { id: 'perfil', label: 'Perfil', icon: User },
-    { id: 'assinatura', label: 'Assinatura', icon: Signature },
+    { id: 'pdf', label: 'Centro de PDF', icon: Printer },
     { id: 'dicom', label: 'PACS / DICOM', icon: Database },
     { id: 'audit', label: 'Auditoria', icon: ShieldCheck },
-    { id: 'financeiro', label: 'Financeiro IA', icon: Coins },
+    { id: 'controle-ia', label: 'Controle IA', icon: BrainCircuit },
   ] as const;
 
   return (
@@ -419,101 +420,276 @@ export function Settings() {
             </div>
           )}
 
-          {/* TAB: ASSINATURA */}
-          {activeTab === 'assinatura' && (
-            <div className="max-w-3xl space-y-5 animate-fade-in">
-              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                    <Signature size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-ink-900">Cédula de Identidade Médica</h3>
-                    <p className="text-xs text-ink-500">Dados usados no rodapé e selo de autenticidade dos laudos.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-5">
-                  <div>
-                    <label className="label">Número do CRM</label>
-                    <input
-                      className="input h-14"
-                      value={draft.physicianCRM || ''}
-                      onChange={(e) => u('physicianCRM', e.target.value)}
-                      placeholder="Ex: 123456-SP"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">RQE (Especialidade)</label>
-                    <input
-                      className="input h-14"
-                      value={draft.physicianRQE || ''}
-                      onChange={(e) => u('physicianRQE', e.target.value)}
-                      placeholder="Ex: 12345"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-3 py-5 border-t border-ink-50">
-                  <label className="label">Assinatura Digitalizada (Imagem)</label>
-                  <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
-                    <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
-                      {draft.signatureImageUrl ? (
-                        <img src={draft.signatureImageUrl} alt="Assinatura" className="max-w-full max-h-full object-contain p-2" />
-                      ) : (
-                        <span className="text-[10px] font-bold text-ink-400 uppercase">Sem Imagem</span>
-                      )}
-                      {isUploadingSignature && (
-                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                          <Loader2 className="animate-spin text-brand-600" size={20} />
-                        </div>
-                      )}
+          {/* TAB: CENTRO DE PDF & ASSINATURA */}
+          {activeTab === 'pdf' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fade-in">
+              {/* Coluna 1: Cédula de Identidade Médica & Assinatura */}
+              <div className="space-y-5">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                      <Signature size={20} />
                     </div>
-                    
-                    <div className="flex-1 w-full space-y-3 text-left">
-                      <p className="text-xs text-ink-500 leading-relaxed">
-                        Faça upload da imagem da sua assinatura manuscrita (preferencialmente com fundo transparente em formato PNG) para exibição direta nos laudos impressos ou copiados.
-                      </p>
-                      
-                      <div className="flex items-center gap-2">
-                        <label className="py-2 px-4 rounded-xl bg-white hover:bg-ink-100 text-ink-700 border border-ink-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95">
-                          <Upload size={14} />
-                          {isUploadingSignature ? 'Enviando...' : 'Carregar Imagem'}
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            disabled={isUploadingSignature} 
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleSignatureImageUpload(file);
-                            }} 
-                          />
-                        </label>
-                        
-                        {draft.signatureImageUrl && (
-                          <button
-                            type="button"
-                            onClick={() => u('signatureImageUrl', '')}
-                            className="py-2 px-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                          >
-                            Remover
-                          </button>
+                    <div>
+                      <h3 className="text-base font-black text-ink-900">Cédula de Identidade Médica</h3>
+                      <p className="text-xs text-ink-500">Dados usados no rodapé e selo de autenticidade dos laudos.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-5">
+                    <div>
+                      <label className="label">Número do CRM</label>
+                      <input
+                        className="input h-14"
+                        value={draft.physicianCRM || ''}
+                        onChange={(e) => u('physicianCRM', e.target.value)}
+                        placeholder="Ex: 123456-SP"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">RQE (Especialidade)</label>
+                      <input
+                        className="input h-14"
+                        value={draft.physicianRQE || ''}
+                        onChange={(e) => u('physicianRQE', e.target.value)}
+                        placeholder="Ex: 12345"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 py-5 border-t border-ink-50">
+                    <label className="label">Assinatura Digitalizada (Imagem)</label>
+                    <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
+                      <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
+                        {draft.signatureImageUrl ? (
+                          <img src={draft.signatureImageUrl} alt="Assinatura" className="max-w-full max-h-full object-contain p-2" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-ink-400 uppercase">Sem Imagem</span>
                         )}
+                        {isUploadingSignature && (
+                          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                            <Loader2 className="animate-spin text-brand-600" size={20} />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 w-full space-y-3 text-left">
+                        <p className="text-xs text-ink-500 leading-relaxed">
+                          Faça upload da imagem da sua assinatura manuscrita (preferencialmente com fundo transparente em formato PNG) para exibição direta nos laudos impressos ou copiados.
+                        </p>
+                        
+                        <div className="flex items-center gap-2">
+                          <label className="py-2 px-4 rounded-xl bg-white hover:bg-ink-100 text-ink-700 border border-ink-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95">
+                            <Upload size={14} />
+                            {isUploadingSignature ? 'Enviando...' : 'Carregar Imagem'}
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              disabled={isUploadingSignature} 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleSignatureImageUpload(file);
+                              }} 
+                            />
+                          </label>
+                          
+                          {draft.signatureImageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => u('signatureImageUrl', '')}
+                              className="py-2 px-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-3 pt-5 border-t border-ink-50">
-                  <label className="label">Texto da Assinatura Digital</label>
-                  <textarea
-                    className="input min-h-[120px] p-6 text-sm leading-relaxed"
-                    value={draft.defaultSignature || ''}
-                    onChange={(e) => u('defaultSignature', e.target.value)}
-                    placeholder={"Ex: Médico Radiologista\nMembro Titular do CBR"}
-                  />
-                  <p className="text-[11px] text-ink-400 italic">Este texto aparecerá centralizado no final de todos os seus laudos gerados.</p>
+                  <div className="space-y-3 pt-5 border-t border-ink-50">
+                    <label className="label">Texto da Assinatura Digital</label>
+                    <textarea
+                      className="input min-h-[120px] p-6 text-sm leading-relaxed"
+                      value={draft.defaultSignature || ''}
+                      onChange={(e) => u('defaultSignature', e.target.value)}
+                      placeholder={"Ex: Médico Radiologista\nMembro Titular do CBR"}
+                    />
+                    <p className="text-[11px] text-ink-400 italic">Este texto aparecerá centralizado no final de todos os seus laudos gerados.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Coluna 2: Configurações de Layout do Laudo (PDF) */}
+              <div className="space-y-5">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <Printer size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-ink-900">Layout do Laudo (PDF)</h3>
+                      <p className="text-xs text-ink-500">Configure a estética e o espaçamento para a impressão do laudo.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    <div>
+                      <label className="label">Fonte do Laudo</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfFontFamily || 'Arial'}
+                        onChange={(e) => u('pdfFontFamily', e.target.value)}
+                      >
+                        <option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Calibri">Calibri</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Inter">Inter</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Tamanho da Fonte</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfFontSize || '14px'}
+                        onChange={(e) => u('pdfFontSize', e.target.value)}
+                      >
+                        <option value="12px">12px</option>
+                        <option value="13px">13px</option>
+                        <option value="14px">14px</option>
+                        <option value="15px">15px</option>
+                        <option value="16px">16px</option>
+                        <option value="18px">18px</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Espaçamento de Linhas</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfLineHeight || '1.5'}
+                        onChange={(e) => u('pdfLineHeight', e.target.value)}
+                      >
+                        <option value="1.2">1.2</option>
+                        <option value="1.3">1.3</option>
+                        <option value="1.4">1.4</option>
+                        <option value="1.5">1.5</option>
+                        <option value="1.6">1.6</option>
+                        <option value="1.8">1.8</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Alinhamento do Texto</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfTextAlign || 'justify'}
+                        onChange={(e) => u('pdfTextAlign', e.target.value as 'justify' | 'left')}
+                      >
+                        <option value="justify">Justificado</option>
+                        <option value="left">Esquerda</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 py-5 border-t border-ink-50">
+                    <span className="text-xs font-black text-ink-700 uppercase tracking-wider block">Margens da Página (mm)</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Superior</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginTop !== undefined ? draft.pdfMarginTop : 15}
+                          onChange={(e) => u('pdfMarginTop', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Inferior</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginBottom !== undefined ? draft.pdfMarginBottom : 15}
+                          onChange={(e) => u('pdfMarginBottom', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Esquerda</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginLeft !== undefined ? draft.pdfMarginLeft : 15}
+                          onChange={(e) => u('pdfMarginLeft', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Direita</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginRight !== undefined ? draft.pdfMarginRight : 15}
+                          onChange={(e) => u('pdfMarginRight', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-5 border-t border-ink-50">
+                    <span className="text-xs font-black text-ink-700 uppercase tracking-wider block">Elementos do Layout</span>
+                    
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                      <div className="flex items-center gap-2.5">
+                        <div>
+                          <p className="text-xs font-bold text-ink-900">Cabeçalho da Clínica</p>
+                          <p className="text-[10px] text-ink-500">Exibir o cabeçalho configurado na clínica no topo do PDF.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => u('pdfShowHeader', draft.pdfShowHeader === false)}
+                        className={classNames(
+                          "w-10 h-6 rounded-full transition-all relative shrink-0",
+                          draft.pdfShowHeader !== false ? "bg-emerald-500" : "bg-ink-300"
+                        )}
+                      >
+                        <div className={classNames(
+                          "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft.pdfShowHeader !== false ? "left-5" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                      <div className="flex items-center gap-2.5">
+                        <div>
+                          <p className="text-xs font-bold text-ink-900">Rodapé da Clínica</p>
+                          <p className="text-[10px] text-ink-500">Exibir o rodapé configurado na clínica na base do PDF.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => u('pdfShowFooter', draft.pdfShowFooter === false)}
+                        className={classNames(
+                          "w-10 h-6 rounded-full transition-all relative shrink-0",
+                          draft.pdfShowFooter !== false ? "bg-emerald-500" : "bg-ink-300"
+                        )}
+                      >
+                        <div className={classNames(
+                          "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft.pdfShowFooter !== false ? "left-5" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -929,9 +1105,18 @@ export function Settings() {
             </div>
           )}
 
-          {/* TAB: FINANCEIRO */}
-          {activeTab === 'financeiro' && (
-            <div className="animate-fade-in">
+          {/* TAB: CONTROLE IA */}
+          {activeTab === 'controle-ia' && (
+            <div className="animate-fade-in space-y-5">
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                  <BrainCircuit size={16} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-ink-800">Motor de IA gerenciado pelo Administrador</p>
+                  <p className="text-[11px] text-ink-400 font-medium">Configurações de provedor, chave e modelo são definidas no Painel Admin → LAUD.IA.</p>
+                </div>
+              </div>
               <FinancialControl />
             </div>
           )}

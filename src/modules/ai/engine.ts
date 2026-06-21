@@ -717,17 +717,15 @@ ${contextMessage}`;
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
 export function resolveGeminiModel(rawModel: string | undefined): string {
-  if (!rawModel) return 'gemini-3.5-flash';
-  const raw = rawModel.toLowerCase();
+  const raw = (rawModel || '').toLowerCase();
 
-  // Gemini 2.5 series (new)
-  if (raw.includes('2.5') && raw.includes('pro')) return 'gemini-2.5-pro-preview-06-05';
-  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('2.5')) return 'gemini-2.5-flash-preview-05-20';
-  // Gemini 3.x series (legacy aliases)
-  if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro-preview';
   if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('pro')) return 'gemini-3.1-pro-preview';
+  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
+  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
+  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
 
   return 'gemini-3.5-flash';
 }

@@ -116,7 +116,7 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
 
     onChange({
       lesions: updatedLesions,
-      _summary: summaries.length > 0 ? `[TI-RADS Calculado]\n${summaries.join('\n')}` : null
+      _summary: summaries.length > 0 ? `TI-RADS: ${summaries.join(' | ')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);
