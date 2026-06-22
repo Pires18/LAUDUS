@@ -26,3 +26,8 @@ yarn-error.log*
 # Cache
 .cache/
 .parcel-cache/
+
+# PACS / Orthanc worklist files (nunca commitar arquivos de pacientes)
+*.wl
+C:/ORTHANCSERVER/
+C:\ORTHANCSERVER\
