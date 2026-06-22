@@ -33,8 +33,6 @@ export async function syncExamToOrthancWorklist(
       ? settings.dicomDevices?.find((d: any) => d.id === deviceId) || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' }
       : settings.dicomDevices?.[0] || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
-    const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-    
     // Principal Sync
     let primarySuccess = false;
     let primaryError = '';
@@ -78,7 +76,7 @@ export async function syncExamToOrthancWorklist(
     let backupSuccess = true;
     if (settings.dicomBackupSyncEnabled && patient.id !== 'ANONIMO') {
       try {
-        const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
+        const urlBackup = settings.dicomBackupLocalAgentUrl
           ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
           : '/api/worklist';
           
