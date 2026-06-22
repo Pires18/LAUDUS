@@ -40,7 +40,7 @@ export async function syncExamToOrthancWorklist(
     let primaryError = '';
     
     if (settings.dicomSyncEnabled !== false && patient.id !== 'ANONIMO') {
-      const url = (isVercel && settings.dicomLocalAgentUrl)
+      const url = settings.dicomLocalAgentUrl
         ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
         : '/api/worklist';
         
