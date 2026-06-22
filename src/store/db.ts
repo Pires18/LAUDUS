@@ -161,7 +161,12 @@ export async function getSettings(): Promise<AppSettings> {
       dicomBackupUsername: '',
       dicomBackupPassword: '',
       dicomBackupLocalAgentUrl: '',
-      dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
+      // Em não-Windows deixar vazio: o generate_wl.py aplica o fallback por SO.
+      // Um path Windows hardcoded aqui faz o Python no Mac/Linux criar arquivos-lixo
+      // com barras invertidas literais no diretório atual (corrompe o repositório git).
+      dicomBackupWorklistFolder: isWindows
+        ? 'C:\\OrthancServer\\db\\WorklistsDatabaseBackup\\'
+        : '',
       soundNotifications: true,
       autoSave: true,
       signatureImageUrl: ''
@@ -216,6 +221,22 @@ export async function getSettings(): Promise<AppSettings> {
         apply: (s) => {
           if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
             s.anthropicModel = 'claude-sonnet-4-6';
+          }
+        }
+      },
+      {
+        version: 6,
+        name: 'fix-backup-worklist-folder-windows-path-on-mac',
+        // O default antigo do backup era um path Windows hardcoded
+        // ('C:\ORTHANCSERVER\DB\WORKLISTSDATABASE\') que, rodado no Mac/Linux,
+        // fazia o Python criar arquivos-lixo com barras invertidas literais no
+        // diretório atual (corrompeu o repositório git). Limpa o valor ruim para
+        // que o generate_wl.py volte a aplicar o fallback correto por SO.
+        apply: (s) => {
+          const bad = s.dicomBackupWorklistFolder?.toUpperCase().replace(/\\/g, '');
+          if (bad === 'C:ORTHANCSERVERDBWORKLISTSDATABASE') {
+            const isWin = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
+            s.dicomBackupWorklistFolder = isWin ? 'C:\\OrthancServer\\db\\WorklistsDatabaseBackup\\' : '';
           }
         }
       },
@@ -333,7 +354,10 @@ export async function getSettings(): Promise<AppSettings> {
     dicomBackupUsername: '',
     dicomBackupPassword: '',
     dicomBackupLocalAgentUrl: '',
-    dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
+    // Ver nota acima: path Windows hardcoded corrompe o repo quando rodado no Mac/Linux.
+    dicomBackupWorklistFolder: isWindows
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabaseBackup\\'
+      : '',
     soundNotifications: true,
     autoSave: true,
     signatureImageUrl: ''
@@ -966,6 +990,8 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 export async function deleteWorklistEntry(examId: string, settings: AppSettings): Promise<void> {
   if (settings.dicomSyncEnabled === false) return;
 
+  // Na nuvem (laud.us/vercel) com agente configurado vai direto ao agente remoto;
+  // localmente usa '/api/worklist' same-origin (Vite/servidor local desta máquina).
   const isVercel = typeof window !== 'undefined' &&
     (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
 

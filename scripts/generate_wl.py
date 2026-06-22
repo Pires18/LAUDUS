@@ -65,9 +65,6 @@ def main():
 
         ds = Dataset()
         ds.file_meta = file_meta
-        ds.is_little_endian = True
-        ds.is_implicit_VR = True
-
         # 2. Dados Demograficos da Paciente (Sobrenome^Nome^NomeMeio em maiusculas)
         ds.PatientName = patient_name
         ds.PatientID = patient_id

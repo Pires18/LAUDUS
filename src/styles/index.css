@@ -245,6 +245,20 @@ html, body, #root {
     display: block !important;
     position: relative !important;
     visibility: visible !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+
+  /* Hide app shell and any open modal/overlay portals while printing images */
+  body.print-mode-images > #root,
+  body.print-mode-images > div:not(#print-images-area) {
+    display: none !important;
   }
 
   body:not(.print-mode-images) #print-images-area {
@@ -259,8 +273,11 @@ html, body, #root {
     page-break-after: always;
     page-break-inside: avoid;
     box-sizing: border-box;
-    height: 285mm;
-    max-height: 285mm;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: 277mm;
+    max-height: 277mm;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -304,10 +321,10 @@ html, body, #root {
   }
 
   .print-images-grid-1x1 .print-image-card img {
-    position: absolute;
-    width: 145%;
-    height: 100%;
-    transform: rotate(270deg) scale(1.2);
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
     object-fit: contain;
   }
 

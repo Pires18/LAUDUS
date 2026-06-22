@@ -237,6 +237,7 @@ export function Appointments() {
 
       if (!success) {
         logger.warn('[Orthanc Sync] Falha ao enviar para o worklist:', error);
+        showToast(`PACS: falha ao criar worklist — ${error || 'verifique o agente local e o Python/pydicom'}`, 'error');
       }
 
       await updateItem('appointments', confirmingApp.id, { status: 'confirmado' });

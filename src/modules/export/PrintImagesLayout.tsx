@@ -41,10 +41,27 @@ export function PrintImagesLayout({
   const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
   const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
 
+  // Margens (mm) configuráveis pelo usuário — default 10mm em cada lado.
+  const mTop = settings.pdfImagesMarginTop ?? 10;
+  const mBottom = settings.pdfImagesMarginBottom ?? 10;
+  const mLeft = settings.pdfImagesMarginLeft ?? 10;
+  const mRight = settings.pdfImagesMarginRight ?? 10;
+  // Altura útil da página A4 (297mm) descontadas as margens superior e inferior.
+  const pageHeight = Math.max(50, 297 - mTop - mBottom);
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <div id="print-images-area" className="hidden print:block w-full text-black bg-white text-[12px] leading-relaxed font-sans">
+      {/* Margens próprias da documentação fotográfica.
+          Renderizado depois do PrintLayout (que define @page margin:0), portanto vence o cascade
+          apenas durante a impressão de imagens. A altura da página acompanha as margens. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: ${mTop}mm ${mRight}mm ${mBottom}mm ${mLeft}mm; }
+          .print-images-page { height: ${pageHeight}mm !important; max-height: ${pageHeight}mm !important; }
+        }
+      `}</style>
       {pages.map((pageInstances, pageIdx) => (
         <div key={pageIdx} className="print-images-page">
           {/* Header */}
