@@ -245,6 +245,10 @@ html, body, #root {
     display: block !important;
     position: relative !important;
     visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   body:not(.print-mode-images) #print-images-area {
@@ -259,6 +263,8 @@ html, body, #root {
     page-break-after: always;
     page-break-inside: avoid;
     box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
     height: 285mm;
     max-height: 285mm;
     display: flex;
