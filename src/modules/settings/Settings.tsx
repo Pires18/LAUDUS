@@ -609,9 +609,62 @@ export function Settings() {
                     </div>
                   </div>
 
+                  <div className="space-y-4 py-5 border-t border-ink-50">
+                    <div>
+                      <span className="text-xs font-black text-ink-700 uppercase tracking-wider block">Margens — Documentação Fotográfica (mm)</span>
+                      <p className="text-[10px] text-ink-500 mt-1">Margens do PDF de imagens (impressão da documentação fotográfica do PACS).</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Superior</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfImagesMarginTop !== undefined ? draft.pdfImagesMarginTop : 10}
+                          onChange={(e) => u('pdfImagesMarginTop', Number(e.target.value))}
+                          min={0}
+                          max={50}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Inferior</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfImagesMarginBottom !== undefined ? draft.pdfImagesMarginBottom : 10}
+                          onChange={(e) => u('pdfImagesMarginBottom', Number(e.target.value))}
+                          min={0}
+                          max={50}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Esquerda</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfImagesMarginLeft !== undefined ? draft.pdfImagesMarginLeft : 10}
+                          onChange={(e) => u('pdfImagesMarginLeft', Number(e.target.value))}
+                          min={0}
+                          max={50}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Direita</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfImagesMarginRight !== undefined ? draft.pdfImagesMarginRight : 10}
+                          onChange={(e) => u('pdfImagesMarginRight', Number(e.target.value))}
+                          min={0}
+                          max={50}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-3 pt-5 border-t border-ink-50">
                     <span className="text-xs font-black text-ink-700 uppercase tracking-wider block">Elementos do Layout</span>
-                    
+
                     <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
                       <div className="flex items-center gap-2.5">
                         <div>

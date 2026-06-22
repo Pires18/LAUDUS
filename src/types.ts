@@ -286,6 +286,12 @@ export interface AppSettings {
   pdfMarginRight?: number;
   pdfShowHeader?: boolean;
   pdfShowFooter?: boolean;
+
+  // Margens (mm) da documentação fotográfica (PDF de imagens). Default: 10mm.
+  pdfImagesMarginTop?: number;
+  pdfImagesMarginBottom?: number;
+  pdfImagesMarginLeft?: number;
+  pdfImagesMarginRight?: number;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */

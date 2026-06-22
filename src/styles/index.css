@@ -276,8 +276,8 @@ html, body, #root {
     width: 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
-    height: 285mm;
-    max-height: 285mm;
+    height: 277mm;
+    max-height: 277mm;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
