@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
-import { exec } from 'child_process'
+import { spawn } from 'child_process'
 import fs from 'fs'
 
 // Custom Plugin to handle local Orthanc Worklist files during development
@@ -137,28 +137,62 @@ function localOrthancWorklistPlugin() {
                   payload.outputDir = '/app/pacs-worklist/';
                 }
                 
-                // Resolve python executable path from env or defaults
-                let pythonExecutable = process.env.VITE_PYTHON_PATH || 'python3';
-                if (!process.env.VITE_PYTHON_PATH && process.platform === 'win32') {
-                  const defaultWinPath = path.join(process.env.USERPROFILE || '', 'AppData/Local/Programs/Python/Python312/python.exe');
-                  if (fs.existsSync(defaultWinPath)) {
-                    pythonExecutable = `"${defaultWinPath}"`;
-                  } else {
-                    pythonExecutable = 'python';
+                // Resolve python executable — try env var first, then a fallback chain
+                const pythonScriptPath = path.resolve(__dirname, 'scripts', 'generate_wl.py');
+
+                function buildPythonCandidates(): string[] {
+                  if (process.env.VITE_PYTHON_PATH) return [process.env.VITE_PYTHON_PATH];
+                  if (process.platform === 'win32') {
+                    const userProfile = process.env.USERPROFILE || '';
+                    const candidates: string[] = [];
+                    // Check common Windows install paths for Python 3.9 – 3.13
+                    for (const ver of ['313', '312', '311', '310', '39']) {
+                      const p = path.join(userProfile, `AppData/Local/Programs/Python/Python${ver}/python.exe`);
+                      if (fs.existsSync(p)) candidates.push(p);
+                    }
+                    // Always append generic shell commands as last resort
+                    candidates.push('python', 'py', 'python3');
+                    return candidates;
                   }
+                  return ['python3', 'python'];
                 }
 
-                // Execute python script and pass payload via stdin
-                const pythonProcess = exec(`${pythonExecutable} scripts/generate_wl.py`, (error, stdout, stderr) => {
-                  if (error) {
+                const candidates = buildPythonCandidates();
+                let candidateIndex = 0;
+
+                function tryNextPython() {
+                  if (candidateIndex >= candidates.length) {
                     res.statusCode = 500;
-                    res.end(JSON.stringify({ success: false, error: stderr.trim() || error.message }));
-                  } else {
-                    res.end(stdout);
+                    res.end(JSON.stringify({ success: false, error: 'Python não encontrado. Instale Python 3.x e o módulo pydicom (pip install pydicom).' }));
+                    return;
                   }
-                });
-                pythonProcess.stdin?.write(JSON.stringify(payload));
-                pythonProcess.stdin?.end();
+                  const cmd = candidates[candidateIndex++];
+                  const pyProcess = spawn(cmd, [pythonScriptPath], { shell: process.platform === 'win32' });
+                  let stdout = '';
+                  let stderr = '';
+                  pyProcess.stdout.on('data', (d: Buffer) => { stdout += d; });
+                  pyProcess.stderr.on('data', (d: Buffer) => { stderr += d; });
+                  pyProcess.on('error', () => { tryNextPython(); });
+                  pyProcess.on('close', (code: number) => {
+                    if (code === 0) {
+                      res.statusCode = 200;
+                      res.setHeader('Content-Type', 'application/json');
+                      res.end(stdout);
+                    } else if (stderr.includes('No module named') || stderr.includes('ModuleNotFoundError')) {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: `Módulo Python ausente: ${stderr.trim()}. Execute: pip install pydicom` }));
+                    } else if ((stderr.includes('not found') || stderr.includes('não reconhecido') || stderr === '') && candidateIndex < candidates.length) {
+                      tryNextPython();
+                    } else {
+                      res.statusCode = 500;
+                      res.end(JSON.stringify({ success: false, error: stderr.trim() || `Python saiu com código ${code}` }));
+                    }
+                  });
+                  pyProcess.stdin.write(JSON.stringify(payload));
+                  pyProcess.stdin.end();
+                }
+
+                tryNextPython();
               } catch (err: any) {
                 res.statusCode = 400;
                 res.end(JSON.stringify({ success: false, error: err.message }));

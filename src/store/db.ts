@@ -966,11 +966,8 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 export async function deleteWorklistEntry(examId: string, settings: AppSettings): Promise<void> {
   if (settings.dicomSyncEnabled === false) return;
 
-  const isVercel = typeof window !== 'undefined' &&
-    (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-
   // ── Primário ──
-  const primaryAgentUrl = (isVercel && settings.dicomLocalAgentUrl)
+  const primaryAgentUrl = settings.dicomLocalAgentUrl
     ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
     : '/api/worklist';
 
@@ -989,7 +986,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
   // ── Backup (se configurado) ──
   let backupPromise: Promise<void | Response> = Promise.resolve();
   if (settings.dicomBackupSyncEnabled) {
-    const backupAgentUrl = (isVercel && settings.dicomBackupLocalAgentUrl)
+    const backupAgentUrl = settings.dicomBackupLocalAgentUrl
       ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
       : '/api/worklist';
 

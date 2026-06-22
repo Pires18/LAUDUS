@@ -182,8 +182,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       
       if (!success) {
         logger.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', error);
+        showToast(`PACS: falha ao criar worklist — ${error || 'verifique o agente local e o Python/pydicom'}`, 'error');
       } else if (backupSuccess === false) {
         logger.warn('[Orthanc Sync] Falha ao enviar para o backup do worklist');
+        showToast('PACS: worklist principal criada, mas falhou no backup', 'error');
       }
 
       // Tocar som de sucesso
