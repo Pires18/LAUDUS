@@ -33,12 +33,18 @@ export async function syncExamToOrthancWorklist(
       ? settings.dicomDevices?.find((d: any) => d.id === deviceId) || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' }
       : settings.dicomDevices?.[0] || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
+    // Decide o endpoint: na nuvem (laud.us/vercel) com agente configurado, vai direto
+    // ao agente remoto da clínica; rodando localmente (dev ou app na máquina da clínica),
+    // usa '/api/worklist' same-origin, que gera o arquivo NESTA máquina via Vite/servidor local.
+    const isVercel = typeof window !== 'undefined' &&
+      (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+
     // Principal Sync
     let primarySuccess = false;
     let primaryError = '';
-    
+
     if (settings.dicomSyncEnabled !== false && patient.id !== 'ANONIMO') {
-      const url = settings.dicomLocalAgentUrl
+      const url = (isVercel && settings.dicomLocalAgentUrl)
         ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
         : '/api/worklist';
         
@@ -76,7 +82,7 @@ export async function syncExamToOrthancWorklist(
     let backupSuccess = true;
     if (settings.dicomBackupSyncEnabled && patient.id !== 'ANONIMO') {
       try {
-        const urlBackup = settings.dicomBackupLocalAgentUrl
+        const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
           ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
           : '/api/worklist';
           
