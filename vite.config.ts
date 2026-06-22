@@ -167,7 +167,10 @@ function localOrthancWorklistPlugin() {
                     return;
                   }
                   const cmd = candidates[candidateIndex++];
-                  const pyProcess = spawn(cmd, [pythonScriptPath], { shell: process.platform === 'win32' });
+                  // NB: não usar { shell: true } — o caminho do projeto pode conter espaços
+                  // (ex: "LAUDUS OFICIAL") e o shell quebraria o argumento sem aspas.
+                  // Sem shell, o spawn passa os args direto ao CreateProcess (espaços OK).
+                  const pyProcess = spawn(cmd, [pythonScriptPath]);
                   let stdout = '';
                   let stderr = '';
                   pyProcess.stdout.on('data', (d: Buffer) => { stdout += d; });

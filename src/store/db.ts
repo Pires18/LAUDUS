@@ -161,7 +161,12 @@ export async function getSettings(): Promise<AppSettings> {
       dicomBackupUsername: '',
       dicomBackupPassword: '',
       dicomBackupLocalAgentUrl: '',
-      dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
+      // Em não-Windows deixar vazio: o generate_wl.py aplica o fallback por SO.
+      // Um path Windows hardcoded aqui faz o Python no Mac/Linux criar arquivos-lixo
+      // com barras invertidas literais no diretório atual (corrompe o repositório git).
+      dicomBackupWorklistFolder: isWindows
+        ? 'C:\\OrthancServer\\db\\WorklistsDatabaseBackup\\'
+        : '',
       soundNotifications: true,
       autoSave: true,
       signatureImageUrl: ''
@@ -333,7 +338,10 @@ export async function getSettings(): Promise<AppSettings> {
     dicomBackupUsername: '',
     dicomBackupPassword: '',
     dicomBackupLocalAgentUrl: '',
-    dicomBackupWorklistFolder: 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\',
+    // Ver nota acima: path Windows hardcoded corrompe o repo quando rodado no Mac/Linux.
+    dicomBackupWorklistFolder: isWindows
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabaseBackup\\'
+      : '',
     soundNotifications: true,
     autoSave: true,
     signatureImageUrl: ''
