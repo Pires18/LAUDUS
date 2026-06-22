@@ -53,7 +53,7 @@ export async function syncExamToOrthancWorklist(
             patientBirthDate: dicomBirthDate,
             patientSex: patient.gender || 'F',
             modality: targetDevice.modality,
-            aeTitle: settings.dicomOrthancAETitle || targetDevice.aeTitle,
+            aeTitle: targetDevice.aeTitle,
             stepDate,
             stepTime,
             stepDescription,
