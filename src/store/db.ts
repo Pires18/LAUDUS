@@ -224,6 +224,22 @@ export async function getSettings(): Promise<AppSettings> {
           }
         }
       },
+      {
+        version: 6,
+        name: 'fix-backup-worklist-folder-windows-path-on-mac',
+        // O default antigo do backup era um path Windows hardcoded
+        // ('C:\ORTHANCSERVER\DB\WORKLISTSDATABASE\') que, rodado no Mac/Linux,
+        // fazia o Python criar arquivos-lixo com barras invertidas literais no
+        // diretório atual (corrompeu o repositório git). Limpa o valor ruim para
+        // que o generate_wl.py volte a aplicar o fallback correto por SO.
+        apply: (s) => {
+          const bad = s.dicomBackupWorklistFolder?.toUpperCase().replace(/\\/g, '');
+          if (bad === 'C:ORTHANCSERVERDBWORKLISTSDATABASE') {
+            const isWin = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
+            s.dicomBackupWorklistFolder = isWin ? 'C:\\OrthancServer\\db\\WorklistsDatabaseBackup\\' : '';
+          }
+        }
+      },
     ];
 
     const currentVersion: number = (data as any)._settingsMigrationVersion ?? 0;
