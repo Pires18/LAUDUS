@@ -654,34 +654,6 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                         </div>
                       )}
                     </div>
-
-                    {/* Template preview on hover */}
-                    <AnimatePresence>
-                      {hoveredTemplate && (hoveredTemplate.aiInstructions || hoveredTemplate.analysisTemplate) && (
-                        <motion.div
-                          key={hoveredTemplate.id}
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15 }}
-                          className="rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 space-y-1.5"
-                        >
-                          <p className="text-[8px] font-black text-brand-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <Sparkles size={9} /> Prévia — {hoveredTemplate.name}
-                          </p>
-                          {hoveredTemplate.aiInstructions && (
-                            <p className="text-[10px] text-ink-600 font-medium leading-relaxed line-clamp-3">
-                              {hoveredTemplate.aiInstructions}
-                            </p>
-                          )}
-                          {!hoveredTemplate.aiInstructions && hoveredTemplate.analysisTemplate && (
-                            <p className="text-[10px] text-ink-500 font-medium leading-relaxed line-clamp-3 font-mono">
-                              {hoveredTemplate.analysisTemplate.slice(0, 200)}…
-                            </p>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
               </motion.div>
             )}
