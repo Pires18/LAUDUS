@@ -8,7 +8,8 @@
     "api/reset-monthly-reports.ts": { "maxDuration": 60 },
     "api/promote-admin.ts": { "maxDuration": 15 },
     "api/anthropic.ts": { "maxDuration": 60 },
-    "api/gemini.ts": { "maxDuration": 60 }
+    "api/gemini.ts": { "maxDuration": 60 },
+    "api/health.ts": { "maxDuration": 5 }
   },
   "crons": [
     {
