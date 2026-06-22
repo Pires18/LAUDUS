@@ -751,13 +751,18 @@ function AbacatePayTab() {
   const [secretCopied, setSecretCopied]   = useState(false);
 
   const publicBase = (import.meta.env.VITE_PUBLIC_URL as string | undefined)?.replace(/\/$/, '');
-  const webhookUrl = publicBase
+  const webhookBase = publicBase
     ? `${publicBase}/api/abacatepay-webhook`
     : typeof window !== 'undefined'
       ? `${window.location.origin}/api/abacatepay-webhook`
       : 'https://seu-dominio.vercel.app/api/abacatepay-webhook';
-  const isNgrok = webhookUrl.includes('ngrok') || webhookUrl.includes('tunnel');
-  const isVercelProd = webhookUrl.includes('vercel.app') || (webhookUrl.startsWith('https://') && !isNgrok && !webhookUrl.includes('localhost'));
+  const isNgrok = webhookBase.includes('ngrok') || webhookBase.includes('tunnel');
+  const isVercelProd = webhookBase.includes('vercel.app') || (webhookBase.startsWith('https://') && !isNgrok && !webhookBase.includes('localhost'));
+  const bypassToken = (import.meta.env.VITE_VERCEL_BYPASS_TOKEN as string | undefined) || '';
+  // Quando Vercel Deployment Protection está ativo, o AbacatePay precisa da URL com o bypass token.
+  const webhookUrl = isVercelProd && bypassToken
+    ? `${webhookBase}?x-vercel-protection-bypass=${bypassToken}`
+    : webhookBase;
 
   const isKeyConfigured    = config.apiKey.length > 10;
   const isSecretConfigured = config.webhookSecret.length > 10;
