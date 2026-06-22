@@ -1,4 +1,4 @@
-# LAUD.US v3.0.1
+# LAUD.US v2.0
 
 > **Plataforma profissional de laudos ultrassonográficos com IA integrada**
 

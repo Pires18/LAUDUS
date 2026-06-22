@@ -208,7 +208,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     onChange({
       gaWeeks, gaDays, sex, bpd, hc, ac, fl, hl, auPi, acmPi, utaPi, dvPi, auFlow, dvWave,
       ...calc,
-      _summary: calc.efw || calc.rcp ? `[CRESCIMENTO FETAL (OMS + Doppler)]\n- ${lines.join('\n- ')}` : null
+      _summary: calc.efw || calc.rcp ? `Crescimento fetal (OMS + Doppler): ${lines.join('; ')}.` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gaWeeks,gaDays,sex,bpd,hc,ac,fl,hl,auPi,acmPi,utaPi,dvPi,auFlow,dvWave,calc]);

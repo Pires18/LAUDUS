@@ -1,16 +1,12 @@
-import { PageHeader } from '../../components/PageHeader';
 import { SharedLaudIA } from './SharedLaudIA';
-import { BrainCircuit } from 'lucide-react';
+import { auth } from '../../lib/firebase';
+import { ADMIN_EMAIL } from '../../config/constants';
 
 export function LaudIA() {
+  const isAdmin = auth.currentUser?.email === ADMIN_EMAIL;
   return (
     <div className="module-container">
-      <PageHeader
-        title="Personalização LAUD.IA"
-        subtitle="Gerencie seu estilo de redação, personalize diretrizes por especialidade e monitore a telemetria do seu copiloto clínico."
-        icon={BrainCircuit}
-      />
-      <SharedLaudIA readOnly={true} />
+      <SharedLaudIA readOnly={!isAdmin} />
     </div>
   );
 }

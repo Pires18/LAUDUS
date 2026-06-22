@@ -3,11 +3,12 @@ import { useApp } from '../../store/app';
 import { useCollection, where } from '../../hooks/useFirestore';
 import { ReportTemplate, Clinic, Patient, AuditLog } from '../../types';
 import { 
-  AlertCircle, CheckCircle2, ShieldCheck, Database, Key, Building2, 
-  FileText, Clock, User, Activity, History, Calendar, Eye, X 
+  AlertCircle, CheckCircle2, ShieldCheck, Database, Key, Building2,
+  FileText, Clock, User, Activity, History, Calendar, Eye
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
+import { Modal } from '../../components/Modal';
 
 interface AuditResult {
   id: string;
@@ -43,27 +44,15 @@ export function AuditDashboard() {
   useEffect(() => {
     const newResults: AuditResult[] = [];
 
-    // 1. API Key Check
-    const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
-    if (!hasKey) {
-      newResults.push({
-        id: 'api-key',
-        category: 'security',
-        status: 'error',
-        title: `API Key do ${settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} Ausente`,
-        message: 'O sistema está operando em modo demo. Configure a API Key para habilitar a IA.',
-        icon: <Key size={18} />
-      });
-    } else {
-      newResults.push({
-        id: 'api-key',
-        category: 'security',
-        status: 'ok',
-        title: 'IA Conectada',
-        message: `API Key configurada e motor ${settings.aiProvider === 'anthropic' ? 'Claude' : 'Gemini'} pronto para uso.`,
-        icon: <Key size={18} />
-      });
-    }
+    // 1. API Key Check (Anthropic and Gemini are managed globally by the Admin or server-side)
+    newResults.push({
+      id: 'api-key',
+      category: 'security',
+      status: 'ok',
+      title: 'IA Conectada',
+      message: `Motor ${settings.aiProvider === 'anthropic' ? 'Claude' : 'Gemini'} pronto para uso (utilizando chaves globais do administrador/servidor).`,
+      icon: <Key size={18} />
+    });
 
     // 2. Templates Health
     const templatesWithoutContent = templates.filter(t => !t.analysisTemplate);
@@ -218,7 +207,7 @@ export function AuditDashboard() {
       </div>
 
       {/* User Activity Logs Timeline */}
-      <div className="bg-white border border-ink-100 rounded-[2rem] p-6 sm:p-8 shadow-sm">
+      <div className="bg-white border border-ink-100 rounded-3xl p-6 sm:p-8 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
             <Activity size={20} />
@@ -283,64 +272,38 @@ export function AuditDashboard() {
       </div>
 
       {/* Forensic Detail Modal */}
-      <AnimatePresence>
+      <Modal
+        open={selectedLog !== null}
+        onClose={() => setSelectedLog(null)}
+        title={`Detalhamento de Auditoria #${selectedLog?.id.slice(0, 8)}`}
+        size="md"
+      >
         {selectedLog && (
-          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-[2rem] p-8 max-w-lg w-full shadow-2xl border border-ink-100 relative overflow-hidden animate-zoom-in"
-            >
-              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-brand-500 to-indigo-500" />
-              
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h4 className="text-xl font-black text-ink-900 flex items-center gap-2">
-                    Detalhamento de Auditoria
-                    <span className="text-[9px] bg-ink-900 text-white px-2 py-0.5 rounded-full uppercase tracking-widest font-mono">
-                      #{selectedLog.id.slice(0, 8)}
-                    </span>
-                  </h4>
-                  <p className="text-xs text-ink-500 mt-0.5">Executado em {new Date(selectedLog.timestamp).toLocaleString('pt-BR')}</p>
-                </div>
-                <button onClick={() => setSelectedLog(null)} className="p-1.5 hover:bg-ink-50 rounded-xl transition-colors">
-                  <X size={18} className="text-ink-450" />
-                </button>
+          <div className="space-y-6">
+            <p className="text-xs text-ink-500">Executado em {new Date(selectedLog.timestamp).toLocaleString('pt-BR')}</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-ink-50/50 p-4 rounded-2xl border border-ink-100 text-xs">
+                <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-1">Módulo</p>
+                <p className="font-bold text-ink-900">{selectedLog.module}</p>
               </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-ink-50/50 p-4 rounded-2xl border border-ink-100 text-xs">
-                    <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-1">Módulo</p>
-                    <p className="font-bold text-ink-900">{selectedLog.module}</p>
-                  </div>
-                  <div className="bg-ink-50/50 p-4 rounded-2xl border border-ink-100 text-xs">
-                    <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-1">Ação</p>
-                    <p className="font-bold text-ink-900">{selectedLog.action}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-2">Dados da Operação</p>
-                  <div className="bg-ink-900 rounded-2xl p-4 overflow-hidden max-h-[220px] overflow-y-auto custom-scrollbar">
-                    <pre className="text-[11px] text-brand-50 font-mono whitespace-pre-wrap leading-relaxed">
-                      {selectedLog.details}
-                    </pre>
-                  </div>
-                </div>
+              <div className="bg-ink-50/50 p-4 rounded-2xl border border-ink-100 text-xs">
+                <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-1">Ação</p>
+                <p className="font-bold text-ink-900">{selectedLog.action}</p>
               </div>
+            </div>
 
-              <button 
-                onClick={() => setSelectedLog(null)}
-                className="w-full mt-6 py-3 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-black text-xs uppercase tracking-widest transition-all shadow-md active:scale-95"
-              >
-                Fechar Detalhes
-              </button>
-            </motion.div>
+            <div>
+              <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-2">Dados da Operação</p>
+              <div className="bg-ink-900 rounded-2xl p-4 overflow-hidden max-h-[220px] overflow-y-auto custom-scrollbar">
+                <pre className="text-[11px] text-brand-50 font-mono whitespace-pre-wrap leading-relaxed">
+                  {selectedLog.details}
+                </pre>
+              </div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </Modal>
     </div>
   );
 }

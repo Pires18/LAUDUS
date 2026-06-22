@@ -21,7 +21,7 @@ export const EXAM_AREAS: { id: ExamArea; label: string; color: string; icon: str
   { id: 'musculoesqueletico', label: 'Musculoesquelético', color: 'bg-orange-100 text-orange-700', icon: 'Bone' },
   { id: 'vascular', label: 'Vascular', color: 'bg-red-100 text-red-700', icon: 'Waves' },
   { id: 'pediatria', label: 'Pediatria', color: 'bg-cyan-100 text-cyan-700', icon: 'ToyBrick' },
-  { id: 'procedimentos', label: 'Procedimentos', color: 'bg-slate-100 text-slate-700', icon: 'Syringe' },
+  { id: 'procedimentos', label: 'Procedimentos', color: 'bg-ink-100 text-ink-700', icon: 'Syringe' },
   { id: 'reumatologico', label: 'Reumatológico', color: 'bg-amber-100 text-amber-700', icon: 'Dna' },
   { id: 'mastologia', label: 'Mastologia', color: 'bg-rose-100 text-rose-700', icon: 'Ribbon' },
 ];
@@ -222,6 +222,8 @@ export interface AppSettings {
   aiTrainingContextSize?: number;
   /** Se o Refinador Automático deve ser ativado por padrão em todo laudo após as alterações do Copiloto */
   aiAutoRefineEnabled?: boolean;
+  /** Se o Modo Rápido (sem scratchpad) está ativo */
+  aiFastMode?: boolean;
   /** Banco de frases prontas do usuário */
   snippets?: { id: string; title: string; content: string; area?: string }[];
   
@@ -251,10 +253,39 @@ export interface AppSettings {
   dicomBackupLocalAgentUrl?: string;
   dicomBackupOrthancAETitle?: string;
 
+  /** Criatividade da IA por modo operacional */
+  aiTemperatureByMode?: {
+    generation?: number;  // default 0.35
+    refine?: number;      // default 0.10
+    copilot?: number;     // default 0.20
+    template?: number;    // default 0.20
+  };
+  /** Regras de ouro do refinamento (Bloco 5) — editável pelo admin */
+  aiRefinementGoldenRules?: string;
+  /** Override do copiloto (formato de saída CONVERSA/PROPOSTA) — editável pelo admin */
+  aiCopilotOverride?: string;
+  /** Taxa de conversão USD → BRL para exibição de custos (default: 5.50) */
+  aiConversionRateBRL?: number;
+
+  // Motor de IA selecionado pelo usuário (Lite ou Pro)
+  selectedMotor?: 'lite' | 'pro';
+
   // Preferências do Sistema
   soundNotifications?: boolean;
   autoSave?: boolean;
   signatureImageUrl?: string;
+
+  // Configurações de Layout de Laudo PDF
+  pdfFontFamily?: string;
+  pdfFontSize?: string;
+  pdfLineHeight?: string;
+  pdfTextAlign?: 'justify' | 'left';
+  pdfMarginTop?: number;
+  pdfMarginBottom?: number;
+  pdfMarginLeft?: number;
+  pdfMarginRight?: number;
+  pdfShowHeader?: boolean;
+  pdfShowFooter?: boolean;
 }
 
 /** Cadastro de clínica (Unidade de atendimento) */
@@ -275,6 +306,10 @@ export interface Clinic {
   email?: string;
   /** URL do logo da clínica */
   logoUrl?: string;
+  /** URL do cabeçalho da clínica como imagem */
+  headerImageUrl?: string;
+  /** URL do rodapé da clínica como imagem */
+  footerImageUrl?: string;
   /** ID do documento template do Google Docs para esta clínica */
   googleDocsTemplateId?: string;
   /** ID da pasta no Drive onde os laudos serão salvos */
@@ -336,22 +371,58 @@ export interface AuditLog {
   timestamp: number;
 }
 
-/** Plano de assinatura */
-export interface Plan {
+/** Assinatura ativa de um usuário */
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'paused';
+export type SubscriptionAddon = 'pacs' | 'calculators' | 'appointments' | 'clinics';
+
+export interface Subscription {
   id: string;
-  name: string;
-  price: number;
-  interval: 'month' | 'year';
-  features: string[];
-  examLimit?: number; // null = ilimitado
-  clinicLimit?: number;
-  active: boolean;
-  
-  // Recursos e adequações clínicas do sistema
-  iaLimit?: number;         // Créditos Laud.IA/mês (null = ilimitado)
-  storageLimitGb?: number;  // Armazenamento de Imagens em GB (null = ilimitado)
-  voiceDictation: boolean;  // Permite Ditado por Voz clínico
-  customMasks: boolean;     // Permite criação de máscaras personalizadas
+  userId: string;
+  userEmail: string;
+  plan: string;
+  planId?: string;
+  addons: SubscriptionAddon[];
+  status: SubscriptionStatus;
+  paymentMethod: 'pix' | 'credit_card' | 'manual';
+  abacatePayCustomerId?: string;
+  abacatePaySubscriptionId?: string;
+  currentPeriodStart: number;
+  currentPeriodEnd: number;
+  trialEndsAt?: number;
+  canceledAt?: number;
+  reportsUsedThisMonth: number;
+  reportsQuota: number;
+  clinicsQuota: number;
+  tokenQuotaLite: number;
+  tokenQuotaPro: number;
+  lastResetAt: number;
+  createdAt: number;
+  updatedAt: number;
+}
+/** Configuração de funcionalidades extras (add-ons) */
+export interface SaasAddonsConfig {
+  calculators: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  pacs: { price: number; description: string; enabled: boolean; assisted: boolean; abacatePayProductId?: string; };
+  appointments: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  clinics: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  extraReport: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  extraClinic: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  tokenLite: { price: number; bundleSize: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  tokenPro: { price: number; bundleSize: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  updatedAt?: number;
+}
+
+/** Configuração dos motores de IA (Lite / Pro) definida pelo admin */
+export interface MotorTierConfig {
+  provider: 'gemini' | 'anthropic';
+  model: string;
+  tokensPerReport: number;
+  costPerThousandTokens: number;
+}
+
+export interface MotorConfig {
+  lite: MotorTierConfig;
+  pro: MotorTierConfig;
 }
 
 export interface SupportMessage {
@@ -373,19 +444,59 @@ export interface SupportTicket {
   messages: SupportMessage[];
   createdAt: number;
   updatedAt: number;
+  type?: string;
+  category?: 'ia_help' | 'billing' | 'pacs_setup' | 'technical_issue' | 'other';
+  rating?: number;
+  ratingComment?: string;
+  adminNotes?: Array<{ timestamp: number; author: string; text: string }>;
+  diagnostics?: {
+    browser: string;
+    os: string;
+    screenResolution: string;
+    reportsRemaining: number;
+    activePlan: string;
+  };
 }
 
-/** Código de Licença comercial atrelado a planos */
-export interface License {
-  id: string;             // Ex: LAUD-XXXX-XXXX-XXXX
-  planId: string;         // ID do plano associado
-  planName: string;       // Nome do plano associado
-  durationMonths: number; // Duração (1, 3, 6, 12, 24 meses)
-  active: boolean;        // Se está ativa (não revogada)
-  createdAt: number;      // Data de geração
-  usedAt?: number;        // Data de ativação pelo usuário
-  usedByUid?: string;     // UID do médico que ativou
-  usedByEmail?: string;   // E-mail do médico que ativou
-  expiresAt?: number;     // Timestamp exato do fim do acesso
+/** Plano de assinatura SaaS */
+export interface Plan {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  interval: 'month' | 'year';
+  active: boolean;
+  featured?: boolean;
+
+  // Quotas
+  reportsQuota: number;       // 0 = ilimitado
+  clinicsQuota: number;       // 0 = ilimitado
+  tokenQuotaLite: number;     // 0 = ilimitado (tokens Lite/mês)
+  tokenQuotaPro: number;      // 0 = ilimitado (tokens Pro/mês)
+  trialDays: number;
+
+  // Funcionalidades incluídas
+  includesCalculators: boolean;
+  includesPacs: boolean;
+  includesAppointments?: boolean;
+  includesClinics?: boolean;
+  motorProDefault: boolean;
+
+  // AbacatePay
+  abacatePayProductId?: string;
+
+  // Legacy compatibility
+  features?: string[];
+  examLimit?: number;
+  clinicLimit?: number;
+  iaLimit?: number;
+  storageLimitGb?: number;
+  voiceDictation?: boolean;
+  customMasks?: boolean;
+
+  createdAt?: number;
+  updatedAt?: number;
 }
+
+
 

@@ -192,7 +192,7 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
 
     onChange({
       lesions: updatedLesions,
-      _summary: summaries.length > 0 ? `[BI-RADS Calculado]\n${summaries.join('\n')}` : null
+      _summary: summaries.length > 0 ? `BI-RADS: ${summaries.join(' | ')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);
@@ -233,7 +233,7 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
 
       <div className="space-y-4">
         {lesions.length === 0 && (
-          <div className="py-12 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center space-y-3">
+          <div className="py-12 border-2 border-dashed border-ink-100 rounded-2xl text-center space-y-3">
             <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200">
               <MapPin size={32} />
             </div>
@@ -242,7 +242,7 @@ export function BiradsCalculator({ value, onChange }: CalculatorProps) {
         )}
 
         {lesions.map((lesion) => (
-          <div key={lesion.id} className="bg-white rounded-[2.5rem] border-2 border-ink-100 overflow-hidden shadow-sm transition-all hover:border-rose-200">
+          <div key={lesion.id} className="bg-white rounded-2xl border-2 border-ink-100 overflow-hidden shadow-sm transition-all hover:border-rose-200">
             {/* HEADER */}
             <div
               className={classNames(

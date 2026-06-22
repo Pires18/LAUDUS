@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Modal } from '../../../components/Modal';
 import { AppSettings, ExamRequest } from '../../../types';
-import { Loader2, Camera, Printer, CheckSquare, Square, AlertTriangle, RefreshCw } from 'lucide-react';
-import { getActivePacsUrl, getProxyEndpoint } from '../../../store/db';
+import { 
+  Loader2, Camera, Printer, CheckSquare, Square,
+  AlertTriangle, RefreshCw, Check
+} from 'lucide-react';
+import { getProxyEndpoint } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { DicomThumbnail } from './DicomThumbnail';
 
@@ -15,7 +18,11 @@ interface Props {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
-  onPrint: (instances: any[], gridType: string) => void;
+  onPrint: (
+    instances: any[], 
+    gridType: string, 
+    adjustments: Record<string, { rotation: number; inverted: boolean }>
+  ) => void;
   activePacsServer: 'primary' | 'backup' | 'both';
 }
 
@@ -33,6 +40,9 @@ export function DicomImagesModal({
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [gridType, setGridType] = useState<string>('2x4');
+  
+  // Viewport Active Image
+  const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
 
   const baseUrl = activePacsServer === 'backup'
     ? (settings.dicomBackupViewerUrl || 'http://localhost:8043')
@@ -41,8 +51,7 @@ export function DicomImagesModal({
   const initializedRef = useRef(false);
   const prevInstanceIdsRef = useRef<string[]>([]);
 
-  // Keep selection in sync: select all initially, and auto-select new instances as they arrive,
-  // without overriding any manual deselection of existing instances.
+  // Reset active image and adjustments on close/open
   useEffect(() => {
     if (open) {
       const currentIds = instances.map((inst: any) => inst.ID);
@@ -61,15 +70,28 @@ export function DicomImagesModal({
         }
       }
       prevInstanceIdsRef.current = currentIds;
+
+      // Set default active image to first instance
+      if (instances.length > 0 && !activeInstanceId) {
+        setActiveInstanceId(instances[0].ID);
+      }
     } else {
-      // Fix 8: reset both initializedRef AND selectedIds so modal is fresh on reopen
       initializedRef.current = false;
       prevInstanceIdsRef.current = [];
       setSelectedIds(new Set());
+      setActiveInstanceId(null);
     }
   }, [open, instances]);
 
-  const handleToggleSelect = (id: string) => {
+  // Sync activeInstanceId if it becomes empty
+  useEffect(() => {
+    if (instances.length > 0 && !activeInstanceId) {
+      setActiveInstanceId(instances[0].ID);
+    }
+  }, [instances, activeInstanceId]);
+
+  const handleToggleSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -92,50 +114,81 @@ export function DicomImagesModal({
   const handleGeneratePdf = () => {
     if (selectedIds.size === 0) return;
     const selectedInstances = instances.filter(inst => selectedIds.has(inst.ID));
-    onPrint(selectedInstances, gridType);
+    onPrint(selectedInstances, gridType, {});
   };
 
+  // Active Instance helper variables
+  const activeInstance = useMemo(() => {
+    return instances.find(inst => inst.ID === activeInstanceId) || null;
+  }, [instances, activeInstanceId]);
+
+  const activeImageUrl = useMemo(() => {
+    if (!activeInstance) return null;
+    const isBackup = activeInstance.serverSource === 'backup';
+    const currentBaseUrl = isBackup
+      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+      : (settings.dicomViewerUrl || 'http://localhost:8042');
+    const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+    const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+    const proxyPath = getProxyEndpoint(settings, isBackup);
+    
+    return `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+  }, [activeInstance, settings]);
+
+
+
+  // Visual layout config selector cards
+  const gridOptions = [
+    { value: '1x1', label: 'Cheio (1x1)', desc: '1 foto por página', rows: 1, cols: 1 },
+    { value: '1x2', label: 'Duplo (1x2)', desc: '2 fotos por página', rows: 2, cols: 1 },
+    { value: '2x3', label: 'Compacto (2x3)', desc: '6 fotos por página', rows: 3, cols: 2 },
+    { value: '2x4', label: 'Padrão (2x4)', desc: '8 fotos por página', rows: 4, cols: 2 },
+  ];
+
   return (
-    <Modal open={open} onClose={onClose} title="Imagens do Exame (Orthanc PACS)" size="lg">
-      <div className="space-y-5">
-        {/* Info Header */}
-        <div className="flex items-start justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-          <div className="flex items-start gap-3">
-            <Camera className="text-slate-500 shrink-0 mt-0.5" size={18} />
-            <div className="text-xs leading-normal font-semibold text-slate-600">
-              Busca direta de imagens no servidor Orthanc local em <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800 font-mono text-[10px]">{baseUrl}</code>.
-              Selecione as fotos do PACS que deseja incluir na documentação fotográfica impressa.
-            </div>
+    <Modal open={open} onClose={onClose} title="Console PACS Orthanc — Diagnóstico e Impressão" size="xl" theme="dark">
+      <div className="space-y-5 text-zinc-100 font-sans select-none">
+        
+        {/* Connection status bar */}
+        <div className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-800/80 p-3.5 rounded-2xl">
+          <div className="flex items-center gap-3">
+            <Camera className="text-zinc-500 shrink-0" size={16} />
+            <span className="text-[11px] font-semibold text-zinc-400">
+              Servidor PACS Ativo: <code className="bg-zinc-800 text-brand-400 px-1.5 py-0.5 rounded font-mono text-[10px]">{baseUrl}</code>
+            </span>
           </div>
           {settings.dicomSyncEnabled !== false && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-black uppercase tracking-wider text-emerald-700 shrink-0 select-none shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Sincronismo Ativo
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-wider text-emerald-400">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              Conexão PACS Ok
             </div>
           )}
         </div>
 
         {/* Loading / Error States */}
         {loading && (
-          <div className="py-12 flex flex-col items-center justify-center gap-3">
-            <Loader2 size={32} className="animate-spin text-brand-600" />
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Buscando imagens do exame no PACS...</p>
+          <div className="py-20 flex flex-col items-center justify-center gap-4 bg-zinc-900/50 border border-zinc-800/55 rounded-3xl">
+            <Loader2 size={36} className="animate-spin text-brand-500" />
+            <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Carregando Estudos PACS...</p>
           </div>
         )}
 
         {error && !loading && (
-          <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col items-center text-center gap-3">
-            <AlertTriangle className="text-amber-500" size={32} />
-            <div className="space-y-1">
-              <h4 className="text-xs font-black text-amber-900 uppercase tracking-wider">Falha de Conexão ou Estudo Não Encontrado</h4>
-              <p className="text-[11px] text-amber-700 font-medium leading-relaxed max-w-md">
+          <div className="p-8 rounded-3xl bg-zinc-900 border border-zinc-800 flex flex-col items-center text-center gap-4">
+            <AlertTriangle className="text-amber-500" size={36} />
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-black text-zinc-200 uppercase tracking-wider">Falha na Sincronização PACS</h4>
+              <p className="text-xs text-zinc-500 leading-relaxed max-w-md font-medium">
                 {error}
               </p>
             </div>
             <button
               type="button"
               onClick={onRefresh}
-              className="mt-2 h-9 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all"
+              className="mt-2 h-10 px-5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-zinc-700 shadow-sm transition-all"
             >
               <RefreshCw size={12} />
               Tentar Novamente
@@ -143,118 +196,211 @@ export function DicomImagesModal({
           </div>
         )}
 
-        {/* Gallery Content */}
+        {/* Diagnostic Workspace Grid (Split view layout) */}
         {!loading && !error && instances.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                {instances.length} imagens carregadas • {selectedIds.size} selecionadas
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSelectAll}
-                  className="text-[9px] font-bold text-slate-900 hover:text-slate-700 uppercase tracking-wider flex items-center gap-1"
-                >
-                  <CheckSquare size={12} />
-                  Selecionar Tudo
-                </button>
-                <div className="h-3 w-px bg-slate-200" />
-                <button
-                  onClick={handleClearSelection}
-                  className="text-[9px] font-bold text-slate-400 hover:text-slate-600 uppercase tracking-wider flex items-center gap-1"
-                >
-                  <Square size={12} />
-                  Limpar
-                </button>
+          <div className="grid grid-cols-12 gap-5 min-h-[450px]">
+            
+            {/* LEFT AREA (40% width): Thumbnails Selection Panel */}
+            <div className="col-span-12 md:col-span-5 flex flex-col bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-4 overflow-hidden max-h-[500px]">
+              
+              {/* Header Toggles */}
+              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3 mb-3 shrink-0">
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
+                  Estudo: {instances.length} Fotos · {selectedIds.size} no PDF
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSelectAll}
+                    className="text-[9px] font-bold text-zinc-300 hover:text-white uppercase tracking-wider flex items-center gap-1 transition-colors"
+                  >
+                    <CheckSquare size={11} className="text-brand-500" />
+                    Tudo
+                  </button>
+                  <div className="h-3 w-px bg-zinc-800" />
+                  <button
+                    onClick={handleClearSelection}
+                    className="text-[9px] font-bold text-zinc-500 hover:text-zinc-300 uppercase tracking-wider flex items-center gap-1 transition-colors"
+                  >
+                    <Square size={11} />
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Thumbnails Grid */}
+              <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {instances.map((instance, idx) => {
+                    const isSelected = selectedIds.has(instance.ID);
+                    const isActive = activeInstanceId === instance.ID;
+                    const isBackup = instance.serverSource === 'backup';
+                    const currentBaseUrl = isBackup
+                      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
+                      : (settings.dicomViewerUrl || 'http://localhost:8042');
+                    const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
+                    const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
+                    const proxyPath = getProxyEndpoint(settings, isBackup);
+                    const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+                    const instNum = instance.MainDicomTags?.InstanceNumber || (idx + 1);
+
+                    return (
+                      <div
+                        key={instance.ID}
+                        onClick={() => setActiveInstanceId(instance.ID)}
+                        className={classNames(
+                          "relative aspect-[4/3] rounded-xl border overflow-hidden flex flex-col justify-between bg-black transition-all duration-300 cursor-pointer group",
+                          isActive 
+                            ? "border-brand-500 ring-2 ring-brand-500/25" 
+                            : "border-zinc-800/80 hover:border-zinc-700"
+                        )}
+                      >
+                        {/* Selected Indicator Checkbox - Click to select/deselect */}
+                        <div 
+                          onClick={(e) => handleToggleSelect(instance.ID, e)}
+                          className="absolute top-2 right-2 z-20 p-1 rounded-md bg-black/60 backdrop-blur-sm border border-zinc-800 text-white transition-all hover:bg-black"
+                        >
+                          {isSelected ? (
+                            <div className="w-3.5 h-3.5 bg-brand-500 rounded flex items-center justify-center shadow-inner">
+                              <Check size={10} strokeWidth={3} className="text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-3.5 h-3.5 rounded border border-zinc-600" />
+                          )}
+                        </div>
+
+                        {/* Thumbnail View */}
+                        <div className="flex-1 flex items-center justify-center overflow-hidden w-full h-full relative">
+                          <DicomThumbnail
+                            src={previewUrl}
+                            alt={`Instance ${instNum}`}
+                            className={classNames(
+                              "transition-transform duration-500 group-hover:scale-105",
+                              isActive ? "scale-97" : ""
+                            )}
+                          />
+                          {/* Selected overlay shadow */}
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-brand-500/5 pointer-events-none" />
+                          )}
+                        </div>
+
+                        {/* Caption bar */}
+                        <div className={classNames(
+                          "px-2 py-1 text-left w-full text-[9px] font-black border-t z-10 transition-colors uppercase tracking-wider flex justify-between",
+                          isActive 
+                            ? "bg-brand-950/80 text-brand-400 border-brand-800" 
+                            : "bg-zinc-950/80 text-zinc-500 border-zinc-800"
+                        )}>
+                          <span>Foto {idx + 1}</span>
+                          {instance.MainDicomTags?.InstanceNumber && <span>Inst. {instance.MainDicomTags.InstanceNumber}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Images Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[460px] md:max-h-[50vh] overflow-y-auto pr-1.5 custom-scrollbar">
-              {instances.map((instance, idx) => {
-                const isSelected = selectedIds.has(instance.ID);
-                const isBackup = instance.serverSource === 'backup';
-                const currentBaseUrl = isBackup
-                  ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                  : (settings.dicomViewerUrl || 'http://localhost:8042');
-                const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-                const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-                const proxyPath = getProxyEndpoint(settings, isBackup);
-                const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-                const instNum = instance.MainDicomTags?.InstanceNumber || (idx + 1);
+            {/* RIGHT AREA (60% width): Diagnostic Viewport Pane */}
+            <div className="col-span-12 md:col-span-7 flex flex-col bg-zinc-950 border border-zinc-800/80 rounded-2xl overflow-hidden max-h-[500px]">
+              
+              {/* Toolbar */}
+              <div className="bg-[#09090b] border-b border-zinc-800/80 px-4 py-2 flex items-center justify-between shrink-0 font-sans">
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                  Visualizador de Imagem
+                </span>
+              </div>
 
+              {/* High-res viewport canvas */}
+              <div className="flex-1 bg-black relative flex items-center justify-center p-6 overflow-hidden">
+                {activeImageUrl ? (
+                  <div className="w-full h-full flex items-center justify-center relative">
+                    <img
+                      src={activeImageUrl}
+                      alt="Viewport"
+                      style={{
+                        maxHeight: '100%',
+                        maxWidth: '100%',
+                        objectFit: 'contain'
+                      }}
+                      className="rounded-lg shadow-2xl"
+                    />
+                    
+                    {/* Status marker */}
+                    <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded bg-black/60 backdrop-blur-sm border border-zinc-800 text-[9px] font-mono text-zinc-400 select-none">
+                      {activeInstance?.MainDicomTags?.InstanceNumber ? `ID: ${activeInstanceId?.slice(0, 8)} · Inst: ${activeInstance.MainDicomTags.InstanceNumber}` : `ID: ${activeInstanceId?.slice(0, 8)}`}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-zinc-500 italic text-xs">Selecione uma imagem para visualização.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer Actions (redesigned with grid cards) */}
+        <div className="flex flex-col gap-5 pt-4 border-t border-zinc-800/80">
+          
+          {/* Visual Grid Layout Cards */}
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-zinc-500 tracking-wider block">Layout do PDF Final:</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {gridOptions.map((opt) => {
+                const isActive = gridType === opt.value;
                 return (
                   <button
-                    key={instance.ID}
-                    onClick={() => handleToggleSelect(instance.ID)}
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setGridType(opt.value)}
                     className={classNames(
-                      "group relative aspect-square rounded-xl border overflow-hidden flex flex-col justify-between bg-black transition-all duration-300",
-                      isSelected 
-                        ? "border-brand-500 ring-4 ring-brand-500/10 scale-[0.97] shadow-lg shadow-brand-500/5" 
-                        : "border-slate-200 hover:border-slate-400 hover:shadow-md"
+                      "flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all duration-200 gap-2 relative shadow-sm cursor-pointer",
+                      isActive
+                        ? "bg-brand-500/10 border-brand-500 text-white font-bold"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-850 hover:text-zinc-200"
                     )}
                   >
-                    {/* Checkbox Overlay */}
-                    <div className="absolute top-2 right-2 z-10 p-1.5 rounded-lg bg-black/40 backdrop-blur-sm border border-white/20 text-white transition-all">
-                      {isSelected ? (
-                        <div className="w-3.5 h-3.5 bg-brand-500 rounded flex items-center justify-center">
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      ) : (
-                        <div className="w-3.5 h-3.5 rounded border border-white/60" />
-                      )}
+                    {/* Tiny representation of the grid */}
+                    <div className="grid gap-0.5 border border-zinc-800 p-1 bg-black rounded" 
+                      style={{
+                        gridTemplateColumns: `repeat(${opt.cols}, minmax(0, 1fr))`,
+                        width: '32px',
+                        height: '24px'
+                      }}
+                    >
+                      {Array.from({ length: opt.rows * opt.cols }).map((_, i) => (
+                        <div key={i} className={classNames(
+                          "rounded-[1px]",
+                          isActive ? "bg-brand-500/80" : "bg-zinc-700"
+                        )} />
+                      ))}
                     </div>
-
-                    {/* Dicom Image Preview */}
-                    <div className="flex-1 flex items-center justify-center overflow-hidden w-full h-full">
-                      <DicomThumbnail
-                        src={previewUrl}
-                        alt={`Instance ${instNum}`}
-                        className="group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-
-                    {/* Metadata Footer */}
-                    <div className="bg-black/60 backdrop-blur-sm px-2.5 py-1 text-left w-full text-[9px] font-bold text-slate-300 border-t border-white/5 z-10">
-                      Foto {idx + 1} {instance.MainDicomTags?.InstanceNumber ? `(Inst. ${instance.MainDicomTags.InstanceNumber})` : ''}
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider block">{opt.label}</span>
+                      <span className="text-[8px] font-bold text-zinc-500">{opt.desc}</span>
                     </div>
                   </button>
                 );
               })}
             </div>
           </div>
-        )}
 
-        {/* Footer Actions */}
-        <div className="flex flex-col gap-4 pt-3 border-t border-slate-100">
-          {/* Grid Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider shrink-0">Layout de Impressão:</span>
-            <select
-              value={gridType}
-              onChange={(e) => setGridType(e.target.value)}
-              className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer shadow-sm"
+          <div className="flex items-center gap-3 justify-end pt-1">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="h-11 px-6 rounded-2xl bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 text-zinc-300 hover:text-white transition-all font-bold text-xs uppercase tracking-widest cursor-pointer active:scale-95"
             >
-              <option value="1x2">1 Coluna x 2 Linhas (2 fotos/pág)</option>
-              <option value="2x2">2 Colunas x 2 Linhas (4 fotos/pág)</option>
-              <option value="2x4">2 Colunas x 4 Linhas (8 fotos/pág)</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-3 justify-end">
-            <button type="button" onClick={onClose} className="h-11 px-5 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all font-semibold text-xs">
               Cancelar
             </button>
             <button
               type="button"
               disabled={selectedIds.size === 0 || loading || !!error}
               onClick={handleGeneratePdf}
-              className="h-11 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white shadow-sm flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+              className="h-11 px-7 rounded-2xl bg-brand-600 hover:bg-brand-700 disabled:bg-zinc-800 text-white shadow-md flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-xs uppercase tracking-widest cursor-pointer"
             >
               <Printer size={16} />
-              <span className="font-bold text-xs uppercase tracking-widest">
+              <span>
                 {selectedIds.size > 0 ? `Imprimir PDF (${selectedIds.size})` : 'Imprimir PDF'}
               </span>
             </button>

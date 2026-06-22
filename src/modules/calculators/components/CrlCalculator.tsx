@@ -40,7 +40,7 @@ export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) 
     }
 
     const summary = ga 
-      ? `[CCN / IG Calculada]\nCCN: ${crl}mm\nIG estimada (Hadlock): ${ga}\nDDP: ${edd}`
+      ? `CCN: ${crl}mm — IG estimada (Hadlock): ${ga}. DDP: ${edd}.`
       : null;
 
     onChange({

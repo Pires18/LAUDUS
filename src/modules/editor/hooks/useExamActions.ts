@@ -4,6 +4,7 @@ import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types
 import { generateReportStream, generateMockReport } from '../../ai/engine';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
 import { getInitialReportContent } from '../../templates/utils';
+import { logger } from '../../../utils/logger';
 
 interface UseExamActionsProps {
   examId: string;
@@ -31,7 +32,8 @@ export function useExamActions({
   examDateMs
 }: UseExamActionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [isReasoning, setIsReasoning] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef<string | null>(null);
   const debouncedSave = useCallback(
@@ -54,9 +56,10 @@ export function useExamActions({
           setSaveState('saved');
           setTimeout(() => setSaveState('idle'), 2000);
         } catch (err) {
-          console.error('[useExamActions] Erro ao salvar:', err);
+          logger.error('[useExamActions] Erro ao salvar', err);
           showToast('Erro ao salvar', 'error');
-          setSaveState('idle');
+          setSaveState('error');
+          setTimeout(() => setSaveState('idle'), 3000);
         } finally {
           latestContentRef.current = null;
         }
@@ -73,7 +76,7 @@ export function useExamActions({
         updateItem('exams', examId, {
           reportContent: latestContentRef.current,
           updatedAt: Date.now()
-        }).catch(console.error);
+        }).catch((err) => logger.error('[useExamActions] Erro ao salvar no unmount:', err));
       }
     };
   }, [examId]);
@@ -90,14 +93,16 @@ export function useExamActions({
     if (!template || !patient) return;
 
     setIsGenerating(true);
+    setIsReasoning(true);
     try {
-      const previousExams = settings.aiTrainingEnabled
-        ? await getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
-        : [];
-        
-      const patientPreviousExams = await getPatientPreviousExams(patient.id, template.area, examId, 2);
+      const [previousExams, patientPreviousExams] = await Promise.all([
+        settings.aiTrainingEnabled
+          ? getRecentFinalizedReports(template.id, settings.aiTrainingContextSize || 3)
+          : Promise.resolve([]),
+        getPatientPreviousExams(patient.id, template.area, examId, 2)
+      ]);
 
-      const hasKey = settings.aiProvider === 'anthropic' ? !!settings.anthropicApiKey : !!settings.geminiApiKey;
+      const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
       let html: string;
 
       if (hasKey) {
@@ -123,7 +128,10 @@ export function useExamActions({
             previousExams,
             patientPreviousExams,
             examDateMs,
-          }, (chunk) => {
+          }, (chunk, rawText) => {
+            const hasClosedScratch = rawText ? rawText.includes('</scratchpad>') : true;
+            const hasOpenScratch = rawText ? rawText.includes('<scratchpad>') : false;
+            setIsReasoning(hasOpenScratch && !hasClosedScratch);
             if (chunk.trim()) {
               onReportChange(chunk);
             }
@@ -146,7 +154,10 @@ export function useExamActions({
             patientPreviousExams,
             customPrompt,
             examDateMs,
-          }, (chunk) => {
+          }, (chunk, rawText) => {
+            const hasClosedScratch = rawText ? rawText.includes('</scratchpad>') : true;
+            const hasOpenScratch = rawText ? rawText.includes('<scratchpad>') : false;
+            setIsReasoning(hasOpenScratch && !hasClosedScratch);
             if (chunk.trim()) {
               onReportChange(chunk);
             }
@@ -172,20 +183,21 @@ export function useExamActions({
         await updateItem('exams', examId, { reportContent: html });
       }
     } catch (e: unknown) {
-      console.error('[useExamActions] Erro na geração/refinamento:', e);
+      logger.error('[useExamActions] Erro na geração/refinamento:', e);
       const rawMsg = e instanceof Error ? e.message : String(e) || 'Erro ao processar laudo com IA';
       const message = rawMsg.includes('404') || rawMsg.includes('not found') || rawMsg.includes('models/')
         ? `Modelo de IA não encontrado. Verifique o nome do modelo em Configurações. (${rawMsg.substring(0, 60)})`
         : rawMsg.includes('403') || rawMsg.includes('unauthorized') || rawMsg.includes('Unauthorized')
           ? 'API Key inválida ou sem permissão. Verifique em Configurações.'
           : rawMsg.includes('API Key') || rawMsg.includes('api key')
-            ? 'Chave de API não configurada. Acesse Configurações para adicionar.'
+            ? `Chave de API não configurada. Acesse Configurações para adicionar. (Detalhe: ${rawMsg})`
             : rawMsg.includes('429') || rawMsg.includes('quota') || rawMsg.includes('RESOURCE_EXHAUSTED')
               ? 'Limite de requisições da API atingido. Aguarde alguns segundos.'
               : rawMsg;
       showToast(message, 'error');
     } finally {
       setIsGenerating(false);
+      setIsReasoning(false);
     }
   }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, examDateMs, onReportChange, showToast]);
 
@@ -201,7 +213,7 @@ export function useExamActions({
       // Isso garante que o aparelho de imagem (US) não liste mais o exame como pendente.
       if (status === 'finalizado') {
         deleteWorklistEntry(examId, settings).catch((err) => {
-          console.warn('[useExamActions] Falha silenciosa ao remover worklist do PACS:', err);
+          logger.warn('[useExamActions] Falha silenciosa ao remover worklist do PACS:', err);
         });
       }
     } catch (err) {
@@ -211,6 +223,7 @@ export function useExamActions({
 
   return {
     isGenerating,
+    isReasoning,
     saveState,
     debouncedSave,
     handleRefine,

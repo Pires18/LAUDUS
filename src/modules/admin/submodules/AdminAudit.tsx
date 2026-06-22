@@ -1,31 +1,35 @@
 import { useState } from 'react';
-import { useCollection } from '../../../hooks/useFirestore';
+import { usePaginatedCollection, orderBy } from '../../../hooks/useFirestore';
 import { AuditLog } from '../../../types';
-import { 
-  Search, History, Download, 
-  Calendar, User, Box, Eye, X
+import {
+  Search, History, Download,
+  Calendar, User, Box, Eye, ChevronDown
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { Modal } from '../../../components/Modal';
 
 export function AdminAudit() {
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
-  
-  const { data: logs, loading } = useCollection<AuditLog>('audit_logs', { isGlobal: true });
+
+  const { data: logs, loading, loadMore, hasMore } = usePaginatedCollection<AuditLog>('audit_logs', {
+    isGlobal: true,
+    initialLimit: 100,
+    constraints: [orderBy('timestamp', 'desc')]
+  });
 
   const filtered = logs
     .filter(l => {
-      const matchesSearch = 
-        l.action?.toLowerCase().includes(search.toLowerCase()) || 
+      const matchesSearch =
+        l.action?.toLowerCase().includes(search.toLowerCase()) ||
         l.details?.toLowerCase().includes(search.toLowerCase()) ||
         l.userName?.toLowerCase().includes(search.toLowerCase());
-      
+
       const matchesModule = moduleFilter === 'all' || l.module === moduleFilter;
-      
+
       return matchesSearch && matchesModule;
-    })
-    .sort((a, b) => b.timestamp - a.timestamp);
+    });
 
   const modules = Array.from(new Set(logs.map(l => l.module))).filter(Boolean);
 
@@ -42,8 +46,8 @@ export function AdminAudit() {
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-ink-100 bg-ink-50/20 flex flex-col md:flex-row gap-4">
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-ink-100 bg-ink-50/20 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
             <input
@@ -134,7 +138,7 @@ export function AdminAudit() {
               {filtered.length === 0 && !loading && (
                 <tr>
                   <td colSpan={5} className="px-6 py-32 text-center">
-                    <div className="w-20 h-20 rounded-[2rem] bg-ink-50 flex items-center justify-center mx-auto mb-6 border border-ink-100">
+                    <div className="w-20 h-20 rounded-2xl bg-ink-50 flex items-center justify-center mx-auto mb-6 border border-ink-100">
                       <History size={40} className="text-ink-200" />
                     </div>
                     <p className="text-ink-400 font-black text-lg">Nenhum rastro encontrado.</p>
@@ -145,36 +149,40 @@ export function AdminAudit() {
             </tbody>
           </table>
         </div>
+
+        {hasMore && !search && moduleFilter === 'all' && (
+          <div className="p-4 border-t border-ink-100 flex justify-center">
+            <button
+              onClick={loadMore}
+              className="flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-widest text-ink-600 bg-ink-50 hover:bg-ink-100 rounded-2xl border border-ink-200 transition-all"
+            >
+              <ChevronDown size={14} />
+              Carregar mais registros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Forensic Detail Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-2xl w-full shadow-2xl border border-ink-100 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-brand-400 to-purple-400" />
-            
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h4 className="text-2xl font-black text-ink-900 flex items-center gap-3">
-                  Detalhamento Forense
-                  <span className="text-[10px] bg-ink-900 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">#{selectedLog.id.slice(0, 8)}</span>
-                </h4>
-                <p className="text-sm text-ink-500 mt-1">Ação executada em {new Date(selectedLog.timestamp).toLocaleString()}.</p>
-              </div>
-              <button onClick={() => setSelectedLog(null)} className="p-2 hover:bg-ink-50 rounded-full transition-colors">
-                <X size={24} className="text-ink-400" />
-              </button>
-            </div>
+      <Modal
+        open={selectedLog !== null}
+        onClose={() => setSelectedLog(null)}
+        title={`Detalhamento Forense #${selectedLog?.id.slice(0, 8)}`}
+        size="lg"
+      >
+        {selectedLog && (
+          <div className="space-y-6">
+            <p className="text-sm text-ink-500">Ação executada em {new Date(selectedLog.timestamp).toLocaleString('pt-BR')}.</p>
 
-            <div className="grid grid-cols-2 gap-8 mb-8">
-              <div className="bg-ink-50/50 p-6 rounded-3xl border border-ink-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="bg-ink-50/50 p-6 rounded-2xl border border-ink-100">
                  <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                    <User size={14} /> Ator
                  </p>
                  <p className="text-sm font-black text-ink-900">{selectedLog.userName}</p>
                  <p className="text-[10px] text-ink-400 font-mono mt-1">{selectedLog.userId}</p>
               </div>
-              <div className="bg-ink-50/50 p-6 rounded-3xl border border-ink-100">
+              <div className="bg-ink-50/50 p-6 rounded-2xl border border-ink-100">
                  <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                    <Box size={14} /> Localização
                  </p>
@@ -185,24 +193,15 @@ export function AdminAudit() {
 
             <div>
                <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest mb-3">Dados da Operação</p>
-               <div className="bg-ink-900 rounded-3xl p-6 overflow-hidden">
+               <div className="bg-ink-900 rounded-2xl p-6 overflow-hidden">
                   <pre className="text-xs text-brand-50 font-mono whitespace-pre-wrap leading-relaxed">
                     {selectedLog.details}
                   </pre>
                </div>
             </div>
-
-            <div className="mt-10 flex gap-3">
-               <button 
-                onClick={() => setSelectedLog(null)}
-                className="flex-1 py-4 rounded-2xl bg-ink-900 text-white font-black text-xs uppercase tracking-widest hover:bg-ink-800 transition-all shadow-lg"
-               >
-                 Fechar Análise
-               </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

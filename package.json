@@ -1,13 +1,16 @@
 {
   "name": "laud-us",
   "private": true,
-  "version": "3.0.1",
+  "version": "2.0.0",
   "type": "module",
   "description": "LAUD.US — Sistema Profissional de Laudos Ultrassonográficos com IA",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
@@ -20,6 +23,7 @@
     "docx": "^9.0.3",
     "file-saver": "^2.0.5",
     "firebase": "^12.13.0",
+    "firebase-admin": "^14.0.0",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
     "react": "^18.3.1",
@@ -31,12 +35,14 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/ui": "^4.1.9",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
     "vite": "^6.0.1",
     "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.9",
     "workbox-window": "^7.4.1"
   }
 }

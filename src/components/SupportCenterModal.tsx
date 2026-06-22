@@ -3,17 +3,19 @@ import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
 import { useCollection, where, orderBy } from '../hooks/useFirestore';
 import { 
-  X, MessageSquare, Plus, Send, 
-  CheckCircle2, Clock, AlertCircle, LifeBuoy,
-  ChevronLeft, Loader2
+  X, MessageSquare, Plus, Send,
+  AlertCircle, LifeBuoy,
+  ChevronLeft, Loader2, Star,
 } from 'lucide-react';
+import { useSubscription } from '../hooks/useSubscription';
 import { classNames } from '../utils/format';
-import { SupportTicket, SupportMessage } from '../types';
-import { createSupportTicket, addSupportMessage } from '../store/db';
+import { SupportTicket } from '../types';
+import { createSupportTicket, addSupportMessage, updateGlobalItem } from '../store/db';
 
 export function SupportCenterModal() {
   const { user } = useAuth();
   const { showSupportModal, setShowSupportModal, showToast } = useApp();
+  const { reportsRemaining, subscription } = useSubscription();
   
   const { data: tickets, loading, error } = useCollection<SupportTicket>('support_tickets', {
     isGlobal: true,
@@ -31,8 +33,20 @@ export function SupportCenterModal() {
   
   // New Ticket Form
   const [newSubject, setNewSubject] = useState('');
+  const [newCategory, setNewCategory] = useState<'ia_help' | 'billing' | 'pacs_setup' | 'technical_issue' | 'other'>('other');
   const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [newInitialMsg, setNewInitialMsg] = useState('');
+  
+  // Rating form states
+  const [rating, setRating] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+
+  useEffect(() => {
+    setRating(5);
+    setRatingComment('');
+    setRatingSubmitted(false);
+  }, [selectedTicketId]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,22 +62,54 @@ export function SupportCenterModal() {
     if (!newSubject || !newInitialMsg || !user) return;
     setIsSending(true);
     try {
+      const ua = window.navigator.userAgent;
+      const isMac = ua.includes('Mac');
+      const isWindows = ua.includes('Win');
+      const os = isMac ? 'mac' : isWindows ? 'windows' : 'other';
+      const browser = ua.includes('Chrome') ? 'chrome' : ua.includes('Safari') && !ua.includes('Chrome') ? 'safari' : ua.includes('Firefox') ? 'firefox' : 'other';
+
+      const diagnostics = {
+        browser,
+        os,
+        screenResolution: `${window.innerWidth}x${window.innerHeight}`,
+        reportsRemaining,
+        activePlan: subscription?.plan || 'trial',
+      };
+
       await createSupportTicket({
         userId: user.uid,
         userName: user.displayName || user.email || 'Usuário',
         subject: newSubject,
         message: newInitialMsg,
         status: 'open',
-        priority: newPriority
+        priority: newPriority,
+        category: newCategory,
+        diagnostics
       });
       showToast('Chamado aberto com sucesso!', 'success');
       setIsCreating(false);
       setNewSubject('');
       setNewInitialMsg('');
+      setNewCategory('other');
     } catch {
       showToast('Erro ao abrir chamado', 'error');
     } finally {
       setIsSending(false);
+    }
+  }
+
+  async function handleSubmitRating() {
+    if (!selectedTicket) return;
+    try {
+      await updateGlobalItem('support_tickets', selectedTicket.id, {
+        rating,
+        ratingComment,
+        updatedAt: Date.now()
+      });
+      setRatingSubmitted(true);
+      showToast('Obrigado pela sua avaliação!', 'success');
+    } catch {
+      showToast('Erro ao enviar avaliação', 'error');
     }
   }
 
@@ -86,7 +132,7 @@ export function SupportCenterModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-ink-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-5xl h-full max-h-[800px] shadow-2xl border border-ink-100 flex overflow-hidden">
+      <div className="bg-white rounded-2xl w-full max-w-5xl h-full max-h-[90dvh] lg:max-h-[800px] shadow-2xl border border-ink-100 flex overflow-hidden">
         
         {/* Sidebar: Tickets List */}
         <aside className={classNames(
@@ -126,14 +172,24 @@ export function SupportCenterModal() {
                 )}
               >
                 <div className="flex justify-between items-start mb-1">
-                  <span className={classNames(
-                    "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                    ticket.status === 'open' ? "bg-red-50 text-red-600" :
-                    ticket.status === 'pending' ? "bg-amber-50 text-amber-600" :
-                    "bg-emerald-50 text-emerald-600"
-                  )}>
-                    {ticket.status}
-                  </span>
+                  <div className="flex gap-1 flex-wrap">
+                    <span className={classNames(
+                      "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
+                      ticket.status === 'open' ? "bg-red-50 text-red-600" :
+                      ticket.status === 'pending' ? "bg-amber-50 text-amber-600" :
+                      "bg-emerald-50 text-emerald-600"
+                    )}>
+                      {ticket.status}
+                    </span>
+                    {ticket.category && (
+                      <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600">
+                        {ticket.category === 'ia_help' ? 'IA' :
+                         ticket.category === 'billing' ? 'Financeiro' :
+                         ticket.category === 'pacs_setup' ? 'PACS' :
+                         ticket.category === 'technical_issue' ? 'Técnico' : 'Outro'}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[9px] text-ink-400 font-bold">{new Date(ticket.updatedAt).toLocaleDateString()}</span>
                 </div>
                 <p className="text-sm font-black text-ink-900 truncate">{ticket.subject}</p>
@@ -190,6 +246,20 @@ export function SupportCenterModal() {
                   />
                 </div>
                 <div>
+                  <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2">Categoria</label>
+                  <select
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value as any)}
+                    className="input h-14 text-sm w-full"
+                  >
+                    <option value="other">Outro Assunto</option>
+                    <option value="ia_help">Dúvidas / Problemas com IA (LaudIA)</option>
+                    <option value="billing">Faturamento, Assinaturas ou Planos</option>
+                    <option value="pacs_setup">Configurações de PACS / DICOM</option>
+                    <option value="technical_issue">Falhas ou Bugs Técnicos</option>
+                  </select>
+                </div>
+                <div>
                   <label className="label text-[10px] font-black uppercase tracking-widest text-ink-400 mb-2">Prioridade</label>
                   <div className="flex gap-2">
                     {(['low', 'medium', 'high'] as const).map(p => (
@@ -241,7 +311,7 @@ export function SupportCenterModal() {
                   <div className="w-10 h-10 rounded-2xl bg-ink-100 flex items-center justify-center shrink-0">
                     <MessageSquare size={20} className="text-ink-400" />
                   </div>
-                  <div className="bg-ink-50 p-5 rounded-[2rem] rounded-tl-none flex-1">
+                  <div className="bg-ink-50 p-5 rounded-2xl rounded-tl-none flex-1">
                     <p className="text-xs font-black text-ink-900 mb-1">{selectedTicket.userName}</p>
                     <p className="text-sm text-ink-600 leading-relaxed">{selectedTicket.message}</p>
                     <p className="text-[9px] text-ink-400 mt-2 font-bold uppercase tracking-widest">{new Date(selectedTicket.createdAt).toLocaleString()}</p>
@@ -260,7 +330,7 @@ export function SupportCenterModal() {
                         {msg.senderName.charAt(0)}
                       </div>
                       <div className={classNames(
-                        "p-5 rounded-[2rem] max-w-[80%]",
+                        "p-5 rounded-2xl max-w-[80%]",
                         isMe ? "bg-brand-600 text-white rounded-tr-none" : "bg-ink-50 text-ink-900 rounded-tl-none"
                       )}>
                         {!isMe && <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-ink-400">{msg.senderName}</p>}
@@ -276,7 +346,7 @@ export function SupportCenterModal() {
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-ink-200 space-y-4">
-                 <div className="w-24 h-24 rounded-[2.5rem] bg-ink-50 flex items-center justify-center border border-ink-50">
+                 <div className="w-24 h-24 rounded-2xl bg-ink-50 flex items-center justify-center border border-ink-50">
                     <MessageSquare size={48} />
                  </div>
                  <p className="font-black text-lg text-ink-400">Escolha um chamado para visualizar</p>
@@ -309,6 +379,56 @@ export function SupportCenterModal() {
                   {isSending ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} />}
                 </button>
               </div>
+            </footer>
+          )}
+
+          {!isCreating && selectedTicket && selectedTicket.status === 'resolved' && (
+            <footer className="p-6 border-t border-ink-100 bg-emerald-50/30">
+              {selectedTicket.rating || ratingSubmitted ? (
+                <div className="text-center py-2 space-y-1">
+                  <div className="flex justify-center gap-1 text-amber-500">
+                    {Array.from({ length: selectedTicket.rating || rating }).map((_, i) => (
+                      <Star key={i} size={16} fill="currentColor" />
+                    ))}
+                  </div>
+                  <p className="text-xs text-ink-600 font-bold">Obrigado por nos ajudar a melhorar!</p>
+                  {(selectedTicket.ratingComment || ratingComment) && (
+                    <p className="text-[11px] text-ink-500 italic mt-1">"{selectedTicket.ratingComment || ratingComment}"</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center">
+                    <p className="text-xs font-black text-ink-900 uppercase tracking-widest mb-1">Como foi seu atendimento?</p>
+                    <p className="text-[10px] text-ink-400 font-bold">Avalie de 1 a 5 estrelas para nos ajudar a aprimorar o suporte.</p>
+                  </div>
+                  <div className="flex justify-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setRating(star)}
+                        className="text-amber-400 hover:scale-110 transition-transform"
+                      >
+                        <Star size={24} fill={rating >= star ? 'currentColor' : 'none'} />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={ratingComment}
+                      onChange={e => setRatingComment(e.target.value)}
+                      placeholder="Escreva um comentário opcional..."
+                      className="flex-1 bg-white border border-ink-100 rounded-xl px-4 py-2 text-xs outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <button
+                      onClick={handleSubmitRating}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                    >
+                      Enviar
+                    </button>
+                  </div>
+                </div>
+              )}
             </footer>
           )}
         </main>

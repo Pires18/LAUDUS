@@ -7,16 +7,16 @@ import { useAuth } from './useAuth';
  */
 export function useAdmin() {
   const { user } = useAuth();
-  const { settings } = useApp();
+  const { settings, profile } = useApp();
 
   const SUPER_ADMIN_EMAIL = 'matheuskpires@gmail.com';
 
-  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL || (import.meta.env.DEV && user?.uid === 'dev-admin-uid');
-  const isAdminRole = settings.currentRole === 'admin' || (import.meta.env.DEV && user?.uid === 'dev-admin-uid');
+  const isSuperAdmin = (user?.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) || (import.meta.env.DEV && user?.uid === 'dev-admin-uid');
+  const isAdminRole = profile?.role === 'admin' || settings.currentRole === 'admin' || (import.meta.env.DEV && user?.uid === 'dev-admin-uid');
 
   return {
     isAdmin: isSuperAdmin || isAdminRole,
     isSuperAdmin,
-    role: settings.currentRole,
+    role: profile?.role || settings.currentRole || 'medico',
   };
 }

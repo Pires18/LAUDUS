@@ -1,29 +1,45 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
+import { logger } from '../../utils/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useCollection } from '../../hooks/useFirestore';
 import { Clinic } from '../../types';
-import { PageHeader } from '../../components/PageHeader';
-import { 
-  Save, User, LogOut, Sliders, ShieldCheck, 
+import {
+  Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Database, Info, Upload, Loader2,
-  Server, Wifi, Monitor, HardDrive, Plus, Trash2, Shield, Cloud, Coins
+  Server, Wifi, HardDrive, Shield, Cloud,
+  Printer, Receipt
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
-import { FinancialControl } from './FinancialControl';
+import { SubscriptionCenter } from './SubscriptionCenter';
+import { useSubscription } from '../../hooks/useSubscription';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
-type SettingsTab = 'perfil' | 'assinatura' | 'sistema' | 'dicom' | 'audit' | 'financeiro';
+type SettingsTab = 'perfil' | 'pdf' | 'audit' | 'assinatura';
+
+function getFontFamilyFallback(family?: string) {
+  if (!family) return 'Arial, sans-serif';
+  switch (family) {
+    case 'Times New Roman': return '"Times New Roman", Times, serif';
+    case 'Courier New': return '"Courier New", Courier, monospace';
+    case 'Inter': return '"Inter", sans-serif';
+    case 'Calibri': return 'Calibri, Candara, Segoe, "Segoe UI", sans-serif';
+    case 'Georgia': return 'Georgia, serif';
+    case 'Lora': return '"Lora", Georgia, serif';
+    default: return `${family}, sans-serif`;
+  }
+}
 
 export function Settings() {
-  const { settings, updateSettings, showToast } = useApp();
-  const { user, signOut } = useAuth();
+  const { settings, updateSettings, showToast, view } = useApp();
+  const { user } = useAuth();
+  const { hasPacs } = useSubscription();
   const { data: clinics } = useCollection<Clinic>('clinics');
   
   const [draft, setDraft] = useState(settings);
@@ -33,17 +49,17 @@ export function Settings() {
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
 
-  const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [pacsTestResults, setPacsTestResults] = useState<{
-    primaryOk: boolean;
-    backupOk: boolean;
-    primaryMsg?: string;
-    backupMsg?: string;
-  } | null>(null);
+
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
+
+  useEffect(() => {
+    if (view.name === 'settings' && view.activeTab) {
+      setActiveTab(view.activeTab as SettingsTab);
+    }
+  }, [view]);
 
   function u<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -93,7 +109,7 @@ export function Settings() {
 
       showToast('Foto de perfil atualizada com sucesso!', 'success');
     } catch (err: any) {
-      console.error('Erro de upload da foto:', err);
+      logger.error('Erro de upload da foto:', err);
       showToast('Erro ao atualizar foto de perfil no Storage.', 'error');
     } finally {
       setIsUploadingProfile(false);
@@ -117,172 +133,90 @@ export function Settings() {
       u('signatureImageUrl', url);
       showToast('Imagem de assinatura carregada! Clique em Salvar para gravar.', 'success');
     } catch (err: any) {
-      console.error('Erro de upload da assinatura:', err);
+      logger.error('Erro de upload da assinatura:', err);
       showToast('Erro ao carregar assinatura digitalizada.', 'error');
     } finally {
       setIsUploadingSignature(false);
     }
   }
 
-  async function handleTestPacsConnection() {
-    setPacsTestState('testing');
-    setPacsTestResults(null);
-    try {
-      const primaryUrl = getActivePacsUrl(draft, false);
-      const primaryAuth = `&username=${encodeURIComponent(draft.dicomUsername || '')}&password=${encodeURIComponent(draft.dicomPassword || '')}`;
-      
-      const backupUrl = draft.dicomBackupViewerUrl ? getActivePacsUrl(draft, true) : null;
-      const backupAuth = backupUrl ? `&username=${encodeURIComponent(draft.dicomBackupUsername || '')}&password=${encodeURIComponent(draft.dicomBackupPassword || '')}` : '';
 
-      // Test Primary
-      const testPrimary = async () => {
-        const pingUrl = `${primaryUrl.replace(/\/$/, '')}/system`;
-        const proxyPath = getProxyEndpoint(draft, false);
-        try {
-          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${primaryAuth}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
-          }
-          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
-        } catch (e: any) {
-          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
-        }
-      };
 
-      // Test Backup
-      const testBackup = async () => {
-        if (!backupUrl) return { ok: false, msg: 'Servidor backup não configurado' };
-        const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
-        const proxyPath = getProxyEndpoint(draft, true);
-        try {
-          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
-          }
-          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
-        } catch (e: any) {
-          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
-        }
-      };
 
-      const [primaryRes, backupRes] = await Promise.all([
-        testPrimary(),
-        backupUrl ? testBackup() : Promise.resolve({ ok: false, msg: 'Nenhum backup configurado' })
-      ]);
-
-      setPacsTestResults({
-        primaryOk: primaryRes.ok,
-        backupOk: backupRes.ok,
-        primaryMsg: primaryRes.msg,
-        backupMsg: backupUrl ? backupRes.msg : undefined
-      });
-      
-      const success = primaryRes.ok && (!backupUrl || backupRes.ok);
-      setPacsTestState(success ? 'success' : 'error');
-      
-      if (primaryRes.ok) {
-        showToast('PACS Principal conectado com sucesso!', 'success');
-      } else {
-        showToast('Erro de conexão com o PACS Principal.', 'error');
-      }
-    } catch (err: any) {
-      setPacsTestState('error');
-      setPacsTestResults({
-        primaryOk: false,
-        backupOk: false,
-        primaryMsg: err.message || 'Falha crítica ao testar conexão.'
-      });
-      showToast('Erro crítico ao testar conexões.', 'error');
-    }
-  }
-
-  const handleAddDevice = () => {
-    const newDevice = { id: Date.now().toString(), name: 'Novo Aparelho', aeTitle: 'AETITLE', modality: 'US' };
-    setDraft(d => ({ ...d, dicomDevices: [...(d.dicomDevices || []), newDevice] }));
-  };
-  const handleRemoveDevice = (id: string) => {
-    setDraft(d => ({ ...d, dicomDevices: (d.dicomDevices || []).filter(x => x.id !== id) }));
-  };
-  const handleUpdateDevice = (id: string, field: string, value: string) => {
-    setDraft(d => ({ ...d, dicomDevices: (d.dicomDevices || []).map(x => x.id === id ? { ...x, [field]: value } : x) }));
-  };
 
   const tabs = [
-    { id: 'perfil', label: 'Meu Perfil', icon: User },
-    { id: 'assinatura', label: 'Assinatura Médica', icon: Signature },
-    { id: 'sistema', label: 'Preferências', icon: Sliders },
-    { id: 'dicom', label: 'Integração PACS', icon: Database },
-    { id: 'audit', label: 'Auditoria & Saúde', icon: ShieldCheck },
-    { id: 'financeiro', label: 'Financeiro IA', icon: Coins },
+    { id: 'perfil',    label: 'Perfil',        icon: User       },
+    { id: 'pdf',       label: 'Centro de PDF',  icon: Printer    },
+    { id: 'audit',     label: 'Auditoria',      icon: ShieldCheck },
+    { id: 'assinatura',label: 'Assinatura & Faturamento',     icon: Receipt },
   ] as const;
 
   return (
     <div className="module-container">
-      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
-      <PageHeader
-        title="Meu Perfil"
-        subtitle="Gerencie sua identidade médica, assinatura digital e preferências de sistema."
-        actions={
-          <div className="flex items-center gap-3">
-             <button onClick={() => setDraft(settings)} className="btn-ghost text-ink-400 h-11 px-5 rounded-2xl">
-              <RotateCcw size={16} /> <span className="font-bold text-xs uppercase tracking-widest">Descartar</span>
+      <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-5">
+
+      {/* ─── COMPACT HEADER ─── */}
+      <div className="bg-white border border-ink-200 rounded-2xl shadow-sm">
+        <div className="px-5 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm shrink-0">
+              <User size={18} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-black text-ink-900 tracking-tight leading-none">Configurações</h1>
+              <p className="text-[11px] text-ink-500 font-medium mt-0.5">Perfil médico, assinatura, PACS e preferências</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setDraft(settings)}
+              className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink-500 hover:text-ink-700 bg-ink-100 border border-ink-200 hover:bg-ink-200 transition-all flex items-center gap-1.5"
+            >
+              <RotateCcw size={11} />
+              <span className="hidden sm:inline">Descartar</span>
             </button>
-            <button className="btn-primary h-11 px-6 rounded-2xl shadow-brand" onClick={handleSave} disabled={isSaving}>
-              <Save size={18} /> <span className="font-bold text-xs uppercase tracking-widest">{isSaving ? 'Salvando...' : 'Salvar'}</span>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+            >
+              {isSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+              Salvar
             </button>
           </div>
-        }
-      />
+        </div>
+      </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start">
-        {/* Sidebar Navigation */}
-        <aside className="hidden lg:flex flex-col gap-1 w-64 shrink-0 bg-white p-2 rounded-3xl border border-ink-100 shadow-sm sticky top-24">
-          <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest px-4 py-3">Menu</p>
-          {tabs.map((tab) => (
+      {/* ─── PILL TAB BAR ─── */}
+      <div className="flex items-center gap-1.5 bg-ink-100 p-1 rounded-2xl border border-ink-200/50 overflow-x-auto">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as SettingsTab)}
               className={classNames(
-                "w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-3",
-                activeTab === tab.id 
-                  ? "bg-brand-50 text-brand-700 shadow-sm border border-brand-100" 
-                  : "text-ink-600 hover:bg-ink-50"
+                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-300 transform active:scale-95 whitespace-nowrap flex-shrink-0',
+                isActive
+                  ? 'bg-indigo-650 text-white shadow-md shadow-indigo-500/20 scale-[1.02] border border-indigo-750/10'
+                  : 'text-ink-500 hover:text-ink-900 hover:bg-white/70 hover:scale-[1.01]'
               )}
             >
-              <div className={classNames("p-1.5 rounded-lg", activeTab === tab.id ? "bg-brand-100 text-brand-600" : "bg-ink-50 text-ink-400")}>
-                <tab.icon size={16} />
-              </div>
+              <tab.icon size={13} />
               {tab.label}
             </button>
-          ))}
-        </aside>
+          );
+        })}
+      </div>
 
-        <div className="flex-1 w-full space-y-6">
-          {/* Mobile Tabs */}
-          <div className="lg:hidden flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as SettingsTab)}
-                className={classNames(
-                  "px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap border flex items-center gap-2",
-                  activeTab === tab.id ? "bg-brand-600 text-white border-brand-600" : "bg-white text-ink-600 border-ink-100"
-                )}
-              >
-                <tab.icon size={14} />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="w-full space-y-5">
 
           {/* TAB: PERFIL */}
           {activeTab === 'perfil' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                  <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-6">Informações Pessoais</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in">
+              <div className="lg:col-span-2 space-y-5">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-4">Informações Pessoais</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
                       <label className="label">Nome de Exibição</label>
@@ -326,7 +260,7 @@ export function Settings() {
               </div>
 
               <div className="lg:col-span-1">
-                <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden text-center p-8 sticky top-24">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden text-center p-5 sticky top-24">
                   <div className="relative inline-block mb-4">
                     <div className="w-24 h-24 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 p-1 shadow-lg overflow-hidden relative">
                       {user?.photoURL ? (
@@ -370,104 +304,472 @@ export function Settings() {
                   </div>
                 </div>
               </div>
+
+              {/* Preferências inline no perfil */}
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 sticky top-36">
+                <div className="flex items-center gap-3 mb-4">
+                  <Sliders size={15} className="text-ink-500" />
+                  <h4 className="text-xs font-black text-ink-700 uppercase tracking-widest">Preferências</h4>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                    <div className="flex items-center gap-2.5">
+                      <Bell size={15} className="text-brand-600" />
+                      <div>
+                        <p className="text-xs font-bold text-ink-900">Notificações Sonoras</p>
+                        <p className="text-[10px] text-ink-500">Alertas ao receber novos exames.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('soundNotifications', draft.soundNotifications === false)}
+                      className={classNames(
+                        "w-10 h-6 rounded-full transition-all relative shrink-0",
+                        draft.soundNotifications !== false ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.soundNotifications !== false ? "left-5" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                    <div className="flex items-center gap-2.5">
+                      <Clock size={15} className="text-indigo-600" />
+                      <div>
+                        <p className="text-xs font-bold text-ink-900">Salvamento Automático</p>
+                        <p className="text-[10px] text-ink-500">Persistir rascunhos no editor.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => u('autoSave', draft.autoSave === false)}
+                      className={classNames(
+                        "w-10 h-6 rounded-full transition-all relative shrink-0",
+                        draft.autoSave !== false ? "bg-emerald-500" : "bg-ink-300"
+                      )}
+                    >
+                      <div className={classNames(
+                        "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                        draft.autoSave !== false ? "left-5" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TAB: ASSINATURA */}
-          {activeTab === 'assinatura' && (
-            <div className="max-w-3xl space-y-6 animate-fade-in">
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                    <Signature size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-ink-900">Cédula de Identidade Médica</h3>
-                    <p className="text-sm text-ink-500">Dados usados no rodapé e selo de autenticidade dos laudos.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6 mb-8">
-                  <div>
-                    <label className="label">Número do CRM</label>
-                    <input
-                      className="input h-14"
-                      value={draft.physicianCRM || ''}
-                      onChange={(e) => u('physicianCRM', e.target.value)}
-                      placeholder="Ex: 123456-SP"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">RQE (Especialidade)</label>
-                    <input
-                      className="input h-14"
-                      value={draft.physicianRQE || ''}
-                      onChange={(e) => u('physicianRQE', e.target.value)}
-                      placeholder="Ex: 12345"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4 py-6 border-t border-ink-50">
-                  <label className="label">Assinatura Digitalizada (Imagem)</label>
-                  <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
-                    <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
-                      {draft.signatureImageUrl ? (
-                        <img src={draft.signatureImageUrl} alt="Assinatura" className="max-w-full max-h-full object-contain p-2" />
-                      ) : (
-                        <span className="text-[10px] font-bold text-ink-400 uppercase">Sem Imagem</span>
-                      )}
-                      {isUploadingSignature && (
-                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                          <Loader2 className="animate-spin text-brand-600" size={20} />
-                        </div>
-                      )}
+          {/* TAB: CENTRO DE PDF & ASSINATURA */}
+          {activeTab === 'pdf' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fade-in">
+              {/* Coluna 1: Cédula de Identidade Médica & Assinatura */}
+              <div className="space-y-5">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                      <Signature size={20} />
                     </div>
-                    
-                    <div className="flex-1 w-full space-y-3 text-left">
-                      <p className="text-xs text-ink-500 leading-relaxed">
-                        Faça upload da imagem da sua assinatura manuscrita (preferencialmente com fundo transparente em formato PNG) para exibição direta nos laudos impressos ou copiados.
-                      </p>
-                      
-                      <div className="flex items-center gap-2">
-                        <label className="py-2 px-4 rounded-xl bg-white hover:bg-ink-100 text-ink-700 border border-ink-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95">
-                          <Upload size={14} />
-                          {isUploadingSignature ? 'Enviando...' : 'Carregar Imagem'}
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            disabled={isUploadingSignature} 
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleSignatureImageUpload(file);
-                            }} 
-                          />
-                        </label>
-                        
-                        {draft.signatureImageUrl && (
-                          <button
-                            type="button"
-                            onClick={() => u('signatureImageUrl', '')}
-                            className="py-2 px-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                          >
-                            Remover
-                          </button>
+                    <div>
+                      <h3 className="text-base font-black text-ink-900">Cédula de Identidade Médica</h3>
+                      <p className="text-xs text-ink-500">Dados usados no rodapé e selo de autenticidade dos laudos.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-5">
+                    <div>
+                      <label className="label flex items-center gap-1.5 relative">
+                        Número do CRM
+                        <span className="group relative cursor-help">
+                          <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            O CRM é obrigatório para validade jurídica de seus laudos. Insira no formato Número-UF (ex: 123456-SP).
+                          </span>
+                        </span>
+                      </label>
+                      <input
+                        className="input h-14"
+                        value={draft.physicianCRM || ''}
+                        onChange={(e) => u('physicianCRM', e.target.value)}
+                        placeholder="Ex: 123456-SP"
+                      />
+                    </div>
+                    <div>
+                      <label className="label flex items-center gap-1.5 relative">
+                        RQE (Especialidade)
+                        <span className="group relative cursor-help">
+                          <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            O RQE (Registro de Qualificação de Especialidade) serve para certificar legalmente a sua especialidade nos laudos.
+                          </span>
+                        </span>
+                      </label>
+                      <input
+                        className="input h-14"
+                        value={draft.physicianRQE || ''}
+                        onChange={(e) => u('physicianRQE', e.target.value)}
+                        placeholder="Ex: 12345"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 py-5 border-t border-ink-50">
+                    <label className="label flex items-center gap-1.5 relative">
+                      Assinatura Digitalizada (Imagem)
+                      <span className="group relative cursor-help">
+                        <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
+                        <span className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                          Faça upload da imagem da sua assinatura manuscrita (PNG com fundo transparente) para inserção nítida nos laudos em PDF.
+                        </span>
+                      </span>
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
+                      <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
+                        {draft.signatureImageUrl ? (
+                          <img src={draft.signatureImageUrl} alt="Assinatura" className="max-w-full max-h-full object-contain p-2" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-ink-400 uppercase">Sem Imagem</span>
                         )}
+                        {isUploadingSignature && (
+                          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                            <Loader2 className="animate-spin text-brand-600" size={20} />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 w-full space-y-3 text-left">
+                        <p className="text-xs text-ink-500 leading-relaxed">
+                          Faça upload da imagem da sua assinatura manuscrita (preferencialmente com fundo transparente em formato PNG) para exibição direta nos laudos impressos ou copiados.
+                        </p>
+                        
+                        <div className="flex items-center gap-2">
+                          <label className="py-2 px-4 rounded-xl bg-white hover:bg-ink-100 text-ink-700 border border-ink-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95">
+                            <Upload size={14} />
+                            {isUploadingSignature ? 'Enviando...' : 'Carregar Imagem'}
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              disabled={isUploadingSignature} 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleSignatureImageUpload(file);
+                              }} 
+                            />
+                          </label>
+                          
+                          {draft.signatureImageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => u('signatureImageUrl', '')}
+                              className="py-2 px-4 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  <div className="space-y-3 pt-5 border-t border-ink-50">
+                    <label className="label">Texto da Assinatura Digital</label>
+                    <textarea
+                      className="input min-h-[120px] p-6 text-sm leading-relaxed"
+                      value={draft.defaultSignature || ''}
+                      onChange={(e) => u('defaultSignature', e.target.value)}
+                      placeholder={"Ex: Médico Radiologista\nMembro Titular do CBR"}
+                    />
+                    <p className="text-[11px] text-ink-400 italic">Este texto aparecerá centralizado no final de todos os seus laudos gerados.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Coluna 2: Configurações de Layout do Laudo (PDF) */}
+              <div className="space-y-5">
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <Printer size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-ink-900">Layout do Laudo (PDF)</h3>
+                      <p className="text-xs text-ink-500">Configure a estética e o espaçamento para a impressão do laudo.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    <div>
+                      <label className="label">Fonte do Laudo</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfFontFamily || 'Arial'}
+                        onChange={(e) => u('pdfFontFamily', e.target.value)}
+                      >
+                        <option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Calibri">Calibri</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Inter">Inter</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Tamanho da Fonte</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfFontSize || '14px'}
+                        onChange={(e) => u('pdfFontSize', e.target.value)}
+                      >
+                        <option value="12px">12px</option>
+                        <option value="13px">13px</option>
+                        <option value="14px">14px</option>
+                        <option value="15px">15px</option>
+                        <option value="16px">16px</option>
+                        <option value="18px">18px</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Espaçamento de Linhas</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfLineHeight || '1.5'}
+                        onChange={(e) => u('pdfLineHeight', e.target.value)}
+                      >
+                        <option value="1.2">1.2</option>
+                        <option value="1.3">1.3</option>
+                        <option value="1.4">1.4</option>
+                        <option value="1.5">1.5</option>
+                        <option value="1.6">1.6</option>
+                        <option value="1.8">1.8</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Alinhamento do Texto</label>
+                      <select
+                        className="input h-12 text-sm"
+                        value={draft.pdfTextAlign || 'justify'}
+                        onChange={(e) => u('pdfTextAlign', e.target.value as 'justify' | 'left')}
+                      >
+                        <option value="justify">Justificado</option>
+                        <option value="left">Esquerda</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 py-5 border-t border-ink-50">
+                    <span className="text-xs font-black text-ink-700 uppercase tracking-wider block">Margens da Página (mm)</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Superior</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginTop !== undefined ? draft.pdfMarginTop : 15}
+                          onChange={(e) => u('pdfMarginTop', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Inferior</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginBottom !== undefined ? draft.pdfMarginBottom : 15}
+                          onChange={(e) => u('pdfMarginBottom', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Esquerda</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginLeft !== undefined ? draft.pdfMarginLeft : 15}
+                          onChange={(e) => u('pdfMarginLeft', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Direita</label>
+                        <input
+                          type="number"
+                          className="input h-12"
+                          value={draft.pdfMarginRight !== undefined ? draft.pdfMarginRight : 15}
+                          onChange={(e) => u('pdfMarginRight', Number(e.target.value))}
+                          min={0}
+                          max={100}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-5 border-t border-ink-50">
+                    <span className="text-xs font-black text-ink-700 uppercase tracking-wider block">Elementos do Layout</span>
+                    
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                      <div className="flex items-center gap-2.5">
+                        <div>
+                          <p className="text-xs font-bold text-ink-900">Cabeçalho da Clínica</p>
+                          <p className="text-[10px] text-ink-500">Exibir o cabeçalho configurado na clínica no topo do PDF.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => u('pdfShowHeader', draft.pdfShowHeader === false)}
+                        className={classNames(
+                          "w-10 h-6 rounded-full transition-all relative shrink-0",
+                          draft.pdfShowHeader !== false ? "bg-emerald-500" : "bg-ink-300"
+                        )}
+                      >
+                        <div className={classNames(
+                          "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft.pdfShowHeader !== false ? "left-5" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                      <div className="flex items-center gap-2.5">
+                        <div>
+                          <p className="text-xs font-bold text-ink-900">Rodapé da Clínica</p>
+                          <p className="text-[10px] text-ink-500">Exibir o rodapé configurado na clínica na base do PDF.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => u('pdfShowFooter', draft.pdfShowFooter === false)}
+                        className={classNames(
+                          "w-10 h-6 rounded-full transition-all relative shrink-0",
+                          draft.pdfShowFooter !== false ? "bg-emerald-500" : "bg-ink-300"
+                        )}
+                      >
+                        <div className={classNames(
+                          "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft.pdfShowFooter !== false ? "left-5" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Preview (Full width under the two columns) */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-ink-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-center gap-3 mb-2 border-b border-ink-150 pb-3">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-650 flex items-center justify-center">
+                    <Sliders size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-ink-950 uppercase tracking-widest leading-none">Pré-visualização Interativa em Tempo Real</h3>
+                    <p className="text-[11px] text-ink-500 font-medium mt-0.5">Veja como suas configurações de fonte, margens e assinatura impactarão o laudo impresso.</p>
+                  </div>
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-ink-50">
-                  <label className="label">Texto da Assinatura Digital</label>
-                  <textarea
-                    className="input min-h-[120px] p-6 text-sm leading-relaxed"
-                    value={draft.defaultSignature || ''}
-                    onChange={(e) => u('defaultSignature', e.target.value)}
-                    placeholder={"Ex: Médico Radiologista\nMembro Titular do CBR"}
-                  />
-                  <p className="text-[11px] text-ink-400 italic">Este texto aparecerá centralizado no final de todos os seus laudos gerados.</p>
+                <div className="bg-ink-50/50 p-6 rounded-2xl border border-ink-100 flex justify-center overflow-x-auto">
+                  <div 
+                    className="w-full max-w-[210mm] bg-white shadow-lg border border-ink-200 rounded-xl overflow-hidden transition-all text-slate-900 duration-200"
+                    style={{
+                      fontFamily: getFontFamilyFallback(draft.pdfFontFamily),
+                      fontSize: draft.pdfFontSize || '14px',
+                      lineHeight: draft.pdfLineHeight || '1.5',
+                      paddingTop: `${draft.pdfMarginTop ?? 15}px`, // Visually approximated
+                      paddingBottom: `${draft.pdfMarginBottom ?? 15}px`,
+                      paddingLeft: `${draft.pdfMarginLeft ?? 15}px`,
+                      paddingRight: `${draft.pdfMarginRight ?? 15}px`,
+                    }}
+                  >
+                    {/* Visual header approximation */}
+                    {draft.pdfShowHeader !== false && (
+                      <div className="border-b border-slate-300 pb-3 mb-4 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block">CLÍNICA SANTA MARIA</span>
+                          <span className="text-[8px] text-slate-500 block uppercase">Av. Paulista, 1000 · São Paulo/SP · CEP: 01310-100</span>
+                        </div>
+                        <div className="w-14 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-[7px] text-slate-400 font-black uppercase rounded-lg">
+                          LOGO
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Patient Info Approximation */}
+                    <div className="border border-slate-350 p-2.5 rounded-lg mb-4 text-[9px] text-slate-505 bg-slate-50/80 grid grid-cols-4 gap-2 leading-tight">
+                      <div className="col-span-2">
+                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">Paciente</span>
+                        <strong className="text-slate-800 uppercase">Maria da Silva Oliveira</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">CPF</span>
+                        <span className="font-semibold text-slate-700 block">123.456.789-00</span>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">Exame</span>
+                        <span className="font-semibold text-slate-700 block uppercase">USG Abdome</span>
+                      </div>
+                    </div>
+
+                    {/* Mock clinical content */}
+                    <div 
+                      className="text-slate-850 text-[0.95em] space-y-2 leading-relaxed"
+                      style={{
+                        textAlign: draft.pdfTextAlign || 'justify'
+                      }}
+                    >
+                      <h4 className="font-black text-slate-900 border-l-2 border-indigo-500 pl-2 text-[1em] uppercase tracking-wider mt-2 mb-1">Fígado</h4>
+                      <p>
+                        Fígado com dimensões normais, contornos regulares e ecotextura do parênquima homogênea, sem evidências de lesões focais ou difusas. Vias biliares intra e extra-hepáticas de calibre normal. Veia porta e veias hepáticas com trajeto e calibre normais.
+                      </p>
+                      
+                      <h4 className="font-black text-slate-900 border-l-2 border-indigo-500 pl-2 text-[1em] uppercase tracking-wider mt-3 mb-1">Vesícula Biliar</h4>
+                      <p>
+                        Vesícula biliar normodensificada, com paredes finas e regulares, conteúdo anecóico livre de cálculos ou ecos em suspensão.
+                      </p>
+
+                      <h4 className="font-black text-slate-950 text-[1.1em] text-center uppercase tracking-widest mt-6 mb-1">Conclusão</h4>
+                      <p className="font-bold text-slate-900 text-center">
+                        Exame de ultrassonografia de abdome superior sem alterações significativas.
+                      </p>
+                    </div>
+
+                    {/* Visual signature block */}
+                    <div className="mt-8 pt-4 flex flex-col items-center text-center">
+                      {draft.signatureImageUrl ? (
+                        <div className="h-10 flex items-center justify-center mb-1">
+                          <img src={draft.signatureImageUrl} alt="Assinatura" className="max-h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className="w-36 border-t border-dashed border-slate-350 mb-1" />
+                      )}
+                      
+                      <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-none">
+                        {draft.physicianName || 'Dr(a). Nome do Médico'}
+                      </span>
+                      
+                      <div className="text-[7.5px] text-slate-505 font-bold uppercase tracking-wider mt-0.5 space-x-1.5">
+                        {draft.physicianCRM && <span>CRM: {draft.physicianCRM}</span>}
+                        {draft.physicianCRM && draft.physicianRQE && <span>|</span>}
+                        {draft.physicianRQE && <span>RQE: {draft.physicianRQE}</span>}
+                      </div>
+
+                      {draft.defaultSignature && (
+                        <p className="text-[7px] text-slate-400 font-medium whitespace-pre-wrap mt-1 leading-normal max-w-[200px] mx-auto">
+                          {draft.defaultSignature}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Visual footer approximation */}
+                    {draft.pdfShowFooter !== false && (
+                      <div className="border-t border-slate-200 mt-6 pt-2 text-[7px] text-slate-400 text-center uppercase">
+                        LAUD.US · Plataforma de Diagnóstico por Imagem Inteligente
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -480,496 +782,12 @@ export function Settings() {
             </div>
           )}
 
-          {/* TAB: SISTEMA */}
-          {activeTab === 'sistema' && (
-            <div className="max-w-3xl space-y-6 animate-fade-in">
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-6">Preferências Globais</h3>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-ink-50 border border-ink-100">
-                    <div className="flex items-center gap-3">
-                      <Bell size={20} className="text-brand-600" />
-                      <div>
-                        <p className="text-sm font-bold text-ink-900">Notificações Sonoras</p>
-                        <p className="text-xs text-ink-500">Alertas ao receber novos exames na worklist.</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => u('soundNotifications', draft.soundNotifications === false)}
-                      className={classNames(
-                        "w-12 h-7 rounded-full transition-all relative shrink-0",
-                        draft.soundNotifications !== false ? "bg-emerald-500" : "bg-ink-300"
-                      )}
-                    >
-                      <div className={classNames(
-                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                        draft.soundNotifications !== false ? "left-6" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-ink-50 border border-ink-100">
-                    <div className="flex items-center gap-3">
-                      <Clock size={20} className="text-indigo-600" />
-                      <div>
-                        <p className="text-sm font-bold text-ink-900">Salvamento Automático</p>
-                        <p className="text-xs text-ink-500">Persistir rascunhos automaticamente no editor conforme digitação.</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => u('autoSave', draft.autoSave === false)}
-                      className={classNames(
-                        "w-12 h-7 rounded-full transition-all relative shrink-0",
-                        draft.autoSave !== false ? "bg-emerald-500" : "bg-ink-300"
-                      )}
-                    >
-                      <div className={classNames(
-                        "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                        draft.autoSave !== false ? "left-6" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: DICOM/PACS */}
-          {activeTab === 'dicom' && (
-            <div className="max-w-4xl space-y-6 animate-fade-in mx-auto">
-              <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Database size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-ink-900">Integração PACS / DICOM</h3>
-                    <p className="text-sm text-ink-500">Gestão de Servidores PACS, Equipamentos Médicos e Envio de Worklist.</p>
-                  </div>
-                </div>
-
-                <div className="space-y-8">
-                  
-                  {/* CARD 1: SERVIDOR PACS PRINCIPAL */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                        <Server size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-ink-900">Servidor PACS Principal (Matriz)</h4>
-                        <p className="text-xs text-ink-500">Configurações do Orthanc e agente local de Worklist principal.</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-5 rounded-xl bg-ink-50 border border-ink-100 mb-6">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-bold text-ink-900">Sincronização de Worklist Local</p>
-                        <p className="text-xs text-ink-500">Gerar arquivos .wl na pasta de destino sempre que um exame for criado.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => u('dicomSyncEnabled', !draft.dicomSyncEnabled)}
-                        className={classNames(
-                          "w-12 h-7 rounded-full transition-all relative",
-                          draft.dicomSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
-                        )}
-                      >
-                        <div className={classNames(
-                          "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                          draft.dicomSyncEnabled ? "left-6" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="md:col-span-2">
-                        <label className="label text-ink-600">URL do Servidor PACS (IP do Tailscale)</label>
-                        <input
-                          className="input h-11 text-sm bg-white"
-                          value={draft.dicomViewerUrl || ''}
-                          onChange={(e) => u('dicomViewerUrl', e.target.value)}
-                          placeholder="Ex: http://100.93.111.95:8042"
-                        />
-                        <p className="text-[10px] text-ink-400 mt-1">Usado localmente para carregar imagens.</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label text-ink-600">URL Pública Tailscale (Nuvem Vercel)</label>
-                        <div className="relative">
-                          <Cloud size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
-                          <input
-                            className="input h-11 text-sm bg-white pl-9"
-                            value={draft.dicomTailscalePublicUrl || ''}
-                            onChange={(e) => u('dicomTailscalePublicUrl', e.target.value)}
-                            placeholder="Ex: https://servidor-mac.tail861dda.ts.net:8443"
-                          />
-                        </div>
-                        <p className="text-[10px] text-ink-400 mt-1">Obrigatório para que a nuvem consiga acessar o PACS.</p>
-                      </div>
-                      <div>
-                        <label className="label">Usuário Orthanc</label>
-                        <input
-                          className="input h-12 text-sm"
-                          value={draft.dicomUsername || ''}
-                          onChange={(e) => u('dicomUsername', e.target.value)}
-                          placeholder="Ex: admin"
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Senha Orthanc</label>
-                        <input
-                          type="password"
-                          className="input h-12 text-sm"
-                          value={draft.dicomPassword || ''}
-                          onChange={(e) => u('dicomPassword', e.target.value)}
-                          placeholder="••••••••"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label">URL do Agente Local (Proxy Vercel/Tailscale)</label>
-                        <input
-                          className="input h-12 text-sm"
-                          value={draft.dicomLocalAgentUrl || ''}
-                          onChange={(e) => u('dicomLocalAgentUrl', e.target.value)}
-                          placeholder="Ex: https://servidor-mac.tail861dda.ts.net"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label">Diretório da Worklist no Servidor (Caminho Absoluto)</label>
-                        <input
-                          className="input h-12 text-sm"
-                          value={draft.dicomWorklistFolder || ''}
-                          onChange={(e) => u('dicomWorklistFolder', e.target.value)}
-                          placeholder="Ex: C:\OrthancServer\db\WorklistsDatabase\"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="label">Tipo de Visualizador DICOM</label>
-                        <select
-                          className="input h-12 text-sm"
-                          value={draft.dicomViewerType || 'stone'}
-                          onChange={(e) => {
-                            const type = e.target.value as any;
-                            u('dicomViewerType', type);
-                            if (type === 'stone') {
-                              u('dicomViewerUrlPattern', '{{baseUrl}}/stone-webviewer/index.html?study={{StudyInstanceUID}}');
-                            } else if (type === 'oe2') {
-                              u('dicomViewerUrlPattern', '{{baseUrl}}/ui/app/retrieve-and-view.html?StudyInstanceUID={{StudyInstanceUID}}');
-                            } else if (type === 'ohif') {
-                              u('dicomViewerUrlPattern', '{{baseUrl}}/viewer?StudyInstanceUIDs={{StudyInstanceUID}}');
-                            }
-                          }}
-                        >
-                          <option value="stone">Stone Web Viewer</option>
-                          <option value="oe2">Orthanc Explorer 2</option>
-                          <option value="ohif">OHIF Viewer</option>
-                          <option value="custom">Personalizado (Padrão de URL)</option>
-                        </select>
-                      </div>
-                      {draft.dicomViewerType === 'custom' && (
-                        <div className="md:col-span-2">
-                          <label className="label">Padrão da URL do Visualizador</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomViewerUrlPattern || ''}
-                            onChange={(e) => u('dicomViewerUrlPattern', e.target.value)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CARD 2: SERVIDOR PACS DE BACKUP */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                        <HardDrive size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-ink-900">Servidor PACS de Backup (Redundância)</h4>
-                        <p className="text-xs text-ink-500">Sincronização em tempo real para um servidor Orthanc secundário (ex: Notebook).</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-5 rounded-xl bg-ink-50 border border-ink-100 mb-6">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-bold text-ink-900">Habilitar Servidor de Redundância</p>
-                        <p className="text-xs text-ink-500">Enviar worklists paralelamente para o servidor de backup.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => u('dicomBackupSyncEnabled', !draft.dicomBackupSyncEnabled)}
-                        className={classNames(
-                          "w-12 h-7 rounded-full transition-all relative",
-                          draft.dicomBackupSyncEnabled ? "bg-emerald-500" : "bg-ink-300"
-                        )}
-                      >
-                        <div className={classNames(
-                          "w-5 h-5 bg-white rounded-full absolute top-1 transition-all shadow-sm",
-                          draft.dicomBackupSyncEnabled ? "left-6" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-
-                    {draft.dicomBackupSyncEnabled && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fade-in">
-                        <div className="md:col-span-2">
-                          <label className="label text-ink-600">URL do Servidor de Backup (IP do Tailscale)</label>
-                          <input
-                            className="input h-11 text-sm bg-white"
-                            value={draft.dicomBackupViewerUrl || ''}
-                            onChange={(e) => u('dicomBackupViewerUrl', e.target.value)}
-                            placeholder="Ex: http://100.124.187.11:8042"
-                          />
-                          <p className="text-[10px] text-ink-400 mt-1">Usado localmente para fallback de imagens.</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label text-ink-600">URL Pública Backup (Nuvem Vercel)</label>
-                          <div className="relative">
-                            <Cloud size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500" />
-                            <input
-                              className="input h-11 text-sm bg-white pl-9"
-                              value={draft.dicomBackupTailscalePublicUrl || ''}
-                              onChange={(e) => u('dicomBackupTailscalePublicUrl', e.target.value)}
-                              placeholder="Ex: https://servidor-notebook.tail861dda.ts.net:8443"
-                            />
-                          </div>
-                          <p className="text-[10px] text-ink-400 mt-1">Obrigatório para que a nuvem consiga acessar o PACS Backup.</p>
-                        </div>
-                        <div>
-                          <label className="label">Usuário Orthanc Backup</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupUsername || ''}
-                            onChange={(e) => u('dicomBackupUsername', e.target.value)}
-                            placeholder="Ex: admin"
-                          />
-                        </div>
-                        <div>
-                          <label className="label">Senha Orthanc Backup</label>
-                          <input
-                            type="password"
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupPassword || ''}
-                            onChange={(e) => u('dicomBackupPassword', e.target.value)}
-                            placeholder="••••••••"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label">AE Title do Servidor Backup</label>
-                          <input
-                            className="input h-12 text-sm font-mono"
-                            value={draft.dicomBackupOrthancAETitle || ''}
-                            onChange={(e) => u('dicomBackupOrthancAETitle', e.target.value.toUpperCase())}
-                            placeholder="Ex: ORTHANC"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label">URL do Agente Local do Backup (Proxy Vercel/Tailscale)</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupLocalAgentUrl || ''}
-                            onChange={(e) => u('dicomBackupLocalAgentUrl', e.target.value)}
-                            placeholder="Ex: https://servidor-notebook.tail861dda.ts.net"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="label">Diretório da Worklist do Backup (Caminho Absoluto)</label>
-                          <input
-                            className="input h-12 text-sm"
-                            value={draft.dicomBackupWorklistFolder || ''}
-                            onChange={(e) => u('dicomBackupWorklistFolder', e.target.value)}
-                            placeholder="Ex: C:\OrthancServer\db\WorklistsDatabase\"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* TESTE DE REDE */}
-                  <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-bold text-white">Validar Conexões de Rede</p>
-                      <p className="text-xs text-slate-400">Verifique se os servidores Orthanc (Principal e Backup) estão respondendo.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleTestPacsConnection}
-                      disabled={pacsTestState === 'testing'}
-                      className="py-2.5 px-6 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:bg-brand-400 text-white font-bold text-xs tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 shrink-0"
-                    >
-                      {pacsTestState === 'testing' ? <Loader2 size={16} className="animate-spin" /> : <Wifi size={16} />}
-                      {pacsTestState === 'testing' ? 'TESTANDO...' : 'TESTAR PACS'}
-                    </button>
-                  </div>
-                  {pacsTestResults && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in -mt-4">
-                      <div className={classNames("p-4 rounded-xl border text-xs", pacsTestResults.primaryOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800")}>
-                        <p className="font-bold mb-1 flex items-center gap-1.5"><span className={classNames("w-2 h-2 rounded-full", pacsTestResults.primaryOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} /> PACS Principal</p>
-                        <p className="mt-1 text-[11px] opacity-80">{pacsTestResults.primaryMsg}</p>
-                      </div>
-                      {draft.dicomBackupViewerUrl && (
-                        <div className={classNames("p-4 rounded-xl border text-xs", pacsTestResults.backupOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-red-50/50 border-red-100 text-red-800")}>
-                          <p className="font-bold mb-1 flex items-center gap-1.5"><span className={classNames("w-2 h-2 rounded-full", pacsTestResults.backupOk ? "bg-emerald-500 animate-pulse" : "bg-red-500")} /> PACS Backup</p>
-                          <p className="mt-1 text-[11px] opacity-80">{pacsTestResults.backupMsg}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* CARD 3: APARELHOS MÉDICOS */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-ink-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
-                          <Monitor size={20} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-ink-900">Aparelhos e Equipamentos</h4>
-                          <p className="text-xs text-ink-500">Cadastre seus aparelhos de ultrassom, ressonância, etc.</p>
-                        </div>
-                      </div>
-                      <button type="button" onClick={handleAddDevice} className="btn-ghost bg-brand-50 hover:bg-brand-100 text-brand-700 h-9 px-3 rounded-xl flex items-center gap-1 text-xs font-bold">
-                        <Plus size={14} /> NOVO
-                      </button>
-                    </div>
-
-                    {(!draft.dicomDevices || draft.dicomDevices.length === 0) ? (
-                      <div className="text-center py-8 bg-ink-50 rounded-xl border border-ink-100 border-dashed">
-                        <Monitor size={32} className="mx-auto text-ink-300 mb-3" />
-                        <p className="text-sm font-bold text-ink-900">Nenhum aparelho cadastrado</p>
-                        <p className="text-xs text-ink-500 max-w-sm mx-auto mt-1">Adicione seus aparelhos para poder selecionar o destino correto ao criar um laudo.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {draft.dicomDevices.map((device, index) => (
-                          <div key={device.id} className="p-4 rounded-xl border border-ink-150 bg-ink-50/50 flex flex-col md:flex-row gap-4 items-start md:items-center relative animate-fade-in group">
-                            {index === 0 && (
-                              <span className="absolute -top-2 -left-2 bg-brand-500 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">
-                                Padrão
-                              </span>
-                            )}
-                            
-                            <div className="flex-1 w-full space-y-3">
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div>
-                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">Nome do Aparelho</label>
-                                  <input 
-                                    className="input h-10 text-xs w-full bg-white" 
-                                    value={device.name} 
-                                    onChange={(e) => handleUpdateDevice(device.id, 'name', e.target.value)} 
-                                    placeholder="Ex: GE Voluson S10"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">AE Title</label>
-                                  <input 
-                                    className="input h-10 text-xs w-full bg-white font-mono" 
-                                    value={device.aeTitle} 
-                                    onChange={(e) => handleUpdateDevice(device.id, 'aeTitle', e.target.value.toUpperCase())} 
-                                    placeholder="Ex: GE_VOLUSON"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[10px] font-black uppercase text-ink-400 block mb-1">Modalidade</label>
-                                  <select 
-                                    className="input h-10 text-xs w-full bg-white" 
-                                    value={device.modality} 
-                                    onChange={(e) => handleUpdateDevice(device.id, 'modality', e.target.value)}
-                                  >
-                                    <option value="US">US (Ultrassom)</option>
-                                    <option value="CR">CR (Raio-X CR)</option>
-                                    <option value="CT">CT (Tomografia)</option>
-                                    <option value="MR">MR (Ressonância)</option>
-                                    <option value="DX">DX (Raio-X DX)</option>
-                                    <option value="MG">MG (Mamografia)</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <button 
-                              type="button" 
-                              onClick={() => handleRemoveDevice(device.id)}
-                              className="md:mt-5 p-2.5 rounded-lg text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors shrink-0"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* CARD 4: CONFIGURAÇÕES GLOBAIS E MANUAL */}
-                  <div className="p-6 rounded-2xl border border-ink-150 bg-white shadow-sm">
-                    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-ink-50">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                        <Shield size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-ink-900">Configurações Globais DICOM</h4>
-                        <p className="text-xs text-ink-500">AE Title do seu servidor Orthanc.</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-8 max-w-sm">
-                      <label className="label">AE Title do Servidor Orthanc</label>
-                      <input
-                        className="input h-12 text-sm font-mono"
-                        value={draft.dicomOrthancAETitle || ''}
-                        onChange={(e) => u('dicomOrthancAETitle', e.target.value.toUpperCase())}
-                        placeholder="Ex: ORTHANC"
-                      />
-                    </div>
-
-                    <div className="bg-slate-900 text-slate-100 rounded-2xl p-6 border border-slate-800 shadow-inner">
-                      <div className="flex items-center gap-3 mb-4">
-                        <Info size={18} className="text-brand-400" />
-                        <h4 className="text-sm font-bold text-white">Manual de Conexão no Aparelho</h4>
-                      </div>
-                      <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                        No seu aparelho de Ultrassom, cadastre o Servidor DICOM Worklist utilizando os dados abaixo para puxar a lista de pacientes gerada pelo Laud.us.
-                      </p>
-                      <ul className="space-y-2 text-xs font-mono bg-slate-950 p-4 rounded-xl border border-slate-800/50 text-brand-400">
-                        <li>
-                          <span className="text-slate-500">IP do Servidor (Principal):</span> {(() => {
-                            try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : 'IP_DO_SERVIDOR_PRINCIPAL'; } catch { return 'IP_DO_SERVIDOR_PRINCIPAL'; }
-                          })()}
-                        </li>
-                        {draft.dicomBackupSyncEnabled && (
-                          <li>
-                            <span className="text-slate-500">IP do Servidor (Backup):</span> {(() => {
-                              try { return draft.dicomBackupViewerUrl ? new URL(draft.dicomBackupViewerUrl).hostname : 'IP_DO_SERVIDOR_BACKUP'; } catch { return 'IP_DO_SERVIDOR_BACKUP'; }
-                            })()}
-                          </li>
-                        )}
-                        <li><span className="text-slate-500">Porta DICOM:</span> 4242</li>
-                        <li><span className="text-slate-500">AE Title (Principal):</span> {draft.dicomOrthancAETitle || 'ORTHANC'}</li>
-                        {draft.dicomBackupSyncEnabled && (
-                          <li><span className="text-slate-500">AE Title (Backup):</span> {draft.dicomBackupOrthancAETitle || 'ORTHANC'}</li>
-                        )}
-                      </ul>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB: FINANCEIRO */}
-          {activeTab === 'financeiro' && (
-            <div className="animate-fade-in">
-              <FinancialControl />
-            </div>
+          {/* TAB: ASSINATURA */}
+          {activeTab === 'assinatura' && (
+            <SubscriptionCenter />
           )}
 
         </div>
-      </div>
       </div>
     </div>
   );

@@ -1,29 +1,62 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../store/app';
 import {
   BrainCircuit, ShieldAlert,
   RotateCcw, Zap, Save,
   GraduationCap, CheckCircle2, AlertCircle, Loader2,
-  Sliders, LayoutList, ShieldCheck,
+  LayoutList, ShieldCheck,
   FlaskConical, Play, FileText, History,
-  Terminal, Code, Copy, Check, Cpu, Key, Eye, EyeOff,
+  Code, Copy, Check, Cpu, Key,
   Activity, BarChart3, Database, Coins, Clock, Sparkles,
-  ChevronDown, ChevronUp, Wifi, WifiOff, TrendingUp
+  Wifi, WifiOff, TrendingUp,
+  GitCompare, Download, Filter, SlidersHorizontal,
+  Brain, CheckSquare, XCircle, ChevronRight, Trash2, ChevronDown
 } from 'lucide-react';
+
 import { classNames } from '../../utils/format';
+import { useConfirm } from '../../hooks/useConfirm';
 import { resolveGeminiModel } from '../ai/engine';
-import { generateReport, callMetricsHistory, type CallMetrics, getAnthropicBaseUrl, auditReportQuality } from '../ai/engine';
+import { logger } from '../../utils/logger';
+import { generateReport, callMetricsHistory, type CallMetrics, auditReportQuality } from '../ai/engine';
 import { EXAM_AREAS, ExamArea, ReportTemplate, Patient } from '../../types';
 import {
   DEFAULT_MASTER_PROMPT,
   DEFAULT_STRUCTURE_PROMPT,
   DEFAULT_GLOBAL_INSTRUCTIONS,
   DEFAULT_RIGID_RULES,
+  DEFAULT_REFINEMENT_GOLDEN_RULES,
+  DEFAULT_COPILOT_OVERRIDE,
+  DEFAULT_AREA_PROMPTS,
 } from '../ai/prompts';
 import { useCollection } from '../../hooks/useFirestore';
-import { updateItem } from '../../store/db';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { firestore } from '../../lib/firebase';
+import { updateItem, getAiUsageStats } from '../../store/db';
 
 type TabId = 'prompts' | 'templates' | 'engine' | 'training' | 'status';
+
+// ─── Token estimator helper ───────────────────────────────────────────────────
+function estimatePromptTokens(text: string): number {
+  return Math.ceil(text.length / 3.5);
+}
+
+function TokenBadge({ value }: { value: string }) {
+  const tokens = estimatePromptTokens(value);
+  const color = tokens < 2000 ? 'text-emerald-400' : tokens < 4000 ? 'text-amber-400' : 'text-rose-400';
+  const bgColor = tokens < 2000 ? 'bg-emerald-500/10' : tokens < 4000 ? 'bg-amber-500/10' : 'bg-rose-500/10';
+  const barWidth = Math.min(100, (tokens / 6000) * 100);
+  const barColor = tokens < 2000 ? 'bg-emerald-500' : tokens < 4000 ? 'bg-amber-500' : 'bg-rose-500';
+  return (
+    <div className="flex items-center gap-2">
+      <div className={classNames("text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg", bgColor, color)}>
+        ~{tokens.toLocaleString('pt-BR')} tokens
+      </div>
+      <div className="w-16 h-1 bg-zinc-800 rounded-full overflow-hidden">
+        <div className={classNames("h-full rounded-full transition-all", barColor)} style={{ width: `${barWidth}%` }} />
+      </div>
+    </div>
+  );
+}
 
 // ==========================================
 // HIGH-FIDELITY IDE CODE EDITOR COMPONENT
@@ -37,7 +70,6 @@ interface CognitiveCodeEditorProps {
   rows?: number;
   onRestore?: () => void;
   glowColor?: 'brand' | 'amber' | 'rose' | 'emerald' | 'violet' | 'teal';
-  extraActions?: React.ReactNode;
   readOnly?: boolean;
 }
 
@@ -50,7 +82,6 @@ function CognitiveCodeEditor({
   rows = 12,
   onRestore,
   glowColor = 'brand',
-  extraActions,
   readOnly = false,
 }: CognitiveCodeEditorProps) {
   const lineRef = useRef<HTMLDivElement>(null);
@@ -74,67 +105,66 @@ function CognitiveCodeEditor({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error(err);
+      logger.error('Erro ao copiar para clipboard:', err);
     }
   };
 
   return (
     <div className={classNames(
-      "bg-zinc-950 rounded-3xl border transition-all duration-300 overflow-hidden flex flex-col shadow-2xl",
+      "bg-zinc-950 rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col shadow-xl",
       glowStyles[glowColor]
     )}>
       {/* Header bar */}
-      <div className="bg-zinc-900/90 px-6 py-4 flex items-center justify-between border-b border-zinc-800/80 backdrop-blur-md">
+      <div className="bg-zinc-900/90 px-4 py-3 flex items-center justify-between border-b border-zinc-800/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          {/* Windows Dots */}
-          <div className="flex gap-1.5 mr-2">
-            <span className="w-3 h-3 rounded-full bg-rose-500/85 hover:bg-rose-600 transition-colors cursor-pointer" />
-            <span className="w-3 h-3 rounded-full bg-amber-500/85 hover:bg-amber-600 transition-colors cursor-pointer" />
-            <span className="w-3 h-3 rounded-full bg-emerald-500/85 hover:bg-emerald-600 transition-colors cursor-pointer" />
+          {/* Dots */}
+          <div className="flex gap-1.5 mr-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/85" />
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/85" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/85" />
           </div>
-
-          {/* Active File Tab */}
-          <div className="bg-zinc-950 px-4 py-2 rounded-xl border border-zinc-800/80 flex items-center gap-2">
-            <Code size={13} className="text-zinc-400" />
+          {/* File tab */}
+          <div className="bg-zinc-950 px-3 py-1.5 rounded-lg border border-zinc-800/80 flex items-center gap-1.5">
+            <Code size={12} className="text-zinc-400" />
             <span className="text-xs font-mono font-semibold text-zinc-200">{fileName}</span>
           </div>
-
-          <span className="px-2.5 py-0.5 rounded-lg bg-zinc-800/80 text-[9px] font-black tracking-widest text-zinc-400 uppercase">
+          <span className="px-2 py-0.5 rounded bg-zinc-800/80 text-[9px] font-black tracking-widest text-zinc-400 uppercase hidden sm:inline">
             {badge}
           </span>
         </div>
-
-        <div className="flex items-center gap-2">
-          {extraActions}
+        <div className="flex items-center gap-1.5">
           {!readOnly && onRestore && (
             <button
               onClick={onRestore}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95"
               title="Restaurar padrão oficial do sistema"
             >
-              <RotateCcw size={12} />
-              Restaurar Padrão
+              <RotateCcw size={11} />
+              <span className="hidden sm:inline">Restaurar</span>
             </button>
           )}
           <button
             onClick={handleCopy}
-            className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80 rounded-xl transition-all"
+            className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/80 rounded-lg transition-all"
             title="Copiar código"
           >
-            {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
           </button>
         </div>
       </div>
 
       {/* Editor Body */}
-      <div className="flex font-mono text-xs overflow-hidden h-[520px] relative bg-zinc-950">
-        {/* Line Numbers Sidebar */}
+      <div
+        className="flex font-mono text-xs relative bg-zinc-950"
+        style={{ minHeight: '280px', maxHeight: '65vh' }}
+      >
+        {/* Line Numbers */}
         <div
           ref={lineRef}
-          className="w-12 py-4 select-none text-right pr-3 text-zinc-600 bg-zinc-950 border-r border-zinc-900 overflow-y-hidden font-mono"
+          className="w-10 py-4 select-none text-right pr-2 text-zinc-600 bg-zinc-950 border-r border-zinc-900 overflow-y-hidden font-mono shrink-0"
         >
           {lineNumbers.map((n) => (
-            <div key={n} className="h-6 leading-6 text-[10px] pr-0.5">{String(n).padStart(2, '0')}</div>
+            <div key={n} className="h-6 leading-6 text-[10px]">{String(n).padStart(2, '0')}</div>
           ))}
         </div>
 
@@ -147,21 +177,21 @@ function CognitiveCodeEditor({
               lineRef.current.scrollTop = e.currentTarget.scrollTop;
             }
           }}
-          className="flex-1 h-full py-4 px-5 bg-transparent border-0 focus:ring-0 focus:outline-none text-zinc-300 font-mono text-xs leading-6 resize-none overflow-y-auto selection:bg-brand-500/20 selection:text-white"
+          className="flex-1 py-4 px-4 bg-transparent border-0 focus:ring-0 focus:outline-none text-zinc-300 font-mono text-xs leading-6 resize-y overflow-y-auto selection:bg-brand-500/20 selection:text-white"
           placeholder={placeholder}
-          style={{ lineHeight: '24px' }}
+          style={{ lineHeight: '24px', minHeight: '280px', maxHeight: '65vh' }}
         />
       </div>
 
       {/* Footer Status Bar */}
-      <div className="bg-zinc-900/60 px-6 py-2 flex items-center justify-between border-t border-zinc-900 text-[10px] text-zinc-500 font-mono">
-        <div className="flex items-center gap-4">
+      <div className="bg-zinc-900/60 px-4 py-2 flex items-center justify-between border-t border-zinc-900 text-[10px] text-zinc-500 font-mono">
+        <div className="flex items-center gap-3">
           <span>UTF-8</span>
-          <span>Markdown / Prompt</span>
+          <span className="hidden sm:inline">Markdown / Prompt</span>
         </div>
-        <div className="flex items-center gap-4">
-          <span>LINES: {value.split('\n').length}</span>
-          <span>CHARS: {value.length}</span>
+        <div className="flex items-center gap-3">
+          <TokenBadge value={value} />
+          <span className="hidden md:inline">L: {value.split('\n').length}</span>
         </div>
       </div>
     </div>
@@ -171,7 +201,13 @@ function CognitiveCodeEditor({
 // ==========================================
 // TELEMETRY DASHBOARD COMPONENT
 // ==========================================
-function TelemetryDashboard() {
+function TelemetryDashboard({
+  modeFilter = 'all',
+  conversionRate = 5.5,
+}: {
+  modeFilter?: string;
+  conversionRate?: number;
+}) {
   const [metrics, setMetrics] = useState<CallMetrics[]>([]);
   const [expandedMetricIndex, setExpandedMetricIndex] = useState<number | null>(null);
 
@@ -183,20 +219,76 @@ function TelemetryDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  if (metrics.length === 0) {
+  const filteredMetrics = modeFilter === 'all' ? metrics : metrics.filter(m => m.mode === modeFilter);
+
+  const handleExportCsv = () => {
+    const rows = [
+      ['Modo','Provider','Modelo','Area','Tokens In','Tokens Out','Latência (ms)','Custo USD','Custo BRL','Sucesso','Timestamp'],
+      ...filteredMetrics.map(m => {
+        const PRICING_REF: Record<string, { input: number; output: number }> = {
+          'claude-sonnet-4-6':           { input: 3.0, output: 15.0 },
+          'claude-3-5-sonnet-latest':    { input: 3.0, output: 15.0 },
+          'claude-3-7-sonnet-latest':    { input: 3.0, output: 15.0 },
+          'claude-opus-4-5':             { input: 15.0, output: 75.0 },
+          'claude-3-haiku-20240307':     { input: 0.25, output: 1.25 },
+          'gemini-3.5-flash':            { input: 0.075, output: 0.30 },
+          'gemini-3.1-pro-preview':      { input: 1.25, output: 5.0 },
+          'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
+          'gemini-2.5-pro-preview-06-05':   { input: 1.25, output: 10.0 },
+        };
+        const p = m.modelName ? (PRICING_REF[m.modelName] || { input: 0, output: 0 }) : { input: 0, output: 0 };
+        const costUsd = ((m.estimatedInputTokens / 1e6) * p.input) + ((m.estimatedOutputTokens / 1e6) * p.output);
+        const costBrl = costUsd * conversionRate;
+        return [
+          m.mode, m.provider, m.modelName || '', m.area,
+          m.estimatedInputTokens, m.estimatedOutputTokens,
+          m.latencyMs, costUsd.toFixed(6), costBrl.toFixed(4),
+          m.success ? 'sim' : 'não',
+          new Date(m.timestamp).toLocaleString('pt-BR')
+        ];
+      })
+    ];
+    const csv = rows.map(r => r.join(';')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laudia_telemetria_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (filteredMetrics.length === 0) {
     return (
-      <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-8 text-center w-full">
-        <BarChart3 size={32} className="text-ink-300 mx-auto mb-3" />
-        <p className="font-black text-ink-500 text-sm">Nenhuma chamada de IA registrada ainda.</p>
-        <p className="text-xs text-ink-400 mt-1">As métricas aparecerão aqui após gerar o primeiro laudo.</p>
+      <div className="bg-white rounded-2xl border border-ink-100 p-8 text-center">
+        <BarChart3 size={28} className="text-ink-300 mx-auto mb-3" />
+        <p className="font-bold text-ink-500 text-sm">{modeFilter === 'all' ? 'Nenhuma chamada registrada ainda.' : `Nenhuma chamada de modo "${modeFilter}" registrada.`}</p>
+        <p className="text-xs text-ink-400 mt-1">As métricas aparecerão após gerar o primeiro laudo.</p>
       </div>
     );
   }
 
-  const totalTokensIn = metrics.reduce((s, m) => s + m.estimatedInputTokens, 0);
-  const totalTokensOut = metrics.reduce((s, m) => s + m.estimatedOutputTokens, 0);
-  const avgLatency = Math.round(metrics.reduce((s, m) => s + m.latencyMs, 0) / metrics.length);
-  const successRate = Math.round((metrics.filter(m => m.success).length / metrics.length) * 100);
+  const totalTokensIn = filteredMetrics.reduce((s, m) => s + m.estimatedInputTokens, 0);
+  const totalTokensOut = filteredMetrics.reduce((s, m) => s + m.estimatedOutputTokens, 0);
+  const avgLatency = filteredMetrics.length > 0 ? Math.round(filteredMetrics.reduce((s, m) => s + m.latencyMs, 0) / filteredMetrics.length) : 0;
+  const successRate = filteredMetrics.length > 0 ? Math.round((filteredMetrics.filter(m => m.success).length / filteredMetrics.length) * 100) : 0;
+
+  const PRICING_REF: Record<string, { input: number; output: number }> = {
+    'claude-sonnet-4-6':           { input: 3.0, output: 15.0 },
+    'claude-3-5-sonnet-latest':    { input: 3.0, output: 15.0 },
+    'claude-3-7-sonnet-latest':    { input: 3.0, output: 15.0 },
+    'claude-opus-4-5':             { input: 15.0, output: 75.0 },
+    'claude-3-haiku-20240307':     { input: 0.25, output: 1.25 },
+    'gemini-3.5-flash':            { input: 0.075, output: 0.30 },
+    'gemini-3.1-pro-preview':      { input: 1.25, output: 5.0 },
+    'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
+    'gemini-2.5-pro-preview-06-05': { input: 1.25, output: 10.0 },
+  };
+  const totalCostUsd = filteredMetrics.reduce((s, m) => {
+    const p = m.modelName ? (PRICING_REF[m.modelName] || { input: 0, output: 0 }) : { input: 0, output: 0 };
+    return s + ((m.estimatedInputTokens / 1e6) * p.input) + ((m.estimatedOutputTokens / 1e6) * p.output);
+  }, 0);
+  const totalCostBrl = totalCostUsd * conversionRate;
 
   const modeColors: Record<string, string> = {
     generation: 'bg-brand-100 text-brand-700',
@@ -212,76 +304,134 @@ function TelemetryDashboard() {
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-ink-100 shadow-sm overflow-hidden w-full">
-      <div className="p-6 border-b border-ink-100 bg-ink-50/30 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-          <BarChart3 size={20} />
+    <div className="bg-white rounded-2xl border border-ink-100 overflow-hidden">
+      <div className="p-4 border-b border-ink-100 bg-ink-50/30 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <BarChart3 size={16} className="text-brand-600" />
+          <div>
+            <span className="font-black text-ink-900 text-sm">Telemetria de Chamadas</span>
+            <p className="text-[10px] text-ink-500 mt-0.5">
+              {filteredMetrics.length} chamada{filteredMetrics.length !== 1 ? 's' : ''} {modeFilter !== 'all' ? `· modo: ${modeLabels[modeFilter] || modeFilter}` : '· todos os modos'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h5 className="font-black text-ink-900">Telemetria de Chamadas</h5>
-          <p className="text-[10px] text-ink-500 uppercase font-bold tracking-widest mt-0.5">Últimas {metrics.length} chamadas de IA nesta sessão</p>
-        </div>
+        <button
+          onClick={handleExportCsv}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+        >
+          <Download size={11} />
+          CSV
+        </button>
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-4 gap-px bg-ink-100">
+      <div className="grid grid-cols-5 gap-px bg-ink-100">
         {[
-          { label: 'Tokens Entrada', value: totalTokensIn.toLocaleString('pt-BR'), icon: Database, color: 'brand' },
-          { label: 'Tokens Saída', value: totalTokensOut.toLocaleString('pt-BR'), icon: Coins, color: 'emerald' },
-          { label: 'Latência Média', value: `${(avgLatency / 1000).toFixed(1)}s`, icon: Clock, color: 'amber' },
-          { label: 'Taxa de Sucesso', value: `${successRate}%`, icon: CheckCircle2, color: successRate >= 90 ? 'emerald' : 'rose' },
+          { label: 'Tok In', value: totalTokensIn.toLocaleString('pt-BR'), icon: Database, color: 'brand' },
+          { label: 'Tok Out', value: totalTokensOut.toLocaleString('pt-BR'), icon: Coins, color: 'emerald' },
+          { label: 'Latência', value: `${(avgLatency / 1000).toFixed(1)}s`, icon: Clock, color: 'amber' },
+          { label: 'Sucesso', value: `${successRate}%`, icon: CheckCircle2, color: successRate >= 90 ? 'emerald' : 'rose' },
+          { label: 'Custo BRL', value: `R$${totalCostBrl.toFixed(3)}`, icon: TrendingUp, color: 'violet' },
         ].map(stat => (
-          <div key={stat.label} className="bg-white p-5 text-center">
-            <stat.icon size={18} className={`text-${stat.color}-500 mx-auto mb-2`} />
-            <span className={`text-xl font-black text-${stat.color}-700 block`}>{stat.value}</span>
+          <div key={stat.label} className="bg-white p-3 text-center">
+            <stat.icon size={14} className={`text-${stat.color}-500 mx-auto mb-1`} />
+            <span className={`text-base font-black text-${stat.color}-700 block leading-none`}>{stat.value}</span>
             <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest block mt-0.5">{stat.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Log das últimas chamadas */}
-      <div className="p-4 space-y-2 max-h-64 overflow-y-auto">
-        {metrics.slice(0, 10).map((m, i) => (
-          <div key={i} className="flex flex-col gap-2">
-            <div className={classNames(
-              'flex items-center gap-3 p-3 rounded-2xl border text-xs',
-              m.success ? 'bg-ink-50/60 border-ink-100' : 'bg-rose-50 border-rose-100'
-            )}>
-              <div className={classNames('px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0', modeColors[m.mode] || 'bg-ink-100 text-ink-600')}>
-                {modeLabels[m.mode] || m.mode}
+      {/* Motor breakdown */}
+      <div className="px-3 pt-3 pb-2 border-t border-ink-100 bg-ink-50/30">
+        {(() => {
+          const liteModels = ['gemini-3.5-flash', 'gemini-2.5-flash-preview-05-20'];
+          const proModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro-preview-06-05'];
+          const liteCalls = filteredMetrics.filter(m => m.modelName && liteModels.some(lm => m.modelName!.includes(lm.split('-preview')[0].split('-flash')[0])));
+          const proCalls = filteredMetrics.filter(m => m.modelName && proModels.some(pm => m.modelName!.includes(pm.split('-preview')[0].split('-pro')[0]) && m.modelName!.includes('pro')));
+          const liteCount = filteredMetrics.filter(m => m.modelName && (m.modelName.includes('flash') || m.modelName === 'gemini-3.5-flash')).length;
+          const proCount = filteredMetrics.filter(m => m.modelName && (m.modelName.includes('pro'))).length;
+          const total = filteredMetrics.length;
+          const litePct = total > 0 ? Math.round((liteCount / total) * 100) : 0;
+          const proPct = total > 0 ? Math.round((proCount / total) * 100) : 0;
+          return (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[9px] font-black text-ink-500 uppercase tracking-widest">
+                <span>Distribuição por Tier de Motor</span>
+                <span>{total} chamadas</span>
               </div>
-              <span className="text-[10px] font-mono text-ink-600 shrink-0">{m.area || '—'}</span>
-              <div className="flex-1 flex items-center gap-3 min-w-0">
-                <span className="text-ink-500 shrink-0">↑ {m.estimatedInputTokens.toLocaleString('pt-BR')} tok</span>
-                <span className="text-ink-500 shrink-0">↓ {m.estimatedOutputTokens.toLocaleString('pt-BR')} tok</span>
-                <span className="text-ink-500 shrink-0">{(m.latencyMs / 1000).toFixed(1)}s</span>
-              </div>
-              <span className={classNames('text-[9px] font-black uppercase tracking-widest shrink-0 px-2 py-0.5 rounded-lg',
-                m.provider === 'gemini' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
-              )}>{m.provider}</span>
-              {m.scratchpad && (
-                <button
-                  onClick={() => setExpandedMetricIndex(expandedMetricIndex === i ? null : i)}
-                  className="px-2 py-1 bg-white border border-ink-200 rounded text-ink-600 text-[10px] font-bold hover:bg-ink-50 transition-all shrink-0"
-                >
-                  {expandedMetricIndex === i ? 'Ocultar Raciocínio' : 'Auditar Raciocínio'}
-                </button>
-              )}
-              {m.success
-                ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-                : <AlertCircle size={14} className="text-rose-500 shrink-0" />}
-            </div>
-            {expandedMetricIndex === i && m.scratchpad && (
-              <div className="p-4 bg-slate-900 text-slate-300 font-mono text-[10px] rounded-xl overflow-x-auto shadow-inner animate-fade-in border border-slate-800">
-                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-800">
-                  <BrainCircuit size={14} className="text-brand-500" />
-                  <span className="font-black text-slate-400 uppercase tracking-widest">Memória Transitória (<span className="text-brand-500">Scratchpad</span>)</span>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block" /> Lite</span>
+                    <span className="font-black text-indigo-700">{liteCount} ({litePct}%)</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${litePct}%` }} />
+                  </div>
                 </div>
-                <pre className="whitespace-pre-wrap leading-relaxed">{m.scratchpad}</pre>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-violet-500 inline-block" /> Pro</span>
+                    <span className="font-black text-violet-700">{proCount} ({proPct}%)</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-ink-100 overflow-hidden">
+                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${proPct}%` }} />
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Log das últimas chamadas */}
+      <div className="p-3 space-y-1.5 max-h-72 overflow-y-auto">
+        {filteredMetrics.slice(0, 15).map((m, i) => {
+          const p = m.modelName ? (PRICING_REF[m.modelName] || { input: 0, output: 0 }) : { input: 0, output: 0 };
+          const costBrl = (((m.estimatedInputTokens / 1e6) * p.input) + ((m.estimatedOutputTokens / 1e6) * p.output)) * conversionRate;
+          return (
+            <div key={i} className="flex flex-col gap-1.5">
+              <div className={classNames(
+                'flex items-center gap-2 p-2.5 rounded-xl border text-xs',
+                m.success ? 'bg-ink-50/60 border-ink-100' : 'bg-rose-50 border-rose-100'
+              )}>
+                <div className={classNames('px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest shrink-0', modeColors[m.mode] || 'bg-ink-100 text-ink-600')}>
+                  {modeLabels[m.mode] || m.mode}
+                </div>
+                <span className="text-[10px] font-mono text-ink-600 shrink-0">{m.area || '—'}</span>
+                <div className="flex-1 flex items-center gap-2 min-w-0 text-ink-500 text-[10px]">
+                  <span>↑{m.estimatedInputTokens.toLocaleString('pt-BR')}</span>
+                  <span>↓{m.estimatedOutputTokens.toLocaleString('pt-BR')}</span>
+                  <span>{(m.latencyMs / 1000).toFixed(1)}s</span>
+                  {costBrl > 0 && <span className="text-violet-600 font-bold">R${costBrl.toFixed(4)}</span>}
+                </div>
+                <span className={classNames('text-[9px] font-black uppercase tracking-widest shrink-0 px-1.5 py-0.5 rounded',
+                  m.provider === 'gemini' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
+                )}>{m.provider}</span>
+                {m.scratchpad && (
+                  <button
+                    onClick={() => setExpandedMetricIndex(expandedMetricIndex === i ? null : i)}
+                    className="px-2 py-0.5 bg-white border border-ink-200 rounded text-ink-600 text-[9px] font-bold hover:bg-ink-50 transition-all shrink-0"
+                  >
+                    {expandedMetricIndex === i ? 'Ocultar' : 'Raciocínio'}
+                  </button>
+                )}
+                {m.success
+                  ? <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                  : <AlertCircle size={13} className="text-rose-500 shrink-0" />}
+              </div>
+              {expandedMetricIndex === i && m.scratchpad && (
+                <div className="p-3 bg-ink-900 text-ink-300 font-mono text-[10px] rounded-xl overflow-x-auto border border-ink-800">
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-ink-800">
+                    <BrainCircuit size={12} className="text-brand-500" />
+                    <span className="font-black text-ink-400 uppercase tracking-widest text-[9px]">Scratchpad</span>
+                  </div>
+                  <pre className="whitespace-pre-wrap leading-relaxed">{m.scratchpad}</pre>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -292,12 +442,96 @@ function TelemetryDashboard() {
 // ==========================================
 export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   const { settings, updateSettings, showToast } = useApp();
+  const confirm = useConfirm();
   const [isSaving, setIsSaving] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings);
   const [activeTab, setActiveTab] = useState<TabId>('prompts');
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid'>('master');
+  const [activePromptSubTab, setActivePromptSubTab] = useState<'master' | 'global' | 'structure' | 'rigid' | 'refinement' | 'copilot'>('master');
+
+  const [motorConfig, setMotorConfig] = useState<{
+    lite: { model: string; tokensPerReport: number; costPerThousandTokens: number };
+    pro:  { model: string; tokensPerReport: number; costPerThousandTokens: number };
+  }>({
+    lite: { model: 'gemini-3.5-flash',      tokensPerReport: 2000, costPerThousandTokens: 0.075 },
+    pro:  { model: 'gemini-3.1-pro-preview', tokensPerReport: 4000, costPerThousandTokens: 1.25  },
+  });
+  const [loadingMotorConfig, setLoadingMotorConfig] = useState(true);
+
+  useEffect(() => {
+    const fetchMotorConfig = async () => {
+      try {
+        const docRef = doc(firestore, 'global_config', 'motor_config');
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          setMotorConfig({
+            lite: {
+              model: data.lite?.model || 'gemini-3.5-flash',
+              tokensPerReport: data.lite?.tokensPerReport ?? 2000,
+              costPerThousandTokens: data.lite?.costPerThousandTokens ?? 0.075,
+            },
+            pro: {
+              model: data.pro?.model || 'gemini-3.1-pro-preview',
+              tokensPerReport: data.pro?.tokensPerReport ?? 4000,
+              costPerThousandTokens: data.pro?.costPerThousandTokens ?? 1.25,
+            },
+          });
+        }
+      } catch (err) {
+        logger.error('Erro ao buscar motorConfig:', err);
+      } finally {
+        setLoadingMotorConfig(false);
+      }
+    };
+    fetchMotorConfig();
+  }, []);
+
+  // ── Versionamento de prompts
+  const getPromptVersionKey = (block: string) => `laudia_prompt_versions_${block}`;
+  const savePromptVersion = useCallback((block: string, value: string) => {
+    try {
+      const key = getPromptVersionKey(block);
+      const existing: Array<{ value: string; timestamp: number }> = JSON.parse(localStorage.getItem(key) || '[]');
+      if (existing.length > 0 && existing[0].value === value) return;
+      const updated = [{ value, timestamp: Date.now() }, ...existing].slice(0, 5);
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch {}
+  }, []);
+  const getPromptVersions = useCallback((block: string): Array<{ value: string; timestamp: number }> => {
+    try {
+      return JSON.parse(localStorage.getItem(getPromptVersionKey(block)) || '[]');
+    } catch { return []; }
+  }, []);
+
+  interface PromptDiff { original: string; improved: string; block: string; }
+  const [pendingDiff, setPendingDiff] = useState<PromptDiff | null>(null);
+
+  const [telemetryModeFilter, setTelemetryModeFilter] = useState<string>('all');
+  const conversionRate = localSettings.aiConversionRateBRL ?? 5.5;
+
+  // ── Historical AI Usage ──
+  const _nowDate = new Date();
+  const _defaultFrom = new Date(_nowDate.getFullYear(), _nowDate.getMonth(), 1).toISOString().slice(0, 10);
+  const _defaultTo = _nowDate.toISOString().slice(0, 10);
+  const [histFrom, setHistFrom] = useState(_defaultFrom);
+  const [histTo, setHistTo] = useState(_defaultTo);
+  const [historicalLogs, setHistoricalLogs] = useState<any[]>([]);
+  const [histLoading, setHistLoading] = useState(false);
+
+  const fetchHistoricalStats = useCallback(async () => {
+    setHistLoading(true);
+    try {
+      const startMs = new Date(histFrom + 'T00:00:00').getTime();
+      const endMs = new Date(histTo + 'T23:59:59').getTime();
+      const logs = await getAiUsageStats(startMs, endMs);
+      setHistoricalLogs(logs);
+    } catch (err) {
+      logger.error('Erro ao buscar histórico IA:', err);
+    } finally {
+      setHistLoading(false);
+    }
+  }, [histFrom, histTo]);
 
   const { data: templates } = useCollection<ReportTemplate>('templates');
   const { data: exams } = useCollection<any>('exams');
@@ -305,20 +539,11 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   const [selectedAreaFilter, setSelectedAreaFilter] = useState<ExamArea | ''>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [editingTemplatePrompt, setEditingTemplatePrompt] = useState<string>('');
-  const [isImprovingTemplate, setIsImprovingTemplate] = useState(false);
-  const [isGeneratingTemplatePrompt, setIsGeneratingTemplatePrompt] = useState(false);
-  const [templateImprovePrompt, setTemplateImprovePrompt] = useState('');
-  const [showImprovePanel, setShowImprovePanel] = useState(false);
-  const [showBatchImprovePanel, setShowBatchImprovePanel] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
-
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  const [isImprovingAll, setIsImprovingAll] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ current: number, total: number } | null>(null);
 
   const [templateSubTab, setTemplateSubTab] = useState<'exams' | 'area'>('exams');
   const [editingAreaPrompt, setEditingAreaPrompt] = useState<string>('');
-  
+
   // Playground States
   const [playgroundNotes, setPlaygroundNotes] = useState<string>(
     "Vesícula biliar normodistendida, apresentando cálculo móvel de 1,2 cm em seu interior, sem espessamento de paredes. Restante do abdome superior sem alterações."
@@ -329,13 +554,11 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   const [playgroundScore, setPlaygroundScore] = useState<any>(null);
   const [showPlayground, setShowPlayground] = useState(false);
 
-  // Sync selected template prompt when selection changes or templates load
   useEffect(() => {
     if (templates.length > 0) {
       const filtered = selectedAreaFilter
         ? templates.filter(t => t.area === selectedAreaFilter)
         : templates;
-      
       const currentExists = filtered.some(t => t.id === selectedTemplateId);
       if (!currentExists && filtered.length > 0) {
         setSelectedTemplateId(filtered[0].id);
@@ -348,7 +571,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
 
   useEffect(() => {
     if (selectedAreaFilter) {
-      setEditingAreaPrompt(localSettings.aiAreaPrompts?.[selectedAreaFilter] || '');
+      setEditingAreaPrompt(localSettings.aiAreaPrompts?.[selectedAreaFilter] || DEFAULT_AREA_PROMPTS[selectedAreaFilter] || '');
     } else {
       setEditingAreaPrompt('');
     }
@@ -377,10 +600,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
         ...(localSettings.aiAreaPrompts || {}),
         [selectedAreaFilter]: editingAreaPrompt,
       };
-      const nextSettings = {
-        ...localSettings,
-        aiAreaPrompts: updatedAreaPrompts,
-      };
+      const nextSettings = { ...localSettings, aiAreaPrompts: updatedAreaPrompts };
       setLocalSettings(nextSettings);
       await updateSettings(nextSettings);
       showToast('Diretriz da área salva com sucesso! ✓', 'success');
@@ -396,42 +616,26 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
       showToast('Selecione um exame para testar.', 'error');
       return;
     }
-    
     setIsPlaygroundTesting(true);
     setPlaygroundResult('');
     setPlaygroundScratchpad('');
     setPlaygroundScore(null);
-    
     try {
       const template = templates.find(t => t.id === selectedTemplateId);
       if (!template) throw new Error('Template não encontrado');
-      
-      const tempTemplate = {
-        ...template,
-        aiInstructions: editingTemplatePrompt,
-      };
-      
-      const tempAreaPrompts = {
-        ...(localSettings.aiAreaPrompts || {}),
-      };
-      if (selectedAreaFilter) {
-        tempAreaPrompts[selectedAreaFilter] = editingAreaPrompt;
-      }
-      const tempSettings = {
-        ...localSettings,
-        aiAreaPrompts: tempAreaPrompts,
-      };
-      
+      const tempTemplate = { ...template, aiInstructions: editingTemplatePrompt };
+      const tempAreaPrompts = { ...(localSettings.aiAreaPrompts || {}) };
+      if (selectedAreaFilter) tempAreaPrompts[selectedAreaFilter] = editingAreaPrompt;
+      const tempSettings = { ...localSettings, aiAreaPrompts: tempAreaPrompts };
       const dummyPatient: Patient = {
         id: 'dummy',
         name: 'Paciente Teste',
-        birthDate: '1985-05-15', // 41 anos
+        birthDate: '1985-05-15',
         gender: 'F',
         createdAt: Date.now(),
         updatedAt: Date.now(),
         history: 'Paciente feminina, 41 anos, sem histórico oncológico.'
       };
-      
       const testResult = await generateReport({
         template: tempTemplate,
         patient: dummyPatient,
@@ -439,23 +643,16 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
         settings: tempSettings,
         examDateMs: Date.now(),
       });
-      
       setPlaygroundResult(testResult);
-      
-      // Obter scratchpad da métrica que acabou de ser salva
       if (callMetricsHistory.length > 0) {
         const lastMetric = callMetricsHistory[0];
-        if (lastMetric.scratchpad) {
-          setPlaygroundScratchpad(lastMetric.scratchpad);
-        }
+        if (lastMetric.scratchpad) setPlaygroundScratchpad(lastMetric.scratchpad);
       }
-      
-      // Rodar auditoria
       const scoreData = auditReportQuality(testResult, template.area);
       setPlaygroundScore(scoreData);
       showToast('Laudo simulado com sucesso!', 'success');
     } catch (err) {
-      console.error(err);
+      logger.error('Erro ao simular laudo:', err);
       showToast('Erro ao simular laudo: ' + (err instanceof Error ? err.message : String(err)), 'error');
     } finally {
       setIsPlaygroundTesting(false);
@@ -475,9 +672,13 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     setIsSaving(true);
     try {
       await updateSettings(localSettings);
+      
+      const docRef = doc(firestore, 'global_config', 'motor_config');
+      await setDoc(docRef, motorConfig);
+      
       showToast('Configurações da IA salvas com sucesso', 'success');
-    } catch {
-      showToast('Erro ao salvar configurações', 'error');
+    } catch (err: any) {
+      showToast('Erro ao salvar configurações: ' + err.message, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -487,9 +688,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     if (!selectedTemplateId) return;
     setIsSavingTemplate(true);
     try {
-      await updateItem('templates', selectedTemplateId, {
-        aiInstructions: editingTemplatePrompt,
-      });
+      await updateItem('templates', selectedTemplateId, { aiInstructions: editingTemplatePrompt });
       showToast('Prompt do exame salvo com sucesso! ✓', 'success');
     } catch {
       showToast('Erro ao salvar prompt do exame', 'error');
@@ -498,1910 +697,1514 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     }
   }
 
-  async function handleImproveTemplatePrompt() {
-    const provider = localSettings.aiProvider || 'anthropic';
-    const apiKey = provider === 'anthropic'
-      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey)
-      : (localSettings.geminiApiKey || settings?.geminiApiKey);
-
-    if (!apiKey) {
-      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} no Motor & API antes de usar este recurso.`, 'error');
-      return;
-    }
-    if (!selectedTemplateId) {
-      showToast('Selecione um exame primeiro.', 'error');
-      return;
-    }
-    if (!editingTemplatePrompt.trim()) {
-      showToast('Adicione instruções ou um prompt inicial para melhorar.', 'error');
-      return;
-    }
-    setIsImprovingTemplate(true);
-
-    const templateName = templates.find(t => t.id === selectedTemplateId)?.name || 'Exame';
-    const userRequest = templateImprovePrompt.trim()
-      ? `\n\nInstrução adicional do médico: "${templateImprovePrompt.trim()}"`
-      : '';
-    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
-Sua tarefa é melhorar o prompt de IA para o exame de "${templateName}" a seguir, tornando-o mais completo,
-claro e clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
-Mantenha o estilo original e a língua portuguesa. Retorne APENAS o prompt melhorado, sem comentários.
-IMPORTANTE: NÃO copie nem repita o Prompt Mestre ou regras globais desnecessariamente. Seja direto, NUNCA entre em loop de repetição e NUNCA corte o texto no meio.${userRequest}`;
-    const fullMessage = `${systemMsg}\n\nPROMPT ATUAL:\n${editingTemplatePrompt}`;
-
-    try {
-      let improved = '';
-
-      if (provider === 'gemini') {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(apiKey!);
-        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
-        });
-        improved = result.response.text().trim();
-      } else {
-        // Anthropic
-        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey!,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-            max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
-            messages: [{ role: 'user', content: fullMessage }],
-            temperature: 0.4,
-          }),
-        });
-        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
-        const result = await response.json();
-        improved = (result.content?.[0]?.text || '').trim();
-      }
-
-      if (improved) {
-        setEditingTemplatePrompt(improved);
-        showToast('Prompt do exame melhorado com sucesso pela IA!', 'success');
-        setShowImprovePanel(false);
-        setTemplateImprovePrompt('');
-      } else {
-        throw new Error('A resposta da IA foi vazia.');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(`Erro ao melhorar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
-    } finally {
-      setIsImprovingTemplate(false);
-    }
+  async function handleRestoreAreaPromptDefault() {
+    if (!selectedAreaFilter) return;
+    const ok = await confirm({
+      title: 'Restaurar Diretriz',
+      message: 'Restaurar a diretriz desta área para o padrão V2.0 do sistema?',
+      confirmLabel: 'Restaurar',
+      variant: 'warning',
+    });
+    if (!ok) return;
+    setEditingAreaPrompt(DEFAULT_AREA_PROMPTS[selectedAreaFilter] || '');
+    const updatedAreaPrompts = { ...(localSettings.aiAreaPrompts || {}) };
+    delete (updatedAreaPrompts as Record<string, string>)[selectedAreaFilter];
+    const nextSettings = { ...localSettings, aiAreaPrompts: updatedAreaPrompts };
+    setLocalSettings(nextSettings);
+    updateSettings(nextSettings)
+      .then(() => showToast('Diretriz restaurada para o padrão V2.0.', 'success'))
+      .catch(() => showToast('Erro ao restaurar diretriz.', 'error'));
   }
 
-  async function handleGenerateTemplatePrompt() {
-    const provider = localSettings.aiProvider || 'anthropic';
-    const apiKey = provider === 'anthropic'
-      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey)
-      : (localSettings.geminiApiKey || settings?.geminiApiKey);
-
-    if (!apiKey) {
-      showToast(`Configure sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'} antes de gerar.`, 'error');
-      return;
-    }
-
-    if (!selectedTemplateId) {
-      showToast('Selecione um exame primeiro.', 'error');
-      return;
-    }
-
-    setIsGeneratingTemplatePrompt(true);
-
-    const template = templates.find(t => t.id === selectedTemplateId);
-    if (!template) {
-      setIsGeneratingTemplatePrompt(false);
-      return;
-    }
-
-    // Pick 1-2 examples of templates with existing aiInstructions
-    const examples = templates
-      .filter(t => t.id !== selectedTemplateId && t.aiInstructions && t.aiInstructions.trim().length > 50)
-      .slice(0, 2);
-
-    let examplesText = '';
-    if (examples.length > 0) {
-      examplesText = `\n\nEXEMPLOS DE PROMPTS DE OUTROS EXAMES PARA PADRONIZAÇÃO:\n`;
-      examples.forEach((ex, idx) => {
-        examplesText += `--- Exemplo ${idx + 1}: ${ex.name} ---\n${ex.aiInstructions}\n\n`;
-      });
-    }
-
-    const templateStructure = `
-Nome do Exame: ${template.name}
-Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
-
-TÉCNICA:
-${template.technique || 'Não definida'}
-
-ANÁLISE PADRÃO:
-${template.analysisTemplate || 'Não definida'}
-
-CONCLUSÃO PADRÃO:
-${template.conclusionTemplate || 'Não definida'}
-
-RECOMENDAÇÕES PADRÃO:
-${template.recommendationsTemplate || 'Não definida'}
-`;
-
-    const masterPrompt = localSettings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
-    const globalInstructions = localSettings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
-    const structurePrompt = localSettings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
-    const rigidRules = localSettings.aiRigidRules || DEFAULT_RIGID_RULES;
-
-    const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
-Sua tarefa é GERAR DO ZERO as diretrizes e regras específicas (Prompt de Exame) para a máscara de laudo "${template.name}".
-Gere APENAS as INSTRUÇÕES ESPECÍFICAS (aiInstructions) para este exame. Não inclua saudações, não inclua blocos genéricos que já estão no Prompt Mestre. O seu output deve ser diretamente o texto Markdown do prompt para este exame.
-
-Use o contexto do LAUD.IA abaixo para entender a doutrina, regras rígidas e estrutura que a IA já segue:
-
-=== PROMPT MESTRE ===
-${masterPrompt}
-
-=== INSTRUÇÕES GLOBAIS ===
-${globalInstructions}
-
-=== SKELETON ===
-${structurePrompt}
-
-=== REGRAS RÍGIDAS ===
-${rigidRules}
-
-=== ESTRUTURA DA MÁSCARA ATUAL ===
-${templateStructure}
-${examplesText}`;
-
-    try {
-      let generated = '';
-
-      if (provider === 'gemini') {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(apiKey!);
-        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
-        });
-        generated = result.response.text().trim();
-      } else {
-        // Anthropic
-        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey!,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-            max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
-            messages: [{ role: 'user', content: systemMsg }],
-            temperature: 0.4,
-          }),
-        });
-        if (!response.ok) throw new Error(`Anthropic ${response.status}`);
-        const result = await response.json();
-        generated = (result.content?.[0]?.text || '').trim();
-      }
-
-      if (generated) {
-        setEditingTemplatePrompt(generated);
-        showToast('Prompt do exame gerado com sucesso pela IA!', 'success');
-      } else {
-        throw new Error('A resposta da IA foi vazia.');
-      }
-    } catch (err) {
-      console.error(err);
-      showToast(`Erro ao gerar prompt com IA. Verifique sua API Key ${provider === 'anthropic' ? 'Anthropic' : 'Gemini'}.`, 'error');
-    } finally {
-      setIsGeneratingTemplatePrompt(false);
-    }
+  async function handleClearExamPrompt() {
+    if (!selectedTemplateId) return;
+    const ok = await confirm({
+      title: 'Limpar Instruções',
+      message: 'Limpar as instruções específicas deste exame?',
+      confirmLabel: 'Limpar',
+      variant: 'warning',
+    });
+    if (!ok) return;
+    const backupKey = `laudia_backup_exam_${selectedTemplateId}`;
+    if (editingTemplatePrompt.trim()) localStorage.setItem(backupKey, editingTemplatePrompt);
+    setEditingTemplatePrompt('');
+    updateItem('templates', selectedTemplateId, { aiInstructions: '' })
+      .then(() => showToast('Instruções limpas. Backup salvo localmente.', 'info'))
+      .catch(() => showToast('Erro ao limpar prompt do exame.', 'error'));
   }
 
-  async function handleGenerateAllPrompts() {
-    if (!selectedAreaFilter) {
-      showToast('Selecione uma área primeiro para gerar os prompts em lote.', 'error');
+  function handleRestoreExamPromptFromBackup() {
+    if (!selectedTemplateId) return;
+    const backup = localStorage.getItem(`laudia_backup_exam_${selectedTemplateId}`);
+    if (!backup) {
+      showToast('Nenhum backup local encontrado para este exame.', 'info');
       return;
     }
-    const templatesToProcess = templates.filter(t => t.area === selectedAreaFilter);
-    if (templatesToProcess.length === 0) return;
-
-    if (!window.confirm(`Deseja gerar o prompt de IA para ${templatesToProcess.length} exames da área selecionada? Isso consumirá tokens da sua API.`)) {
-      return;
-    }
-
-    const provider = localSettings.aiProvider || 'anthropic';
-    const apiKey = provider === 'anthropic'
-      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey)
-      : (localSettings.geminiApiKey || settings?.geminiApiKey);
-
-    if (!apiKey) {
-      showToast(`Configure sua API Key antes de gerar.`, 'error');
-      return;
-    }
-
-    setIsGeneratingAll(true);
-    setBatchProgress({ current: 0, total: templatesToProcess.length });
-
-    const masterPrompt = localSettings.aiMasterPrompt || DEFAULT_MASTER_PROMPT;
-    const globalInstructions = localSettings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
-    const structurePrompt = localSettings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
-    const rigidRules = localSettings.aiRigidRules || DEFAULT_RIGID_RULES;
-
-    let successCount = 0;
-
-    for (let i = 0; i < templatesToProcess.length; i++) {
-      const template = templatesToProcess[i];
-      setBatchProgress({ current: i + 1, total: templatesToProcess.length });
-
-      const examples = templates
-        .filter(t => t.id !== template.id && t.aiInstructions && t.aiInstructions.trim().length > 50)
-        .slice(0, 2);
-
-      let examplesText = '';
-      if (examples.length > 0) {
-        examplesText = `\n\nEXEMPLOS DE PROMPTS DE OUTROS EXAMES PARA PADRONIZAÇÃO:\n`;
-        examples.forEach((ex, idx) => {
-          examplesText += `--- Exemplo ${idx + 1}: ${ex.name} ---\n${ex.aiInstructions}\n\n`;
-        });
-      }
-
-      const templateStructure = `
-Nome do Exame: ${template.name}
-Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
-
-TÉCNICA:
-${template.technique || 'Não definida'}
-
-ANÁLISE PADRÃO:
-${template.analysisTemplate || 'Não definida'}
-
-CONCLUSÃO PADRÃO:
-${template.conclusionTemplate || 'Não definida'}
-
-RECOMENDAÇÕES PADRÃO:
-${template.recommendationsTemplate || 'Não definida'}
-`;
-
-      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
-Sua tarefa é GERAR DO ZERO as diretrizes e regras específicas (Prompt de Exame) para a máscara de laudo "${template.name}".
-Gere APENAS as INSTRUÇÕES ESPECÍFICAS (aiInstructions) para este exame. Não inclua saudações, não inclua blocos genéricos que já estão no Prompt Mestre. O seu output deve ser diretamente o texto Markdown do prompt para este exame.
-IMPORTANTE: NÃO copie nem repita as Regras Rígidas ou o Prompt Mestre no seu output. Foque estritamente nas regras do órgão/exame em questão. Seja objetivo e não entre em loops de repetição.
-
-Use o contexto do LAUD.IA abaixo para entender a doutrina, regras rígidas e estrutura que a IA já segue:
-
-=== PROMPT MESTRE ===
-${masterPrompt}
-
-=== INSTRUÇÕES GLOBAIS ===
-${globalInstructions}
-
-=== SKELETON ===
-${structurePrompt}
-
-=== REGRAS RÍGIDAS ===
-${rigidRules}
-
-=== ESTRUTURA DA MÁSCARA ATUAL ===
-${templateStructure}
-${examplesText}`;
-
-      try {
-        let generated = '';
-
-        if (provider === 'gemini') {
-          const { GoogleGenerativeAI } = await import('@google/generative-ai');
-          const genAI = new GoogleGenerativeAI(apiKey!);
-          const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
-          const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: systemMsg }] }],
-          });
-          generated = result.response.text().trim();
-        } else {
-          const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-            method: 'POST',
-            headers: {
-              'x-api-key': apiKey!,
-              'anthropic-version': '2023-06-01',
-              'anthropic-dangerous-direct-browser-access': 'true',
-              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-              max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
-              messages: [{ role: 'user', content: systemMsg }],
-              temperature: 0.4,
-            }),
-          });
-          if (!response.ok) throw new Error(`Anthropic ${response.status}`);
-          const result = await response.json();
-          generated = (result.content?.[0]?.text || '').trim();
-        }
-
-        if (generated) {
-          await updateItem('templates', template.id, { aiInstructions: generated });
-          successCount++;
-          if (selectedTemplateId === template.id) {
-            setEditingTemplatePrompt(generated);
-          }
-        }
-      } catch (err) {
-        console.error(`Erro ao gerar prompt para ${template.name}:`, err);
-      }
-    }
-
-    setIsGeneratingAll(false);
-    setBatchProgress(null);
-    showToast(`Geração concluída! ${successCount} de ${templatesToProcess.length} prompts gerados com sucesso.`, 'success');
-  }
-
-  async function handleImproveAllPrompts() {
-    if (!selectedAreaFilter) {
-      showToast('Selecione uma área primeiro para melhorar os prompts em lote.', 'error');
-      return;
-    }
-    const templatesToProcess = templates.filter(t => t.area === selectedAreaFilter);
-    if (templatesToProcess.length === 0) {
-      showToast('Nenhum exame encontrado nesta área.', 'info');
-      return;
-    }
-
-    if (!window.confirm(`Deseja melhorar com IA os prompts de ${templatesToProcess.length} exames da área selecionada? Isso consumirá tokens da sua API.`)) {
-      return;
-    }
-
-    const provider = localSettings.aiProvider || 'anthropic';
-    const apiKey = provider === 'anthropic'
-      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey)
-      : (localSettings.geminiApiKey || settings?.geminiApiKey);
-
-    if (!apiKey) {
-      showToast(`Configure sua API Key antes de continuar.`, 'error');
-      return;
-    }
-
-    setIsImprovingAll(true);
-    setBatchProgress({ current: 0, total: templatesToProcess.length });
-
-    const userRequest = templateImprovePrompt.trim()
-      ? `\n\nInstrução adicional do médico: "${templateImprovePrompt.trim()}"`
-      : '';
-
-    let successCount = 0;
-
-    for (let i = 0; i < templatesToProcess.length; i++) {
-      const template = templatesToProcess[i];
-      setBatchProgress({ current: i + 1, total: templatesToProcess.length });
-
-      const templateStructure = `
-Nome do Exame: ${template.name}
-Área: ${EXAM_AREAS.find(a => a.id === template.area)?.label || template.area}
-
-TÉCNICA:
-${template.technique || 'Não definida'}
-
-ANÁLISE PADRÃO:
-${template.analysisTemplate || 'Não definida'}
-
-CONCLUSÃO PADRÃO:
-${template.conclusionTemplate || 'Não definida'}
-
-RECOMENDAÇÕES PADRÃO:
-${template.recommendationsTemplate || 'Não definida'}
-`;
-
-      const hasInstructions = template.aiInstructions && template.aiInstructions.trim().length > 0;
-      const systemMsg = `Você é um especialista em ultrassonografia e engenharia de prompts médicos.
-Sua tarefa é ${hasInstructions ? 'melhorar o prompt de IA (aiInstructions) existente' : 'gerar um prompt de IA (aiInstructions) excelente do zero'} para o exame de "${template.name}".
-O prompt deve ser completo, claro, clinicamente preciso, seguindo as melhores práticas de radiologia diagnóstica brasileira e CBR.
-Retorne APENAS o prompt melhorado/gerado em formato Markdown. Não inclua saudações, comentários, nem explicações. O seu output deve ser diretamente o texto do prompt.
-IMPORTANTE: NÃO copie nem repita o Prompt Mestre ou regras globais desnecessariamente no seu output. Foque estritamente nas regras do órgão/exame em questão. Seja objetivo e não entre em loops de repetição.`;
-
-      const promptAtualMsg = hasInstructions
-        ? `=== PROMPT ATUAL DO EXAME ===\n${template.aiInstructions}`
-        : `=== PROMPT ATUAL DO EXAME ===\n(Nenhum prompt definido. Por favor, crie um do zero com base na estrutura do exame e técnicas abaixo)`;
-
-      const fullMessage = `${systemMsg}
-
-=== ESTRUTURA DO EXAME ===
-${templateStructure}
-
-${promptAtualMsg}
-
-=== DIRETRIZES OPERACIONAIS DE REFERÊNCIA (NÃO REPETIR NO OUTPUT) ===
-Mestre: ${localSettings.aiMasterPrompt || DEFAULT_MASTER_PROMPT}
-Instruções Globais: ${localSettings.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS}
-Skeleton: ${localSettings.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT}
-Regras Rígidas: ${localSettings.aiRigidRules || DEFAULT_RIGID_RULES}
-${userRequest}`;
-
-      try {
-        let improved = '';
-
-        if (provider === 'gemini') {
-          const { GoogleGenerativeAI } = await import('@google/generative-ai');
-          const genAI = new GoogleGenerativeAI(apiKey!);
-          const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
-          const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: fullMessage }] }],
-          });
-          improved = result.response.text().trim();
-        } else {
-          const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-            method: 'POST',
-            headers: {
-              'x-api-key': apiKey!,
-              'anthropic-version': '2023-06-01',
-              'anthropic-dangerous-direct-browser-access': 'true',
-              'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-              max_tokens: (localSettings.anthropicModel || '').includes('3-7') || (localSettings.anthropicModel || '').includes('opus') ? 64000 : 8192,
-              messages: [{ role: 'user', content: fullMessage }],
-              temperature: 0.4,
-            }),
-          });
-          if (!response.ok) throw new Error(`Anthropic ${response.status}`);
-          const result = await response.json();
-          improved = (result.content?.[0]?.text || '').trim();
-        }
-
-        if (improved) {
-          await updateItem('templates', template.id, { aiInstructions: improved });
-          successCount++;
-          if (selectedTemplateId === template.id) {
-            setEditingTemplatePrompt(improved);
-          }
-        }
-      } catch (err) {
-        console.error(`Erro ao melhorar prompt para ${template.name}:`, err);
-      }
-    }
-
-    setIsImprovingAll(false);
-    setBatchProgress(null);
-    showToast(`Melhoria concluída! ${successCount} de ${templatesToProcess.length} prompts melhorados com sucesso.`, 'success');
+    setEditingTemplatePrompt(backup);
+    showToast('Rascunho anterior restaurado. Clique em Salvar para confirmar.', 'success');
   }
 
   async function testConnection() {
-    const provider = localSettings.aiProvider || 'anthropic';
-    const apiKey = (provider === 'anthropic'
-      ? (localSettings.anthropicApiKey || settings?.anthropicApiKey)
-      : (localSettings.geminiApiKey || settings?.geminiApiKey))?.trim();
-
-    if (provider === 'gemini') {
-      if (!apiKey) {
-        showToast('Insira a API Key do Gemini primeiro', 'error');
-        return;
+    const apiKey = (localSettings.geminiApiKey || settings?.geminiApiKey)?.trim();
+    if (!apiKey) { showToast('Insira a API Key do Gemini primeiro', 'error'); return; }
+    setTestStatus('testing');
+    try {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const result = await model.generateContent('Responda apenas: OK');
+      if (result.response.text()) {
+        setTestStatus('success');
+        showToast('Conexão com Gemini validada com sucesso!', 'success');
       }
-      setTestStatus('testing');
-      try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(localSettings.geminiModel) });
-        const result = await model.generateContent('Responda apenas: OK');
-        const text = result.response.text();
-        if (text) {
-          setTestStatus('success');
-          showToast('Conexão validada com sucesso com o Gemini!', 'success');
-        }
-      } catch (err: unknown) {
-        setTestStatus('error');
-        const msg = err instanceof Error ? err.message : String(err);
-        showToast('Falha na conexão: ' + msg, 'error');
-
-        // Diagnóstico: listar modelos disponíveis
-        try {
-          const { GoogleGenerativeAI } = await import('@google/generative-ai');
-          const genAI = new GoogleGenerativeAI(apiKey);
-          // O SDK do JS não tem listModels() direto na instância em versões mais antigas,
-          // mas vamos tentar usar a REST API via fetch para listar modelos e mostrar no console
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-          const data = await response.json();
-          if (data && data.models) {
-            const modelNames = data.models.map((m: any) => m.name.replace('models/', '')).filter((n: string) => n.includes('gemini'));
-            console.log('Modelos Gemini disponíveis para esta chave:', modelNames);
-            showToast('Modelos suportados pela sua chave: ' + modelNames.slice(0, 5).join(', ') + '...', 'info');
-          }
-        } catch (diagErr) {
-          console.error('Erro no diagnóstico:', diagErr);
-        }
-      }
-    } else {
-      if (!apiKey) {
-        showToast('Insira a API Key do Anthropic primeiro', 'error');
-        return;
-      }
-      setTestStatus('testing');
-      try {
-        const response = await fetch(`${getAnthropicBaseUrl()}/v1/messages`, {
-          method: 'POST',
-          headers: {
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-            'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15, output-128k-2025-02-19',
-            'content-type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-            messages: [{ role: 'user', content: 'Say OK' }],
-            max_tokens: 1
-          })
-        });
-        if (response.status === 200 || response.status === 400 || response.status === 401) {
-          if (response.status === 401) {
-            setTestStatus('error');
-            showToast('Chave Anthropic Inválida', 'error');
-          } else {
-            setTestStatus('success');
-            showToast('Conexão validada com a Anthropic!', 'success');
-          }
-        } else {
-          setTestStatus('error');
-          showToast('Erro ao contatar API da Anthropic', 'error');
-        }
-      } catch (err: unknown) {
-        setTestStatus('error');
-        const msg = err instanceof Error ? err.message : 'Erro de rede';
-        showToast(`Falha na conexão: ${msg}`, 'error');
-      }
+    } catch (err: unknown) {
+      setTestStatus('error');
+      showToast('Falha na conexão: ' + (err instanceof Error ? err.message : String(err)), 'error');
     }
   }
 
-  const renderPlayground = () => {
-    return (
-      <div className="bg-zinc-950 rounded-[2.5rem] border border-zinc-800 shadow-2xl overflow-hidden mt-8">
-        <button
-          type="button"
-          onClick={() => setShowPlayground(!showPlayground)}
-          className="w-full px-8 py-5 flex items-center justify-between text-left hover:bg-zinc-900/40 transition-all border-b border-zinc-900"
-        >
-          <div className="flex items-center gap-3">
-            <FlaskConical className="text-violet-500 animate-pulse" size={22} />
-            <div>
-              <h5 className="text-xs font-black text-zinc-100 uppercase tracking-wider">🔬 Playground de Teste Rápido (Simulação)</h5>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Teste e refine suas diretrizes simulando a IA em tempo real</p>
-            </div>
+  // ── Playground renderer ───────────────────────────────────────────────
+  const renderPlayground = () => (
+    <div className="bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden mt-6">
+      <button
+        type="button"
+        onClick={() => setShowPlayground(!showPlayground)}
+        className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-zinc-900/40 transition-all"
+      >
+        <div className="flex items-center gap-2.5">
+          <FlaskConical className="text-violet-500" size={18} />
+          <div>
+            <span className="text-xs font-black text-zinc-100 uppercase tracking-wider">Playground de Teste</span>
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">Simule a IA com as diretrizes atuais</p>
           </div>
-          <span className="px-3 py-1 bg-zinc-900 text-zinc-400 hover:text-zinc-200 text-[10px] rounded-xl font-black uppercase tracking-widest border border-zinc-800">
-            {showPlayground ? 'Recolher' : 'Expandir Playground'}
-          </span>
-        </button>
+        </div>
+        <ChevronDown size={16} className={classNames("text-zinc-400 transition-transform", showPlayground ? "rotate-180" : "")} />
+      </button>
 
-        {showPlayground && (
-          <div className="p-5 sm:p-8 space-y-6 text-zinc-300">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Pane: Notes Input */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Notas Clínicas do Médico (Input do Teste)</label>
-                  {/* Select template dropdown for testing when in Area sub-tab */}
-                  {templateSubTab === 'area' && selectedAreaFilter && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Exame de Teste:</span>
-                      <select
-                        value={selectedTemplateId}
-                        onChange={(e) => setSelectedTemplateId(e.target.value)}
-                        className="bg-zinc-900 text-zinc-300 border border-zinc-800 rounded-xl text-[10px] px-2 py-1 focus:ring-1 focus:ring-violet-500/30 font-bold"
-                      >
-                        <option value="">Selecione um exame...</option>
-                        {templates
-                          .filter(t => t.area === selectedAreaFilter)
-                          .map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
-                      </select>
+      {showPlayground && (
+        <div className="p-5 space-y-5 border-t border-zinc-900 text-zinc-300">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Left: Notes Input */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest font-mono">Notas Clínicas (Input)</label>
+                {templateSubTab === 'area' && selectedAreaFilter && (
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                    className="bg-zinc-900 text-zinc-300 border border-zinc-800 rounded-xl text-[10px] px-2 py-1 focus:ring-1 focus:ring-violet-500/30 font-bold"
+                  >
+                    <option value="">Exame de teste...</option>
+                    {templates.filter(t => t.area === selectedAreaFilter).map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <textarea
+                value={playgroundNotes}
+                onChange={(e) => setPlaygroundNotes(e.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-900/40 text-zinc-200 text-xs p-3 focus:ring-2 focus:ring-violet-500/30 placeholder-zinc-700 resize-none font-medium leading-relaxed"
+                placeholder="Digite notas médicas de teste..."
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500 font-mono">Paciente Simulado: F, 41a</span>
+                <button
+                  type="button"
+                  onClick={handleRunPlaygroundTest}
+                  disabled={isPlayinggroundTesting || !selectedTemplateId}
+                  className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
+                >
+                  {isPlayinggroundTesting ? (
+                    <><Loader2 size={12} className="animate-spin" /> Simulando...</>
+                  ) : (
+                    <><Play size={12} /> Simular Laudo</>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Right: Score */}
+            <div className="bg-zinc-900/20 border border-zinc-900 rounded-2xl p-4 flex flex-col justify-center min-h-[140px]">
+              {isPlayinggroundTesting ? (
+                <div className="flex flex-col items-center justify-center py-6 text-zinc-500 font-mono text-[11px]">
+                  <Loader2 size={24} className="animate-spin text-violet-500 mb-2" />
+                  <span>Chamando IA...</span>
+                </div>
+              ) : playgroundResult ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-2.5">
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest font-mono">Auditoria</span>
+                    {playgroundScore && (
+                      <span className={classNames(
+                        "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider",
+                        playgroundScore.score >= 90 ? "bg-emerald-950/60 text-emerald-400 border border-emerald-900/50" :
+                        playgroundScore.score >= 75 ? "bg-amber-950/60 text-amber-400 border border-amber-900/50" :
+                        "bg-rose-950/60 text-rose-400 border border-rose-900/50"
+                      )}>
+                        Nota: {playgroundScore.score}/100
+                      </span>
+                    )}
+                  </div>
+                  {playgroundScore && playgroundScore.issues.length > 0 ? (
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                      {playgroundScore.issues.map((issue: any, index: number) => (
+                        <div key={index} className={classNames(
+                          "flex items-start gap-2 p-2 rounded-lg text-[10px] font-medium border",
+                          issue.severity === 'error' ? "bg-rose-950/30 text-rose-300 border-rose-900/20" : "bg-amber-950/30 text-amber-300 border-amber-900/20"
+                        )}>
+                          <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                          <span>{issue.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2.5 bg-emerald-950/30 border border-emerald-900/20 text-emerald-400 rounded-xl text-xs font-semibold">
+                      <CheckCircle2 size={13} className="shrink-0" />
+                      <span>Sem erros de conformidade detectados!</span>
                     </div>
                   )}
                 </div>
-                <textarea
-                  value={playgroundNotes}
-                  onChange={(e) => setPlaygroundNotes(e.target.value)}
-                  rows={5}
-                  className="w-full rounded-2xl border border-zinc-850 bg-zinc-900/40 text-zinc-200 text-xs p-4 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-550 placeholder-zinc-700 resize-none font-semibold leading-relaxed"
-                  placeholder="Digite notas médicas de teste. Ex: fígado ok, vesícula com cálculo de 12mm móvel..."
-                />
-                
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                  <div className="text-[10px] text-zinc-500 font-mono font-semibold">
-                    Paciente Simulado: F, 41 anos
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={handleRunPlaygroundTest}
-                    disabled={isPlayinggroundTesting || !selectedTemplateId}
-                    className="px-5 py-3 bg-violet-600 hover:bg-violet-750 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md hover:shadow-violet-900/10 active:scale-95 flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {isPlayinggroundTesting ? (
-                      <><Loader2 size={13} className="animate-spin" /> Simulando...</>
-                    ) : (
-                      <><Play size={13} /> Simular Laudo</>
-                    )}
-                  </button>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-zinc-600 font-mono text-[11px] text-center">
+                  <Sparkles size={20} className="text-zinc-800 mb-2" />
+                  <span>Simule o laudo para ver os resultados.</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Result */}
+          {playgroundResult && !isPlayinggroundTesting && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 pt-4 border-t border-zinc-900">
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Laudo Gerado</span>
+                <div className="bg-white text-zinc-900 rounded-2xl border border-zinc-200 p-5 shadow-inner max-h-[300px] overflow-y-auto prose prose-sm max-w-none">
+                  <div dangerouslySetInnerHTML={{ __html: playgroundResult }} />
                 </div>
               </div>
-
-              {/* Right Pane: Quality Score & Feedback */}
-              <div className="bg-zinc-900/20 border border-zinc-900 rounded-3xl p-6 space-y-4 flex flex-col justify-between min-h-[180px]">
-                {isPlayinggroundTesting ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-zinc-500 font-mono text-[11px] h-full my-auto">
-                    <Loader2 size={28} className="animate-spin text-violet-500 mb-3" />
-                    <span>Chamando inteligência artificial em segundo plano...</span>
-                  </div>
-                ) : playgroundResult ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-zinc-850 pb-3">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest font-mono">Resultado da Auditoria</span>
-                      {playgroundScore && (
-                        <span className={classNames(
-                          "px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm",
-                          playgroundScore.score >= 90 ? "bg-emerald-950/60 text-emerald-400 border border-emerald-900/50" :
-                          playgroundScore.score >= 75 ? "bg-amber-950/60 text-amber-400 border border-amber-900/50" :
-                          "bg-rose-950/60 text-rose-400 border border-rose-900/50"
-                        )}>
-                          Nota: {playgroundScore.score}/100
-                        </span>
-                      )}
-                    </div>
-                    
-                    {playgroundScore && playgroundScore.issues.length > 0 ? (
-                      <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                        {playgroundScore.issues.map((issue: any, index: number) => (
-                          <div key={index} className={classNames(
-                            "flex items-start gap-2.5 p-2.5 rounded-xl text-xs font-semibold border",
-                            issue.severity === 'error' ? "bg-rose-950/30 text-rose-350 border-rose-900/20" : "bg-amber-950/30 text-amber-350 border-amber-900/20"
-                          )}>
-                            <AlertCircle size={14} className="mt-0.5 shrink-0 text-current" />
-                            <span>{issue.message}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 p-3 bg-emerald-950/30 border border-emerald-900/20 text-emerald-400 rounded-xl text-xs font-semibold">
-                        <CheckCircle2 size={15} className="shrink-0 animate-fade-in" />
-                        <span>Nenhum erro de conformidade ou placeholder órfão detectado!</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-zinc-500 font-mono text-[11px] text-center h-full my-auto">
-                    <Sparkles size={24} className="text-zinc-800 mb-2" />
-                    <span>Simulação inativa. Digite notas clínicas e clique em <strong>Simular Laudo</strong> para testar as diretrizes locais da IA.</span>
-                  </div>
-                )}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Raciocínio (Scratchpad)</span>
+                <div className="bg-zinc-900/60 text-zinc-400 font-mono text-[10px] rounded-2xl border border-zinc-800 p-5 max-h-[300px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                  {playgroundScratchpad || "Nenhum bloco de pensamento foi capturado."}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
-            {/* Split Display of HTML Report vs Scratchpad thought */}
-            {playgroundResult && !isPlayinggroundTesting && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t border-zinc-900">
-                {/* Left: Rendered report */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Laudo Final (Visualização HTML)</span>
-                  <div className="bg-white text-zinc-900 rounded-3xl border border-zinc-850 p-6 shadow-inner max-h-[350px] overflow-y-auto prose prose-sm max-w-none">
-                    <div dangerouslySetInnerHTML={{ __html: playgroundResult }} />
-                  </div>
-                </div>
+  // ── Tab definitions ───────────────────────────────────────────────────
+  const TABS = [
+    { id: 'prompts' as const, label: 'Doutrina', icon: ShieldAlert, color: 'indigo' },
+    { id: 'templates' as const, label: 'Por Exame', icon: LayoutList, color: 'emerald' },
+    { id: 'engine' as const, label: 'Motor & API', icon: Cpu, color: 'brand' },
+    { id: 'training' as const, label: 'Aprendizado', icon: GraduationCap, color: 'amber' },
+    { id: 'status' as const, label: 'Telemetria', icon: BarChart3, color: 'violet' },
+  ];
 
-                {/* Right: Thought log */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Raciocínio Clínico Realizado (Scratchpad)</span>
-                  <div className="bg-zinc-900/60 text-zinc-400 font-mono text-[10px] rounded-3xl border border-zinc-850 p-6 shadow-inner max-h-[350px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                    {playgroundScratchpad || "Nenhum bloco de pensamento foi capturado na resposta."}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-
-
-  const sidebarItems = [
-    { id: 'prompts', label: 'Doutrina & Prompts', icon: ShieldAlert },
-    { id: 'templates', label: 'Prompts por Exame', icon: LayoutList },
-    { id: 'engine', label: 'Motor & API', icon: Sliders },
-    { id: 'training', label: 'Aprendizado IA', icon: GraduationCap },
-    { id: 'status', label: 'Status da IA', icon: Activity },
-  ] as const;
+  const providerName = `Google Gemini · Lite: ${motorConfig.lite.model.replace('gemini-', '').replace('-preview', '')} · Pro: ${motorConfig.pro.model.replace('gemini-', '').replace('-preview', '')}`;
+  const hasApiKey = !!localSettings.geminiApiKey;
 
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      {/* Light Glassmorphic Header aligned with other sections */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-ink-100 pb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest border border-emerald-100 animate-pulse">
-              COGNITIVE HUB: ACTIVE
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest border border-indigo-100">
-              {(localSettings.aiProvider === 'anthropic')
-                ? (localSettings.anthropicModel || 'claude-3-5-sonnet-latest')
-                : (localSettings.geminiModel || 'gemini-3.5-flash')}
-            </span>
+    <div className="animate-fade-in pb-24" style={{ minHeight: '100vh' }}>
+
+      {/* ─── COMPACT HEADER ─── */}
+      <div className="relative mb-6 rounded-2xl overflow-hidden border border-ink-200 shadow-sm bg-white">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.05)_0%,transparent_60%)]" />
+        <div className="relative px-6 py-5 flex items-center justify-between gap-4">
+          {/* Identity */}
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+                <BrainCircuit size={24} className="text-white" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-black text-ink-900 tracking-tight">LAUD.IA</h2>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-600 text-[9px] font-black uppercase tracking-widest">v2.0</span>
+                {!hasApiKey && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/20 text-amber-600 text-[9px] font-black uppercase tracking-widest">⚠ API KEY</span>
+                )}
+              </div>
+              <p className="text-xs text-ink-500 mt-0.5 font-medium truncate">
+                ✨ {providerName}
+                <span className="mx-1.5 text-ink-300">·</span>
+                {templates.length} exames
+                <span className="mx-1.5 text-ink-300">·</span>
+                {callMetricsHistory.length} chamadas
+              </p>
+            </div>
           </div>
-          <h3 className="text-xl font-black text-ink-900">IA Command Center</h3>
-          <p className="text-xs text-ink-500 mt-1 max-w-xl font-medium">
-            Gestão de alto nível, sintonia fina de temperatura cognitiva e publicação dos prompts médicos oficiais do motor de inteligência artificial LAUD.IA.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 shrink-0 self-start md:self-auto">
+
+          {/* Actions — only on non-readOnly */}
           {!readOnly && (
-
-            <button
-              onClick={() => {
-                if (window.confirm('Tem certeza que deseja restaurar os prompts (Mestre, Globais, Estrutura e Regras) para o padrão de fábrica? Isso sobrescreverá as alterações atuais.')) {
-                  setLocalSettings({
-                    ...localSettings,
-                    aiMasterPrompt: DEFAULT_MASTER_PROMPT,
-                    aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
-                    aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT,
-                    aiRigidRules: DEFAULT_RIGID_RULES,
-                  });
-                  showToast('Reset de Fábrica concluído. Clique em Publicar para salvar.', 'success');
-                }
-              }}
-              className="h-12 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-600 hover:text-rose-700 bg-rose-50 border border-rose-200/80 hover:border-rose-500 transition-all flex items-center gap-2"
-            >
-              <ShieldAlert size={12} />
-              Factory Reset
-            </button>
-
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  setLocalSettings(settings);
+                  showToast('Alterações descartadas', 'info');
+                }}
+                className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink-500 hover:text-ink-700 bg-ink-100 border border-ink-200 hover:bg-ink-200 transition-all flex items-center gap-1.5"
+              >
+                <XCircle size={11} />
+                <span className="hidden sm:inline">Descartar</span>
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+              >
+                {isSaving ? <Loader2 size={11} className="animate-spin" /> : <ShieldCheck size={11} />}
+                Publicar
+              </button>
+            </div>
           )}
-
-          <button
-            onClick={() => {
-              setLocalSettings(settings);
-              showToast('Alterações descartadas', 'info');
-            }}
-            className="h-12 px-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 bg-white border border-slate-200/80 hover:border-brand-500 transition-all flex items-center gap-2"
-          >
-            <RotateCcw size={12} />
-            Descartar
-          </button>
-
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white shadow-xl shadow-brand-500/20 hover:shadow-brand-500/35 transition-all flex items-center gap-2 disabled:opacity-50 scale-100 active:scale-95"
-          >
-            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
-            Publicar Configurações
-          </button>
         </div>
       </div>
 
-      {/* Sub-Tab Navigation */}
-      <div className="flex bg-slate-100 p-1.5 rounded-[2rem] border border-slate-200/60 shadow-sm w-full sm:w-fit overflow-x-auto scrollbar-hide">
-        {sidebarItems.map((item) => {
-
-          const isActive = activeTab === item.id;
+      {/* ─── TAB BAR ─── */}
+      <div className="flex items-center gap-1.5 mb-6 bg-ink-100 p-1 rounded-2xl border border-ink-200/50 overflow-x-auto">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const colorMap: Record<string, string> = {
+            indigo: 'bg-indigo-600 text-white shadow-indigo-500/20',
+            emerald: 'bg-emerald-600 text-white shadow-emerald-500/20',
+            brand: 'bg-brand-600 text-white shadow-brand-500/20',
+            amber: 'bg-amber-500 text-white shadow-amber-500/20',
+            violet: 'bg-violet-600 text-white shadow-violet-500/20',
+          };
           return (
             <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               className={classNames(
-                "px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2",
-                isActive
-                  ? "bg-white text-brand-600 shadow-sm border border-slate-200/10 scale-[1.02]"
-                  : "text-slate-500 hover:text-slate-700"
+                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                isActive ? `${colorMap[tab.color]} shadow-md` : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
               )}
             >
-              <item.icon size={12} />
-              {item.label}
+              <tab.icon size={14} />
+              {tab.label}
             </button>
           );
         })}
       </div>
 
-      {/* Content Area */}
-      <div className="w-full space-y-8">
+      {/* ─── CONTENT ─── */}
+      <div className="w-full space-y-6">
 
-        {/* TAB: PROMPTS */}
-        {activeTab === 'prompts' && (
-          <div className="space-y-8 animate-fade-in-up">
-            {/* Primary Master Prompt Editor */}
-            <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl overflow-hidden p-6 md:p-8 space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-ink-50 pb-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/50 shadow-inner shrink-0">
-                    <BrainCircuit size={28} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-ink-900 uppercase tracking-wider">Diretrizes Operacionais do LAUD.IA</h4>
-                    <p className="text-[10px] text-ink-400 font-bold uppercase tracking-[0.15em] mt-0.5">Doutrina, Raciocínio, Skeleton e Compliance Médico-Legal</p>
-                  </div>
-                </div>
+        {/* ══════════════════════════════════
+            TAB: PROMPTS — Doutrina & Diretrizes
+        ══════════════════════════════════ */}
+        {activeTab === 'prompts' && (() => {
+          const PROMPT_BLOCKS = [
+            {
+              id: 'master' as const,
+              label: 'Prompt Mestre',
+              subtitle: 'Doutrina Central',
+              icon: BrainCircuit,
+              color: 'indigo',
+              accentBg: 'bg-indigo-50',
+              accentText: 'text-indigo-700',
+              accentBorder: 'border-indigo-200',
+              glowColor: 'brand' as const,
+              badge: 'MASTER DIRECTIVE',
+              fileName: 'master_prompt.md',
+              desc: 'Define a personalidade, leis absolutas e padrão numérico — a "constituição" do sistema.',
+              settingsKey: 'aiMasterPrompt' as keyof typeof localSettings,
+              defaultVal: DEFAULT_MASTER_PROMPT,
+              mustHave: ['Lei da Não-Invenção', 'Cascata Tripartite', 'Lei da Conclusão Enxuta', 'Padrão numérico pt-BR'],
+              neverRemove: ['Seção "NÃO INVENÇÃO"', 'Seção "CASCATA TRIPARTITE"', 'Padrão numérico'],
+              safeToAdjust: ['Vocabulário da persona', 'Siglas de sociedades médicas', 'Permissões de autocálculo'],
+            },
+            {
+              id: 'global' as const,
+              label: 'Raciocínio Clínico',
+              subtitle: 'Instruções Globais',
+              icon: Brain,
+              color: 'emerald',
+              accentBg: 'bg-emerald-50',
+              accentText: 'text-emerald-700',
+              accentBorder: 'border-emerald-200',
+              glowColor: 'emerald' as const,
+              badge: 'GLOBAL REASONING',
+              fileName: 'global_instructions.md',
+              desc: '7 Fases de Raciocínio Clínico executadas no scratchpad antes de gerar o laudo.',
+              settingsKey: 'aiGlobalInstructions' as keyof typeof localSettings,
+              defaultVal: DEFAULT_GLOBAL_INSTRUCTIONS,
+              mustHave: ['7 Fases (Ancoragem → Self-Audit)', 'Tag <scratchpad> obrigatória', 'Fórmula do elipsoide (Fase 4)'],
+              neverRemove: ['Fase 4 — Fórmula do elipsoide', 'Fase 7 — Self-Audit', 'Obrigatoriedade do <scratchpad>'],
+              safeToAdjust: ['Fase 3: variantes anatômicas', 'Fase 4: fórmulas adicionais', 'Fase 5: mapeamento de jargões'],
+            },
+            {
+              id: 'structure' as const,
+              label: 'Skeleton',
+              subtitle: 'Arquitetura HTML',
+              icon: Code,
+              color: 'amber',
+              accentBg: 'bg-amber-50',
+              accentText: 'text-amber-700',
+              accentBorder: 'border-amber-200',
+              glowColor: 'amber' as const,
+              badge: 'SKELETON SPEC',
+              fileName: 'structure_prompt.md',
+              desc: 'Tags HTML permitidas e ordem obrigatória das seções do laudo.',
+              settingsKey: 'aiStructurePrompt' as keyof typeof localSettings,
+              defaultVal: DEFAULT_STRUCTURE_PROMPT,
+              mustHave: ['Tags HTML permitidas', 'Ordem das seções (TÉCNICA → OBSERVAÇÕES)', 'Proibição de Markdown'],
+              neverRemove: ['Proibição de Markdown', '<scratchpad> antes do HTML'],
+              safeToAdjust: ['Exemplos de exames', 'Seções opcionais'],
+            },
+            {
+              id: 'rigid' as const,
+              label: 'Regras Rígidas',
+              subtitle: 'Compliance Médico-Legal',
+              icon: ShieldAlert,
+              color: 'rose',
+              accentBg: 'bg-rose-50',
+              accentText: 'text-rose-700',
+              accentBorder: 'border-rose-200',
+              glowColor: 'rose' as const,
+              badge: 'SECURITY GUARDIAN',
+              fileName: 'rigid_rules.md',
+              desc: 'Leis de segurança médico-legal que anulam qualquer outra instrução (R1–R7).',
+              settingsKey: 'aiRigidRules' as keyof typeof localSettings,
+              defaultVal: DEFAULT_RIGID_RULES,
+              mustHave: ['R1 — Anti-invenção', 'R2 — Blindagem histopatológica', 'R6 — Override urgência', 'R7 — OBSERVAÇÕES obrigatórias'],
+              neverRemove: ['R1 (risco clínico)', 'R2 (risco legal)', 'R7 (OBSERVAÇÕES)'],
+              safeToAdjust: ['R6: novos red flags', 'Novas regras de compliance (R9, R10...)'],
+            },
+            {
+              id: 'refinement' as const,
+              label: 'Refinamento',
+              subtitle: 'Regras de Ouro',
+              icon: Sparkles,
+              color: 'violet',
+              accentBg: 'bg-violet-50',
+              accentText: 'text-violet-700',
+              accentBorder: 'border-violet-200',
+              glowColor: 'violet' as const,
+              badge: 'REFINEMENT v16',
+              fileName: 'refinement_golden_rules.md',
+              desc: 'Regras do modo Refine: preservação de dados clínicos, laudo nunca truncado.',
+              settingsKey: 'aiRefinementGoldenRules' as keyof typeof localSettings,
+              defaultVal: DEFAULT_REFINEMENT_GOLDEN_RULES,
+              mustHave: ['Laudo completo (sem "...")', 'Preservação de dados clínicos (INQUEBRÁVEL)', 'Eliminação de placeholders'],
+              neverRemove: ['Preservação de dados clínicos', 'Proibição de truncar'],
+              safeToAdjust: ['Regras específicas de preservação', 'Fraseologia de placeholders'],
+            },
+            {
+              id: 'copilot' as const,
+              label: 'Copiloto',
+              subtitle: 'Override de Protocolo',
+              icon: FlaskConical,
+              color: 'teal',
+              accentBg: 'bg-teal-50',
+              accentText: 'text-teal-700',
+              accentBorder: 'border-teal-200',
+              glowColor: 'teal' as const,
+              badge: 'COPILOT v16',
+              fileName: 'copilot_override.md',
+              desc: 'Formato de saída do Copiloto: === CONVERSA === + === PROPOSTA ===.',
+              settingsKey: 'aiCopilotOverride' as keyof typeof localSettings,
+              defaultVal: DEFAULT_COPILOT_OVERRIDE,
+              mustHave: ['"=== CONVERSA ===" (1 frase)', '"=== PROPOSTA ===" (HTML completo)', 'Integração de calculadoras'],
+              neverRemove: ['"=== CONVERSA ===" e "=== PROPOSTA ===" (o parser depende disso)'],
+              safeToAdjust: ['Instrução da CONVERSA', 'Tipos de calculadoras suportadas'],
+            },
+          ];
 
-                {/* Prompt Sub-Selector Pills */}
-                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-100 border border-slate-200/50 rounded-2xl shrink-0">
-                  <button
-                    onClick={() => setActivePromptSubTab('master')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'master'
-                        ? "bg-white text-indigo-650 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Prompt Mestre
-                  </button>
-                  <button
-                    onClick={() => setActivePromptSubTab('global')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'global'
-                        ? "bg-white text-emerald-650 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Instruções Globais
-                  </button>
-                  <button
-                    onClick={() => setActivePromptSubTab('structure')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'structure'
-                        ? "bg-white text-amber-650 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Skeleton (Estrutura)
-                  </button>
-                  <button
-                    onClick={() => setActivePromptSubTab('rigid')}
-                    className={classNames(
-                      "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                      activePromptSubTab === 'rigid'
-                        ? "bg-white text-rose-650 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    Regras Rígidas
-                  </button>
-                </div>
-              </div>
+          const activeBlock = PROMPT_BLOCKS.find(b => b.id === activePromptSubTab) || PROMPT_BLOCKS[0];
+          const activeValue = (localSettings[activeBlock.settingsKey] as string) || activeBlock.defaultVal;
+          const versions = getPromptVersions(activeBlock.id);
 
-              {activePromptSubTab === 'master' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-indigo-50/50 rounded-2xl text-[11px] text-indigo-900 font-semibold leading-relaxed">
-                    💡 <strong>Prompt Mestre (Doutrina):</strong> Define a personalidade central da IA como radiologista sênior, a cascata tripartite, o mimetismo de estilo e a tradução semântica de notas rápidas.
-                  </div>
-                  <CognitiveCodeEditor readOnly={readOnly}
-                    value={localSettings.aiMasterPrompt || ''}
-                    onChange={(val) => setLocalSettings({ ...localSettings, aiMasterPrompt: val })}
-                    fileName="master_prompt.md"
-                    badge="CENTRAL MASTER DIRECTIVE"
-                    glowColor="brand"
-                    placeholder="Defina o papel principal, tom e escopo da IA..."
-                    onRestore={() => {
-                      setLocalSettings({ ...localSettings, aiMasterPrompt: DEFAULT_MASTER_PROMPT });
-                      showToast('Prompt Mestre restaurado para o padrão', 'info');
-                    }}
-                  />
-                </div>
-              )}
-
-              {activePromptSubTab === 'global' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-emerald-50/50 rounded-2xl text-[11px] text-emerald-950 font-semibold leading-relaxed">
-                    💡 <strong>Instruções Globais (Raciocínio Clínico):</strong> Regula o motor de cognição em 5 fases sequenciais (ancoragem, normalidade habitual, autocalculo e matemática de eixos, etc.) e as regras métricas (1 casa para mm, 2 para cm).
-                  </div>
-                  <CognitiveCodeEditor readOnly={readOnly}
-                    value={localSettings.aiGlobalInstructions || ''}
-                    onChange={(val) => setLocalSettings({ ...localSettings, aiGlobalInstructions: val })}
-                    fileName="global_instructions.md"
-                    badge="GLOBAL REASONING SYSTEM"
-                    glowColor="emerald"
-                    placeholder="Defina as instruções de raciocínio lógico e matemático global..."
-                    onRestore={() => {
-                      setLocalSettings({ ...localSettings, aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS });
-                      showToast('Instruções Globais restauradas para o padrão', 'info');
-                    }}
-                  />
-                </div>
-              )}
-
-              {activePromptSubTab === 'structure' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-amber-50/50 rounded-2xl text-[11px] text-amber-950 font-semibold leading-relaxed">
-                    💡 <strong>Arquitetura Obrigatória (Skeleton):</strong> Define a formatação das tags de marcação HTML e os tópicos obrigatórios (TÍTULO, TÉCNICA, ANÁLISE, CONCLUSÃO, RECOMENDAÇÕES) que protegem a integridade do editor.
-                  </div>
-                  <CognitiveCodeEditor readOnly={readOnly}
-                    value={localSettings.aiStructurePrompt || ''}
-                    onChange={(val) => setLocalSettings({ ...localSettings, aiStructurePrompt: val })}
-                    fileName="structure_prompt.md"
-                    badge="SKELETON CODE SPECIFICATION"
-                    glowColor="amber"
-                    placeholder="Defina as diretrizes obrigatórias de formatação e tags do laudo..."
-                    onRestore={() => {
-                      setLocalSettings({ ...localSettings, aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT });
-                      showToast('Skeleton estrutural restaurado para o padrão', 'info');
-                    }}
-                  />
-                </div>
-              )}
-
-              {activePromptSubTab === 'rigid' && (
-                <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-rose-50/50 rounded-2xl text-[11px] text-rose-950 font-semibold leading-relaxed">
-                    💡 <strong>Regras Rígidas (Compliance & Segurança):</strong> Regras inquebráveis e proibitivas de blindagem médico-legal, tratamento de red flags e urgências clínicas, e proibição absoluta de prescrição de condutas cirúrgicas diretas.
-                  </div>
-                  <CognitiveCodeEditor readOnly={readOnly}
-                    value={localSettings.aiRigidRules || ''}
-                    onChange={(val) => setLocalSettings({ ...localSettings, aiRigidRules: val })}
-                    fileName="rigid_rules.md"
-                    badge="LAUD.IA SECURITY GUARDIAN"
-                    glowColor="rose"
-                    placeholder="Defina as regras restritivas que a IA sob nenhuma hipótese pode violar..."
-                    onRestore={() => {
-                      setLocalSettings({ ...localSettings, aiRigidRules: DEFAULT_RIGID_RULES });
-                      showToast('Regras Rígidas de Segurança restauradas para o padrão', 'info');
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* TAB: TEMPLATES (Prompts por Exame) */}
-        {activeTab === 'templates' && (
-          <div className="bg-white/80 backdrop-blur-md rounded-[2.5rem] border border-ink-100 shadow-xl p-5 sm:p-8 lg:p-10 space-y-8 animate-fade-in">
-            <div className="border-b border-ink-50 pb-6 space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-lg font-black text-ink-900 uppercase tracking-wider">
-                    {templateSubTab === 'exams' ? 'Prompts por Exame (Máscara)' : 'Diretrizes por Área (Especialidade)'}
-                  </h4>
-                  <p className="text-xs text-ink-400 font-semibold uppercase tracking-wider mt-0.5">
-                    {templateSubTab === 'exams'
-                      ? 'Gestão e refinamento das diretrizes específicas aplicadas a cada máscara de laudo'
-                      : 'Defina diretrizes padronizadas herdadas por todos os exames de uma mesma especialidade'}
-                  </p>
-                </div>
-                {!readOnly && (
-                  templateSubTab === 'exams' ? (
-                    selectedTemplateId && (
-                      <button
-                        onClick={handleSaveTemplatePrompt}
-                        disabled={isSavingTemplate}
-                        className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-all flex items-center gap-2"
-                      >
-                        {isSavingTemplate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                        Salvar Prompt do Exame
-                      </button>
-                    )
-                  ) : (
-                    selectedAreaFilter && (
-                      <button
-                        onClick={handleSaveAreaPrompt}
-                        disabled={isSavingTemplate}
-                        className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white shadow-md transition-all flex items-center gap-2"
-                      >
-                        {isSavingTemplate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                        Salvar Diretriz da Área
-                      </button>
-                    )
-                  )
-                )}
-              </div>
-
-              {/* Sub-tab selection: Prompts dos Exames vs Diretriz Base da Área */}
-              <div className="flex gap-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-2xl w-fit">
-                <button
-                  onClick={() => setTemplateSubTab('exams')}
-                  className={classNames(
-                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                    templateSubTab === 'exams'
-                      ? "bg-white text-indigo-650 shadow-sm font-bold"
-                      : "text-slate-500 hover:text-slate-850 font-bold"
-                  )}
-                >
-                  Prompts dos Exames
-                </button>
-                <button
-                  onClick={() => setTemplateSubTab('area')}
-                  className={classNames(
-                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                    templateSubTab === 'area'
-                      ? "bg-white text-indigo-650 shadow-sm font-bold"
-                      : "text-slate-500 hover:text-slate-850 font-bold"
-                  )}
-                >
-                  Diretriz Base da Área
-                </button>
-              </div>
-
-              {/* Template Dropdown Selector */}
-              <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-                <div>
-                  <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Filtrar por Área</label>
-                  <select disabled={readOnly}
-                    value={selectedAreaFilter}
-                    onChange={(e) => {
-                      const area = e.target.value as ExamArea | '';
-                      setSelectedAreaFilter(area);
-                      if (area) {
-                        const areaTemplates = templates.filter(t => t.area === area);
-                        if (areaTemplates.length > 0) {
-                          setSelectedTemplateId(areaTemplates[0].id);
-                        } else {
-                          setSelectedTemplateId('');
-                        }
-                      } else {
-                        setSelectedTemplateId('');
-                      }
-                    }}
-                    className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border"
-                  >
-                    <option value="">Todas as Áreas</option>
-                    {EXAM_AREAS.map(a => (
-                      <option key={a.id} value={a.id}>{a.label}</option>
-                    ))}
-                  </select>
-                </div>
-                {templateSubTab === 'exams' && (
-                  <div>
-                    <label className="text-[10px] font-black text-ink-500 uppercase tracking-widest block mb-2">Selecione o Exame/Máscara</label>
-                    <select
-                      value={selectedTemplateId}
-                      onChange={(e) => setSelectedTemplateId(e.target.value)}
-                      className="w-full rounded-xl border-zinc-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500/50 h-12 px-4 font-bold text-xs uppercase tracking-wider cursor-pointer bg-white border disabled:opacity-50"
-                      disabled={readOnly || (selectedAreaFilter !== '' && templates.filter(t => t.area === selectedAreaFilter).length === 0)}
+          return (
+            <div className="animate-fade-in-up">
+              {/* Pill sub-tab navigator */}
+              <div className="flex items-center gap-1 mb-5 overflow-x-auto pb-1">
+                {PROMPT_BLOCKS.map(block => {
+                  const isActive = activePromptSubTab === block.id;
+                  const colorActiveMap: Record<string, string> = {
+                    indigo: 'bg-indigo-600 text-white',
+                    emerald: 'bg-emerald-600 text-white',
+                    amber: 'bg-amber-500 text-white',
+                    rose: 'bg-rose-600 text-white',
+                    violet: 'bg-violet-600 text-white',
+                    teal: 'bg-teal-600 text-white',
+                  };
+                  return (
+                    <button
+                      key={block.id}
+                      onClick={() => setActivePromptSubTab(block.id)}
+                      className={classNames(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 border',
+                        isActive
+                          ? `${colorActiveMap[block.color]} border-transparent shadow-sm`
+                          : 'text-ink-500 bg-white border-ink-200 hover:border-ink-300 hover:text-ink-700'
+                      )}
                     >
-                      <option value="">Selecione um exame...</option>
-                      {templates
-                        .filter(t => selectedAreaFilter === '' || t.area === selectedAreaFilter)
-                        .map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} {!selectedAreaFilter && `(${EXAM_AREAS.find(a => a.id === t.area)?.label || t.area})`}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
+                      <block.icon size={11} />
+                      {block.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Ações em Lote */}
-              {!readOnly && selectedAreaFilter && templateSubTab === 'exams' && (
+              <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
+                {/* Left: Version history + context doc */}
                 <div className="space-y-3">
-                  <div className="flex flex-col md:flex-row md:items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1">
-                      Ações em lote para a área: {EXAM_AREAS.find(a => a.id === selectedAreaFilter)?.label}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleGenerateAllPrompts}
-                        disabled={isGeneratingAll || isImprovingAll}
-                        className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-black rounded-xl transition-all border uppercase tracking-widest shadow-sm bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
-                      >
-                        {isGeneratingAll ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
-                        Gerar Todos ({templates.filter(t => t.area === selectedAreaFilter).length})
-                      </button>
-                      <button
-                        onClick={() => setShowBatchImprovePanel(!showBatchImprovePanel)}
-                        disabled={isGeneratingAll || isImprovingAll}
-                        className={classNames(
-                          'flex items-center gap-1.5 px-4 py-2 text-[10px] font-black rounded-xl transition-all border uppercase tracking-widest shadow-sm',
-                          showBatchImprovePanel
-                            ? 'bg-violet-600 text-white border-violet-700'
-                            : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100 disabled:opacity-50'
-                        )}
-                      >
-                        {isImprovingAll ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                        Melhorar Todos
-                        {showBatchImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                      </button>
+                  {/* Context doc panel */}
+                  <div className={classNames('rounded-2xl border overflow-hidden', activeBlock.accentBorder)}>
+                    <div className={classNames('px-4 py-3 flex items-center gap-2', activeBlock.accentBg)}>
+                      <activeBlock.icon size={14} className={classNames('shrink-0', activeBlock.accentText)} />
+                      <span className={classNames('text-[11px] font-black uppercase tracking-widest', activeBlock.accentText)}>{activeBlock.label}</span>
+                    </div>
+                    <div className="bg-white p-4 space-y-3">
+                      <p className="text-[11px] text-ink-600 leading-relaxed">{activeBlock.desc}</p>
+                      {/* Must have */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <CheckCircle2 size={11} className="text-emerald-600" />
+                          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Deve conter</span>
+                        </div>
+                        {activeBlock.mustHave?.map((item, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className="text-emerald-500 text-[10px] mt-0.5 shrink-0">✓</span>
+                            <span className="text-[10px] text-ink-600 leading-snug">{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Never remove */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <AlertCircle size={11} className="text-rose-600" />
+                          <span className="text-[9px] font-black text-rose-700 uppercase tracking-widest">NUNCA remover</span>
+                        </div>
+                        {activeBlock.neverRemove?.map((item, i) => (
+                          <div key={i} className="flex items-start gap-1.5">
+                            <span className="text-rose-500 text-[10px] mt-0.5 shrink-0">⚠</span>
+                            <span className="text-[10px] text-ink-600 leading-snug">{item}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Batch AI Improve Panel */}
-                  {showBatchImprovePanel && (
-                    <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
-                      <div className="flex items-center gap-2">
-                        <Sparkles size={16} className="text-violet-600" />
-                        <h5 className="font-black text-violet-900 text-sm">Melhoria em Lote com IA</h5>
+                  {/* Version history */}
+                  {versions.length > 0 && (
+                    <div className="bg-ink-50 border border-ink-200 rounded-2xl p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <History size={11} className="text-ink-400" />
+                        <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">Histórico</span>
+                        <span className="ml-auto text-[9px] text-ink-400">{versions.length} versões</span>
                       </div>
-                      <p className="text-[11px] text-violet-700 leading-relaxed">
-                        A IA analisará e reescreverá todos os prompts desta área para torná-los mais completos e clinicamente precisos. Opcionalmente, descreva o que deseja focar.
-                      </p>
-                      <textarea readOnly={readOnly} disabled={readOnly}
-                        value={templateImprovePrompt}
-                        onChange={(e) => setTemplateImprovePrompt(e.target.value)}
-                        rows={3}
-                        className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
-                        placeholder="Opcional: descreva instruções para todos os exames desta área... (ex: focar em critérios de malignidade)"
-                      />
+                      <div className="space-y-1">
+                        {versions.map((v, i) => (
+                          <button
+                            key={i}
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Restaurar Versão',
+                                message: `Restaurar versão de ${new Date(v.timestamp).toLocaleString('pt-BR')}?`,
+                                confirmLabel: 'Restaurar',
+                                variant: 'warning',
+                              });
+                              if (ok) {
+                                savePromptVersion(activeBlock.id, activeValue);
+                                setLocalSettings(prev => ({ ...prev, [activeBlock.settingsKey]: v.value }));
+                                showToast('Versão restaurada!', 'success');
+                              }
+                            }}
+                            className="w-full flex items-center gap-2 p-2 rounded-xl bg-white border border-ink-200 hover:border-brand-300 hover:bg-brand-50 text-left transition-all group"
+                          >
+                            <RotateCcw size={9} className="text-ink-300 group-hover:text-brand-500 shrink-0" />
+                            <div>
+                              <div className="text-[9px] font-bold text-ink-600">{new Date(v.timestamp).toLocaleString('pt-BR', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                              <div className="text-[8px] text-ink-400 truncate w-36">{v.value.substring(0, 50)}…</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Save block button (context-specific) */}
+                  {!readOnly && (
+                    <button
+                      onClick={async () => {
+                        const currentValue = (localSettings[activeBlock.settingsKey] as string) || '';
+                        savePromptVersion(activeBlock.id, currentValue);
+                        setIsSaving(true);
+                        try {
+                          await updateSettings(localSettings);
+                          showToast(`✓ "${activeBlock.label}" salvo!`, 'success');
+                        } catch { showToast('Erro ao salvar bloco', 'error'); }
+                        finally { setIsSaving(false); }
+                      }}
+                      disabled={isSaving}
+                      className="w-full h-9 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
+                      Salvar Bloco
+                    </button>
+                  )}
+                </div>
+
+                {/* Right: Editor */}
+                <CognitiveCodeEditor
+                  readOnly={readOnly}
+                  value={activeValue}
+                  onChange={(val) => setLocalSettings({ ...localSettings, [activeBlock.settingsKey]: val })}
+                  fileName={activeBlock.fileName}
+                  badge={activeBlock.badge}
+                  glowColor={activeBlock.glowColor}
+                  placeholder={`Defina as diretrizes de ${activeBlock.label}...`}
+                  onRestore={() => {
+                    savePromptVersion(activeBlock.id, activeValue);
+                    setLocalSettings({ ...localSettings, [activeBlock.settingsKey]: activeBlock.defaultVal });
+                    showToast(`${activeBlock.label} restaurado para o padrão`, 'info');
+                  }}
+                />
+              </div>
+
+              {/* Diff Visual Modal */}
+              {pendingDiff && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                  <div className="bg-zinc-950 rounded-3xl border border-zinc-700 shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+                    <div className="flex items-center justify-between p-5 border-b border-zinc-800">
                       <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-violet-600/20 flex items-center justify-center">
+                          <GitCompare size={16} className="text-violet-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-white text-sm">Diff Visual — Melhoria por IA</h4>
+                          <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Bloco: {pendingDiff.block}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            setShowBatchImprovePanel(false);
-                            handleImproveAllPrompts();
+                            const keyMap: Record<string, keyof typeof localSettings> = {
+                              master: 'aiMasterPrompt', global: 'aiGlobalInstructions',
+                              structure: 'aiStructurePrompt', rigid: 'aiRigidRules',
+                              refinement: 'aiRefinementGoldenRules', copilot: 'aiCopilotOverride',
+                            };
+                            const k = keyMap[pendingDiff.block];
+                            if (k) { savePromptVersion(pendingDiff.block, pendingDiff.original); setLocalSettings(prev => ({ ...prev, [k]: pendingDiff.improved })); }
+                            setPendingDiff(null);
+                            showToast('✓ Melhoria aceita!', 'success');
                           }}
-                          disabled={isImprovingAll || isGeneratingAll}
-                          className="btn-primary bg-violet-600 hover:bg-violet-750 border-violet-700 flex items-center gap-2"
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
-                          {isImprovingAll ? (
-                            <><Loader2 size={16} className="animate-spin" /> Processando Lote...</>
-                          ) : (
-                            <><Sparkles size={16} /> Iniciar Melhoria em Lote</>
-                          )}
+                          <CheckSquare size={13} /> Aceitar
                         </button>
-                        <button
-                          onClick={() => { setShowBatchImprovePanel(false); setTemplateImprovePrompt(''); }}
-                          className="text-sm text-violet-500 hover:underline font-medium"
-                        >
-                          Cancelar
+                        <button onClick={() => setPendingDiff(null)} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                          <XCircle size={13} /> Rejeitar
                         </button>
                       </div>
                     </div>
-                  )}
-                  {batchProgress && (
-                    <div className="flex items-center gap-3 p-3 bg-brand-50 border border-brand-200 rounded-xl animate-fade-in">
-                      <Loader2 size={16} className="animate-spin text-brand-600" />
-                      <span className="text-xs font-bold text-brand-700">Processando: {batchProgress.current} de {batchProgress.total}</span>
-                      <div className="flex-1 bg-brand-200/50 h-2 rounded-full overflow-hidden ml-4">
-                        <div className="bg-brand-500 h-full transition-all duration-300" style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }} />
+                    <div className="flex-1 overflow-auto grid grid-cols-2">
+                      <div className="border-r border-zinc-800">
+                        <div className="px-4 py-2 bg-rose-950/30 border-b border-zinc-800 flex items-center gap-2">
+                          <XCircle size={10} className="text-rose-400" />
+                          <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Original</span>
+                        </div>
+                        <pre className="p-5 text-[11px] text-rose-300/80 font-mono whitespace-pre-wrap leading-relaxed">{pendingDiff.original}</pre>
+                      </div>
+                      <div>
+                        <div className="px-4 py-2 bg-emerald-950/30 border-b border-zinc-800 flex items-center gap-2">
+                          <CheckSquare size={10} className="text-emerald-400" />
+                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Melhorado pela IA</span>
+                        </div>
+                        <pre className="p-5 text-[11px] text-emerald-300/80 font-mono whitespace-pre-wrap leading-relaxed">{pendingDiff.improved}</pre>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
+          );
+        })()}
 
-            {templateSubTab === 'exams' ? (
-              selectedTemplateId ? (
-                <div className="space-y-6 pt-4">
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {/* Left side: Code Editor */}
-                    <div className="xl:col-span-2 space-y-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <span className="px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-600 text-[9px] font-black uppercase tracking-wider border border-violet-100 flex items-center gap-1.5 w-fit">
-                            EXAM SPECIFIC DIRECTIVE
-                          </span>
-                          <h5 className="text-sm font-black text-ink-900 mt-2">
-                            Exame: {templates.find(t => t.id === selectedTemplateId)?.name}
-                          </h5>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {!readOnly && (
-                            <>
-                              <button
-                                onClick={handleGenerateTemplatePrompt}
-                                disabled={isGeneratingTemplatePrompt}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-indigo-50 text-indigo-750 border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
-                              >
-                                {isGeneratingTemplatePrompt ? <Loader2 size={12} className="animate-spin" /> : <BrainCircuit size={12} />}
-                                Gerar Prompt
-                              </button>
-                              <button
-                                onClick={() => setShowImprovePanel(!showImprovePanel)}
-                                className={classNames(
-                                  'flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black rounded-xl transition-all border uppercase tracking-widest active:scale-95 shadow-sm bg-white',
-                                  showImprovePanel
-                                    ? 'bg-violet-600 text-white border-violet-700'
-                                    : 'bg-violet-50 text-violet-750 border-violet-200 hover:bg-violet-100'
-                                )}
-                              >
-                                <Sparkles size={12} />
-                                Melhorar com IA
-                                {showImprovePanel ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
+        {/* ══════════════════════════════════
+            TAB: TEMPLATES
+        ══════════════════════════════════ */}
+        {activeTab === 'templates' && (() => {
+          const selectedArea = EXAM_AREAS.find(a => a.id === selectedAreaFilter);
+          const areaTemplates = selectedAreaFilter ? templates.filter(t => t.area === selectedAreaFilter) : [];
+          const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+          const hasCustomAreaPrompt = selectedAreaFilter ? !!(localSettings.aiAreaPrompts?.[selectedAreaFilter as ExamArea]?.trim()) : false;
 
-                      {/* AI Improve Panel */}
-                      {!readOnly && showImprovePanel && (
-                        <div className="p-5 bg-violet-50 border border-violet-200 rounded-2xl space-y-4 animate-fade-in">
-                          <div className="flex items-center gap-2">
-                            <Sparkles size={16} className="text-violet-600" />
-                            <h5 className="font-black text-violet-900 text-sm">Melhoria com IA</h5>
-                          </div>
-                          <p className="text-[11px] text-violet-700 leading-relaxed">
-                            A IA analisará o prompt atual deste exame e o reescreverá de forma mais completa e clinicamente precisa. Opcionalmente, descreva o que deseja melhorar.
-                          </p>
-                          <textarea readOnly={readOnly} disabled={readOnly}
-                            value={templateImprovePrompt}
-                            onChange={(e) => setTemplateImprovePrompt(e.target.value)}
-                            rows={3}
-                            className="w-full rounded-xl border border-violet-200 bg-white text-sm p-3 focus:ring-violet-500 focus:border-violet-500 placeholder-violet-300"
-                            placeholder="Opcional: descreva o que deseja melhorar neste prompt... (ex: adicionar critérios BI-RADS detalhados, focar em condutas específicas...)"
-                          />
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={handleImproveTemplatePrompt}
-                              disabled={isImprovingTemplate}
-                              className="btn-primary bg-violet-600 hover:bg-violet-750 border-violet-700 flex items-center gap-2"
-                            >
-                              {isImprovingTemplate ? (
-                                <><Loader2 size={16} className="animate-spin" /> Melhorando...</>
-                              ) : (
-                                <><Sparkles size={16} /> Melhorar Prompt</>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => { setShowImprovePanel(false); setTemplateImprovePrompt(''); }}
-                              className="text-sm text-violet-500 hover:underline font-semibold"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      )}
+          const areaColors: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+            'medicina-interna':   { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200',   icon: '🫀' },
+            'medicina-fetal':     { bg: 'bg-pink-50',   text: 'text-pink-700',   border: 'border-pink-200',   icon: '🤰' },
+            'ginecologia':        { bg: 'bg-rose-50',   text: 'text-rose-700',   border: 'border-rose-200',   icon: '🌸' },
+            'vascular':           { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    icon: '🩸' },
+            'musculoesqueletico': { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200',  icon: '🦴' },
+            'mastologia':         { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: '🎗️' },
+            'pequenas-partes':    { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200',   icon: '🔬' },
+            'pediatria':          { bg: 'bg-lime-50',   text: 'text-lime-700',   border: 'border-lime-200',   icon: '👶' },
+            'reumatologico':      { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: '🦾' },
+            'procedimentos':      { bg: 'bg-ink-50',    text: 'text-ink-700',    border: 'border-ink-200',    icon: '💉' },
+          };
+          const ac = selectedAreaFilter ? (areaColors[selectedAreaFilter] || areaColors['medicina-interna']) : null;
 
-                      <div className="w-full">
-                        <CognitiveCodeEditor readOnly={readOnly}
-                          value={editingTemplatePrompt}
-                          onChange={(v) => setEditingTemplatePrompt(v)}
-                          fileName={`${(templates.find(t => t.id === selectedTemplateId)?.name || '').toLowerCase().replace(/\s+/g, '_')}_prompt.md`}
-                          badge="EXAM SPECIFIC DIRECTIVE"
-                          glowColor="violet"
-                          placeholder="Digite as instruções e diretrizes clínicas específicas para este exame..."
-                        />
-                      </div>
-                    </div>
-
-                    {/* Right side: Assistant Panel */}
-                    <div>
-                      <div className="bg-zinc-50 border border-zinc-200 rounded-[2rem] p-6 space-y-6 shadow-sm">
-                        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
-                          <Sparkles size={16} className="text-violet-600" />
-                          <h5 className="font-black text-zinc-900 text-sm">Assistente de Prompt</h5>
-                        </div>
-                        
-                        {/* Checklist */}
-                        <div className="space-y-3">
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Checklist de Qualidade</span>
-                          <ul className="space-y-2 text-xs text-zinc-650 font-semibold leading-relaxed font-semibold">
-                            <li className="flex items-start gap-2">
-                              <CheckCircle2 size={13} className="text-emerald-500 mt-0.5 shrink-0" />
-                              <span>Instruir normalidade para placeholders <code>(...)</code> não preenchidos.</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <CheckCircle2 size={13} className="text-emerald-500 mt-0.5 shrink-0" />
-                              <span>Garantir correlação direta: Análise &rarr; Conclusão &rarr; Recomendação.</span>
-                            </li>
-                            {templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('tireoide') && (
-                              <li className="flex items-start gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-805 border border-amber-100 animate-fade-in font-semibold">
-                                <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
-                                <span>Dica: Use critérios TI-RADS e injeção de volumes de nódulos.</span>
-                              </li>
-                            )}
-                            {templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('mama') && (
-                              <li className="flex items-start gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-805 border border-amber-100 animate-fade-in font-semibold">
-                                <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
-                                <span>Dica: Use classificação BI-RADS e descrição morfológica do CBR.</span>
-                              </li>
-                            )}
-                            {(templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('obstetr') || 
-                              templates.find(t => t.id === selectedTemplateId)?.name.toLowerCase().includes('fetal')) && (
-                              <li className="flex items-start gap-2 p-2.5 bg-amber-50 rounded-xl text-amber-805 border border-amber-100 animate-fade-in font-semibold">
-                                <AlertCircle size={13} className="text-amber-500 mt-0.5 shrink-0" />
-                                <span>Dica: Prever cálculo de IG, DDP por DUM e regras de Diástole Zero.</span>
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                        
-                        {/* Injeção de Diretrizes / Padronização */}
-                        <div className="space-y-3">
-                          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block font-mono">Injetar Diretrizes Clínicas</span>
-                          <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-1 font-semibold">
-                            {[
-                              { 
-                                label: 'Fórmula Volume (Elipsoide)', 
-                                text: '- Cálculo de volume de estruturas tridimensionais (cistos, nódulos, tireoide, próstata, útero): utilize a fórmula do elipsoide: Diâmetro1 x Diâmetro2 x Diâmetro3 x 0,523. SEMPRE converta as medidas de milímetros (mm) para centímetros (cm) dividindo por 10 antes de computar o volume final.' 
-                              },
-                              { 
-                                label: 'Regras TI-RADS (Tireoide)', 
-                                text: '- Classificação TI-RADS (ACR): para cada nódulo tireoidiano descrito, classifique-o segundo a pontuação de composição, ecogenicidade, formato, margem e focos ecogênicos. Declare a pontuação total e a categoria TI-RADS (TR1 a TR5) com a recomendação de seguimento ou punção (PAAF).' 
-                              },
-                              { 
-                                label: 'Classificação BI-RADS (Mama)', 
-                                text: '- Classificação BI-RADS: descreva detalhadamente os nódulos mamários (forma, orientação, margem, limite, ecotextura, achados acústicos posteriores). Atribua uma categoria final de classificação (BI-RADS 1 a 6) e determine a conduta (controle, mamografia digital complementar, ultrassonografia, ou core biopsy).' 
-                              },
-                              { 
-                                label: 'Regras Simples IOTA (Ovário)', 
-                                text: '- Regras Simples IOTA (International Ovarian Tumor Analysis): ao identificar massas ou cistos anexiais, classifique-os em Benigno (regras B) ou Maligno (regras M) e declare se a massa é classificável ou indeterminada pelas Regras Simples.' 
-                              },
-                              { 
-                                label: 'Urgência Médica / Alerta (R9)', 
-                                text: '- Situação de Emergência Médica (Alerta): em caso de achados de gravidade imediata (ex: diástole zero ou reversa nas artérias uterinas/umbilical, descolamento prematuro de placenta, sofrimento fetal agudo, gestação ectópica rota), inclua obrigatoriamente um bullet destacado nas RECOMENDAÇÕES com "ALERTA OBSTÉTRICO: recomenda-se encaminhamento imediato para serviço de urgência/emergência obstétrica devido a...".' 
-                              },
-                              { 
-                                label: 'Normalidade Qualitativa', 
-                                text: '- Redação Qualitativa: se alguma estrutura não for explicitamente citada nas notas do exame, adote redação qualitativa padrão de normalidade (ex: "de aspecto anatômico preservado", "com contornos regulares e ecotextura homogênea"). Nunca invente medidas numéricas fictícias.' 
-                              }
-                            ].map((item) => (
-                              <button
-                                key={item.label}
-                                type="button"
-                                onClick={() => handleInjectDirective(item.text)}
-                                className="text-left px-3 py-2 bg-white hover:bg-violet-50 text-zinc-700 hover:text-violet-750 border border-zinc-200 rounded-xl text-[11px] font-semibold transition-all flex items-center justify-between group shadow-sm active:scale-95 animate-fade-in"
-                              >
-                                <span>{item.label}</span>
-                                <Zap size={11} className="text-zinc-400 group-hover:text-violet-500 shrink-0 ml-2" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 🔬 Playground de Teste Rápido */}
-                  {renderPlayground()}
+          return (
+            <div className="animate-fade-in">
+              {/* Cascata visual - compact */}
+              <div className="mb-5 bg-ink-900 rounded-xl p-3 flex items-center gap-2 overflow-hidden">
+                <div className="flex-1 text-center px-2 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30">
+                  <div className="text-[8px] font-black text-indigo-300 uppercase tracking-widest">Camada 1</div>
+                  <div className="text-[10px] font-black text-indigo-100">Doutrina Universal</div>
                 </div>
-              ) : (
-                <div className="p-8 text-center border border-dashed border-ink-200 rounded-3xl text-ink-400 font-semibold">
-                  Nenhum exame cadastrado ou selecionado.
+                <div className="text-indigo-500 font-black shrink-0">→</div>
+                <div className={classNames('flex-1 text-center px-2 py-1.5 rounded-lg border transition-all',
+                  selectedAreaFilter && ac ? `bg-emerald-500/20 border-emerald-500/40` : 'bg-emerald-600/10 border-emerald-500/20 opacity-60'
+                )}>
+                  <div className="text-[8px] font-black text-emerald-300 uppercase tracking-widest">Camada 2</div>
+                  <div className="text-[10px] font-black text-emerald-100">{selectedArea ? selectedArea.label : 'Área'}</div>
                 </div>
-              )
-            ) : (
-              selectedAreaFilter ? (
-                <div className="space-y-6 pt-4">
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {/* Left side: Area Code Editor */}
-                    <div className="xl:col-span-2 space-y-4">
-                      <div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600 text-[9px] font-black uppercase tracking-wider border border-brand-100 flex items-center gap-1.5 w-fit font-bold">
-                          AREA LEVEL DIRECTIVE
-                        </span>
-                        <h5 className="text-sm font-black text-ink-900 mt-2">
-                          Área: {EXAM_AREAS.find(a => a.id === selectedAreaFilter)?.label}
-                        </h5>
-                      </div>
-                      
-                      <div className="w-full">
-                        <CognitiveCodeEditor readOnly={readOnly}
-                          value={editingAreaPrompt}
-                          onChange={(v) => setEditingAreaPrompt(v)}
-                          fileName={`${selectedAreaFilter.replace(/\s+/g, '_')}_area_prompt.md`}
-                          badge="AREA LEVEL DIRECTIVE"
-                          glowColor="brand"
-                          placeholder="Digite as diretrizes e regras clínicas gerais compartilhadas por todos os exames desta especialidade..."
-                        />
-                      </div>
-                    </div>
-
-                    {/* Right side: Area Info / Assistant */}
-                    <div>
-                      <div className="bg-zinc-50 border border-zinc-200 rounded-[2rem] p-6 space-y-6 shadow-sm">
-                        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
-                          <Sparkles size={16} className="text-brand-600" />
-                          <h5 className="font-black text-zinc-900 text-sm">Padronização da Área</h5>
-                        </div>
-                        <p className="text-xs text-zinc-650 leading-relaxed font-semibold">
-                          As diretrizes escritas aqui serão herdadas automaticamente por todos os exames da área <strong>{EXAM_AREAS.find(a => a.id === selectedAreaFilter)?.label}</strong>.
-                        </p>
-                        <div className="p-4 bg-indigo-50/50 border border-indigo-100/50 rounded-2xl text-xs text-indigo-950 font-semibold leading-relaxed">
-                          💡 <strong>Dica de Organização:</strong>
-                          <ul className="list-disc list-inside mt-2 space-y-1.5 text-indigo-900">
-                            <li>Defina regras de formatação comuns para todos os laudos desta especialidade.</li>
-                            <li>Escreva fórmulas e tabelas que múltiplos exames utilizam (ex: doppler vascular, biometrias).</li>
-                            <li>Insira termos específicos preferidos pelos médicos desta área.</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Playground */}
-                  {selectedTemplateId ? (
-                    renderPlayground()
-                  ) : (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-850 font-semibold">
-                      Adicione pelo menos um exame/máscara a esta área para habilitar o Playground de simulação.
-                    </div>
-                  )}
+                <div className="text-indigo-500 font-black shrink-0">→</div>
+                <div className={classNames('flex-1 text-center px-2 py-1.5 rounded-lg border',
+                  selectedTemplate ? 'bg-violet-600/20 border-violet-500/40' : 'bg-violet-600/10 border-violet-500/20 opacity-40'
+                )}>
+                  <div className="text-[8px] font-black text-violet-300 uppercase tracking-widest">Camada 3</div>
+                  <div className="text-[10px] font-black text-violet-100">{selectedTemplate ? selectedTemplate.name : 'Exame'}</div>
                 </div>
-              ) : (
-                <div className="p-8 text-center border border-dashed border-ink-200 rounded-3xl text-ink-400 font-semibold">
-                  Selecione uma área no menu superior para começar a editar as diretrizes da especialidade.
-                </div>
-              )
-            )}
-          </div>
-        )}
+              </div>
 
-        {/* ═══ TAB: ENGINE ═══ */}
-        {activeTab === 'engine' && (
-          <div className="max-w-3xl space-y-6 animate-fade-in">
-            <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-5 sm:p-8">
-              <h4 className="text-lg font-black text-ink-900 mb-6 flex items-center gap-3">
-                <Sliders size={24} className="text-brand-600" /> Configurações do Motor
-              </h4>
-
-              <div className="space-y-8">
-                <div>
-                  <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Provedor de Inteligência Artificial</label>
-                  <select
-                    value={localSettings.aiProvider || 'gemini'}
-                    onChange={(e) => setLocalSettings({ ...localSettings, aiProvider: e.target.value as 'gemini' | 'anthropic' })}
-                    className="input h-14"
-                  >
-                    <option value="gemini">Google Gemini (Modelos 2.5+)</option>
-                    <option value="anthropic">Anthropic Claude (Modelos Claude 3.5 / 3.7 / 4)</option>
-                  </select>
-                </div>
-
-                {(localSettings.aiProvider === 'gemini' || !localSettings.aiProvider) ? (
-                  <>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Gemini API Key</label>
-                      <div className="flex gap-3">
-                        <input
-                          type="password"
-                          value={localSettings.geminiApiKey || ''}
-                          onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
-                          placeholder="AIzaSy..."
-                          className="input flex-1 font-mono text-sm h-14"
-                        />
-                        <button onClick={testConnection}
-                          disabled={testStatus === 'testing'}
-                          className={classNames(
-                            'w-14 h-14 flex items-center justify-center rounded-xl transition-all border',
-                            testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                              testStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
-                                'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
-                          )}
-                        >
-                          {testStatus === 'testing' ? <Loader2 size={20} className="animate-spin" /> :
-                            testStatus === 'success' ? <CheckCircle2 size={20} /> :
-                              testStatus === 'error' ? <AlertCircle size={20} /> : <Zap size={20} />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-ink-400 mt-2 ml-1">Obtenha em <span className="font-bold text-brand-600">aistudio.google.com/apikey</span></p>
-                    </div>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Gemini Principal</label>
-                      <select
-                        value={localSettings.geminiModel || 'gemini-3.5-flash'}
-                        onChange={(e) => setLocalSettings({ ...localSettings, geminiModel: e.target.value })}
-                        className="input h-14"
-                      >
-                        <option value="gemini-3.5-flash">GEMINI 3.5 FLASH (Recomendado)</option>
-                        <option value="gemini-3.1-pro-preview">GEMINI 3.1 PRO (Mais Inteligente)</option>
-                      </select>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        {[
-                          { model: 'gemini-3.5-flash', label: '3.5 FLASH', desc: 'Velocidade e Precisão', color: 'brand' },
-                          { model: 'gemini-3.1-pro-preview', label: '3.1 PRO', desc: 'Raciocínio Clínico', color: 'violet' },
-                        ].map(m => (
-                          <button
-                            key={m.model}
-                            onClick={() => setLocalSettings({ ...localSettings, geminiModel: m.model })}
-                            className={classNames(
-                              'p-3 rounded-2xl border text-left transition-all',
-                              (localSettings.geminiModel || 'gemini-3.5-flash') === m.model
-                                ? 'bg-brand-50 border-brand-300 text-brand-800'
-                                : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
-                            )}
-                          >
-                            <span className="text-[10px] font-black uppercase tracking-widest block">{m.label}</span>
-                            <span className="text-[9px] text-ink-500 mt-0.5 block">{m.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Anthropic Claude API Key</label>
-                      <div className="flex gap-3">
-                        <input
-                          type="password"
-                          value={localSettings.anthropicApiKey || ''}
-                          onChange={(e) => setLocalSettings({ ...localSettings, anthropicApiKey: e.target.value })}
-                          placeholder="sk-ant-..."
-                          className="input flex-1 font-mono text-sm h-14"
-                        />
-                        <button onClick={testConnection}
-                          disabled={testStatus === 'testing'}
-                          className={classNames(
-                            'w-14 h-14 flex items-center justify-center rounded-xl transition-all border',
-                            testStatus === 'success' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                              testStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
-                                'bg-ink-50 text-ink-600 border-ink-200 hover:bg-ink-100'
-                          )}
-                        >
-                          {testStatus === 'testing' ? <Loader2 size={20} className="animate-spin" /> :
-                            testStatus === 'success' ? <CheckCircle2 size={20} /> :
-                              testStatus === 'error' ? <AlertCircle size={20} /> : <Zap size={20} />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-ink-400 mt-2 ml-1">Obtenha em <span className="font-bold text-brand-600">console.anthropic.com</span></p>
-                    </div>
-                    <div>
-                      <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Modelo Claude Principal</label>
-                      <select
-                        value={localSettings.anthropicModel || 'claude-3-5-sonnet-latest'}
-                        onChange={(e) => setLocalSettings({ ...localSettings, anthropicModel: e.target.value })}
-                        className="input h-14"
-                      >
-                        <optgroup label="Claude 3.7">
-                          <option value="claude-3-7-sonnet-latest">Claude 3.7 Sonnet — Thinking Mode</option>
-                        </optgroup>
-                        <optgroup label="Claude 3.5">
-                          <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet — Alta Qualidade</option>
-                          <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku — Mais Rápido</option>
-                        </optgroup>
-                      </select>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        {[
-                          { model: 'claude-3-5-sonnet-latest', label: '3.5 Sonnet', desc: 'Recomendado', color: 'brand' },
-                          { model: 'claude-3-7-sonnet-latest', label: '3.7 Sonnet', desc: 'Raciocínio', color: 'amber' },
-                        ].map(m => (
-                          <button
-                            key={m.model}
-                            onClick={() => setLocalSettings({ ...localSettings, anthropicModel: m.model })}
-                            className={classNames(
-                              'p-3 rounded-2xl border text-left transition-all',
-                              (localSettings.anthropicModel || 'claude-3-5-sonnet-latest') === m.model
-                                ? 'bg-brand-50 border-brand-300 text-brand-800'
-                                : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
-                            )}
-                          >
-                            <span className="text-[10px] font-black uppercase tracking-widest block">{m.label}</span>
-                            <span className="text-[9px] text-ink-500 mt-0.5 block">{m.desc}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="pt-6 border-t border-ink-100">
-                  <label className="block text-sm font-bold text-ink-700 mb-6 flex items-center justify-between">
-                    Temperatura (Criatividade)
-                    <span className="text-brand-600 text-xl font-black">{localSettings.aiTemperature ?? 0.3}</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={localSettings.aiTemperature ?? 0.3}
-                    onChange={(e) => setLocalSettings({ ...localSettings, aiTemperature: parseFloat(e.target.value) })}
-                    className="w-full h-3 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-brand-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-ink-400 font-bold uppercase mt-3 tracking-widest">
-                    <span>Literal / Preciso</span>
-                    <span>Criativo / Fluído</span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    {[
-                      { val: 0.1, label: 'Clínico', desc: 'Máxima fidelidade' },
-                      { val: 0.3, label: 'Balanceado', desc: 'Recomendado' },
-                      { val: 0.7, label: 'Criativo', desc: 'Estilo pessoal' },
-                    ].map(t => (
+              <div className="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-5 items-start">
+                {/* LEFT: Area list */}
+                <div className="space-y-2.5">
+                  {/* Sub-tab pills */}
+                  <div className="flex gap-1 p-1 bg-ink-100 border border-ink-200/50 rounded-xl">
+                    {(['area', 'exams'] as const).map(t => (
                       <button
-                        key={t.val}
-                        onClick={() => setLocalSettings({ ...localSettings, aiTemperature: t.val })}
+                        key={t}
+                        onClick={() => setTemplateSubTab(t)}
                         className={classNames(
-                          'p-3 rounded-2xl border text-center transition-all',
-                          (localSettings.aiTemperature ?? 0.3) === t.val
-                            ? 'bg-brand-50 border-brand-300 text-brand-800'
-                            : 'bg-ink-50 border-ink-100 text-ink-600 hover:border-brand-200'
+                          "flex-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                          templateSubTab === t ? "bg-white text-ink-800 shadow-sm" : "text-ink-500 hover:text-ink-700"
                         )}
                       >
-                        <span className="text-[11px] font-black block">{t.label}</span>
-                        <span className="text-[9px] text-ink-400 block">{t.desc}</span>
-                        <span className="text-[10px] font-black text-brand-600 block mt-0.5">{t.val}</span>
+                        {t === 'area' ? 'Por Área' : 'Por Exame'}
                       </button>
                     ))}
                   </div>
+
+                  {/* Area list */}
+                  <div className="space-y-1">
+                    {EXAM_AREAS.map(area => {
+                      const count = templates.filter(t => t.area === area.id).length;
+                      const isActive = selectedAreaFilter === area.id;
+                      const hasCustom = !!(localSettings.aiAreaPrompts?.[area.id as ExamArea]?.trim());
+                      const colors = areaColors[area.id] || areaColors['medicina-interna'];
+                      return (
+                        <button
+                          key={area.id}
+                          onClick={() => {
+                            setSelectedAreaFilter(area.id as ExamArea);
+                            const first = templates.filter(t => t.area === area.id)[0];
+                            setSelectedTemplateId(first ? first.id : '');
+                          }}
+                          className={classNames(
+                            'w-full text-left px-3 py-2.5 rounded-xl border transition-all duration-200 group',
+                            isActive ? `${colors.bg} ${colors.border}` : 'bg-white border-ink-100 hover:border-ink-200'
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-sm shrink-0">{colors.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className={classNames('text-[11px] font-black truncate', isActive ? colors.text : 'text-ink-700')}>
+                                  {area.label}
+                                </span>
+                                {hasCustom && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Customizada" />}
+                              </div>
+                              <div className={classNames('text-[9px]', isActive ? `${colors.text} opacity-70` : 'text-ink-400')}>
+                                {count} {count === 1 ? 'exame' : 'exames'}
+                              </div>
+                            </div>
+                            {isActive && <ChevronRight size={11} className={colors.text} />}
+                          </div>
+
+                          {/* Exam sub-list */}
+                          {isActive && templateSubTab === 'exams' && count > 0 && (
+                            <div className="mt-2 space-y-0.5 border-t border-current/10 pt-2">
+                              {templates.filter(t => t.area === area.id).map(t => {
+                                const isExamActive = selectedTemplateId === t.id;
+                                const hasInstructions = !!(t.aiInstructions?.trim());
+                                return (
+                                  <button
+                                    key={t.id}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedTemplateId(t.id); }}
+                                    className={classNames(
+                                      'w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-2',
+                                      isExamActive ? 'bg-white shadow-sm text-ink-900' : `${colors.text} opacity-70 hover:opacity-100`
+                                    )}
+                                  >
+                                    <span className="shrink-0">{isExamActive ? '▶' : '○'}</span>
+                                    <span className="flex-1 truncate">{t.name}</span>
+                                    {hasInstructions && <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="px-3 py-2 bg-ink-50 rounded-xl border border-ink-100 text-center">
+                    <span className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Total: </span>
+                    <span className="text-[10px] font-black text-ink-700">{templates.length} exames</span>
+                  </div>
                 </div>
 
-                <div className="pt-6 border-t border-ink-100 flex items-center justify-between">
+                {/* RIGHT: Content */}
+                {selectedAreaFilter && ac ? (
+                  <div className="space-y-4 min-w-0">
+
+                    {/* ── Sub-tab: ÁREA */}
+                    {templateSubTab === 'area' && (
+                      <div className="space-y-4 animate-fade-in-up">
+                        <div className={classNames('rounded-2xl border overflow-hidden', ac.border)}>
+                          <div className={classNames('px-4 py-3 flex items-center justify-between gap-2', ac.bg)}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{areaColors[selectedAreaFilter]?.icon}</span>
+                              <div>
+                                <span className={classNames('text-[11px] font-black uppercase tracking-widest', ac.text)}>{selectedArea?.label}</span>
+                                <span className="text-[10px] text-ink-400 ml-2">— Camada 2</span>
+                              </div>
+                            </div>
+                            {!readOnly && (
+                              <div className="flex items-center gap-1.5">
+                                {hasCustomAreaPrompt && (
+                                  <button
+                                    onClick={handleRestoreAreaPromptDefault}
+                                    className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-all"
+                                  >
+                                    <RotateCcw size={9} />
+                                    V2.0
+                                  </button>
+                                )}
+                                <button
+                                  onClick={handleSaveAreaPrompt}
+                                  disabled={isSavingTemplate}
+                                  className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-black rounded-lg uppercase tracking-widest bg-brand-600 hover:bg-brand-700 text-white transition-all disabled:opacity-50"
+                                >
+                                  {isSavingTemplate ? <Loader2 size={9} className="animate-spin" /> : <Save size={9} />}
+                                  Salvar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="bg-white p-4">
+                            <p className="text-[11px] text-ink-600 leading-relaxed mb-3">
+                              Diretrizes herdadas por <strong>todos os exames de {selectedArea?.label}</strong>.
+                              {hasCustomAreaPrompt ? ' ✓ Customizada.' : ' Usando padrão do sistema.'}
+                            </p>
+                            {areaTemplates.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {areaTemplates.map(t => (
+                                  <button
+                                    key={t.id}
+                                    onClick={() => { setTemplateSubTab('exams'); setSelectedTemplateId(t.id); }}
+                                    className={classNames('px-2.5 py-1 rounded-lg text-[9px] font-bold border transition-all hover:shadow-sm', ac.bg, ac.border, ac.text)}
+                                  >
+                                    {t.name}
+                                    {t.aiInstructions?.trim() && <span className="ml-1 w-1 h-1 rounded-full bg-violet-400 inline-block" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <CognitiveCodeEditor
+                          readOnly={readOnly}
+                          value={editingAreaPrompt}
+                          onChange={(v) => setEditingAreaPrompt(v)}
+                          fileName={`${selectedAreaFilter.replace(/\s+/g, '_')}_area_directive.md`}
+                          badge="AREA LEVEL — CAMADA 2"
+                          glowColor="brand"
+                          placeholder={`Diretrizes gerais para todos os exames de ${selectedArea?.label}...`}
+                          onRestore={hasCustomAreaPrompt ? handleRestoreAreaPromptDefault : undefined}
+                        />
+                      </div>
+                    )}
+
+                    {/* ── Sub-tab: EXAMES */}
+                    {templateSubTab === 'exams' && (
+                      <div className="space-y-4 animate-fade-in-up">
+                        {selectedTemplateId && selectedTemplate ? (
+                          <>
+                            {/* Exam header with actions */}
+                            <div className="rounded-2xl border border-violet-200 overflow-hidden">
+                              <div className="px-4 py-3 flex items-center justify-between gap-2 bg-violet-50">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText size={13} className="text-violet-600 shrink-0" />
+                                  <div className="min-w-0">
+                                    <span className="text-[11px] font-black text-violet-700 uppercase tracking-widest truncate block">{selectedTemplate.name}</span>
+                                    <span className="text-[9px] text-ink-400">Camada 3 · Prompt Específico</span>
+                                  </div>
+                                </div>
+                                {!readOnly && (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      onClick={handleRestoreExamPromptFromBackup}
+                                      className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-all"
+                                      title="Recuperar backup"
+                                    >
+                                      <RotateCcw size={9} />
+                                      Backup
+                                    </button>
+                                    <button
+                                      onClick={handleClearExamPrompt}
+                                      className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-widest bg-red-50 text-red-600 border-red-200 hover:bg-red-100 transition-all"
+                                      title="Limpar instruções"
+                                    >
+                                      <Trash2 size={9} />
+                                      Limpar
+                                    </button>
+                                    <button
+                                      onClick={handleSaveTemplatePrompt}
+                                      disabled={isSavingTemplate}
+                                      className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-black rounded-lg uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white transition-all disabled:opacity-50"
+                                    >
+                                      {isSavingTemplate ? <Loader2 size={9} className="animate-spin" /> : <Save size={9} />}
+                                      Salvar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="bg-white p-4">
+                                <p className="text-[11px] text-ink-600 leading-relaxed mb-3">
+                                  Instruções <strong>exclusivas</strong> deste exame: fraseologia de RECOMENDAÇÕES, biometria, classificações específicas.
+                                </p>
+                                {/* Quick inject directives */}
+                                <div>
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <Zap size={11} className="text-violet-600" />
+                                    <span className="text-[9px] font-black text-violet-700 uppercase tracking-widest">Injetar diretiva rápida</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                      { label: 'Elipsoide', text: '- Calcule o volume pelo elipsoide: D1 × D2 × D3 × 0,523. Converta mm→cm antes.' },
+                                      { label: 'TI-RADS', text: '- Classifique nódulos tireoidianos pelo TI-RADS ACR 2017. Declare pontuação e categoria TR1–TR5.' },
+                                      { label: 'BI-RADS', text: '- Classifique lesões mamárias pelo BI-RADS ACR 2013. Atribua categoria 0–6.' },
+                                      { label: 'O-RADS', text: '- Classifique cistos/massas ovarianas pelo O-RADS ACR 2022. Declare categoria 1–5.' },
+                                      { label: 'Urgência R6', text: '- Em achado de urgência, inicie RECOMENDAÇÕES com: <p>• <strong>ALERTA [CATEGORIA]:</strong> encaminhamento imediato.</p>' },
+                                    ].map((item) => (
+                                      <button
+                                        key={item.label}
+                                        type="button"
+                                        onClick={() => handleInjectDirective(item.text)}
+                                        className="px-2.5 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded-lg text-[9px] font-bold transition-all flex items-center gap-1 active:scale-95"
+                                      >
+                                        {item.label}
+                                        <Zap size={8} className="text-violet-400" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <CognitiveCodeEditor
+                              readOnly={readOnly}
+                              value={editingTemplatePrompt}
+                              onChange={(v) => setEditingTemplatePrompt(v)}
+                              fileName={`${(selectedTemplate.name || '').toLowerCase().replace(/\s+/g, '_')}_exam_directive.md`}
+                              badge="EXAM DIRECTIVE — CAMADA 3"
+                              glowColor="violet"
+                              placeholder={`Instruções específicas para "${selectedTemplate.name}"...`}
+                            />
+
+                            {/* Playground */}
+                            {renderPlayground()}
+                          </>
+                        ) : (
+                          <div className="p-10 text-center border-2 border-dashed border-ink-200 rounded-3xl">
+                            <LayoutList size={32} className="text-ink-300 mx-auto mb-3" />
+                            <p className="text-sm font-bold text-ink-400">
+                              {areaTemplates.length > 0 ? 'Selecione um exame na sidebar.' : `Nenhum exame em ${selectedArea?.label}.`}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-10 text-center border-2 border-dashed border-ink-200 rounded-3xl">
+                    <LayoutList size={32} className="text-ink-300 mx-auto mb-3" />
+                    <p className="text-sm font-bold text-ink-400">Selecione uma especialidade para começar.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ══════════════════════════════════
+            TAB: ENGINE
+        ══════════════════════════════════ */}
+        {activeTab === 'engine' && (
+          <div className="max-w-4xl space-y-5 animate-fade-in">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+              {/* Left: API Keys */}
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4">
+                <h4 className="text-sm font-black text-ink-900 flex items-center gap-2">
+                  <Key size={15} className="text-brand-600" /> Chaves de API Globais
+                </h4>
+                
+                <div>
+                  <label className="label text-ink-600 uppercase tracking-widest text-[10px] mb-2">Gemini API Key</label>
+                  <input
+                    type="password"
+                    disabled={readOnly}
+                    value={localSettings.geminiApiKey || ''}
+                    onChange={(e) => setLocalSettings({ ...localSettings, geminiApiKey: e.target.value })}
+                    placeholder="AIzaSy..."
+                    className="input font-mono text-sm h-12"
+                  />
+                  <p className="text-[10px] text-ink-400 mt-1.5 ml-1">Obtenha em <span className="font-bold text-brand-600">aistudio.google.com/apikey</span></p>
+                </div>
+
+                {!readOnly && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={testConnection}
+                      disabled={testStatus === 'testing'}
+                      className={classNames('flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all border',
+                        testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        testStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                        testStatus === 'testing' ? 'bg-brand-50 text-brand-600 border-brand-200' :
+                        'bg-ink-50 text-ink-700 border-ink-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200'
+                      )}
+                    >
+                      {testStatus === 'testing' ? (<><Loader2 size={12} className="animate-spin" /> Testando...</>) :
+                       testStatus === 'success' ? (<><CheckCircle2 size={12} /> Conexão OK!</>) :
+                       testStatus === 'error' ? (<><AlertCircle size={12} /> Falha</>) :
+                       (<><Zap size={12} /> Testar Conexão</>)}
+                    </button>
+                    {testStatus !== 'idle' && (
+                      <button 
+                        type="button"
+                        onClick={() => setTestStatus('idle')} 
+                        className="text-xs text-ink-400 hover:text-ink-600 font-bold"
+                      >
+                        Resetar
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">
+                  <span className="font-black">Motor Único: Google Gemini</span><br/>
+                  <span className="text-[10px] text-blue-600">Lite = gemini-3.5-flash · Pro = gemini-3.1-pro-preview</span>
+                </div>
+              </div>
+
+              {/* Right: Auto Refine and Fast Mode */}
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4">
+                <h4 className="text-sm font-black text-ink-900 flex items-center gap-2">
+                  <SlidersHorizontal size={15} className="text-brand-600" /> Parâmetros Adicionais
+                </h4>
+
+                {/* Auto Refine */}
+                <div className="p-3 bg-ink-50/50 border border-ink-100 rounded-xl flex items-center justify-between gap-3">
                   <div>
-                    <label className="block text-sm font-bold text-ink-700 mb-1">
-                      Refinador Automático (Copiloto)
-                    </label>
-                    <p className="text-[11px] text-ink-500 max-w-md leading-relaxed">
-                      Se ativado, o LAUD.IA executará um ciclo extra de higienização cirúrgica no laudo logo após integrar propostas do Copiloto, garantindo conformidade com a máscara.
-                    </p>
+                    <div className="text-xs font-black text-ink-900">Refinador Automático</div>
+                    <p className="text-[9px] text-ink-400 mt-0.5">Ciclo extra de higienização após propostas do Copiloto.</p>
                   </div>
                   <button
+                    disabled={readOnly}
                     onClick={() => setLocalSettings({ ...localSettings, aiAutoRefineEnabled: !localSettings.aiAutoRefineEnabled })}
-
-                    className={classNames(
-                      'relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50',
+                    className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
                       localSettings.aiAutoRefineEnabled ? 'bg-brand-600' : 'bg-ink-200'
                     )}
                   >
-                    <span className={classNames(
-                      'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                    <span className={classNames('pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
                       localSettings.aiAutoRefineEnabled ? 'translate-x-5' : 'translate-x-0'
                     )} />
                   </button>
                 </div>
+
+                {/* Fast Mode */}
+                <div className="p-3 bg-ink-50/50 border border-ink-100 rounded-xl flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-black text-ink-900">Modo Rápido (Sem Raciocínio)</div>
+                    <p className="text-[9px] text-ink-400 mt-0.5">Ignora a auto-auditoria/scratchpad do modelo para obter laudos mais rapidamente.</p>
+                  </div>
+                  <button
+                    disabled={readOnly}
+                    onClick={() => setLocalSettings({ ...localSettings, aiFastMode: !localSettings.aiFastMode })}
+                    className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
+                      localSettings.aiFastMode ? 'bg-brand-600' : 'bg-ink-200'
+                    )}
+                  >
+                    <span className={classNames('pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
+                      localSettings.aiFastMode ? 'translate-x-5' : 'translate-x-0'
+                    )} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Tiers de Motores */}
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-6 col-span-1 xl:col-span-2">
+                <h4 className="text-sm font-black text-ink-900 flex items-center gap-2">
+                  <Cpu size={15} className="text-brand-600" /> Tiers de Motores de IA (Lite e Pro)
+                </h4>
+                {loadingMotorConfig ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 size={18} className="animate-spin text-brand-500" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(['lite', 'pro'] as const).map((tier) => {
+                      const cfg = motorConfig[tier];
+                      const isLite = tier === 'lite';
+                      return (
+                        <div key={tier} className={`p-4 rounded-xl border space-y-4 ${isLite ? 'border-indigo-200 bg-indigo-50/20' : 'border-brand-200 bg-brand-50/20'}`}>
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-xs font-black text-ink-900 uppercase tracking-wider flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${isLite ? 'bg-indigo-500' : 'bg-brand-500'}`} />
+                              Motor {isLite ? 'Lite' : 'Pro'} · Google Gemini
+                            </h5>
+                            <span className="text-[9px] font-mono px-2 py-0.5 rounded-lg bg-white border border-ink-100 text-ink-500">
+                              {cfg.model}
+                            </span>
+                          </div>
+                          <div>
+                            <label className="label text-[10px] uppercase font-bold text-ink-500">Modelo Gemini</label>
+                            <select
+                              disabled={readOnly}
+                              value={cfg.model}
+                              onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, model: e.target.value } })}
+                              className="input h-10 text-xs"
+                            >
+                              <option value="gemini-3.5-flash">gemini-3.5-flash (rápido, econômico)</option>
+                              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (alta qualidade)</option>
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="label text-[10px] uppercase font-bold text-ink-500">Tokens/Laudo (est.)</label>
+                              <input
+                                type="number"
+                                disabled={readOnly}
+                                value={cfg.tokensPerReport}
+                                onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, tokensPerReport: parseInt(e.target.value, 10) || 0 } })}
+                                className="input h-10 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="label text-[10px] uppercase font-bold text-ink-500">Custo/1k Tok (USD)</label>
+                              <input
+                                type="number"
+                                step="0.001"
+                                disabled={readOnly}
+                                value={cfg.costPerThousandTokens}
+                                onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, costPerThousandTokens: parseFloat(e.target.value) || 0 } })}
+                                className="input h-10 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* ═══ TAB: TRAINING ═══ */}
+        {/* ══════════════════════════════════
+            TAB: TRAINING
+        ══════════════════════════════════ */}
         {activeTab === 'training' && (
-          <div className="max-w-3xl space-y-6 animate-fade-in">
-            {/* Toggle Card */}
-            <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-5 sm:p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <GraduationCap size={28} />
+          <div className="max-w-2xl space-y-5 animate-fade-in">
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 sm:p-7">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <GraduationCap size={22} />
                   </div>
                   <div>
-                    <h4 className="text-xl font-black text-ink-900">Aprendizado por Estilo</h4>
-                    <p className="text-sm text-ink-500">A IA aprende com seus laudos finalizados.</p>
+                    <h4 className="text-base font-black text-ink-900">Aprendizado por Estilo</h4>
+                    <p className="text-xs text-ink-500">A IA aprende com seus laudos finalizados.</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
-                  className={classNames(
-                    'relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
+                  className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
                     localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
                   )}
                 >
-                  <span className={classNames(
-                    'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  <span className={classNames('pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
                     localSettings.aiTrainingEnabled ? 'translate-x-5' : 'translate-x-0'
                   )} />
                 </button>
               </div>
 
-              <div className={classNames('space-y-8 transition-opacity duration-300', !localSettings.aiTrainingEnabled && 'opacity-40 pointer-events-none')}>
-                <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl text-sm text-indigo-900 leading-relaxed">
-                  <strong>Como funciona:</strong> Ao habilitar esta função, o LAUD.IA enviará seus últimos exames finalizados da mesma especialidade como contexto. Isso garante que a IA utilize o seu vocabulário, estilo de pontuação e estrutura preferida.
+              <div className={classNames('space-y-5 transition-opacity duration-300', !localSettings.aiTrainingEnabled && 'opacity-40 pointer-events-none')}>
+                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
+                  <strong>Como funciona:</strong> O LAUD.IA enviará seus últimos laudos finalizados da mesma especialidade como contexto para mimetizar seu vocabulário, estilo e estrutura preferida.
                 </div>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   {[
-                    { icon: Database, label: 'Laudos no Banco', value: finalizedCount.toString(), sub: 'Finalizados', color: 'indigo' },
-                    { icon: TrendingUp, label: 'Mimetismo Ativo', value: localSettings.aiTrainingContextSize || 3, sub: 'exames p/ geração', color: 'violet' },
-                    { icon: FlaskConical, label: 'Qualidade Est.', value: localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 5 ? 'Alta' : localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 3 ? 'Média' : 'Baixa', sub: 'calibração', color: 'emerald' },
+                    { icon: Database, label: 'No Banco', value: finalizedCount.toString(), color: 'indigo' },
+                    { icon: TrendingUp, label: 'Mimetismo', value: String(localSettings.aiTrainingContextSize || 3), color: 'violet' },
+                    { icon: FlaskConical, label: 'Qualidade', value: localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 5 ? 'Alta' : localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 3 ? 'Média' : 'Baixa', color: 'emerald' },
                   ].map((stat) => (
-                    <div key={stat.label} className={`p-4 bg-${stat.color}-50 border border-${stat.color}-100 rounded-2xl text-center`}>
-                      <stat.icon size={20} className={`text-${stat.color}-600 mx-auto mb-2`} />
-                      <span className={`text-xl font-black text-${stat.color}-900 block`}>{stat.value}</span>
-                      <span className={`text-[9px] font-black text-${stat.color}-600 uppercase tracking-widest block`}>{stat.label}</span>
-                      <span className={`text-[9px] text-${stat.color}-400 block mt-0.5`}>{stat.sub}</span>
+                    <div key={stat.label} className={`p-3 bg-${stat.color}-50 border border-${stat.color}-100 rounded-xl text-center`}>
+                      <stat.icon size={16} className={`text-${stat.color}-600 mx-auto mb-1`} />
+                      <span className={`text-lg font-black text-${stat.color}-900 block`}>{stat.value}</span>
+                      <span className={`text-[9px] font-black text-${stat.color}-600 uppercase tracking-widest`}>{stat.label}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="space-y-4 pt-4">
+                <div className="space-y-2">
                   <label className="block text-sm font-bold text-ink-700 flex items-center gap-2">
-                    Quantidade de Exames Contextuais
-                    <span className="text-indigo-600 font-black text-lg">{localSettings.aiTrainingContextSize || 3}</span>
+                    Exames Contextuais
+                    <span className="text-indigo-600 font-black">{localSettings.aiTrainingContextSize || 3}</span>
                   </label>
                   <input
-                    type="range"
-                    min="1"
-                    max="10"
+                    type="range" min="1" max="10"
                     value={localSettings.aiTrainingContextSize || 3}
                     onChange={(e) => setLocalSettings({ ...localSettings, aiTrainingContextSize: parseInt(e.target.value) })}
-                    className="w-full h-3 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    className="w-full h-2 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                   />
                   <div className="flex justify-between text-[9px] text-ink-400 font-bold uppercase tracking-widest">
                     <span>1 — Rápido</span>
                     <span className="text-indigo-600">3-5 Ideal</span>
                     <span>10 — Lento</span>
                   </div>
-                  <p className="text-xs text-ink-400 italic">Recomendado: 3 a 5 exames para o melhor equilíbrio entre fidelidade e velocidade.</p>
                 </div>
 
-                {/* Impacto Qualitativo */}
-                <div className="pt-4 border-t border-ink-100">
-                  <h5 className="text-[10px] font-black text-ink-600 uppercase tracking-widest mb-3">O que a IA aprende com seus laudos</h5>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: 'Estilo de Escrita', desc: 'Tom, pontuação e fraseologia típica do médico' },
-                      { label: 'Vocabulário CBR', desc: 'Termos preferenciais para cada órgão e achado' },
-                      { label: 'Nível de Detalhe', desc: 'Densidade descritiva da análise morfológica' },
-                      { label: 'Padrão de Conduta', desc: 'Verbos e estrutura das recomendações N1-N4' },
-                    ].map(item => (
-                      <div key={item.label} className="p-4 bg-ink-50 border border-ink-100 rounded-2xl">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                          <span className="text-[10px] font-black text-ink-800">{item.label}</span>
-                        </div>
-                        <p className="text-[10px] text-ink-500 leading-relaxed">{item.desc}</p>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-ink-100">
+                  {[
+                    { label: 'Estilo de Escrita', desc: 'Tom, pontuação e fraseologia do médico' },
+                    { label: 'Vocabulário CBR', desc: 'Termos preferenciais por órgão' },
+                    { label: 'Nível de Detalhe', desc: 'Densidade descritiva morfológica' },
+                    { label: 'Padrão de Conduta', desc: 'Verbos e estrutura das recomendações' },
+                  ].map(item => (
+                    <div key={item.label} className="p-3 bg-ink-50 border border-ink-100 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                        <span className="text-[10px] font-black text-ink-800">{item.label}</span>
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-[10px] text-ink-500 leading-relaxed">{item.desc}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* TAB: STATUS */}
+        {/* ══════════════════════════════════
+            TAB: STATUS / TELEMETRIA
+        ══════════════════════════════════ */}
         {activeTab === 'status' && (
-          <div className="max-w-3xl space-y-6 animate-fade-in">
-            {/* Telemetria */}
-            <TelemetryDashboard />
-
-            {/* Connection Status */}
-            <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-5 sm:p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center">
-                  <Activity size={28} />
-                </div>
-                <div>
-                  <h4 className="text-xl font-black text-ink-900">Status da IA</h4>
-                  <p className="text-sm text-ink-500">Diagnóstico de conexão e configuração do motor.</p>
-                </div>
-              </div>
-
-              {/* Provider Status */}
-              <div className="space-y-4 mb-8">
-                <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Provedor Ativo</h5>
-                {[
-                  {
-                    name: 'Google Gemini',
-                    provider: 'gemini',
-                    icon: Cpu,
-                    color: 'brand',
-                    hasKey: !!localSettings.geminiApiKey,
-                    model: localSettings.geminiModel || 'gemini-3.5-flash',
-                    isActive: (localSettings.aiProvider || 'anthropic') === 'gemini',
-                  },
-                  {
-                    name: 'Anthropic Claude',
-                    provider: 'anthropic',
-                    icon: BrainCircuit,
-                    color: 'violet',
-                    hasKey: !!localSettings.anthropicApiKey,
-                    model: localSettings.anthropicModel || 'claude-3-5-sonnet-latest',
-                    isActive: localSettings.aiProvider === 'anthropic',
-                  },
-                ].map((prov) => (
-                  <div
-                    key={prov.provider}
+          <div className="max-w-4xl space-y-5 animate-fade-in">
+            {/* Filter bar */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 bg-white border border-ink-100 rounded-xl px-3 py-2 shadow-sm">
+                <Filter size={13} className="text-ink-400" />
+                <span className="text-xs font-bold text-ink-600">Filtrar:</span>
+                {['all', 'generation', 'refine', 'copilot', 'template'].map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setTelemetryModeFilter(mode)}
                     className={classNames(
-                      'p-5 rounded-2xl border flex items-center justify-between transition-all',
-                      prov.isActive
-                        ? 'bg-brand-50/50 border-brand-200/50'
-                        : 'bg-ink-50/30 border-ink-100'
+                      'px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                      telemetryModeFilter === mode ? 'bg-brand-600 text-white' : 'bg-ink-50 text-ink-500 hover:bg-ink-100'
                     )}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={classNames(
-                        'w-10 h-10 rounded-xl flex items-center justify-center',
-                        prov.isActive ? 'bg-brand-100 text-brand-600' : 'bg-ink-100 text-ink-400'
-                      )}>
-                        <prov.icon size={20} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-sm text-ink-900">{prov.name}</span>
-                          {prov.isActive && (
-                            <span className="px-2 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full">Ativo</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-ink-500 font-mono">{prov.model}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {prov.hasKey ? (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-                          <Wifi size={12} className="text-emerald-600" />
-                          <span className="text-[10px] font-black text-emerald-700 uppercase">Configurado</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl">
-                          <WifiOff size={12} className="text-red-500" />
-                          <span className="text-[10px] font-black text-red-600 uppercase">Sem API Key</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    {mode === 'all' ? 'Todos' : mode === 'generation' ? 'Geração' : mode === 'refine' ? 'Refine' : mode === 'copilot' ? 'Copiloto' : 'Template'}
+                  </button>
                 ))}
               </div>
+              <div className="flex items-center gap-2 bg-white border border-ink-100 rounded-xl px-3 py-2 shadow-sm">
+                <TrendingUp size={13} className="text-violet-500" />
+                <span className="text-xs font-bold text-ink-600">BRL:</span>
+                <input
+                  type="number" min={1} max={20} step={0.1}
+                  value={localSettings.aiConversionRateBRL ?? 5.5}
+                  onChange={e => setLocalSettings(prev => ({ ...prev, aiConversionRateBRL: parseFloat(e.target.value) || 5.5 }))}
+                  className="w-14 text-xs font-mono border border-ink-200 rounded-lg px-2 py-1 focus:ring-1 focus:ring-brand-400 outline-none"
+                />
+              </div>
+            </div>
 
-              {/* Quick Test */}
-              <div className="pt-6 border-t border-ink-100">
-                <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-4">Teste de Conectividade</h5>
-                <div className="flex items-center gap-4">
-                  {!readOnly && (
-                    <>
-                      <button
-                        onClick={testConnection}
-                        disabled={testStatus === 'testing'}
-                        className={classNames(
-                          'flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black transition-all border bg-white',
-                          testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                            testStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                              testStatus === 'testing' ? 'bg-brand-50 text-brand-600 border-brand-200' :
-                                'bg-ink-50 text-ink-700 border-ink-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200'
-                        )}
-                      >
-                        {testStatus === 'testing' ? (
-                          <><Loader2 size={16} className="animate-spin" /> Testando Conexão...</>
-                        ) : testStatus === 'success' ? (
-                          <><CheckCircle2 size={16} /> Conexão OK!</>
-                        ) : testStatus === 'error' ? (
-                          <><AlertCircle size={16} /> Falha na Conexão</>
-                        ) : (
-                          <><Zap size={16} /> Testar Agora</>
-                        )}
-                      </button>
-                      {testStatus !== 'idle' && (
-                        <button
-                          onClick={() => setTestStatus('idle')}
-                          className="text-sm text-ink-400 hover:text-ink-600 font-bold"
-                        >
-                          Resetar
-                        </button>
-                      )}
-                    </>
+            {/* ── Histórico do Sistema ── */}
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+              <h4 className="text-sm font-black text-ink-900 flex items-center gap-2 mb-4">
+                <Database size={15} className="text-violet-600" /> Histórico do Sistema
+              </h4>
+              <div className="flex items-center gap-3 flex-wrap mb-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-black uppercase text-ink-500 tracking-widest">De</label>
+                  <input
+                    type="date"
+                    value={histFrom}
+                    onChange={e => setHistFrom(e.target.value)}
+                    className="h-8 px-3 border border-ink-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-brand-400 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-black uppercase text-ink-500 tracking-widest">Até</label>
+                  <input
+                    type="date"
+                    value={histTo}
+                    onChange={e => setHistTo(e.target.value)}
+                    className="h-8 px-3 border border-ink-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-brand-400 outline-none"
+                  />
+                </div>
+                <button
+                  onClick={fetchHistoricalStats}
+                  disabled={histLoading}
+                  className="flex items-center gap-1.5 h-8 px-4 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all"
+                >
+                  {histLoading ? <Loader2 size={11} className="animate-spin" /> : null}
+                  Buscar
+                </button>
+              </div>
+
+              {historicalLogs.length > 0 && (() => {
+                const htotalCalls = historicalLogs.length;
+                const htotalIn = historicalLogs.reduce((s, l) => s + (l.inputTokens || 0), 0);
+                const htotalOut = historicalLogs.reduce((s, l) => s + (l.outputTokens || 0), 0);
+                const htotalUsd = historicalLogs.reduce((s, l) => s + (l.costUsd || 0), 0);
+                const htotalBrl = htotalUsd * conversionRate;
+
+                // Group by model
+                const byModel: Record<string, { calls: number; tokIn: number; tokOut: number; usd: number }> = {};
+                historicalLogs.forEach(l => {
+                  const m = l.model || 'unknown';
+                  if (!byModel[m]) byModel[m] = { calls: 0, tokIn: 0, tokOut: 0, usd: 0 };
+                  byModel[m].calls++;
+                  byModel[m].tokIn += l.inputTokens || 0;
+                  byModel[m].tokOut += l.outputTokens || 0;
+                  byModel[m].usd += l.costUsd || 0;
+                });
+
+                const liteLogs = historicalLogs.filter(l => (l.model || '').toLowerCase().includes('flash'));
+                const proLogs = historicalLogs.filter(l => (l.model || '').toLowerCase().includes('pro'));
+
+                return (
+                  <div className="space-y-4">
+                    {/* Summary cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { label: 'Chamadas', v: htotalCalls.toLocaleString('pt-BR') },
+                        { label: 'Tokens IN', v: htotalIn.toLocaleString('pt-BR') },
+                        { label: 'Tokens OUT', v: htotalOut.toLocaleString('pt-BR') },
+                        { label: 'Custo USD', v: `$${htotalUsd.toFixed(4)}` },
+                        { label: 'Custo BRL', v: `R$ ${htotalBrl.toFixed(2)}` },
+                      ].map(c => (
+                        <div key={c.label} className="bg-ink-50 rounded-xl p-3 text-center">
+                          <div className="text-[9px] font-black uppercase text-ink-500 tracking-widest mb-0.5">{c.label}</div>
+                          <div className="text-sm font-black text-ink-900">{c.v}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Per model table */}
+                    <div className="overflow-x-auto rounded-xl border border-ink-100">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="bg-ink-50/50 border-b border-ink-100 text-[9px] font-black uppercase text-ink-500 tracking-wider">
+                            <th className="px-4 py-2.5">Modelo</th>
+                            <th className="px-4 py-2.5 text-right">Chamadas</th>
+                            <th className="px-4 py-2.5 text-right">Tokens IN</th>
+                            <th className="px-4 py-2.5 text-right">Tokens OUT</th>
+                            <th className="px-4 py-2.5 text-right">USD</th>
+                            <th className="px-4 py-2.5 text-right">BRL</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink-50">
+                          {Object.entries(byModel).map(([model, d]) => (
+                            <tr key={model} className="hover:bg-ink-50/30">
+                              <td className="px-4 py-2.5 font-mono text-[10px] text-zinc-700">{model}</td>
+                              <td className="px-4 py-2.5 text-right font-bold">{d.calls}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-ink-600">{d.tokIn.toLocaleString('pt-BR')}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-ink-600">{d.tokOut.toLocaleString('pt-BR')}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">${d.usd.toFixed(4)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-emerald-700">R$ {(d.usd * conversionRate).toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Lite vs Pro breakdown */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-indigo-50/50 border border-indigo-200/50">
+                        <div className="text-[9px] font-black uppercase text-indigo-700 tracking-widest mb-1">Lite (Flash)</div>
+                        <div className="text-xs font-bold text-ink-900">{liteLogs.length} chamadas</div>
+                        <div className="text-[10px] text-ink-500">R$ {(liteLogs.reduce((s, l) => s + (l.costUsd || 0), 0) * conversionRate).toFixed(2)}</div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-violet-50/50 border border-violet-200/50">
+                        <div className="text-[9px] font-black uppercase text-violet-700 tracking-widest mb-1">Pro</div>
+                        <div className="text-xs font-bold text-ink-900">{proLogs.length} chamadas</div>
+                        <div className="text-[10px] text-ink-500">R$ {(proLogs.reduce((s, l) => s + (l.costUsd || 0), 0) * conversionRate).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {!histLoading && historicalLogs.length === 0 && (
+                <p className="text-xs text-ink-400 text-center py-4">Nenhum dado encontrado. Clique em "Buscar" para carregar o histórico.</p>
+              )}
+            </div>
+
+            <TelemetryDashboard modeFilter={telemetryModeFilter} conversionRate={conversionRate} />
+
+            {/* Connection Status */}
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+              <h4 className="text-sm font-black text-ink-900 flex items-center gap-2 mb-4">
+                <Activity size={15} className="text-brand-600" /> Status da IA
+              </h4>
+              <div className="space-y-2.5 mb-5">
+                {/* Main provider status */}
+                <div className="p-4 rounded-xl border bg-brand-50/50 border-brand-200/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <Cpu size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-ink-900">Google Gemini</span>
+                        <span className="px-1.5 py-0.5 bg-brand-500 text-white text-[8px] font-black uppercase tracking-widest rounded-full">Motor Único</span>
+                      </div>
+                      <span className="text-[10px] text-ink-500">Lite: {motorConfig.lite.model} · Pro: {motorConfig.pro.model}</span>
+                    </div>
+                  </div>
+                  {localSettings.geminiApiKey ? (
+                    <div className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <Wifi size={11} className="text-emerald-600" />
+                      <span className="text-[9px] font-black text-emerald-700 uppercase">OK</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg">
+                      <WifiOff size={11} className="text-red-500" />
+                      <span className="text-[9px] font-black text-red-600 uppercase">Sem Key</span>
+                    </div>
                   )}
                 </div>
+                {/* Motor tiers */}
+                <div className="grid grid-cols-2 gap-2">
+                  {(['lite', 'pro'] as const).map((tier) => (
+                    <div key={tier} className={`p-3 rounded-xl border flex items-center gap-2.5 ${tier === 'lite' ? 'bg-indigo-50/50 border-indigo-200/50' : 'bg-violet-50/50 border-violet-200/50'}`}>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${tier === 'lite' ? 'bg-indigo-500' : 'bg-violet-500'}`} />
+                      <div className="min-w-0">
+                        <div className={`text-[10px] font-black uppercase tracking-widest ${tier === 'lite' ? 'text-indigo-700' : 'text-violet-700'}`}>
+                          Motor {tier === 'lite' ? 'Lite' : 'Pro'}
+                        </div>
+                        <div className="text-[9px] font-mono text-ink-500 truncate">{motorConfig[tier].model}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {!readOnly && (
+                <div className="flex items-center gap-3 pt-4 border-t border-ink-100">
+                  <button
+                    onClick={testConnection}
+                    disabled={testStatus === 'testing'}
+                    className={classNames('flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all border',
+                      testStatus === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      testStatus === 'error' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                      testStatus === 'testing' ? 'bg-brand-50 text-brand-600 border-brand-200' :
+                      'bg-ink-50 text-ink-700 border-ink-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200'
+                    )}
+                  >
+                    {testStatus === 'testing' ? (<><Loader2 size={14} className="animate-spin" /> Testando...</>) :
+                     testStatus === 'success' ? (<><CheckCircle2 size={14} /> Conexão OK!</>) :
+                     testStatus === 'error' ? (<><AlertCircle size={14} /> Falha</>) :
+                     (<><Zap size={14} /> Testar Conexão</>)}
+                  </button>
+                  {testStatus !== 'idle' && (
+                    <button onClick={() => setTestStatus('idle')} className="text-sm text-ink-400 hover:text-ink-600 font-bold">
+                      Resetar
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Config Summary */}
-            <div className="bg-white rounded-3xl border border-ink-100 shadow-sm p-5 sm:p-8">
-              <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-6">Resumo de Configuração</h5>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+              <h5 className="text-[10px] font-black text-ink-500 uppercase tracking-widest mb-4">Resumo de Configuração</h5>
+              <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Motor', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? 'Google Gemini' : 'Anthropic Claude', icon: Cpu },
-                  { label: 'Modelo', value: (localSettings.aiProvider || 'anthropic') === 'gemini' ? (localSettings.geminiModel || 'gemini-3.5-flash') : (localSettings.anthropicModel || 'claude-3-5-sonnet-latest'), icon: BrainCircuit },
-                  { label: 'Temperatura', value: `${localSettings.aiTemperature ?? 0.3} — ${(localSettings.aiTemperature ?? 0.3) <= 0.2 ? 'Clínico' : (localSettings.aiTemperature ?? 0.3) <= 0.5 ? 'Balanceado' : 'Criativo'}`, icon: Sliders },
+                  { label: 'Provedor', value: 'Google Gemini', icon: Cpu },
+                  { label: 'Motor Lite', value: motorConfig.lite.model, icon: BrainCircuit },
+                  { label: 'Motor Pro', value: motorConfig.pro.model, icon: Sparkles },
                   { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
+                  { label: 'API Key', value: localSettings.geminiApiKey ? 'Configurada' : 'Não configurada', icon: Key },
+                  { label: 'Laud.IA Core', value: 'v2.0 PROD', icon: ShieldCheck },
                 ].map(item => (
-                  <div key={item.label} className="p-4 bg-ink-50 rounded-2xl border border-ink-100">
-                    <div className="flex items-center gap-2 mb-1">
-                      <item.icon size={14} className="text-ink-400" />
+                  <div key={item.label} className="p-3 bg-ink-50 rounded-xl border border-ink-100">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <item.icon size={12} className="text-ink-400" />
                       <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">{item.label}</span>
                     </div>
-                    <span className="text-sm font-bold text-ink-800 leading-tight">{item.value}</span>
+                    <span className="text-xs font-bold text-ink-800 leading-tight truncate block">{item.value}</span>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* Versão */}
-            <div className="bg-gradient-to-r from-brand-50 to-indigo-50/50 border border-brand-100/50 rounded-2xl p-5 flex items-center justify-between">
-              <div className="space-y-1">
-                <span className="text-[10px] font-black text-brand-600 uppercase tracking-widest block">Laud.IA Core</span>
-                <p className="text-[11px] text-slate-600 font-bold leading-relaxed">
-                  Motor cognitivo radiológico v13.0 — Cascata Tripartite + Regras Rígidas + Temperatura Adaptativa + Retry Automático + Telemetria.
-                </p>
-              </div>
-              <div className="px-4 py-2 bg-white border border-brand-200 rounded-xl text-[10px] font-black text-brand-700 shadow-sm">
-                v13.0 PROD
               </div>
             </div>
           </div>
         )}
 
       </div>
+
+      {/* ─── Factory Reset (floating, minimal, always accessible) ─── */}
+      {!readOnly && (
+        <div className="fixed bottom-20 right-4 z-10 sm:bottom-6">
+          <button
+            onClick={async () => {
+              const ok = await confirm({
+                title: 'Reset de Fábrica',
+                message: 'Restaurar os 4 prompts principais para o padrão de fábrica?',
+                confirmLabel: 'Restaurar',
+                variant: 'danger',
+              });
+              if (ok) {
+                setLocalSettings({
+                  ...localSettings,
+                  aiMasterPrompt: DEFAULT_MASTER_PROMPT,
+                  aiGlobalInstructions: DEFAULT_GLOBAL_INSTRUCTIONS,
+                  aiStructurePrompt: DEFAULT_STRUCTURE_PROMPT,
+                  aiRigidRules: DEFAULT_RIGID_RULES,
+                });
+                showToast('Reset de Fábrica concluído. Clique em Publicar para salvar.', 'success');
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-rose-600 bg-white border border-rose-200 hover:border-rose-350 hover:bg-rose-50 shadow-lg transition-all"
+            title="Reset de Fábrica — Restaura os 4 prompts principais ao padrão"
+          >
+            <RotateCcw size={11} />
+            <span className="hidden sm:inline">Factory Reset</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

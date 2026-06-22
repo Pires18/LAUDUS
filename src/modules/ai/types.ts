@@ -1,4 +1,4 @@
-import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
+import { ReportTemplate, Patient, AppSettings } from '../../types';
 
 export interface GenerateReportParams {
   examId?: string;
@@ -76,9 +76,10 @@ export interface AiProvider {
     settings: AppSettings,
     area: string,
     mode: string,
-    onChunk: (text: string) => void,
+    onChunk: (text: string, rawText?: string) => void,
     signal?: AbortSignal,
-    onComplete?: (scratchpad?: string) => void
+    onComplete?: (scratchpad?: string) => void,
+    helpers?: any
   ): Promise<string>;
   extractJson(
     built: BuiltPrompt,

@@ -1,8 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
-import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE } from './prompts';
+import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
 import { getInitialReportContent } from '../templates/utils';
+import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
+import { logger } from '../../utils/logger';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
@@ -68,20 +70,36 @@ export interface CallMetrics {
   success: boolean;
   scratchpad?: string;
   modelName?: string;
+  promptHash?: string;
 }
 
-let lastCallMetrics: CallMetrics | null = null;
+function hashPrompt(built: BuiltPrompt): string {
+  const content = built.universalContext.slice(0, 500) + built.areaContext.slice(0, 200);
+  let h = 5381;
+  for (let i = 0; i < content.length; i++) {
+    h = ((h << 5) + h) ^ content.charCodeAt(i);
+    h = h >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 export const callMetricsHistory: CallMetrics[] = [];
 
 const PRICING: Record<string, { input: number, output: number }> = {
-  'claude-3-5-sonnet-latest': { input: 3.0, output: 15.0 },
-  'claude-3-7-sonnet-latest': { input: 3.0, output: 15.0 },
-  'gemini-3.5-flash': { input: 0.075, output: 0.30 },
-  'gemini-3.1-pro-preview': { input: 1.25, output: 5.0 },
+  // Anthropic
+  'claude-sonnet-4-6':           { input: 3.0,   output: 15.0  },
+  'claude-3-5-sonnet-latest':    { input: 3.0,   output: 15.0  },
+  'claude-3-7-sonnet-latest':    { input: 3.0,   output: 15.0  },
+  'claude-opus-4-5':             { input: 15.0,  output: 75.0  },
+  'claude-3-haiku-20240307':     { input: 0.25,  output: 1.25  },
+  // Gemini
+  'gemini-3.5-flash':            { input: 0.075, output: 0.30  },
+  'gemini-3.1-pro-preview':      { input: 1.25,  output: 5.0   },
+  'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
+  'gemini-2.5-pro-preview-06-05':   { input: 1.25, output: 10.0 },
 };
 
 function recordMetrics(m: CallMetrics) {
-  lastCallMetrics = m;
   callMetricsHistory.unshift(m);
   if (callMetricsHistory.length > 20) callMetricsHistory.pop();
 
@@ -97,7 +115,8 @@ function recordMetrics(m: CallMetrics) {
       inputTokens: m.estimatedInputTokens,
       outputTokens: m.estimatedOutputTokens,
       costUsd,
-      area: m.area
+      area: m.area,
+      promptHash: m.promptHash
     }).catch(() => {});
   }
 }
@@ -130,8 +149,20 @@ function getMaxTokens(area: string): number {
   return MAX_TOKENS_BY_AREA[area as ExamArea] ?? 8192;
 }
 
-function getModeTemperature(mode: string, override?: number): number {
+/**
+ * Retorna temperatura adaptativa por modo.
+ * Prioridade: settings.aiTemperatureByMode[mode] → override legado → default hardcoded
+ */
+function getModeTemperature(mode: string, override?: number, settings?: AppSettings): number {
+  // 1. Override explícito (legado, vindo direto como número)
   if (override !== undefined && override >= 0 && override <= 1) return override;
+  // 2. Configuração por modo nas settings (novo)
+  const byMode = settings?.aiTemperatureByMode;
+  if (byMode) {
+    const configured = byMode[mode as keyof typeof byMode];
+    if (configured !== undefined && configured >= 0 && configured <= 1) return configured;
+  }
+  // 3. Default hardcoded
   return TEMPERATURE_BY_MODE[mode] ?? 0.3;
 }
 
@@ -246,27 +277,56 @@ function buildUniversalContext(settings: AppSettings): string {
   const rules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
 
   const parts = [master, global, skeleton, rules];
+  if (settings.aiFastMode) {
+    parts.push(`═══════════════════════════════════════════
+ATENÇÃO: MODO RÁPIDO ATIVADO (SEM RACIOCÍNIO)
+═══════════════════════════════════════════
+REGRA MÁXIMA DE SAÍDA:
+NÃO use a tag <scratchpad> nem faça nenhum raciocínio interno ou auto-auditoria.
+NÃO comece seu output com <scratchpad> e NUNCA use a tag </scratchpad>.
+Inicie sua resposta DIRETA e IMEDIATAMENTE com o HTML do laudo (iniciando com <h1>) ou com o formato de resposta do Copiloto solicitado.
+Você deve pular as fases de auditoria e raciocínio prévio.`);
+  }
   return parts.join('\n\n');
 }
 
+/**
+ * buildSpecificContext — monta o contexto de Camada 2 (Área) + Camada 3 (Exame).
+ *
+ * Prioridade da diretriz de área:
+ *   1. Diretriz customizada do usuário (settings.aiAreaPrompts[area])
+ *   2. Diretriz padrão do sistema (DEFAULT_AREA_PROMPTS[area])
+ *   3. Sem diretriz de área (se a área não tiver padrão definido)
+ *
+ * Após a diretriz de área, injeta as INSTRUÇÕES ESPECÍFICAS DO EXAME (template.aiInstructions).
+ */
 function buildSpecificContext(
   template?: ReportTemplate | null,
   settings?: AppSettings,
   fallbackArea?: string
 ): string {
   const area = template?.area || fallbackArea;
-  const areaPrompt = area && settings?.aiAreaPrompts?.[area as ExamArea];
-  
+
+  // Camada 2 — Diretriz de Área: customizada > padrão > vazia
+  const customAreaPrompt = area && settings?.aiAreaPrompts?.[area as ExamArea];
+  const defaultAreaPrompt = area && DEFAULT_AREA_PROMPTS[area];
+  const areaPrompt = (customAreaPrompt && customAreaPrompt.trim())
+    ? customAreaPrompt.trim()
+    : (defaultAreaPrompt && defaultAreaPrompt.trim())
+      ? defaultAreaPrompt.trim()
+      : null;
+
   const parts: string[] = [];
-  
-  if (areaPrompt && areaPrompt.trim()) {
-    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt.trim()}`);
+
+  if (areaPrompt && area) {
+    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt}`);
   }
-  
+
+  // Camada 3 — Instruções Específicas do Exame
   if (template?.aiInstructions && template.aiInstructions.trim()) {
     parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions.trim()}`);
   }
-  
+
   return parts.join('\n\n');
 }
 
@@ -363,24 +423,51 @@ ${maskHtml}`;
  */
 export function stripScratchpad(text: string, disableHtmlExtraction = false): string {
   if (!text) return '';
+  
+  const lower = text.toLowerCase();
+  
+  // Fast-path bypass check during streaming:
+  // If a scratchpad tag is open but not yet closed, we can assume the AI is still in its reasoning phase
+  // and no actual content has been generated. Returning an empty string avoids executing multiple heavy regex operations.
+  const hasOpenScratch = lower.includes('<scratchpad>') && !lower.includes('</scratchpad>');
+  const hasOpenThink = lower.includes('<think>') && !lower.includes('</think>');
+  const hasOpenThinking = lower.includes('<thinking>') && !lower.includes('</thinking>');
+  const hasOpenThought = lower.includes('<thought>') && !lower.includes('</thought>');
+  
+  if (hasOpenScratch || hasOpenThink || hasOpenThinking || hasOpenThought) {
+    return '';
+  }
+
   let cleaned = text;
 
-  // 1A. Remove complete scratchpad/thinking blocks first. Handles spaces inside tags.
-  cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
-  
-  // 1B. For any remaining unclosed scratchpad tags (e.g., streaming or forgotten closing tag),
-  // remove from the opening tag up to the first valid content marker or end of string.
-  cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?(?====\s*CONVERSA|===\s*PROPOSTA|<h[1-6][\s>]|$)/gi, '');
-  
-  // 2. Remove python/tool_code/code blocks (internal tool calls)
-  cleaned = cleaned.replace(/```(?:tool_code|python|code|javascript|typescript|bash)[\s\S]*?```/gi, '');
+  // Optimize: Only run regexes if corresponding patterns are actually present
+  const hasScratchTags = /<\s*\/?\s*(scratchpad|think|thinking|thought)/i.test(cleaned);
+  const hasCodeBlocks = /```/.test(cleaned);
 
-  // 3. Remove any loose closing/opening tags just in case
-  cleaned = cleaned.replace(/<\s*\/?\s*(scratchpad|think|thinking|thought)\s*>/gi, '');
+  if (hasScratchTags) {
+    // 1A. Remove complete scratchpad/thinking blocks first. Handles spaces inside tags.
+    cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
+    
+    // 1B. For any remaining unclosed scratchpad tags (e.g., streaming or forgotten closing tag),
+    // remove from the opening tag up to the first valid content marker or end of string.
+    cleaned = cleaned.replace(/<\s*(scratchpad|think|thinking|thought)\s*>[\s\S]*?(?====\s*CONVERSA|===\s*PROPOSTA|<h[1-6][\s>]|$)/gi, '');
+  }
 
-  // 5. Keep HTML block contents but strip markdown backticks if wrapped in them
-  cleaned = cleaned.replace(/```html\s*([\s\S]*?)\s*```/gi, '$1');
-  cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/gi, '$1');
+  if (hasCodeBlocks) {
+    // 2. Remove python/tool_code/code blocks (internal tool calls)
+    cleaned = cleaned.replace(/```(?:tool_code|python|code|javascript|typescript|bash)[\s\S]*?```/gi, '');
+  }
+
+  if (hasScratchTags) {
+    // 3. Remove any loose closing/opening tags just in case
+    cleaned = cleaned.replace(/<\s*\/?\s*(scratchpad|think|thinking|thought)\s*>/gi, '');
+  }
+
+  if (hasCodeBlocks) {
+    // 5. Keep HTML block contents but strip markdown backticks if wrapped in them
+    cleaned = cleaned.replace(/```html\s*([\s\S]*?)\s*```/gi, '$1');
+    cleaned = cleaned.replace(/```\s*([\s\S]*?)\s*```/gi, '$1');
+  }
 
   // 6. Clean leading/trailing markdown from the response
   cleaned = cleanMarkdownFromResponse(cleaned);
@@ -424,7 +511,7 @@ export async function extractCalculatorData(
   settings: AppSettings,
   signal?: AbortSignal
 ): Promise<any> {
-  const aiProvider = settings.aiProvider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
+  const aiProvider = new GeminiProvider();
   const systemContext = `Você é um assistente médico especialista em ultrassonografia e radiologia.
 Sua tarefa é ler um texto (laudo médico) e extrair os dados necessários para preencher a calculadora clínica chamada "${calcDef.name}".
 A calculadora faz o seguinte: "${calcDef.description}".
@@ -461,7 +548,7 @@ Retorne APENAS um objeto JSON.`;
       }
     );
   } catch (error) {
-    console.error('Erro na extração de dados da calculadora:', error);
+    logger.error('Erro na extração de dados da calculadora', error);
     throw error;
   }
 }
@@ -526,6 +613,8 @@ function buildRefinePrompt({
 }: RefineParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template, settings);
+  // Respeita regras de refinamento customizadas no settings
+  const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
   const refineNote = customPrompt
     ? `INSTRUÇÃO DE REFINAMENTO: "${customPrompt}"`
@@ -549,18 +638,24 @@ function buildRefinePrompt({
     examDateMs,
   });
 
+  const formatRule = settings.aiFastMode
+    ? `REGRA ABSOLUTA DE FORMATO:
+1. O output DEVE começar direta e imediatamente com a tag <h1>.
+2. É ESTRITAMENTE PROIBIDO usar <scratchpad>, <think>, ou qualquer tag de raciocínio.`
+    : `NOVA REGRA ABSOLUTA DE FORMATO:
+1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
+2. APÓS fechar a tag </scratchpad>, o laudo deve começar diretamente com a tag <h1>.
+ZERO texto, avisos ou mensagens de pensamento fora da tag <scratchpad>.`;
+
   const userMessage = `═══════════════════════════════════════════════════════════════
 INPUT CLÍNICO — EXECUTAR FASES 1-5 ANTES DO OUTPUT:
 ═══════════════════════════════════════════════════════════════
 ${contextMessage}
 
-${DEFAULT_REFINEMENT_GOLDEN_RULES}
+${refinementRules}
 
 Gere agora o laudo REFINADO completo em HTML puro. 
-NOVA REGRA ABSOLUTA DE FORMATO:
-1. O output DEVE começar com a tag <scratchpad> contendo seu raciocínio e Self-Audit detalhado.
-2. APÓS fechar a tag </scratchpad>, o laudo deve começar diretamente com a tag <h1>.
-ZERO texto, avisos ou mensagens de pensamento fora da tag <scratchpad>.`;
+${formatRule}`;
 
   return { universalContext, areaContext, userMessage };
 }
@@ -575,12 +670,24 @@ function buildCopilotPrompt({
   patientPreviousExams = [],
   template,
 }: CopilotParams): BuiltPrompt {
-  const copilotModeOverride = DEFAULT_COPILOT_OVERRIDE;
+  // Respeita override customizado no settings, com fallback para o default do sistema
+  let copilotModeOverride = settings.aiCopilotOverride || DEFAULT_COPILOT_OVERRIDE;
+  if (settings.aiFastMode) {
+    copilotModeOverride = copilotModeOverride
+      .replace(
+        `① Abra <scratchpad> e execute raciocínio completo sobre a instrução recebida e o laudo atual.\n② Feche </scratchpad>.\n③ Gere EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`,
+        `① É ESTRITAMENTE PROIBIDO usar <scratchpad>, <think> ou descrever qualquer raciocínio.\n② Gere DIRETA, IMEDIATA e EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`
+      )
+      .replace(
+        `① Abra <scratchpad> e execute raciocínio completo sobre a instrução recebida e o laudo atual.\r\n② Feche </scratchpad>.\r\n③ Gere EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`,
+        `① É ESTRITAMENTE PROIBIDO usar <scratchpad>, <think> ou descrever qualquer raciocínio.\n② Gere DIRETA, IMEDIATA e EXATAMENTE a seguinte estrutura (os delimitadores são parseados pelo frontend):`
+      );
+  }
+  const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template, settings, exam.area) + copilotModeOverride;
 
-  const isFormCompilation = instruction.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
@@ -599,7 +706,7 @@ function buildCopilotPrompt({
     examDateMs: exam.createdAt,
   });
 
-  const userMessage = `${DEFAULT_REFINEMENT_GOLDEN_RULES}
+  const userMessage = `${refinementRules}
 
 ═══════════════════════════════════════════════════════════════
 INPUT CLÍNICO:
@@ -612,14 +719,16 @@ ${contextMessage}`;
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
 export function resolveGeminiModel(rawModel: string | undefined): string {
-  if (!rawModel) return 'gemini-3.5-flash';
-  const raw = rawModel.toLowerCase();
-  
-  if (raw.includes('3.1') && raw.includes('pro')) return 'gemini-3.1-pro-preview';
+  const raw = (rawModel || '').toLowerCase();
+
   if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('pro')) return 'gemini-3.1-pro-preview';
-  
-  // Default de máxima segurança
+  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
+  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
+  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
+
   return 'gemini-3.5-flash';
 }
 
@@ -629,7 +738,6 @@ function getModelForMode(settings: AppSettings, mode: string, area: string): str
 }
 
 import { GeminiProvider } from './providers/GeminiProvider';
-import { AnthropicProvider, getAnthropicBaseUrl } from './providers/AnthropicProvider';
 
 const helpers = {
   getModeTemperature,
@@ -640,9 +748,8 @@ const helpers = {
   stripScratchpad,
 };
 
-export { getAnthropicBaseUrl };
-
-// stream deleted
+// Exportar builders internos para uso no Playground com streaming real
+export { buildRefinePrompt, buildCopilotPrompt };
 
 // ─── Detecção de modo e área ─────────────────────────────────────────────────
 
@@ -658,15 +765,114 @@ function detectArea(params: GenerateReportParams | CopilotParams | RefineParams)
   return '';
 }
 
+// ─── Helpers para Controle de Motor (Lite/Pro) e Quota de Laudos ─────────────
+
+async function resolveMotorConfigAndCheckQuota(
+  settings: AppSettings,
+  mode: string
+): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; uid?: string }> {
+  const uid = auth.currentUser?.uid;
+  let resolvedModelName = 'gemini-3.5-flash';
+
+  if (!uid) {
+    return { resolvedProvider: 'gemini', resolvedModelName };
+  }
+
+  try {
+    const userRef = doc(firestore, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
+
+      // 1. Validar cota mensal antes da geração inicial
+      if (mode === 'generation' && !isAdmin) {
+        const reportsUsed = userData.reportsUsedThisMonth ?? 0;
+        const reportsQuota = userData.reportsQuota ?? 100;
+        if (reportsUsed >= reportsQuota) {
+          throw new Error('Sua cota mensal de laudos foi atingida. Faça um upgrade ou aguarde o reset mensal.');
+        }
+      }
+
+      // 2. Resolver configuração dos motores (sempre Gemini)
+      const isTrialing = !userData.subscriptionId && userData.createdAt && (Date.now() < userData.createdAt + 14 * 24 * 60 * 60 * 1000);
+      const motorProEnabled = isAdmin || userData.motorProEnabled === true || isTrialing || userData.subscriptionStatus === 'trialing';
+      let chosenMotor = settings.selectedMotor || 'lite';
+      if (chosenMotor === 'pro' && !motorProEnabled) {
+        chosenMotor = 'lite';
+      }
+
+      const motorConfigRef = doc(firestore, 'global_config', 'motor_config');
+      const motorConfigSnap = await getDoc(motorConfigRef);
+      const motorConfig = {
+        lite: { model: 'gemini-3.5-flash' },
+        pro:  { model: 'gemini-3.1-pro-preview' }
+      };
+
+      if (motorConfigSnap.exists()) {
+        const configData = motorConfigSnap.data();
+        if (configData.lite?.model) motorConfig.lite.model = configData.lite.model;
+        if (configData.pro?.model)  motorConfig.pro.model  = configData.pro.model;
+      }
+
+      resolvedModelName = motorConfig[chosenMotor].model;
+    }
+  } catch (err: any) {
+    if (err.message && err.message.includes('cota mensal')) {
+      throw err;
+    }
+    logger.error('Erro ao resolver motor e cota:', err);
+  }
+
+  return { resolvedProvider: 'gemini', resolvedModelName, uid };
+}
+
+async function incrementReportUsage(uid: string) {
+  try {
+    const userRef = doc(firestore, 'users', uid);
+    await runTransaction(firestore, async (transaction) => {
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists()) return;
+      const userData = userSnap.data();
+      const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
+      if (isAdmin) return;
+
+      const newUsed = (userData.reportsUsedThisMonth ?? 0) + 1;
+      transaction.update(userRef, {
+        reportsUsedThisMonth: newUsed,
+        updatedAt: Date.now()
+      });
+
+      const subscriptionId = userData.subscriptionId;
+      if (subscriptionId) {
+        const subRef = doc(firestore, 'subscriptions', subscriptionId);
+        transaction.update(subRef, {
+          reportsUsedThisMonth: newUsed,
+          updatedAt: Date.now()
+        });
+      }
+    });
+  } catch (err) {
+    logger.error('Erro ao incrementar uso de laudo:', err);
+  }
+}
+
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
   const { settings, signal } = params as any;
-  const provider = settings.aiProvider || 'anthropic';
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
-  let success = false;
+
+  const { resolvedModelName, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+
+  const callSettings = {
+    ...settings,
+    aiProvider: 'gemini' as const,
+    geminiModel: resolvedModelName,
+  };
 
   let built: BuiltPrompt;
   if (mode === 'copilot') {
@@ -680,16 +886,13 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
   try {
     let text: string;
     let scratchpad: string | undefined;
-    
-    const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
-    text = await aiProvider.generate(built, settings, area, mode, signal, (sp) => scratchpad = sp, helpers);
 
-    success = true;
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
+    text = await new GeminiProvider().generate(built, callSettings, area, mode, signal, (sp) => scratchpad = sp, helpers);
+
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: Math.round(text.length / 4),
@@ -697,22 +900,28 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       timestamp: Date.now(),
       success: true,
       scratchpad,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
+
+    if (mode === 'generation' && uid) {
+      await incrementReportUsage(uid);
+    }
+
     return text;
   } catch (err) {
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: 0,
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: false,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
     throw err;
   }
@@ -720,13 +929,20 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
 
 export async function generateReportStream(
   params: GenerateReportParams | CopilotParams | RefineParams,
-  onChunk: (text: string) => void
+  onChunk: (text: string, rawText?: string) => void
 ): Promise<string> {
   const { settings, signal } = params as any;
-  const provider = settings.aiProvider || 'anthropic';
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
+
+  const { resolvedModelName, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+
+  const callSettings = {
+    ...settings,
+    aiProvider: 'gemini' as const,
+    geminiModel: resolvedModelName,
+  };
 
   let built: BuiltPrompt;
   if (mode === 'copilot') {
@@ -740,14 +956,13 @@ export async function generateReportStream(
   try {
     let text: string;
     let scratchpad: string | undefined;
-    
-    const aiProvider = provider === 'gemini' ? new GeminiProvider() : new AnthropicProvider();
-    text = await aiProvider.stream(built, settings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
+
+    text = await new GeminiProvider().stream(built, callSettings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
+
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: Math.round(text.length / 4),
@@ -755,22 +970,28 @@ export async function generateReportStream(
       timestamp: Date.now(),
       success: true,
       scratchpad,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
+
+    if (mode === 'generation' && uid) {
+      await incrementReportUsage(uid);
+    }
+
     return text;
   } catch (err) {
-    const resolvedModelName = provider === 'gemini' ? getModelForMode(settings, mode, area) : (settings.anthropicModel || 'claude-3-5-sonnet-latest');
     recordMetrics({
       examId: (params as any).examId,
       mode: mode as CallMetrics['mode'],
-      provider,
+      provider: 'gemini',
       area,
       estimatedInputTokens: Math.round((built.universalContext.length + built.areaContext.length + built.userMessage.length) / 4),
       estimatedOutputTokens: 0,
       latencyMs: Date.now() - t0,
       timestamp: Date.now(),
       success: false,
-      modelName: resolvedModelName
+      modelName: resolvedModelName,
+      promptHash: hashPrompt(built)
     });
     throw err;
   }

@@ -4,13 +4,14 @@ import { useCollection } from '../../hooks/useFirestore';
 import { addItemWithId, genId, updateItem, deleteItem, generateNumericId } from '../../store/db';
 import { Patient, ReportTemplate, Clinic, ExamRequest, Appointment } from '../../types';
 import { 
-  Plus, Search, RotateCcw, Sliders, CalendarDays, AlertCircle, Trash2, X, Clock
+  Plus, Search, RotateCcw, Sliders, CalendarDays, AlertCircle, Trash2, Clock
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { getInitialReportContent } from '../templates/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { syncExamToOrthancWorklist } from '../../utils/dicom';
 import { PageHeader } from '../../components/PageHeader';
+import { logger } from '../../utils/logger';
 
 // Modular Imports
 import { getLocalDateStr, isSlotAvailable } from './utils/scheduleUtils';
@@ -183,7 +184,7 @@ export function Appointments() {
       dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: false });
       dispatch({ type: 'RESET_FORM' });
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao criar agendamento:', error);
       showToast('Erro ao criar agendamento', 'error');
     }
   };
@@ -235,7 +236,7 @@ export function Appointments() {
       );
 
       if (!success) {
-        console.warn('[Orthanc Sync] Falha ao enviar para o worklist:', error);
+        logger.warn('[Orthanc Sync] Falha ao enviar para o worklist:', error);
       }
 
       await updateItem('appointments', confirmingApp.id, { status: 'confirmado' });
@@ -247,7 +248,7 @@ export function Appointments() {
         setView({ name: 'exam-editor', examId });
       }
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao confirmar agendamento:', error);
       showToast('Erro ao confirmar agendamento', 'error');
     }
   };
@@ -299,7 +300,7 @@ export function Appointments() {
       showToast('Agendamento reagendado com sucesso!');
       dispatch({ type: 'SET_RESCHEDULING_APP', payload: null });
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao reagendar agendamento:', error);
       showToast('Erro ao reagendar', 'error');
     }
   };
@@ -312,7 +313,7 @@ export function Appointments() {
       showToast('Agendamento cancelado.');
       dispatch({ type: 'SET_CANCELING_APP', payload: null });
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao cancelar agendamento:', error);
       showToast('Erro ao cancelar agendamento', 'error');
     }
   };
@@ -325,7 +326,7 @@ export function Appointments() {
       showToast('Agendamento excluído.');
       dispatch({ type: 'SET_DELETING_APP', payload: null });
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao excluir agendamento:', error);
       showToast('Erro ao excluir agendamento', 'error');
     }
   };
@@ -355,7 +356,7 @@ export function Appointments() {
       showToast('Agendamento atualizado com sucesso!');
       dispatch({ type: 'SET_EDITING_APP', payload: null });
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao atualizar agendamento:', error);
       showToast('Erro ao atualizar agendamento', 'error');
     }
   };
@@ -369,7 +370,7 @@ export function Appointments() {
       showToast('Turnos salvos com sucesso!');
       dispatch({ type: 'SET_ACTIVE_TAB', payload: 'agendamentos' });
     } catch (error) {
-      console.error(error);
+      logger.error('Erro ao salvar configuração de turnos:', error);
       showToast('Erro ao salvar configuração de turnos', 'error');
     }
   };
@@ -377,35 +378,43 @@ export function Appointments() {
   return (
     <div className="module-container">
       <div className="max-w-7xl mx-auto w-full animate-fade-in space-y-6">
-        <PageHeader
-          title="Agendamentos & Recepção"
-          subtitle="Gerencie a agenda de exames, crie fichas rápidas de pacientes e sincronize diretamente com a Worklist."
-          actions={
-            <div className="flex gap-2">
+        {/* ─── COMPACT HEADER ─── */}
+        <div className="bg-white border border-ink-200 rounded-2xl shadow-sm">
+          <div className="px-5 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-sm shrink-0">
+                <CalendarDays size={18} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-black text-ink-900 tracking-tight leading-none">Agendamentos & Recepção</h1>
+                <p className="text-[11px] text-ink-500 font-medium mt-0.5">Gerencie a agenda de exames, crie fichas rápidas de pacientes e sincronize com a Worklist.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 className={classNames(
-                  "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border flex items-center gap-2 shadow-sm",
+                  "h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border flex items-center gap-1.5 active:scale-95",
                   state.activeTab === 'configuracao'
-                    ? "bg-slate-900 border-slate-900 text-white"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    ? "bg-ink-900 border-ink-900 text-white"
+                    : "text-ink-500 bg-ink-100 border border-ink-200 hover:bg-ink-200"
                 )}
                 onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: state.activeTab === 'configuracao' ? 'agendamentos' : 'configuracao' })}
               >
-                <Sliders size={16} />
+                <Sliders size={12} />
                 <span>Configurar Turnos</span>
               </button>
               <button 
                 type="button"
-                className="btn-primary h-11 px-6 rounded-2xl shadow-brand flex items-center gap-2" 
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-750 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95" 
                 onClick={() => { dispatch({ type: 'RESET_FORM' }); dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: true }); }}
               >
-                <Plus size={18} />
-                <span className="font-bold text-xs uppercase tracking-widest">Novo Agendamento</span>
+                <Plus size={11} />
+                <span>Novo Agendamento</span>
               </button>
             </div>
-          }
-        />
+          </div>
+        </div>
 
         {state.activeTab === 'configuracao' ? (
           <ShiftConfigPanel
@@ -434,16 +443,16 @@ export function Appointments() {
             </div>
 
             {/* Filtros e Toolbar */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="bg-white border border-ink-200 rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
                 <div className="relative flex-1 w-full">
-                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
                   <input
                     type="text"
                     placeholder="Buscar por paciente, exame, CPF ou telefone..."
                     value={state.search}
                     onChange={(e) => dispatch({ type: 'SET_SEARCH', payload: e.target.value })}
-                    className="input pl-12 py-3 h-12 text-sm shadow-sm border-slate-200 focus:border-brand-500 w-full"
+                    className="input pl-12 py-3 h-12 text-sm shadow-sm border-ink-200 focus:border-brand-500 w-full"
                   />
                 </div>
 
@@ -463,8 +472,8 @@ export function Appointments() {
                         className={classNames(
                           "px-3.5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border",
                           state.statusFilter === f.id
-                            ? "bg-slate-900 border-slate-900 text-white shadow-sm"
-                            : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                            ? "bg-ink-900 border-ink-900 text-white shadow-sm"
+                            : "bg-ink-50 border-ink-200 text-ink-500 hover:bg-ink-100"
                         )}
                       >
                         {f.label}
@@ -481,25 +490,25 @@ export function Appointments() {
                         dispatch({ type: 'SET_STATUS_FILTER', payload: 'todos' });
                         dispatch({ type: 'SET_DATE_FILTER', payload: getLocalDateStr(new Date()) });
                       }}
-                      className="p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 rounded-xl transition-all flex items-center justify-center shadow-sm"
+                      className="p-2.5 text-ink-400 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 rounded-xl transition-all flex items-center justify-center shadow-sm"
                       title="Limpar Filtros"
                     >
                       <RotateCcw size={15} />
                     </button>
                   )}
 
-                  <div className="w-[1px] h-6 bg-slate-200 hidden sm:block" />
+                  <div className="w-[1px] h-6 bg-ink-200 hidden sm:block" />
 
                   {/* View mode toggle */}
-                  <div className="flex border border-slate-200 rounded-xl p-0.5 bg-slate-50 shadow-inner shrink-0">
+                  <div className="flex border border-ink-200 rounded-xl p-0.5 bg-ink-50 shadow-inner shrink-0">
                     <button
                       type="button"
                       onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'cards' })}
                       className={classNames(
                         "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1",
                         state.viewMode === 'cards'
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
+                          ? "bg-white text-ink-900 shadow-sm"
+                          : "text-ink-500 hover:text-ink-700"
                       )}
                     >
                       Cards
@@ -510,8 +519,8 @@ export function Appointments() {
                       className={classNames(
                         "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1",
                         state.viewMode === 'timeline'
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
+                          ? "bg-white text-ink-900 shadow-sm"
+                          : "text-ink-500 hover:text-ink-700"
                       )}
                     >
                       <Clock size={11} /> Timeline
@@ -525,18 +534,18 @@ export function Appointments() {
             {loadingAppointments ? (
               <div className="flex flex-col gap-3">
                 {[1, 2, 3].map(i => (
-                  <div key={i} className="h-28 bg-white border border-slate-100 rounded-3xl animate-pulse" />
+                  <div key={i} className="h-28 bg-white border border-ink-100 rounded-2xl animate-pulse" />
                 ))}
               </div>
             ) : filteredAppointments.length === 0 ? (
-              <div className="text-center py-20 bg-white border border-slate-200 rounded-3xl">
-                <CalendarDays size={48} className="mx-auto text-slate-200 mb-4 animate-pulse" />
-                <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Nenhum Agendamento Localizado</h4>
-                <p className="text-xs text-slate-400 mt-1">Experimente navegar pelo calendário acima ou clique para criar um novo.</p>
+              <div className="text-center py-20 bg-white border border-ink-200 rounded-2xl shadow-sm">
+                <CalendarDays size={48} className="mx-auto text-ink-200 mb-4 animate-pulse" />
+                <h4 className="text-sm font-black text-ink-700 uppercase tracking-widest">Nenhum Agendamento Localizado</h4>
+                <p className="text-xs text-ink-400 mt-1">Experimente navegar pelo calendário acima ou clique para criar um novo.</p>
                 <button 
                   type="button"
                   onClick={() => { dispatch({ type: 'RESET_FORM' }); dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: true }); }}
-                  className="mt-5 px-5 py-2.5 bg-slate-900 text-white font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-sm active:scale-95"
+                  className="mt-5 px-5 py-2.5 bg-ink-900 text-white font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all shadow-sm active:scale-95"
                 >
                   Novo Agendamento
                 </button>
@@ -577,7 +586,7 @@ export function Appointments() {
                     }}
                   />
                 ) : (
-                  <div className="text-center py-12 text-slate-400 italic text-xs">
+                  <div className="text-center py-12 text-ink-400 italic text-xs">
                     Nenhuma clínica selecionada para gerar a timeline.
                   </div>
                 )}
@@ -663,12 +672,12 @@ export function Appointments() {
       {/* CANCELLATION CONFIRMATION DIALOG */}
       <AnimatePresence>
         {state.cancelingApp && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm animate-in fade-in duration-300">
             <motion.div 
               initial={{ scale: 0.96, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 15 }}
-              className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-sm w-full overflow-hidden"
+              className="bg-white rounded-2xl border border-ink-100 shadow-2xl max-w-sm w-full overflow-hidden"
             >
               <div className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
@@ -676,19 +685,19 @@ export function Appointments() {
                     <AlertCircle size={20} />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-slate-900 leading-tight">Cancelar Agendamento</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Esta ação é irreversível</p>
+                    <h3 className="text-base font-black text-ink-900 leading-tight">Cancelar Agendamento</h3>
+                    <p className="text-[10px] text-ink-400 font-bold uppercase tracking-wider">Esta ação é irreversível</p>
                   </div>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs text-ink-600 leading-relaxed">
                   Tem certeza que deseja cancelar o agendamento de **{state.cancelingApp.patientName}** para o procedimento de **{state.cancelingApp.examType}**?
                 </p>
               </div>
-              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-ink-50 border-t border-ink-100 flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => dispatch({ type: 'SET_CANCELING_APP', payload: null })}
-                  className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                  className="px-4 py-2 border border-ink-200 hover:bg-ink-100 text-ink-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
                 >
                   Manter Ativo
                 </button>
@@ -708,12 +717,12 @@ export function Appointments() {
       {/* DELETION CONFIRMATION DIALOG */}
       <AnimatePresence>
         {state.deletingApp && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-ink-900/40 backdrop-blur-sm animate-in fade-in duration-300">
             <motion.div 
               initial={{ scale: 0.96, opacity: 0, y: 15 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 15 }}
-              className="bg-white rounded-3xl border border-slate-100 shadow-2xl max-w-sm w-full overflow-hidden"
+              className="bg-white rounded-2xl border border-ink-100 shadow-2xl max-w-sm w-full overflow-hidden"
             >
               <div className="p-6 space-y-4">
                 <div className="flex items-center gap-3">
@@ -721,19 +730,19 @@ export function Appointments() {
                     <Trash2 size={20} />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-slate-900 leading-tight">Excluir Agendamento</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Remoção permanente</p>
+                    <h3 className="text-base font-black text-ink-900 leading-tight">Excluir Agendamento</h3>
+                    <p className="text-[10px] text-ink-400 font-bold uppercase tracking-wider">Remoção permanente</p>
                   </div>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs text-ink-600 leading-relaxed">
                   Tem certeza que deseja **excluir permanentemente** do banco de dados o agendamento de **{state.deletingApp.patientName}**? Esta ação não pode ser desfeita.
                 </p>
               </div>
-              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-ink-50 border-t border-ink-100 flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => dispatch({ type: 'SET_DELETING_APP', payload: null })}
-                  className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
+                  className="px-4 py-2 border border-ink-200 hover:bg-ink-100 text-ink-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all"
                 >
                   Manter
                 </button>

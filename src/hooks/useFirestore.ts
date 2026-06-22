@@ -4,12 +4,13 @@ import {
   doc,
   onSnapshot,
   query,
-  where,
-  orderBy,
   limit,
   QueryConstraint,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
+import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
+import { logger } from '../utils/logger';
+import { resolveAdminUid } from '../store/db';
 
 // ─── Helper: user-scoped collection path ───
 function userPath(collectionName: string): string {
@@ -18,8 +19,8 @@ function userPath(collectionName: string): string {
   return `users/${uid}/${collectionName}`;
 }
 
-// Cache global para evitar múltiplas queries do UID do administrador
-let cachedAdminUid: string | null = null;
+// Cache local para a hook, inicialmente nulo
+let localCachedAdminUid: string | null = null;
 
 // ─── useCollection: realtime listener for a collection ───
 interface UseCollectionOptions {
@@ -36,18 +37,20 @@ export function useCollection<T extends { id: string }>(
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [adminUid, setAdminUid] = useState<string | null>(cachedAdminUid);
+  const [adminUid, setAdminUid] = useState<string | null>(localCachedAdminUid);
 
   // Serialize constraints for dependency array
   const constraintKey = JSON.stringify(constraints.map((c) => c.toString()));
 
-  // Hardcoded UID do administrador matheuskpires@gmail.com
-  // Evita falhas de permissão ao tentar buscar na coleção de 'users' via getDocs()
   useEffect(() => {
-    if (!enabled || !auth.currentUser || cachedAdminUid) return;
+    if (!enabled || !auth.currentUser) return;
 
-    cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
-    setAdminUid(cachedAdminUid);
+    resolveAdminUid().then(uid => {
+      if (uid) {
+        localCachedAdminUid = uid;
+        setAdminUid(uid);
+      }
+    });
   }, [enabled, auth.currentUser?.uid]);
 
   useEffect(() => {
@@ -66,9 +69,9 @@ export function useCollection<T extends { id: string }>(
     let adminDocs: T[] = [];
 
     const updateCombinedData = () => {
-      if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+      if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== ADMIN_EMAIL) {
         const combined = [...userDocs];
-        adminDocs.forEach((aDoc: any) => {
+        adminDocs.forEach((aDoc: T) => {
           if (!combined.some((uDoc) => uDoc.id === aDoc.id)) {
             combined.push({
               ...aDoc,
@@ -94,14 +97,14 @@ export function useCollection<T extends { id: string }>(
         updateCombinedData();
       },
       (err) => {
-        console.error(`[Firestore] Error listening to ${collectionName}:`, err);
+        logger.error(`Firestore: erro ao ouvir ${collectionName}`, err);
         setError(err.message);
         setLoading(false);
       }
     );
 
     // Se for templates e o usuário atual não for o admin, escuta também a coleção do admin em tempo real
-    if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== 'matheuskpires@gmail.com' && adminUid) {
+    if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== ADMIN_EMAIL && adminUid) {
       const adminPath = `users/${adminUid}/templates`;
       const adminColRef = collection(firestore, adminPath);
       // Carrega apenas os modelos globais/padrões do admin (sem clinicId específico)
@@ -118,7 +121,7 @@ export function useCollection<T extends { id: string }>(
             updateCombinedData();
           },
           (err) => {
-            console.warn(`[Firestore] Erro ao carregar máscaras padrão do sistema:`, err);
+            logger.warn(`[Firestore] Erro ao carregar máscaras padrão do sistema:`, err);
           }
         );
       });
@@ -162,52 +165,36 @@ export function useDocument<T extends { id: string }>(
           setError(null);
         } else {
           // Se for templates e não achar no escopo do usuário, tenta carregar do administrador
-          if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== 'matheuskpires@gmail.com') {
-            if (cachedAdminUid) {
-              const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, documentId);
-              import('firebase/firestore').then(({ onSnapshot: snapListener }) => {
-                unsubscribeAdmin = snapListener(
-                  adminDocRef,
-                  (adminSnap) => {
-                    if (adminSnap.exists()) {
-                      setData({ ...adminSnap.data(), id: adminSnap.id, isSystem: true } as any);
-                    } else {
+          // Se for templates e não achar no escopo do usuário, tenta carregar do administrador
+          if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== ADMIN_EMAIL) {
+            resolveAdminUid().then(adminUid => {
+              if (adminUid) {
+                const adminDocRef = doc(firestore, `users/${adminUid}/templates`, documentId);
+                import('firebase/firestore').then(({ onSnapshot: snapListener }) => {
+                  unsubscribeAdmin = snapListener(
+                    adminDocRef,
+                    (adminSnap) => {
+                      if (adminSnap.exists()) {
+                        setData({ ...adminSnap.data(), id: adminSnap.id, isSystem: true } as unknown as T);
+                      } else {
+                        setData(null);
+                      }
+                      setLoading(false);
+                      setError(null);
+                    },
+                    (err) => {
+                      logger.warn(`[useDocument] Erro ao assinar fallback do admin:`, err);
                       setData(null);
+                      setLoading(false);
                     }
-                    setLoading(false);
-                    setError(null);
-                  },
-                  (err) => {
-                    console.warn(`[useDocument] Erro ao assinar fallback do admin:`, err);
-                    setData(null);
-                    setLoading(false);
-                  }
-                );
-              });
-            } else {
-              // Usa o UID hardcoded do admin
-              cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
-              import('firebase/firestore').then(({ onSnapshot: snapListener }) => {
-                const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, documentId);
-                unsubscribeAdmin = snapListener(
-                  adminDocRef,
-                  (adminSnap) => {
-                    if (adminSnap.exists()) {
-                      setData({ ...adminSnap.data(), id: adminSnap.id, isSystem: true } as any);
-                    } else {
-                      setData(null);
-                    }
-                    setLoading(false);
-                    setError(null);
-                  },
-                  (err) => {
-                    console.warn(`[useDocument] Erro ao assinar fallback do admin:`, err);
-                    setData(null);
-                    setLoading(false);
-                  }
-                );
-              });
-            }
+                  );
+                });
+              } else {
+                setData(null);
+                setLoading(false);
+                setError(null);
+              }
+            });
           } else {
             setData(null);
             setLoading(false);
@@ -216,7 +203,7 @@ export function useDocument<T extends { id: string }>(
         }
       },
       (err) => {
-        console.error(`[Firestore] Error listening to ${collectionName}/${documentId}:`, err);
+        logger.error(`Firestore: erro ao ouvir ${collectionName}/${documentId}`, err);
         setError(err.message);
         setLoading(false);
       }
@@ -267,7 +254,7 @@ export function usePaginatedCollection<T extends { id: string }>(
         setError(null);
       },
       (err) => {
-        console.error(`[Firestore] Error listening to paginated ${collectionName}:`, err);
+        logger.error(`Firestore: erro ao ouvir paginado ${collectionName}`, err);
         setError(err.message);
         setLoading(false);
       }

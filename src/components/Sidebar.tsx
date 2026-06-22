@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
+import { useSubscription } from '../hooks/useSubscription';
 import { useCollection } from '../hooks/useFirestore';
 import { Clinic, ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
-  Calculator, Sparkles, Hospital, Sliders, PanelLeftClose,
+  Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
-  Users, LogOut, CalendarDays
+  Users, LogOut, CalendarDays, Database
 } from 'lucide-react';
 import { classNames } from '../utils/format';
-import { CreateExamModal } from './CreateExamModal';
 import { LogoIcon } from './LogoIcon';
 
 const items = [
@@ -20,9 +20,9 @@ const items = [
   { key: 'appointments', label: 'Agendamentos', icon: CalendarDays, view: { name: 'appointments' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'templates', label: 'Máscaras', icon: FileSignature, view: { name: 'templates' as const }, roles: ['admin', 'medico'] },
-  { key: 'laud-ia', label: 'LaudIA', icon: Sparkles, view: { name: 'laud-ia' as const }, roles: ['admin', 'medico'] },
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  { key: 'dicom', label: 'PACS / DICOM', icon: Database, view: { name: 'dicom' as const }, roles: ['admin', 'medico'] },
   { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
 ];
 
@@ -45,7 +45,8 @@ export function Sidebar() {
     showToast, setShowCreateExamModal, setShowSupportModal, settings
   } = useApp();
   const { user, signOut } = useAuth();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, role } = useAdmin();
+  const { hasPacs, hasCalculators, hasAppointments, hasClinics } = useSubscription();
   const isTablet = useIsTablet();
 
   // Auto-collapse on tablet, expanded on desktop
@@ -156,7 +157,7 @@ export function Sidebar() {
         <button
           onClick={() => setShowCreateExamModal(true)}
           className={classNames(
-            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-slate-900 text-white hover:bg-slate-800 active:scale-95 shadow-sm',
+            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-ink-900 text-white hover:bg-ink-800 active:scale-95 shadow-sm',
             collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
           )}
           title="Novo Laudo"
@@ -165,14 +166,22 @@ export function Sidebar() {
           {!collapsed && <span className="animate-fade-in">Novo Laudo</span>}
         </button>
 
-        {items.filter(item => item.roles.includes(settings.currentRole || 'medico')).map(item => {
+        {items
+          .filter(item => item.roles.includes(role || 'medico'))
+          .filter(item => {
+            if (item.key === 'dicom') return hasPacs;
+            if (item.key === 'calculators') return hasCalculators;
+            if (item.key === 'appointments') return hasAppointments;
+            if (item.key === 'clinics') return hasClinics;
+            return true;
+          })
+          .map(item => {
           const isActive = view.name === item.key ||
             (item.key === 'patients' && view.name === 'patient-detail') ||
             (item.key === 'templates' && view.name === 'template-editor') ||
             (item.key === 'worklist' && view.name === 'exam-editor') ||
             (item.key === 'clinics' && (view.name === 'clinic-detail' || view.name === 'clinic-form'));
           const Icon = item.icon;
-          const isLaudIA = item.key === 'laud-ia';
 
           return (
             <button
@@ -183,18 +192,10 @@ export function Sidebar() {
                 collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5',
                 isActive
                   ? 'bg-brand-50 text-brand-700 shadow-soft border border-brand-100/50'
-                  : isLaudIA
-                    ? 'text-violet-600 hover:bg-violet-50 hover:text-violet-700'
-                    : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900'
+                  : 'text-ink-600 hover:bg-ink-50 hover:text-ink-900'
               )}
             >
-              <Icon
-                size={collapsed ? 18 : 16}
-                className={classNames(
-                  "shrink-0 transition-transform duration-200 group-hover:scale-110",
-                  isLaudIA && !isActive ? "text-violet-500" : ""
-                )}
-              />
+              <Icon size={collapsed ? 18 : 16} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
               {!collapsed && (
                 <span className="animate-fade-in flex-1 text-left">{item.label}</span>
               )}
@@ -207,11 +208,6 @@ export function Sidebar() {
               )}
               {collapsed && item.key === 'worklist' && pendingCount > 0 && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full ring-2 ring-white shadow-sm" />
-              )}
-
-              {/* LaudIA sparkle badge */}
-              {!collapsed && isLaudIA && (
-                <span className="ml-auto text-[9px] bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider animate-fade-in">IA</span>
               )}
 
               {/* Tooltip for collapsed state */}
@@ -238,15 +234,15 @@ export function Sidebar() {
               'sidebar-nav-item w-full flex items-center rounded-2xl transition-all duration-300 relative overflow-hidden group',
               collapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3',
               view.name === 'admin'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                ? 'bg-ink-900 text-white'
+                : 'bg-white text-ink-700 border border-ink-200 hover:bg-ink-50 hover:border-ink-300 shadow-sm'
             )}
           >
-            <ShieldCheck size={collapsed ? 20 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-slate-300" : "text-slate-500")} />
+            <ShieldCheck size={collapsed ? 20 : 18} className={classNames("shrink-0 transition-transform group-hover:scale-110", view.name === 'admin' ? "text-ink-300" : "text-ink-500")} />
             {!collapsed && (
               <div className="flex flex-col items-start leading-none">
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] animate-fade-in">Administração</span>
-                <span className="text-[9px] text-slate-400 font-semibold mt-1 transition-colors uppercase tracking-widest">Master Panel</span>
+                <span className="text-[9px] text-ink-400 font-semibold mt-1 transition-colors uppercase tracking-widest">Master Panel</span>
               </div>
             )}
             {collapsed && (
@@ -329,13 +325,13 @@ export function Sidebar() {
         {!collapsed && (
           <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-2 text-[9px] bg-slate-50 text-slate-600 px-3 py-1.5 rounded-full font-bold border border-slate-200 uppercase tracking-widest">
+              <span className="inline-flex items-center gap-2 text-[9px] bg-ink-50 text-ink-600 px-3 py-1.5 rounded-full font-bold border border-ink-200 uppercase tracking-widest">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Online
               </span>
               <button
                 onClick={() => setShowSupportModal(true)}
-                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-slate-50 text-slate-700 px-3 py-1.5 rounded-full font-bold border border-slate-200 uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 text-[9px] bg-ink-50 text-ink-700 px-3 py-1.5 rounded-full font-bold border border-ink-200 uppercase tracking-widest hover:bg-ink-100 transition-all active:scale-95"
               >
                 <LifeBuoy size={12} />
                 Suporte
@@ -354,7 +350,7 @@ export function Sidebar() {
             {/* Version badge */}
             <div className="text-center pt-1">
               <span className="text-[8px] font-black text-ink-300 uppercase tracking-[0.2em]">
-                LAUD.US v3.0.1 · LAUD.IA
+                LAUD.US v2.0 · LAUD.IA v2.0
               </span>
             </div>
           </div>

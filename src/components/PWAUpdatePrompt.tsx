@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Download, X, RefreshCw } from 'lucide-react';
+import { logger } from '../utils/logger';
 
 /**
  * PWAUpdatePrompt — Exibe um banner elegante quando uma nova versão
@@ -52,7 +53,7 @@ export function PWAUpdatePrompt() {
           navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
         };
       } catch (err) {
-        console.warn('[PWA Update] Erro ao verificar atualização:', err);
+        logger.warn('[PWA Update] Erro ao verificar atualização:', err);
       }
     };
 

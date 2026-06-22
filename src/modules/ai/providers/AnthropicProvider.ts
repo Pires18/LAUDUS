@@ -1,6 +1,8 @@
 import { AppSettings } from '../../../types';
 import { AiProvider, BuiltPrompt } from '../types';
 import { robustJsonParse } from '../json';
+import { logger } from '../../../utils/logger';
+import { auth } from '../../../lib/firebase';
 
 export function getAnthropicBaseUrl(): string {
   const isLocalDev = typeof window !== 'undefined' &&
@@ -10,7 +12,26 @@ export function getAnthropicBaseUrl(): string {
 
 export class AnthropicProvider implements AiProvider {
   resolveModelName(settings: AppSettings, mode: string, area: string): string {
-    return settings.anthropicModel || 'claude-3-5-sonnet-latest';
+    const raw = settings.anthropicModel || 'claude-3-5-sonnet-latest';
+    if (raw === 'claude-sonnet-4-6') return 'claude-3-5-sonnet-latest';
+    if (raw === 'claude-opus-4-5') return 'claude-3-opus-20240229';
+    return raw;
+  }
+
+  /** Computa o header anthropic-beta correto com base no modelo selecionado */
+  private getBetaHeader(settings: AppSettings): string {
+    const model = this.resolveModelName(settings, 'geral', 'geral');
+    const headers = ['prompt-caching-2024-07-31'];
+
+    if (model.includes('3-7') || model.includes('opus')) {
+      // Extended Thinking support for claude-3-7 and claude-opus
+      headers.push('interleaved-thinking-2025-05-14');
+      headers.push('output-128k-2025-02-19');
+    } else {
+      // Legacy max-tokens for 3-5-sonnet
+      headers.push('max-tokens-3-5-sonnet-2024-07-15');
+    }
+    return headers.join(', ');
   }
 
   async generate(
@@ -32,17 +53,19 @@ export class AnthropicProvider implements AiProvider {
     if (built.areaContext) {
       systemBlocks.push({
         type: 'text',
-        text: built.areaContext
+        text: built.areaContext,
+        cache_control: { type: 'ephemeral' }
       });
     }
 
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey!,
+        'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'content-type': 'application/json'
+        'anthropic-beta': this.getBetaHeader(settings),
+        'content-type': 'application/json',
+        'x-api-key': settings.anthropicApiKey || ''
       },
       body: JSON.stringify({
         model: this.resolveModelName(settings, mode, area),
@@ -70,7 +93,7 @@ export class AnthropicProvider implements AiProvider {
     settings: AppSettings,
     area: string,
     mode: string,
-    onChunk: (text: string) => void,
+    onChunk: (text: string, rawText?: string) => void,
     signal?: AbortSignal,
     onComplete?: (scratchpad?: string) => void,
     helpers?: any
@@ -85,17 +108,19 @@ export class AnthropicProvider implements AiProvider {
     if (built.areaContext) {
       systemBlocks.push({
         type: 'text',
-        text: built.areaContext
+        text: built.areaContext,
+        cache_control: { type: 'ephemeral' }
       });
     }
 
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-api-key': settings.anthropicApiKey!,
+        'x-uid': auth.currentUser?.uid || 'anonymous',
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31, max-tokens-3-5-sonnet-2024-07-15',
-        'content-type': 'application/json'
+        'anthropic-beta': this.getBetaHeader(settings),
+        'content-type': 'application/json',
+        'x-api-key': settings.anthropicApiKey || ''
       },
       body: JSON.stringify({
         model: this.resolveModelName(settings, mode, area),
@@ -120,33 +145,44 @@ export class AnthropicProvider implements AiProvider {
     let fullText = '';
     let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (true) {
+        if (signal?.aborted) break;
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        const cleanLine = line.trim();
-        if (!cleanLine || !cleanLine.startsWith('data:')) continue;
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (!cleanLine || !cleanLine.startsWith('data:')) continue;
 
-        const dataStr = cleanLine.slice(5).trim();
-        if (dataStr === '[DONE]') continue;
+          const dataStr = cleanLine.slice(5).trim();
+          if (dataStr === '[DONE]') continue;
 
-        try {
-          const parsed = JSON.parse(dataStr);
-          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-            fullText += parsed.delta.text;
-            onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)));
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+              fullText += parsed.delta.text;
+              onChunk(helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText)), fullText);
+            }
+          } catch {
+            // Ignorar eventos SSE não-JSON (ex: event:, ping)
           }
-        } catch {
-          // Ignorar eventos não-JSON
         }
       }
+    } catch (streamErr) {
+      if (signal?.aborted || (streamErr instanceof Error && streamErr.name === 'AbortError')) {
+        throw streamErr;
+      }
+      throw new Error(`Erro durante streaming Anthropic: ${streamErr instanceof Error ? streamErr.message : String(streamErr)}`);
+    } finally {
+      reader.cancel().catch(() => {});
     }
 
+    if (onComplete) onComplete(helpers.extractScratchpad(fullText));
     return helpers.stripScratchpad(helpers.cleanMarkdownFromResponse(fullText));
   }
 
@@ -165,12 +201,13 @@ export class AnthropicProvider implements AiProvider {
       const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
         method: 'POST',
         headers: {
-          'x-api-key': settings.anthropicApiKey!,
+          'x-uid': auth.currentUser?.uid || 'anonymous',
           'anthropic-version': '2023-06-01',
-          'content-type': 'application/json'
+          'content-type': 'application/json',
+          'x-api-key': settings.anthropicApiKey || ''
         },
         body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
+          model: this.resolveModelName(settings, 'geral', 'geral'),
           max_tokens: 2048,
           system: built.universalContext,
           messages: [{ role: 'user', content: prompt }],
@@ -193,7 +230,7 @@ export class AnthropicProvider implements AiProvider {
     try {
       return robustJsonParse(text);
     } catch (e: any) {
-      console.warn('Auto-healing JSON parsing triggered for Anthropic:', e.message);
+      logger.warn('Auto-healing JSON parsing triggered for Anthropic:', e.message);
       text = await attemptFetch(true, e.message);
       return robustJsonParse(text);
     }

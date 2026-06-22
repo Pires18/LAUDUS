@@ -16,14 +16,41 @@ import {
   query,
   where,
   orderBy,
-  limit,
   onSnapshot,
   writeBatch,
   QueryConstraint,
+  limit,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../modules/ai/prompts/general';
+import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
+import { logger } from '../utils/logger';
+import { encryptPassword, decryptPassword } from '../utils/crypto';
+
+async function decryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
+  settings: T
+): Promise<T> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return settings;
+  const [pw, bkpw] = await Promise.all([
+    settings.dicomPassword ? decryptPassword(settings.dicomPassword, uid) : Promise.resolve(''),
+    settings.dicomBackupPassword ? decryptPassword(settings.dicomBackupPassword, uid) : Promise.resolve(''),
+  ]);
+  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw };
+}
+
+async function encryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
+  settings: T
+): Promise<T> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return settings;
+  const [pw, bkpw] = await Promise.all([
+    settings.dicomPassword ? encryptPassword(settings.dicomPassword, uid) : Promise.resolve(''),
+    settings.dicomBackupPassword ? encryptPassword(settings.dicomBackupPassword, uid) : Promise.resolve(''),
+  ]);
+  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw };
+}
 
 // Cache global para evitar múltiplas queries do UID do administrador
 let cachedAdminUid: string | null = null;
@@ -108,14 +135,14 @@ export async function getSettings(): Promise<AppSettings> {
     const snap = await getDoc(docRef);
     const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
     
-    let defaultSettings: AppSettings = { 
+    let defaultSettings: AppSettings = {
       geminiModel: 'gemini-3.5-flash',
-      aiProvider: 'anthropic', 
-      anthropicModel: 'claude-3-5-sonnet-latest',
+      aiProvider: 'anthropic',
+      anthropicModel: 'claude-sonnet-4-6',
       dicomSyncEnabled: true,
-      dicomWorklistFolder: isWindows 
-        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-        : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
+      dicomWorklistFolder: isWindows
+        ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+        : '',
       dicomModalityAETitle: 'MINDRAYMX7',
       dicomModalityType: 'US',
       dicomOrthancAETitle: '',
@@ -141,65 +168,86 @@ export async function getSettings(): Promise<AppSettings> {
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
-    // Realiza a migração automática de caminhos antigos para o novo local no SSD do usuário
-    let migrated = false;
-    if (data.dicomWorklistFolder && data.dicomWorklistFolder.includes('/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase')) {
-      data.dicomWorklistFolder = data.dicomWorklistFolder.replace(
-        '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase',
-        '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase'
-      );
-      migrated = true;
-    }
+    // ── Versioned settings migrations ───────────────────────────────────────
+    // Add new entries at the END. Never change existing version numbers.
+    const SETTINGS_MIGRATIONS: Array<{ version: number; name: string; apply: (s: AppSettings) => void }> = [
+      {
+        version: 1,
+        name: 'worklist-path-to-ssd',
+        apply: (s) => {
+          if (s.dicomWorklistFolder?.includes('/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase')) {
+            s.dicomWorklistFolder = s.dicomWorklistFolder.replace(
+              '/Users/matheuskistenmackerpires/Documents/OrthancServer/db/WorklistsDatabase',
+              '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase'
+            );
+          }
+        }
+      },
+      {
+        version: 2,
+        name: 'dicom-viewer-url-pattern-uid',
+        apply: (s) => {
+          if (s.dicomViewerUrlPattern?.includes('1.2.276.0.7230010.3.1.2.{{examId}}')) {
+            s.dicomViewerUrlPattern = s.dicomViewerUrlPattern.replace('1.2.276.0.7230010.3.1.2.{{examId}}', '{{StudyInstanceUID}}');
+          }
+        }
+      },
+      {
+        version: 3,
+        name: 'dicom-viewer-url-add-port',
+        apply: (s) => {
+          if (s.dicomViewerUrl === 'https://servidor-mac.tail861dda.ts.net/') {
+            s.dicomViewerUrl = 'https://servidor-mac.tail861dda.ts.net:8443/';
+          }
+        }
+      },
+      {
+        version: 4,
+        name: 'dicom-local-agent-url-normalize',
+        apply: (s) => {
+          if (s.dicomLocalAgentUrl?.includes('servidor-mac.tail861dda.ts.net') && s.dicomLocalAgentUrl !== 'https://servidor-mac.tail861dda.ts.net') {
+            s.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net';
+          }
+        }
+      },
+      {
+        version: 5,
+        name: 'anthropic-model-upgrade-to-sonnet-4-6',
+        apply: (s) => {
+          if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
+            s.anthropicModel = 'claude-sonnet-4-6';
+          }
+        }
+      },
+    ];
 
-    if (data.dicomViewerUrlPattern && data.dicomViewerUrlPattern.includes('1.2.276.0.7230010.3.1.2.{{examId}}')) {
-      data.dicomViewerUrlPattern = data.dicomViewerUrlPattern.replace('1.2.276.0.7230010.3.1.2.{{examId}}', '{{StudyInstanceUID}}');
-      migrated = true;
-    }
-
-    if (data.dicomViewerUrl === 'https://servidor-mac.tail861dda.ts.net/') {
-      data.dicomViewerUrl = 'https://servidor-mac.tail861dda.ts.net:8443/';
-      migrated = true;
-    }
-
-    if (
-      data.dicomLocalAgentUrl && 
-      data.dicomLocalAgentUrl.includes('servidor-mac.tail861dda.ts.net') && 
-      data.dicomLocalAgentUrl !== 'https://servidor-mac.tail861dda.ts.net'
-    ) {
-      data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net';
-      migrated = true;
-    }
-
-    // Forçar migração para o novo padrão Tailscale solicitado pelo usuário
-    if (auth.currentUser?.email === 'matheuskpires@gmail.com') {
-      if (data.dicomViewerUrl !== 'http://100.93.111.95:8042' || data.dicomBackupViewerUrl !== 'http://100.124.187.11:8043') {
-      data.dicomViewerUrl = 'http://100.93.111.95:8042';
-      data.dicomLocalAgentUrl = 'https://servidor-mac.tail861dda.ts.net:10443';
-      data.dicomOrthancAETitle = 'ORTHANCPACS';
-      data.dicomWorklistFolder = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-      data.dicomBackupSyncEnabled = true;
-      data.dicomBackupViewerUrl = 'http://100.124.187.11:8043';
-      data.dicomBackupLocalAgentUrl = 'https://servidor-notebook.tail861dda.ts.net:10443';
-      data.dicomBackupOrthancAETitle = 'ORTHANCBACKUP';
-      data.dicomBackupWorklistFolder = 'C:\\ORTHANCSERVER\\DB\\WORKLISTSDATABASE\\';
-      data.dicomUsername = 'admin';
-      data.dicomPassword = '123456789';
-      data.dicomBackupUsername = 'admin';
-      data.dicomBackupPassword = '123456789';
-      migrated = true;
+    const currentVersion: number = (data as any)._settingsMigrationVersion ?? 0;
+    const pendingMigrations = SETTINGS_MIGRATIONS.filter(m => m.version > currentVersion);
+    if (pendingMigrations.length > 0 && snap.exists()) {
+      for (const migration of pendingMigrations) {
+        try {
+          migration.apply(data);
+          logger.info(`[DB] Migration ${migration.version} (${migration.name}) aplicada`);
+        } catch (err) {
+          logger.warn(`[DB] Falha na migration ${migration.version} (${migration.name}):`, err);
+        }
       }
-    }
-
-    if (migrated && snap.exists()) {
-      saveSettings(data).catch(err => console.warn('[DB] Falha ao persistir migração de settings:', err));
+      const latestVersion = pendingMigrations[pendingMigrations.length - 1].version;
+      (data as any)._settingsMigrationVersion = latestVersion;
+      saveSettings(data).catch(err => logger.warn('[DB] Falha ao persistir migrations:', err));
     }
 
     // Se o preset for modificado localmente, a configuração persistirá sem ser sobrescrita.
     
     // Fallback de segurança para buscar prompts oficiais do administrador
-    if (auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+    const isCurrentUserAdmin = auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
+    console.log('[DB] Resolvendo settings. Usuário:', auth.currentUser?.email, 'isAdmin:', isCurrentUserAdmin);
+
+    if (!isCurrentUserAdmin) {
+      console.log('[DB] Buscando configurações globais do administrador...');
       const adminSettings = await getAdminSettings();
       if (adminSettings) {
+        console.log('[DB] Configurações globais do administrador carregadas com sucesso. Mesclando com configurações locais...');
         const merged = {
           ...defaultSettings,
           ...data, // Configurações locais do médico (Motor, PACS, CRM, RQE, etc) prevalecem
@@ -212,15 +260,22 @@ export async function getSettings(): Promise<AppSettings> {
           normalDoctrine: adminSettings.normalDoctrine || defaultSettings.normalDoctrine,
           aiAreaPrompts: adminSettings.aiAreaPrompts || defaultSettings.aiAreaPrompts,
           
-          // Chaves de API estritamente isoladas por usuário (sem fallback do admin)
-          geminiApiKey: data.geminiApiKey || '',
-          anthropicApiKey: data.anthropicApiKey || '',
+          // Chaves de API, provedor, modelo e temperaturas herdados do administrador:
+          aiProvider: adminSettings.aiProvider || data.aiProvider || defaultSettings.aiProvider,
+          geminiModel: adminSettings.geminiModel || data.geminiModel || defaultSettings.geminiModel,
+          anthropicModel: adminSettings.anthropicModel || data.anthropicModel || defaultSettings.anthropicModel,
+          geminiApiKey: adminSettings.geminiApiKey || data.geminiApiKey || '',
+          anthropicApiKey: adminSettings.anthropicApiKey || data.anthropicApiKey || '',
+          aiTemperatureByMode: adminSettings.aiTemperatureByMode || data.aiTemperatureByMode || {},
+          aiTemperature: adminSettings.aiTemperature ?? data.aiTemperature ?? defaultSettings.aiTemperature,
         };
-        
+
         if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
-          merged.anthropicModel = 'claude-3-5-sonnet-latest';
+          merged.anthropicModel = 'claude-sonnet-4-6';
         }
-        return merged;
+        return decryptDicomPasswords(merged);
+      } else {
+        console.warn('[DB] getAdminSettings retornou null. O médico não pôde herdar as chaves e prompts do admin.');
       }
     }
     const finalData = { ...defaultSettings, ...data };
@@ -228,23 +283,38 @@ export async function getSettings(): Promise<AppSettings> {
     finalData.aiGlobalInstructions = finalData.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
     finalData.aiStructurePrompt = finalData.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
     finalData.aiRigidRules = finalData.aiRigidRules || DEFAULT_RIGID_RULES;
-    
+
     if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
-      finalData.anthropicModel = 'claude-3-5-sonnet-latest';
+      finalData.anthropicModel = 'claude-sonnet-4-6';
     }
-    return finalData;
+
+    // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
+    if (isCurrentUserAdmin || finalData.currentRole === 'admin') {
+      console.log('[DB] Usuário é administrador. Publicando/sincronizando configurações na coleção global (global_config/admin_settings)...');
+      const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+      setDoc(globalDocRef, sanitize({
+        ...finalData,
+        adminUid: auth.currentUser?.uid,
+        adminEmail: auth.currentUser?.email || '',
+        updatedAt: Date.now()
+      }), { merge: true })
+        .then(() => console.log('[DB] Sincronização global concluída.'))
+        .catch(err => console.error('[DB] Erro ao sincronizar global settings do admin:', err));
+    }
+
+    return decryptDicomPasswords(finalData);
   } catch (err) {
-    console.warn('[DB] Erro ao carregar settings:', err);
+    logger.warn('[DB] Erro ao carregar settings:', err);
   }
   const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
-  return { 
+  return {
     geminiModel: 'gemini-3.5-flash',
-    aiProvider: 'anthropic', 
-    anthropicModel: 'claude-3-5-sonnet-latest',
+    aiProvider: 'anthropic',
+    anthropicModel: 'claude-sonnet-4-6',
     dicomSyncEnabled: true,
-    dicomWorklistFolder: isWindows 
-      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\' 
-      : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/',
+    dicomWorklistFolder: isWindows
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+      : '',
     dicomModalityAETitle: 'MINDRAYMX7',
     dicomModalityType: 'US',
     dicomOrthancAETitle: '',
@@ -270,31 +340,141 @@ export async function getSettings(): Promise<AppSettings> {
   };
 }
 
-export async function getAdminSettings(): Promise<AppSettings | null> {
+export async function resolveAdminUid(): Promise<string | null> {
+  if (cachedAdminUid) return cachedAdminUid;
+  if (ADMIN_UID) {
+    cachedAdminUid = ADMIN_UID;
+    return cachedAdminUid;
+  }
+  
+  // Tenta carregar o UID a partir do documento global compartilhado
   try {
-    if (!cachedAdminUid) {
-      cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
+    const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+    const globalSnap = await getDoc(globalDocRef);
+    if (globalSnap.exists()) {
+      const globalData = globalSnap.data();
+      if (globalData && globalData.adminUid) {
+        console.log('[DB] UID do administrador resolvido do global_config:', globalData.adminUid);
+        cachedAdminUid = globalData.adminUid;
+        return cachedAdminUid;
+      }
     }
-    if (cachedAdminUid) {
-      const adminDocRef = doc(firestore, `users/${cachedAdminUid}/settings`, SETTINGS_DOC_ID);
+  } catch (err) {
+    console.warn('[DB] Erro ao buscar UID do admin em global_config:', err);
+  }
+
+  const adminEmail = (ADMIN_EMAIL || 'matheuskpires@gmail.com').trim().toLowerCase();
+  console.log('[DB] Buscando UID do admin via query de email na coleção users para:', adminEmail);
+  try {
+    const q = query(
+      collection(firestore, 'users'),
+      where('email', '==', adminEmail),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      cachedAdminUid = snap.docs[0].id;
+      console.log('[DB] UID do administrador resolvido por email na coleção users:', cachedAdminUid);
+      return cachedAdminUid;
+    }
+  } catch (err) {
+    console.warn('[DB] Falha ao buscar UID do administrador por email (provável restrição de regras do Firestore):', err);
+  }
+  
+  console.log('[DB] Buscando UID do admin via query de role na coleção users...');
+  try {
+    const q = query(
+      collection(firestore, 'users'),
+      where('role', '==', 'admin'),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      cachedAdminUid = snap.docs[0].id;
+      console.log('[DB] UID do administrador resolvido por role na coleção users:', cachedAdminUid);
+      return cachedAdminUid;
+    }
+  } catch (err) {
+    console.warn('[DB] Falha ao buscar UID do administrador por role (provável restrição de regras do Firestore):', err);
+  }
+  
+  return null;
+}
+
+export async function getAdminSettings(): Promise<AppSettings | null> {
+  console.log('[DB] getAdminSettings iniciada...');
+  try {
+    // 1. Tenta carregar primeiro do global_config para evitar queries bloqueadas na coleção de users
+    const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+    const globalSnap = await getDoc(globalDocRef);
+    if (globalSnap.exists()) {
+      const globalData = globalSnap.data() as AppSettings & { adminUid?: string };
+      console.log('[DB] Documento global_config/admin_settings encontrado com sucesso. Chaves configuradas:', {
+        hasGeminiKey: !!globalData.geminiApiKey,
+        hasAnthropicKey: !!globalData.anthropicApiKey
+      });
+      if (globalData.adminUid) {
+        cachedAdminUid = globalData.adminUid;
+      }
+      if (globalData.anthropicModel === 'claude-3-5-sonnet-latest' || globalData.anthropicModel === 'claude-3-7-sonnet-latest' || globalData.anthropicModel === 'claude-3-5-haiku-latest') {
+        globalData.anthropicModel = 'claude-sonnet-4-6';
+      }
+      return globalData;
+    } else {
+      console.warn('[DB] Documento global_config/admin_settings NÃO existe no Firestore.');
+    }
+
+    // 2. Fallback para carregar do documento de usuário se o global ainda não existir
+    console.log('[DB] Tentando carregar settings diretamente do documento do usuário administrador como fallback...');
+    const adminUid = await resolveAdminUid();
+    if (adminUid) {
+      const adminDocRef = doc(firestore, `users/${adminUid}/settings`, SETTINGS_DOC_ID);
       const adminSnap = await getDoc(adminDocRef);
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AppSettings;
+        console.log('[DB] Settings carregadas do fallback (documento do admin). Chaves:', {
+          hasGeminiKey: !!adminData.geminiApiKey,
+          hasAnthropicKey: !!adminData.anthropicApiKey
+        });
         if (adminData.anthropicModel === 'claude-3-5-sonnet-latest' || adminData.anthropicModel === 'claude-3-7-sonnet-latest' || adminData.anthropicModel === 'claude-3-5-haiku-latest') {
-          adminData.anthropicModel = 'claude-3-5-sonnet-latest';
+          adminData.anthropicModel = 'claude-sonnet-4-6';
         }
         return adminData;
+      } else {
+        console.warn(`[DB] Documento de settings do admin (users/${adminUid}/settings/app) não existe.`);
       }
+    } else {
+      console.warn('[DB] Não foi possível resolver o adminUid para o fallback.');
     }
-  } catch (e) {
-    console.warn('[DB] Erro ao carregar settings do administrador:', e);
+  } catch (e: any) {
+    console.error('[DB] Erro crítico ao carregar settings do administrador:', e);
   }
   return null;
 }
 
 export async function saveSettings(settings: AppSettings): Promise<void> {
+  const encrypted = await encryptDicomPasswords(settings);
   const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
-  await setDoc(docRef, sanitize(settings), { merge: true });
+  await setDoc(docRef, sanitize(encrypted), { merge: true });
+
+  // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
+  const isCurrentUserAdmin = auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
+  if (isCurrentUserAdmin || settings.currentRole === 'admin') {
+    console.log('[DB] Usuário é admin no saveSettings. Sincronizando com global_config/admin_settings...');
+    const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
+    try {
+      await setDoc(globalDocRef, sanitize({
+        ...encrypted,
+        adminUid: auth.currentUser?.uid,
+        adminEmail: auth.currentUser?.email || '',
+        updatedAt: Date.now()
+      }), { merge: true });
+      console.log('[DB] Sincronização global de settings efetuada no salvamento.');
+    } catch (err) {
+      console.error('[DB] Falha crítica ao salvar global settings no Firestore:', err);
+      throw err;
+    }
+  }
 }
 
 // ─── Generic CRUD ───
@@ -334,7 +514,7 @@ export async function addItemWithId<T extends Record<string, unknown>>(
         });
       }
     } catch (err) {
-      console.warn('[DB] Erro ao salvar versão do template no setDoc:', err);
+      logger.warn('[DB] Erro ao salvar versão do template no setDoc:', err);
     }
   }
 
@@ -379,7 +559,7 @@ export async function updateItem(
         });
       }
     } catch (err) {
-      console.warn('[DB] Erro ao salvar versão do template:', err);
+      logger.warn('[DB] Erro ao salvar versão do template:', err);
     }
   }
 
@@ -428,23 +608,20 @@ export async function getItem<T>(
   }
 
   // Fallback de segurança para buscar templates oficiais do administrador/sistema
-  if (collectionName === 'templates' && auth.currentUser?.email !== 'matheuskpires@gmail.com') {
+  if (collectionName === 'templates' && auth.currentUser?.email !== ADMIN_EMAIL) {
     try {
-      // 1. Usa o UID hardcoded do administrador matheuskpires@gmail.com
-      if (!cachedAdminUid) {
-        cachedAdminUid = 'unU2WjwHXYac5lZgiqXMgcWxoBA3';
-      }
+      const adminUid = await resolveAdminUid();
 
       // 2. Tenta carregar o template na coleção do administrador
-      if (cachedAdminUid) {
-        const adminDocRef = doc(firestore, `users/${cachedAdminUid}/templates`, id);
+      if (adminUid) {
+        const adminDocRef = doc(firestore, `users/${adminUid}/templates`, id);
         const adminSnap = await getDoc(adminDocRef);
         if (adminSnap.exists()) {
-          return { id: adminSnap.id, ...adminSnap.data(), isSystem: true } as any;
+          return { id: adminSnap.id, ...adminSnap.data(), isSystem: true } as unknown as T & { id: string };
         }
       }
     } catch (e) {
-      console.warn('[DB] Erro no fallback de template do administrador:', e);
+      logger.warn('[DB] Erro no fallback de template do administrador:', e);
     }
   }
 
@@ -513,20 +690,28 @@ const EXAM_AREAS_SET = new Set([
  * Busca os últimos laudos finalizados do mesmo template ou especialidade (área) para contexto da IA.
  * Garante o escopo multi-tenant do usuário autenticado.
  */
+interface ExamDoc {
+  id: string;
+  area?: string;
+  templateId?: string;
+  reportContent?: string;
+  status?: string;
+  finalizedAt?: number;
+  createdAt?: number;
+}
+
 export async function getRecentFinalizedReports(templateIdOrArea: string, limitCount: number = 3): Promise<string[]> {
   try {
     const isArea = EXAM_AREAS_SET.has(templateIdOrArea);
 
-    // Fetch all finalized exams for this user.
-    // Filtering by status == 'finalizado' is simple equality and doesn't require composite indexes.
     const q = query(
       getCollectionRef('exams'),
       where('status', '==', 'finalizado')
     );
     const snap = await getDocs(q);
-    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ExamDoc));
 
-    let filtered: any[] = [];
+    let filtered: ExamDoc[] = [];
 
     if (isArea) {
       // If templateIdOrArea is an area, filter by area.
@@ -540,7 +725,7 @@ export async function getRecentFinalizedReports(templateIdOrArea: string, limitC
       // If we don't have enough matches for this template, fallback to the same area/specialty
       if (filtered.length < limitCount) {
         // Find the area of the active template
-        const template = await getItem<any>('templates', templateIdOrArea);
+        const template = await getItem<{ area?: string }>('templates', templateIdOrArea);
         const area = template?.area;
         if (area) {
           const areaFallback = docs.filter(d => d.area === area && d.templateId !== templateIdOrArea);
@@ -553,9 +738,9 @@ export async function getRecentFinalizedReports(templateIdOrArea: string, limitC
     return filtered
       .slice(0, limitCount)
       .map(doc => doc.reportContent)
-      .filter(Boolean);
+      .filter((c): c is string => Boolean(c));
   } catch (err) {
-    console.error('Erro ao buscar laudos recentes:', err);
+    logger.error('Erro ao buscar laudos recentes', err);
     return [];
   }
 }
@@ -573,9 +758,8 @@ export async function getPatientPreviousExams(patientId: string, area: string, c
       where('status', '==', 'finalizado')
     );
     const snap = await getDocs(q);
-    const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-    
-    // Filtra pela mesma área e exclui o exame atual
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ExamDoc));
+
     const filtered = docs.filter(d => d.area === area && d.id !== currentExamId);
     
     // Ordena do mais recente para o mais antigo
@@ -584,12 +768,12 @@ export async function getPatientPreviousExams(patientId: string, area: string, c
     return filtered
       .slice(0, limitCount)
       .map(doc => {
-        const dateStr = new Date(doc.finalizedAt || doc.createdAt).toLocaleDateString('pt-BR');
+        const dateStr = new Date(doc.finalizedAt ?? doc.createdAt ?? 0).toLocaleDateString('pt-BR');
         return `[EXAME DE ${dateStr}]\n${doc.reportContent}`;
       })
       .filter(Boolean);
   } catch (err) {
-    console.error('Erro ao buscar histórico clínico do paciente:', err);
+    logger.error('Erro ao buscar histórico clínico do paciente', err);
     return [];
   }
 }
@@ -624,7 +808,7 @@ export async function saveVersionSnapshot(
       updatedAt: Date.now()
     });
   } catch (err) {
-    console.error('[DB] Erro ao salvar snapshot de versão do laudo:', err);
+    logger.error('[DB] Erro ao salvar snapshot de versão do laudo', err);
   }
 }
 
@@ -649,7 +833,7 @@ export async function addAuditLog(log: {
       timestamp: Date.now()
     }));
   } catch (err) {
-    console.error('[DB] Erro ao gravar log de auditoria:', err);
+    logger.error('[DB] Erro ao gravar log de auditoria', err);
   }
 }
 
@@ -719,130 +903,6 @@ export function onSupportTicketsChange(userId: string | null, callback: (tickets
 }
 
 /**
- * Valida um código de licença e ativa a assinatura para o usuário logado.
- */
-export async function validateAndActivateLicense(
-  code: string,
-  uid: string,
-  email: string,
-  displayName: string
-): Promise<void> {
-  const normalizedCode = code.trim().toUpperCase();
-  const licenseRef = doc(firestore, 'plans', `LICENSE_${normalizedCode}`);
-  const licenseSnap = await getDoc(licenseRef);
-
-  if (!licenseSnap.exists()) {
-    throw new Error('Código de licença não encontrado ou inválido.');
-  }
-
-  const licenseData = licenseSnap.data();
-  if (!licenseData.active || licenseData.usedByUid) {
-    throw new Error('Esta licença já foi utilizada ou está inativa.');
-  }
-
-  // Busca os dados do plano associado
-  const planRef = doc(firestore, 'plans', licenseData.planId);
-  const planSnap = await getDoc(planRef);
-  const planName = planSnap.exists() ? planSnap.data().name : licenseData.planName || 'Plano Personalizado';
-
-  const durationMonths = licenseData.durationMonths || 12;
-  const now = Date.now();
-  const expiresAt = durationMonths === 9999 ? null : now + durationMonths * 30 * 24 * 60 * 60 * 1000;
-
-  const batch = writeBatch(firestore);
-
-  // 1. Atualiza o status da licença
-  batch.update(licenseRef, {
-    usedByUid: uid,
-    usedByEmail: email,
-    usedAt: now,
-    expiresAt: expiresAt,
-    active: false, // Marca como consumida
-    updatedAt: now
-  });
-
-  // 2. Atualiza ou cria o documento do usuário
-  const userRef = doc(firestore, 'users', uid);
-  const userSnap = await getDoc(userRef);
-
-  const userPayload: Record<string, any> = {
-    name: displayName || userSnap.data()?.name || email.split('@')[0],
-    email: email,
-    role: userSnap.data()?.role || 'medico',
-    active: true,
-    licenseCode: normalizedCode,
-    licensePlanId: licenseData.planId,
-    licensePlanName: planName,
-    licenseExpiresAt: expiresAt,
-    updatedAt: now
-  };
-
-  if (!userSnap.exists()) {
-    userPayload.createdAt = now;
-  }
-
-  batch.set(userRef, userPayload, { merge: true });
-
-  // Commit das escritas atômicas
-  await batch.commit();
-
-  // 3. Grava log de auditoria
-  await addAuditLog({
-    action: 'ATIVAR_LICENCA',
-    details: `Licença ${normalizedCode} ativada para o e-mail ${email}. Plano: ${planName} (${durationMonths} meses).`,
-    module: 'LICENSE_MGR',
-    userId: uid,
-    userName: displayName || email
-  });
-}
-
-/**
- * Helper para verificar o status de expiração da licença do usuário.
- */
-export async function checkUserLicenseStatus(uid: string): Promise<{
-  active: boolean;
-  expired: boolean;
-  licenseExpiresAt?: number;
-  licensePlanName?: string;
-} | null> {
-  try {
-    const userRef = doc(firestore, 'users', uid);
-    const snap = await getDoc(userRef);
-
-    if (!snap.exists()) return null;
-
-    const data = snap.data();
-    if (data.email === 'matheuskpires@gmail.com') {
-      // Super Admin bypass
-      return { active: true, expired: false };
-    }
-
-    if (data.active === false) {
-      return { active: false, expired: false };
-    }
-
-    if (data.licenseExpiresAt && data.licenseExpiresAt < Date.now()) {
-      return {
-        active: false,
-        expired: true,
-        licenseExpiresAt: data.licenseExpiresAt,
-        licensePlanName: data.licensePlanName
-      };
-    }
-
-    return {
-      active: true,
-      expired: false,
-      licenseExpiresAt: data.licenseExpiresAt,
-      licensePlanName: data.licensePlanName
-    };
-  } catch (err) {
-    console.error('[License] Erro ao validar licença do usuário:', err);
-    return null;
-  }
-}
-
-/**
  * Remove permanentemente todo o histórico de chamados de suporte do Firestore.
  */
 export async function clearAllSupportTickets(): Promise<void> {
@@ -864,12 +924,12 @@ export function getActivePacsUrl(settings: AppSettings, isBackup = false): strin
   if (isBackup) {
     return (isVercel && settings.dicomBackupTailscalePublicUrl) 
       ? settings.dicomBackupTailscalePublicUrl 
-      : (settings.dicomBackupViewerUrl || 'http://100.124.187.11:8043');
+      : (settings.dicomBackupViewerUrl || 'http://localhost:8042');
   }
   
   return (isVercel && settings.dicomTailscalePublicUrl) 
     ? settings.dicomTailscalePublicUrl 
-    : (settings.dicomViewerUrl || 'http://100.93.111.95:8042');
+    : (settings.dicomViewerUrl || 'http://localhost:8042');
 }
 
 
@@ -923,7 +983,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
       localAgentUrl: settings.dicomLocalAgentUrl
     })
   }).catch((err) => {
-    console.warn('[Orthanc Worklist] Falha ao remover entrada primária:', err);
+    logger.warn('[Orthanc Worklist] Falha ao remover entrada primária:', err);
   });
 
   // ── Backup (se configurado) ──
@@ -942,7 +1002,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
         localAgentUrl: settings.dicomBackupLocalAgentUrl
       })
     }).catch((err) => {
-      console.warn('[Orthanc Worklist Backup] Falha ao remover entrada de backup:', err);
+      logger.warn('[Orthanc Worklist Backup] Falha ao remover entrada de backup:', err);
     });
   }
 
@@ -963,6 +1023,7 @@ export interface AiUsageLog {
   outputTokens: number;
   costUsd: number;
   area: string;
+  promptHash?: string;
 }
 
 export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Promise<void> {
@@ -973,7 +1034,7 @@ export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Pr
       timestamp: Date.now()
     }));
   } catch (err) {
-    console.error('[DB] Erro ao gravar uso de IA:', err);
+    logger.error('[DB] Erro ao gravar uso de IA', err);
   }
 }
 
@@ -988,7 +1049,7 @@ export async function getAiUsageStats(startDateMs: number, endDateMs: number): P
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as AiUsageLog));
   } catch (err) {
-    console.error('[DB] Erro ao buscar estatísticas de IA:', err);
+    logger.error('[DB] Erro ao buscar estatísticas de IA', err);
     return [];
   }
 }

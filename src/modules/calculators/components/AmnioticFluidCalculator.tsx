@@ -106,7 +106,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
         </div>
 
         {method === 'mbv' ? (
-          <div className="space-y-3 p-4 bg-ink-50/20 rounded-3xl border border-ink-100/55">
+          <div className="space-y-3 p-4 bg-ink-50/20 rounded-2xl border border-ink-100/55">
             {pockets.map((p, i) => (
               <div key={p.id} className="flex items-center gap-3">
                 <span className="text-[10px] font-black text-ink-500 uppercase tracking-wider w-16 shrink-0">Bolsão {i + 1}</span>
@@ -139,7 +139,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 p-4 bg-ink-50/20 rounded-3xl border border-ink-100/55">
+          <div className="grid grid-cols-2 gap-3 p-4 bg-ink-50/20 rounded-2xl border border-ink-100/55">
             {[
               { label: 'QSD (S. Direito)', val: q1, set: setQ1 },
               { label: 'QSE (S. Esquerdo)', val: q2, set: setQ2 },
@@ -165,7 +165,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
 
         {value?.result !== null && value?.result !== undefined ? (
           <div className={classNames(
-            "rounded-3xl p-5 border-2 flex items-center justify-between shadow-sm animate-in zoom-in-95 duration-150",
+            "rounded-2xl p-5 border-2 flex items-center justify-between shadow-sm animate-in zoom-in-95 duration-150",
             value.classification?.includes('Oligo') ? "bg-red-50/80 border-red-200 text-red-900" :
             value.classification?.includes('Poli') ? "bg-amber-50/80 border-amber-200 text-amber-900" :
             "bg-emerald-50/80 border-emerald-200 text-emerald-900"
@@ -185,7 +185,7 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
             </div>
           </div>
         ) : (
-          <div className="bg-ink-50/40 rounded-3xl p-4 flex items-center gap-3 border-2 border-dashed border-ink-100">
+          <div className="bg-ink-50/40 rounded-2xl p-4 flex items-center gap-3 border-2 border-dashed border-ink-100">
             <Info size={16} className="text-ink-400 shrink-0" />
             <span className="text-[10px] text-ink-500 font-bold uppercase tracking-tight">Insira as medidas do líquido amniótico para processar a volumetria fetal.</span>
           </div>

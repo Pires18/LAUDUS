@@ -129,8 +129,8 @@ function localOrthancWorklistPlugin() {
                 // Determine output directory based on environment variables or OS fallback
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
-                
+                  : '';
+
                 payload.outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
                 
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
@@ -178,7 +178,7 @@ function localOrthancWorklistPlugin() {
                 }
                 const defaultOutputDir = process.platform === 'win32'
                   ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
+                  : '';
                 let outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
                 if (process.env.RUNNING_IN_DOCKER === 'true') {
                   outputDir = '/app/pacs-worklist/';
@@ -198,6 +198,82 @@ function localOrthancWorklistPlugin() {
           } else {
             res.statusCode = 405;
             res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          }
+        } else if (
+          req.url && (
+            req.url.startsWith('/api/abacatepay-checkout') ||
+            req.url.startsWith('/api/abacatepay-webhook') ||
+            req.url.startsWith('/api/abacatepay-portal') ||
+            req.url.startsWith('/api/abacatepay-test') ||
+            req.url.startsWith('/api/reset-monthly-reports') ||
+            req.url.startsWith('/api/promote-admin') ||
+            req.url.startsWith('/api/abacatepay-cancel')
+          )
+        ) {
+          const parsedUrl = new URL(req.url, 'http://localhost');
+          const pathName = parsedUrl.pathname;
+
+          const runServerless = async (filePath: string) => {
+            try {
+              const mod = await server.ssrLoadModule(filePath);
+              const handler = mod.default || mod;
+
+              res.status = (code: number) => { res.statusCode = code; return res; };
+              res.json = (data: any) => {
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify(data));
+                return res;
+              };
+              res.send = (data: any) => { res.end(data); return res; };
+              res.writeHead = res.writeHead || ((code: number, headers: any) => {
+                res.statusCode = code;
+                Object.entries(headers || {}).forEach(([k, v]) => res.setHeader(k, v as string));
+                return res;
+              });
+
+              if (req.method === 'POST' || req.method === 'PUT') {
+                let body = '';
+                await new Promise<void>((resolve) => {
+                  req.on('data', (chunk: any) => { body += chunk; });
+                  req.on('end', () => { resolve(); });
+                });
+                // Store raw body so handlers with bodyParser:false (e.g. webhook) can read it.
+                req._rawBody = body;
+                try { req.body = JSON.parse(body); } catch { req.body = body; }
+              } else {
+                req.body = {};
+                req._rawBody = '';
+              }
+
+              const queryParams: Record<string, string> = {};
+              parsedUrl.searchParams.forEach((val, key) => { queryParams[key] = val; });
+              req.query = queryParams;
+
+              await handler(req, res);
+            } catch (err: any) {
+              console.error(`[Serverless Dev Proxy] Error in ${filePath}:`, err);
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: err.message || 'Internal Server Error' }));
+            }
+          };
+
+          if (pathName === '/api/abacatepay-checkout') {
+            await runServerless('./api/abacatepay-checkout.ts');
+          } else if (pathName === '/api/abacatepay-webhook') {
+            await runServerless('./api/abacatepay-webhook.ts');
+          } else if (pathName === '/api/abacatepay-portal') {
+            await runServerless('./api/abacatepay-portal.ts');
+          } else if (pathName === '/api/abacatepay-test') {
+            await runServerless('./api/abacatepay-test.ts');
+          } else if (pathName === '/api/reset-monthly-reports') {
+            await runServerless('./api/reset-monthly-reports.ts');
+          } else if (pathName === '/api/promote-admin') {
+            await runServerless('./api/promote-admin.ts');
+          } else if (pathName === '/api/abacatepay-cancel') {
+            await runServerless('./api/abacatepay-cancel.ts');
+          } else {
+            next();
           }
         } else {
           next();
@@ -345,6 +421,31 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Firebase separado (maior vendor)
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          // React core
+          'vendor-react': ['react', 'react-dom'],
+          // UI libs
+          'vendor-ui': ['framer-motion', 'lucide-react'],
+          // Editor Tiptap (ProseMirror = pesado)
+          'vendor-editor': [
+            '@tiptap/react',
+            '@tiptap/starter-kit',
+            '@tiptap/extension-text-align',
+            '@tiptap/extension-underline',
+          ],
+          // IA Gemini SDK
+          'vendor-ai': ['@google/generative-ai'],
+          // Exportação DOCX
+          'vendor-export': ['docx', 'file-saver'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,
@@ -353,11 +454,36 @@ export default defineConfig({
     open: process.env.RUNNING_IN_DOCKER === 'true' ? false : true,
     proxy: {
       '/api/anthropic': {
-        target: 'https://api.anthropic.com/v1/messages',
+        target: 'https://api.anthropic.com',
         changeOrigin: true,
-        rewrite: (path) => '',
+        rewrite: () => '/v1/messages',
         secure: true,
-      }
+        configure: (proxy: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            const key = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY || '';
+            if (key) proxyReq.setHeader('x-api-key', key);
+          });
+        },
+      },
+      '/api/gemini': {
+        target: 'https://generativelanguage.googleapis.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path: string) => {
+          // Strip /api/gemini — actual URL is built in configure
+          return path.replace('/api/gemini', '');
+        },
+        configure: (proxy: any, _options: any) => {
+          proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            const key = req.headers['x-api-key'] || process.env.GOOGLE_API_KEY || '';
+            const model = req.headers['x-gemini-model'] || 'gemini-3.5-flash';
+            const isStream = req.headers['x-gemini-stream'] === 'true';
+            const action = isStream ? 'streamGenerateContent' : 'generateContent';
+            const url = `/v1beta/models/${model}:${action}?key=${key}${isStream ? '&alt=sse' : ''}`;
+            proxyReq.path = url;
+          });
+        },
+      },
     }
   }
 })

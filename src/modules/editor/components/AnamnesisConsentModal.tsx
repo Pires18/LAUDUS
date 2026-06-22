@@ -2,48 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from '../../../components/Modal';
 import { ExamRequest, Patient, ReportTemplate, Clinic, AppSettings } from '../../../types';
 import { updateItem, getItem, deleteField } from '../../../store/db';
-import { ClipboardList, ShieldCheck, Printer, RotateCcw, Check, FileText, UserCog, Loader2 } from 'lucide-react';
+import { ShieldCheck, Printer, RotateCcw, Check, UserCog, Loader2, Users } from 'lucide-react';
 import { useCollection } from '../../../hooks/useFirestore';
 import { useApp } from '../../../store/app';
+import { useConfirm } from '../../../hooks/useConfirm';
+import { useAdmin } from '../../../hooks/useAdmin';
 import { getInitialReportContent } from '../../templates/utils';
-
-export interface AnamnesisField {
-  label: string;
-  value: string;
-  isStructured: boolean;
-  rawLine: string;
-}
-
-export function parseAnamnesis(text: string): AnamnesisField[] {
-  if (!text) return [];
-  const lines = text.split('\n');
-  return lines.map(line => {
-    const match = line.match(/^([^:[\]]+):\s*\[([^\]]*)\]\s*$/);
-    if (match) {
-      return {
-        label: match[1].trim(),
-        value: match[2],
-        isStructured: true,
-        rawLine: line
-      };
-    }
-    return {
-      label: '',
-      value: line,
-      isStructured: false,
-      rawLine: line
-    };
-  });
-}
-
-export function serializeAnamnesis(fields: AnamnesisField[]): string {
-  return fields.map(field => {
-    if (field.isStructured) {
-      return `${field.label}: [${field.value}]`;
-    }
-    return field.value;
-  }).join('\n');
-}
+import { PatientForm } from '../../patients/PatientForm';
 
 interface Props {
   open: boolean;
@@ -51,38 +16,33 @@ interface Props {
   exam: ExamRequest;
   patient: Patient;
   template?: ReportTemplate | null;
-  initialTab?: 'metadata' | 'anamnesis' | 'consent';
+  initialTab?: 'metadata' | 'patient' | 'consent';
   clinic?: Clinic | null;
   settings?: AppSettings;
 }
 
 export function AnamnesisConsentModal({ open, onClose, exam, patient, template: initialTemplate, initialTab = 'metadata', clinic, settings }: Props) {
-  const [activeTab, setActiveTab] = useState<'metadata' | 'anamnesis' | 'consent'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'metadata' | 'patient' | 'consent'>(initialTab);
   const [template, setTemplate] = useState<ReportTemplate | null>(initialTemplate || null);
 
   const { showToast } = useApp();
+  const confirm = useConfirm();
   const { data: clinics } = useCollection<Clinic>('clinics');
   const { data: allTemplates } = useCollection<ReportTemplate>('templates');
-  const currentRole = settings?.currentRole || 'medico';
+  const { role: currentRole } = useAdmin();
   const isEditable = exam.status !== 'finalizado' && currentRole !== 'recepcao';
 
   // Local state for fields
-  const [anamnesis, setAnamnesis] = useState(exam.anamnesis ?? '');
   const [consentTerm, setConsentTerm] = useState(exam.consentTerm ?? '');
   const [consentAccepted, setConsentAccepted] = useState(exam.consentAccepted ?? false);
-  const [viewMode, setViewMode] = useState<'form' | 'text'>('form');
 
-  const isAnamnesisDirtyRef = useRef(false);
   const isConsentDirtyRef = useRef(false);
-  const isAnamnesisFocusedRef = useRef(false);
   const isConsentFocusedRef = useRef(false);
-  const anamnesisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const consentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear timers on unmount
   useEffect(() => {
     return () => {
-      if (anamnesisTimerRef.current) clearTimeout(anamnesisTimerRef.current);
       if (consentTimerRef.current) clearTimeout(consentTimerRef.current);
     };
   }, []);
@@ -99,25 +59,13 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     setExamTemplateId(exam.templateId || '');
   }, [patient, exam]);
 
-  // Set default view mode based on structured fields
-  useEffect(() => {
-    if (open) {
-      const fields = parseAnamnesis(exam.anamnesis || '');
-      const hasStructured = fields.some(f => f.isStructured);
-      setViewMode(hasStructured ? 'form' : 'text');
-    }
-  }, [open, exam.templateId]);
-
   // Sync with exam data updates
   useEffect(() => {
-    if (!isAnamnesisDirtyRef.current && !isAnamnesisFocusedRef.current) {
-      setAnamnesis(exam.anamnesis ?? '');
-    }
     if (!isConsentDirtyRef.current && !isConsentFocusedRef.current) {
       setConsentTerm(exam.consentTerm ?? '');
     }
     setConsentAccepted(exam.consentAccepted ?? false);
-  }, [exam.anamnesis, exam.consentTerm, exam.consentAccepted]);
+  }, [exam.consentTerm, exam.consentAccepted]);
 
   // Load template dynamically if not provided as prop
   useEffect(() => {
@@ -132,7 +80,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
         }
       });
     }
-  }, [open, exam.templateId, template, exam.id, exam.anamnesis, exam.consentTerm]);
+  }, [open, exam.templateId, template, exam.id, exam.consentTerm]);
 
   // Sync active tab prop
   useEffect(() => {
@@ -141,31 +89,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     }
   }, [open, initialTab]);
 
-  const handleSaveAnamnesis = (val: string) => {
-    setAnamnesis(val);
-    isAnamnesisDirtyRef.current = true;
-    if (anamnesisTimerRef.current) clearTimeout(anamnesisTimerRef.current);
-    
-    anamnesisTimerRef.current = setTimeout(async () => {
-      try {
-        await updateItem('exams', exam.id, { anamnesis: val });
-      } finally {
-        isAnamnesisDirtyRef.current = false;
-      }
-    }, 800);
-  };
 
-  const handleBlurAnamnesis = async (val: string) => {
-    isAnamnesisFocusedRef.current = false;
-    if (isAnamnesisDirtyRef.current) {
-      if (anamnesisTimerRef.current) clearTimeout(anamnesisTimerRef.current);
-      try {
-        await updateItem('exams', exam.id, { anamnesis: val });
-      } finally {
-        isAnamnesisDirtyRef.current = false;
-      }
-    }
-  };
 
   const handleSaveConsentTerm = (val: string) => {
     setConsentTerm(val);
@@ -203,7 +127,13 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
   const handleRestoreConsent = async () => {
     if (!template?.consentTemplate) return;
-    if (window.confirm('Deseja restaurar o termo de consentimento para o padrão da máscara?')) {
+    const ok = await confirm({
+      title: 'Restaurar Termo',
+      message: 'Deseja restaurar o termo de consentimento para o padrão da máscara?',
+      confirmLabel: 'Restaurar',
+      variant: 'warning',
+    });
+    if (ok) {
       setConsentTerm(template.consentTemplate);
       await updateItem('exams', exam.id, { consentTerm: template.consentTemplate });
     }
@@ -332,35 +262,35 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     >
       <div className="flex flex-col h-full space-y-4">
         {/* Navigation Tabs inside Modal */}
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+        <div className="flex bg-ink-100 p-1 rounded-xl w-fit border border-ink-200">
           <button
             onClick={() => setActiveTab('metadata')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
               activeTab === 'metadata'
-                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-brand-650 shadow-sm border border-ink-200'
+                : 'text-ink-500 hover:text-ink-800'
             }`}
           >
             <UserCog size={14} />
             Dados do Exame
           </button>
           <button
-            onClick={() => setActiveTab('anamnesis')}
+            onClick={() => setActiveTab('patient')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
-              activeTab === 'anamnesis'
-                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
+              activeTab === 'patient'
+                ? 'bg-white text-brand-650 shadow-sm border border-ink-200'
+                : 'text-ink-500 hover:text-ink-800'
             }`}
           >
-            <ClipboardList size={14} />
-            Anamnese
+            <Users size={14} />
+            Dados do Paciente
           </button>
           <button
             onClick={() => setActiveTab('consent')}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
               activeTab === 'consent'
-                ? 'bg-white text-brand-650 shadow-sm border border-slate-200'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white text-brand-650 shadow-sm border border-ink-200'
+                : 'text-ink-500 hover:text-ink-800'
             }`}
           >
             <ShieldCheck size={14} />
@@ -371,17 +301,17 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
         {/* Tab 0: Metadata (Dados do Exame) */}
         {activeTab === 'metadata' && (
           <div className="flex-1 flex flex-col space-y-4 min-h-[350px]">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 pb-2 border-b border-ink-100">
               <UserCog size={16} className="text-brand-500" />
-              <span className="text-xs font-bold text-slate-700">Configuração de Identificação & Unidade</span>
+              <span className="text-xs font-bold text-ink-700">Configuração de Identificação & Unidade</span>
             </div>
 
             <div className="space-y-4">
               <div className="flex flex-col space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Médico Solicitante</label>
+                  <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Médico Solicitante</label>
                   <input 
                     type="text"
-                    className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                    className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
                     value={requestingPhysician} 
                     onChange={e => setRequestingPhysician(e.target.value)}
                     disabled={!isEditable}
@@ -389,9 +319,9 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                 </div>
 
               <div className="flex flex-col space-y-1.5">
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Clínica</label>
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Clínica</label>
                 <select 
-                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
                   value={clinicId} 
                   onChange={e => setClinicId(e.target.value)}
                   disabled={!isEditable}
@@ -401,24 +331,27 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-                <p className="text-[9px] text-slate-400 mt-1 ml-1 italic">
+                <p className="text-[9px] text-ink-400 mt-1 ml-1 italic">
                   * Alterar a clínica afeta o template e a pasta de exportação do Google Docs.
                 </p>
               </div>
 
-              <div className="flex flex-col space-y-1.5 pt-2 border-t border-slate-100">
-                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Tipo de Exame (Máscara)</label>
+              <div className="flex flex-col space-y-1.5 pt-2 border-t border-ink-100">
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Tipo de Exame (Máscara)</label>
                 <select 
-                  className="h-10 px-3 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60" 
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
                   value={examTemplateId} 
                   onChange={async (e) => {
                     const newTemplateId = e.target.value;
                     const newTemplate = allTemplates.find(t => t.id === newTemplateId);
                     if (newTemplateId !== exam.templateId && newTemplate) {
-                      const confirm = window.confirm(
-                        'CUIDADO: Alterar o exame reiniciará o laudo para o padrão da nova máscara e apagará as informações atuais e o histórico do copiloto. Deseja prosseguir?'
-                      );
-                      if (confirm) {
+                      const ok = await confirm({
+                        title: 'Alterar Máscara',
+                        message: 'CUIDADO: Alterar o exame reiniciará o laudo para o padrão da nova máscara e apagará as informações atuais e o histórico do copiloto. Deseja prosseguir?',
+                        confirmLabel: 'Prosseguir',
+                        variant: 'danger',
+                      });
+                      if (ok) {
                         try {
                           setLoadingMetadata(true);
                           await updateItem('exams', exam.id, {
@@ -456,7 +389,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             </div>
 
             {isEditable && (
-              <div className="flex justify-end pt-4 border-t border-slate-100">
+              <div className="flex justify-end pt-4 border-t border-ink-100">
                 <button 
                   type="button"
                   onClick={handleSaveMetadata}
@@ -470,133 +403,28 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
           </div>
         )}
 
-        {/* Tab 1: Anamnesis */}
-        {activeTab === 'anamnesis' && (() => {
-          const fields = parseAnamnesis(anamnesis);
-          const hasStructured = fields.some(f => f.isStructured);
-          const structuredFields = fields.filter(f => f.isStructured);
-          const unstructuredLines = fields.filter(f => !f.isStructured).map(f => f.value).join('\n').trim();
-
-          const handleFieldChange = (idx: number, newVal: string) => {
-            const updated = [...fields];
-            updated[idx].value = newVal;
-            handleSaveAnamnesis(serializeAnamnesis(updated));
-          };
-
-          const handleUnstructuredChange = (newUnstructured: string) => {
-            const structuredPart = fields
-              .filter(f => f.isStructured)
-              .map(f => `${f.label}: [${f.value}]`)
-              .join('\n');
-            
-            const newText = structuredPart 
-              ? structuredPart + '\n' + newUnstructured
-              : newUnstructured;
-              
-            handleSaveAnamnesis(newText);
-          };
-
-          return (
-            <div className="flex-1 flex flex-col space-y-3 min-h-[350px]">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-brand-500" />
-                    <span className="text-xs font-bold text-slate-700">Anamnese do Paciente</span>
-                  </div>
-                  
-                  {hasStructured && (
-                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
-                      <button
-                        onClick={() => setViewMode('form')}
-                        className={`px-2 py-1 font-bold rounded-md transition-all ${
-                          viewMode === 'form'
-                            ? 'bg-white text-brand-650 shadow-sm border border-slate-200/50'
-                            : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                      >
-                        Formulário
-                      </button>
-                      <button
-                        onClick={() => setViewMode('text')}
-                        className={`px-2 py-1 font-bold rounded-md transition-all ${
-                          viewMode === 'text'
-                            ? 'bg-white text-brand-650 shadow-sm border border-slate-200/50'
-                            : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                      >
-                        Texto Livre
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => printDocument('Anamnese de Exame', anamnesis, false)}
-                    className="text-[10px] font-black text-white bg-slate-900 hover:bg-slate-800 flex items-center gap-1.5 uppercase tracking-wider transition-all px-3 py-1.5 rounded-lg shadow-sm"
-                  >
-                    <Printer size={11} />
-                    Imprimir
-                  </button>
-                </div>
-              </div>
-
-              {viewMode === 'form' && hasStructured ? (
-                <div className="flex-1 flex flex-col space-y-4 min-h-[350px] overflow-y-auto max-h-[400px] pr-1">
-                  {/* Form Fields Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                    {fields.map((field, idx) => {
-                      if (!field.isStructured) return null;
-                      return (
-                        <div key={idx} className="flex flex-col space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                            {field.label}
-                          </label>
-                          <input
-                            type="text"
-                            value={field.value}
-                            disabled={!isEditable}
-                            onFocus={() => isAnamnesisFocusedRef.current = true}
-                            onBlur={() => handleBlurAnamnesis(serializeAnamnesis(fields))}
-                            onChange={(e) => handleFieldChange(idx, e.target.value)}
-                            className="h-10 px-3 bg-white border border-slate-200 focus:border-brand-500 rounded-xl text-xs font-semibold outline-none transition-all text-slate-850 shadow-sm disabled:opacity-60"
-                            placeholder={`Preencher ${field.label.toLowerCase()}...`}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Additional Free Text Notes */}
-                  <div className="flex flex-col space-y-1.5 flex-1 min-h-[120px]">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                      Anotações Adicionais / Observações
-                    </label>
-                    <textarea
-                      value={unstructuredLines}
-                      disabled={!isEditable}
-                      onFocus={() => isAnamnesisFocusedRef.current = true}
-                      onBlur={() => handleBlurAnamnesis(anamnesis)}
-                      onChange={(e) => handleUnstructuredChange(e.target.value)}
-                      placeholder="Outros achados, cirurgias, observações ou queixas clínicas livres..."
-                      className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 min-h-[100px] disabled:opacity-60"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <textarea
-                  value={anamnesis}
-                  disabled={!isEditable}
-                  onFocus={() => isAnamnesisFocusedRef.current = true}
-                  onBlur={(e) => handleBlurAnamnesis(e.target.value)}
-                  onChange={(e) => handleSaveAnamnesis(e.target.value)}
-                  placeholder="Descreva o histórico clínico do paciente, sintomas e indicações para este exame..."
-                  className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
-                />
-              )}
+        {/* Tab 1: Patient Data */}
+        {activeTab === 'patient' && (
+          <div className="flex-1 flex flex-col space-y-4 min-h-[350px] overflow-y-auto max-h-[500px] pr-1">
+            <div className="flex items-center gap-2 pb-2 border-b border-ink-100">
+              <Users size={16} className="text-brand-500" />
+              <span className="text-xs font-bold text-ink-700">Dados do Paciente</span>
             </div>
-          );
-        })()}
+            <PatientForm
+              initial={patient}
+              onCancel={onClose}
+              onSubmit={async (data) => {
+                try {
+                  await updateItem('patients', patient.id, data);
+                  showToast('Dados do paciente atualizados com sucesso', 'success');
+                  onClose();
+                } catch (err) {
+                  showToast('Erro ao atualizar dados do paciente', 'error');
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Tab 2: Consent Term */}
         {activeTab === 'consent' && (
@@ -604,14 +432,14 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <ShieldCheck size={16} className="text-indigo-500" />
-                <span className="text-xs font-bold text-slate-700">Termo de Consentimento Informado</span>
+                <span className="text-xs font-bold text-ink-700">Termo de Consentimento Informado</span>
               </div>
               <div className="flex items-center gap-2">
                 {template?.consentTemplate && isEditable && (
                   <button
                     onClick={handleRestoreConsent}
                     title="Restaurar termo padrão da máscara"
-                    className="text-[10px] font-black text-slate-500 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors border border-slate-200 bg-slate-50 hover:bg-brand-50 px-2 py-1.5 rounded-lg"
+                    className="text-[10px] font-black text-ink-500 hover:text-brand-600 flex items-center gap-1 uppercase tracking-wider transition-colors border border-ink-200 bg-ink-50 hover:bg-brand-50 px-2 py-1.5 rounded-lg"
                   >
                     <RotateCcw size={11} />
                     Restaurar Padrão
@@ -634,7 +462,7 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
               onBlur={(e) => handleBlurConsentTerm(e.target.value)}
               onChange={(e) => handleSaveConsentTerm(e.target.value)}
               placeholder="Insira o texto explicativo do termo de consentimento livre e esclarecido..."
-              className="w-full flex-1 p-4 bg-slate-50 border border-slate-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-slate-850 disabled:opacity-60"
+              className="w-full flex-1 p-4 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-xs font-semibold leading-relaxed resize-none text-ink-850 disabled:opacity-60"
             />
 
             {/* Checkbox for Acceptance */}

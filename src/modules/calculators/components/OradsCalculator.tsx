@@ -82,7 +82,7 @@ export function OradsCalculator({ value, onChange }: CalculatorProps) {
 
     onChange({
       lesions: updatedLesions,
-      _summary: summaries.length > 0 ? `Achados O-RADS (Ovário):\n${summaries.join('\n')}` : null
+      _summary: summaries.length > 0 ? `O-RADS (Ovário): ${summaries.join(' | ')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesions]);

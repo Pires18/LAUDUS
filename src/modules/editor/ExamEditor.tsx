@@ -1,16 +1,17 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useDocument, useCollection } from '../../hooks/useFirestore';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useDocument } from '../../hooks/useFirestore';
 import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 import { useApp } from '../../store/app';
-import { ExamStatus, EXAM_AREAS, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
+import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
 import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, AlertTriangle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, Printer, RefreshCw, SlidersHorizontal, ExternalLink } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
+import { logger } from '../../utils/logger';
 import { PrintLayout } from '../export/PrintLayout';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
@@ -22,50 +23,69 @@ import { DicomThumbnail } from './components/DicomThumbnail';
 import { useExamActions } from './hooks/useExamActions';
 import { useGoogleDocs } from './hooks/useGoogleDocs';
 import { useDicomSync } from './hooks/useDicomSync';
+import { useCopilotSuggestions } from './hooks/useCopilotSuggestions';
 import { getStudyInstanceUID } from '../../utils/dicom';
 
+import { useAdmin } from '../../hooks/useAdmin';
 // Refactored Components
+import { DicomViewerSidebar } from './components/DicomViewerSidebar';
 import { EditorHeader } from './components/EditorHeader';
 import { EditorToolbar } from './components/EditorToolbar';
 import { getInitialReportContent } from '../templates/utils';
+import { useConfirm } from '../../hooks/useConfirm';
 import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
 import { ReportVersionsModal } from './components/ReportVersionsModal';
 
 
 
-const preloadImages = (urls: string[]): Promise<void> => {
-  return new Promise((resolve) => {
-    if (urls.length === 0) {
-      resolve();
-      return;
-    }
-    let loadedCount = 0;
-    const total = urls.length;
-    
-    const checkResolve = () => {
-      loadedCount++;
-      if (loadedCount === total) {
-        resolve();
-      }
-    };
 
-    urls.forEach(url => {
-      const img = new Image();
-      img.onload = checkResolve;
-      img.onerror = checkResolve; // Resolve anyway on error to avoid hanging
-      img.src = url;
-    });
-  });
-};
+function PatientHistoryPanel({ patient }: { patient: Patient }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-emerald-100 bg-emerald-50/20 shrink-0">
+      <button
+        onClick={() => setOpen(s => !s)}
+        className="w-full flex items-center justify-between px-4 py-2.5 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <UserCog size={13} className="text-emerald-600" />
+          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Histórico do Paciente</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        </div>
+        <ChevronDown size={13} className={classNames("text-emerald-500 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-2 space-y-2 animate-in fade-in duration-150 border-t border-emerald-100/30">
+          {patient.history && (
+            <div>
+              <p className="text-[9px] font-black uppercase text-emerald-500 tracking-wider mb-1">Histórico Clínico</p>
+              <p className="text-xs text-ink-700 leading-relaxed bg-white border border-emerald-100 rounded-xl p-3 whitespace-pre-wrap">{patient.history}</p>
+            </div>
+          )}
+          {patient.notes && (
+            <div>
+              <p className="text-[9px] font-black uppercase text-emerald-500 tracking-wider mb-1">Observações</p>
+              <p className="text-xs text-ink-600 leading-relaxed bg-white border border-emerald-100 rounded-xl p-3 whitespace-pre-wrap">{patient.notes}</p>
+            </div>
+          )}
+          {patient.insurance && (
+            <p className="text-[10px] text-emerald-600 font-semibold">Convênio: {patient.insurance}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   examId: string;
 }
 
 export function ExamEditor({ examId }: Props) {
+  const { isAdmin, role: currentRole } = useAdmin();
   const { setView, settings, showToast } = useApp();
-  const currentRole = settings.currentRole || 'medico';
+  const confirm = useConfirm();
 
   // Firestore realtime listeners
   const { data: exam } = useDocument<ExamRequest>('exams', examId);
@@ -75,7 +95,6 @@ export function ExamEditor({ examId }: Props) {
     : dbPatient;
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
-  const { data: clinics } = useCollection<Clinic>('clinics');
 
   // Load related data
   useEffect(() => {
@@ -97,7 +116,6 @@ export function ExamEditor({ examId }: Props) {
 
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showEditPatient, setShowEditPatient] = useState(false);
   const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [showCalculators, setShowCalculators] = useState(false);
   const [calcModalInitialId, setCalcModalInitialId] = useState<string | null>(null);
@@ -106,6 +124,7 @@ export function ExamEditor({ examId }: Props) {
   const [selectedInstancesForPrint, setSelectedInstancesForPrint] = useState<any[]>([]);
   const [copilotPrompt, setCopilotPrompt] = useState('');
   const [showSnippets, setShowSnippets] = useState(false);
+  const [showCustomForm, setShowCustomForm] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
   const [activePacsServer, setActivePacsServer] = useState<'primary' | 'backup' | 'both'>(() => {
     return (localStorage.getItem('laudus_active_pacs_server') as 'primary' | 'backup' | 'both') || 'both';
@@ -135,7 +154,10 @@ export function ExamEditor({ examId }: Props) {
     hasDicomImages,
     dicomInstances,
     dicomLoading,
-    dicomError
+    dicomError,
+    dicomStatus,
+    activeServer,
+    lastErrorMessage
   } = useDicomSync({
     exam: exam || undefined,
     patient,
@@ -203,6 +225,8 @@ export function ExamEditor({ examId }: Props) {
     return `${currentBaseUrl.replace(/\/$/, '')}/stone-webviewer/index.html?study=${studyUid}`;
   }, [candidateStudies, selectedStudyId, settings, exam?.id]);
 
+  const externalViewerUrl = useMemo(() => getExternalViewerUrl(), [getExternalViewerUrl]);
+
   
 
 
@@ -251,6 +275,7 @@ export function ExamEditor({ examId }: Props) {
   // Actions Hook
   const {
     isGenerating,
+    isReasoning,
     saveState,
     debouncedSave,
     handleRefine,
@@ -259,7 +284,9 @@ export function ExamEditor({ examId }: Props) {
     examId,
     settings,
     showToast,
-    onReportChange: (html) => setReportContent(html),
+    onReportChange: (html) => {
+      setReportContent(html);
+    },
     patient,
     template,
     clinicalIndication: exam?.clinicalIndication,
@@ -267,6 +294,18 @@ export function ExamEditor({ examId }: Props) {
     anamnesis: exam?.anamnesis,
     examDateMs: exam?.createdAt
   });
+
+  const { suggestions: copilotSuggestions, generateSuggestions, clearSuggestions } = useCopilotSuggestions(settings);
+
+  // After report generation completes, quietly generate contextual Copilot suggestions
+  const prevIsGenerating = useRef(false);
+  useEffect(() => {
+    if (prevIsGenerating.current && !isGenerating && reportContent && template?.area) {
+      clearSuggestions();
+      generateSuggestions(reportContent, template.area);
+    }
+    prevIsGenerating.current = isGenerating;
+  }, [isGenerating]);
 
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
 
@@ -329,61 +368,90 @@ export function ExamEditor({ examId }: Props) {
 
   const handleReset = useCallback(async () => {
     if (!template) return;
-    if (window.confirm('Deseja reiniciar o laudo para o padrão da máscara? Isso apagará as alterações atuais.')) {
+    const ok = await confirm({
+      title: 'Reiniciar Laudo',
+      message: 'Deseja reiniciar o laudo para o padrão da máscara? Isso apagará as alterações atuais.',
+      confirmLabel: 'Reiniciar',
+      variant: 'warning',
+    });
+    if (ok) {
       const initial = getInitialReportContent(template);
       setReportContent(initial);
       await updateItem('exams', examId, { reportContent: initial });
       showToast('Laudo reiniciado para o padrão da máscara', 'success');
     }
-  }, [template, examId, showToast]);
+  }, [template, examId, showToast, confirm]);
 
 
 
   // Grid types: '1x2' = 1 coluna × 2 linhas (2 imagens), '2x4' = 2 colunas × 4 linhas (8 imagens)
   const [selectedGridType, setSelectedGridType] = useState<string>('2x4');
   const [isPrintingImages, setIsPrintingImages] = useState(false);
+  const [printProgress, setPrintProgress] = useState<string>('');
+  const [printLocalUrls, setPrintLocalUrls] = useState<Record<string, string>>({});
 
   const handlePrintImages = async (instances: any[], gridType: string = '2x4') => {
     if (instances.length === 0) return;
     setIsPrintingImages(true);
+    setPrintProgress(`Otimizando imagens (0/${instances.length})...`);
     showToast('Preparando imagens para a impressão...', 'info');
 
-    try {
-      const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-      const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
+    const localUrlsMap: Record<string, string> = {};
+    const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+    const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
 
-      // Fix 15: use correct server credentials (backup vs primary) per instance
-      const urls = instances.map(instance => {
+    try {
+      for (let i = 0; i < instances.length; i++) {
+        const instance = instances[i];
+        setPrintProgress(`Otimizando imagens (${i + 1}/${instances.length})...`);
         const isBackup = instance.serverSource === 'backup';
         const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
         const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
         const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
         const proxyPath = getProxyEndpoint(settings, isBackup);
-        return `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-      });
+        const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
 
-      // Preload all image URLs into browser cache
-      await preloadImages(urls);
+        // Fetch the image as blob
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        localUrlsMap[instance.ID] = blobUrl;
+      }
 
+      setPrintLocalUrls(localUrlsMap);
       setSelectedInstancesForPrint(instances);
       setSelectedGridType(gridType);
       
       document.body.classList.add('print-mode-images');
       
-      // Tiny delay to let DOM render the images loaded from cache
+      // Tiny delay to let DOM render the images loaded from local blob URLs
       setTimeout(() => {
         window.print();
         document.body.classList.remove('print-mode-images');
         setIsPrintingImages(false);
-        // Delay resetting instances to avoid tearing during viewport restore
+        setPrintProgress('');
+        
+        // Delay resetting instances and revoking object URLs to avoid tearing during viewport restore
         setTimeout(() => {
           setSelectedInstancesForPrint([]);
+          // Revoke local object URLs to free up memory
+          Object.values(localUrlsMap).forEach(url => {
+            URL.revokeObjectURL(url);
+          });
+          setPrintLocalUrls({});
         }, 500);
-      }, 150);
+      }, 300);
     } catch (err) {
-      console.error('[PACS Print Preload Error]', err);
+      logger.error('[PACS Print Preload Error]', err);
       showToast('Erro ao carregar imagens para a impressão.', 'error');
       setIsPrintingImages(false);
+      setPrintProgress('');
+      // Clean up any successfully created blobs in case of partial success / error
+      Object.values(localUrlsMap).forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+      setPrintLocalUrls({});
     }
   };
 
@@ -524,15 +592,18 @@ export function ExamEditor({ examId }: Props) {
             hasDicomImages={hasDicomImages}
             onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
             viewerOpen={showIntegratedViewer}
-            onEditPatient={() => setShowEditPatient(true)}
+            dicomStatus={dicomStatus}
+            activeServer={activeServer}
+            lastErrorMessage={lastErrorMessage}
+            googleDocUrl={exam.googleDocUrl || null}
+            saveState={saveState}
           />
 
-          {/* AVISO API KEY */}
-          {(((settings.aiProvider === 'anthropic' || !settings.aiProvider) && !settings.anthropicApiKey) || 
-            ((settings.aiProvider === 'gemini') && !settings.geminiApiKey)) && (
+          {/* AVISO API KEY — apenas para Gemini (Anthropic é gerenciado server-side) */}
+          {settings.aiProvider === 'gemini' && !settings.geminiApiKey && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
               <AlertCircle size={12} />
-              <span>API Key do {settings.aiProvider === 'anthropic' ? 'Anthropic' : 'Gemini'} não configurada — geração em <strong>modo demo</strong>.</span>
+              <span>API Key do Gemini não configurada — geração em <strong>modo demo</strong>.</span>
               <button className="underline ml-1 font-medium" onClick={() => setView({ name: 'settings' })}>Configurar</button>
             </div>
           )}
@@ -540,316 +611,30 @@ export function ExamEditor({ examId }: Props) {
           <div className="flex-1 flex min-h-0 relative overflow-hidden bg-ink-50/20">
             {/* Integrated Dicom Image Viewer Sidebar */}
             {showIntegratedViewer && (
-               <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-slate-850 bg-slate-950 text-slate-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0">
-                {/* Header */}
-                <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-4">
-                    {dicomLoading && (
-                      <Loader2 size={12} className="animate-spin text-emerald-500" />
-                    )}
-                    <div className="flex items-center gap-3">
-                      {settings.dicomBackupViewerUrl ? (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={activePacsServer}
-                            onChange={(e) => {
-                              const val = e.target.value as 'primary' | 'backup' | 'both';
-                              setActivePacsServer(val);
-                              localStorage.setItem('laudus_active_pacs_server', val);
-                              setDicomRefreshKey(prev => prev + 1);
-                            }}
-                            className="bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-black uppercase tracking-wider rounded-lg px-2 py-1 focus:outline-none cursor-pointer hover:border-slate-700 transition-colors"
-                          >
-                            <option value="both">Ambos PACS</option>
-                            <option value="primary">PACS Principal</option>
-                            <option value="backup">PACS Backup</option>
-                          </select>
-                          <div className="flex items-center gap-1.5 ml-1">
-                            {activePacsServer !== 'backup' && (
-                              <div 
-                                className={classNames(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
-                                )} 
-                                title={`PACS Principal: ${pacsConnected}`} 
-                              />
-                            )}
-                            {activePacsServer !== 'primary' && (
-                              <div 
-                                className={classNames(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  pacsBackupConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.5)]" : pacsBackupConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
-                                )} 
-                                title={`PACS Backup: ${pacsBackupConnected}`} 
-                              />
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5">
-                          <div 
-                            className={classNames(
-                              "w-2 h-2 rounded-full",
-                              pacsConnected === 'connected' ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" : pacsConnected === 'disconnected' ? "bg-rose-500" : "bg-slate-500 animate-pulse"
-                            )} 
-                            title={`PACS Principal: ${pacsConnected === 'connected' ? 'Online' : pacsConnected === 'disconnected' ? 'Offline' : 'Carregando'}`} 
-                          />
-                          <span className="font-black text-[9px] uppercase tracking-widest text-slate-450">
-                            PACS Principal
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {candidateStudies.length > 1 && (
-                      <button
-                        onClick={() => setShowStudySelector(!showStudySelector)}
-                        className={classNames(
-                          "h-8 px-2.5 rounded-xl flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border",
-                          showStudySelector
-                            ? "bg-brand-600 text-white border-brand-500"
-                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
-                        )}
-                        title="Vários estudos localizados para este paciente"
-                      >
-                        <SlidersHorizontal size={12} />
-                        <span>Estudos ({candidateStudies.length})</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setDicomRefreshKey(prev => prev + 1)}
-                      disabled={dicomLoading}
-                      className={classNames(
-                        "p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95 border border-transparent hover:border-slate-700",
-                        dicomLoading && "animate-spin"
-                      )}
-                      title="Atualizar Imagens"
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                    {(() => {
-                      const extUrl = getExternalViewerUrl();
-                      if (!extUrl) return null;
-                      return (
-                        <a
-                          href={extUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="h-8 px-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-slate-750 hover:border-slate-700 active:scale-95 shadow-sm select-none"
-                          title="Abrir no Visualizador Orthanc Externo (Stone Viewer, etc.)"
-                        >
-                          <ExternalLink size={12} className="text-brand-400" />
-                          <span>Viewer</span>
-                        </a>
-                      );
-                    })()}
-                    <button
-                      onClick={() => setShowDicomImages(true)}
-                      className="h-8 px-3 rounded-xl bg-brand-500 hover:bg-brand-600 active:scale-95 text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all shadow-md border border-brand-500/20"
-                      title="Gerar/Imprimir PDF das Imagens"
-                    >
-                      <Printer size={12} />
-                      <span>PDF</span>
-                    </button>
-                    <button 
-                      onClick={() => setShowIntegratedViewer(false)}
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
-                      title="Fechar Visualizador"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Candidate Studies Dropdown Selector Panel */}
-                {showStudySelector && candidateStudies.length > 0 && (
-                  <div className="bg-slate-900 border-b border-slate-850 p-4 space-y-2 shrink-0 animate-slide-down">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
-                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar">
-                      {candidateStudies.map((study) => {
-                        const date = study.MainDicomTags?.StudyDate || '';
-                        const time = study.MainDicomTags?.StudyTime || '';
-                        const desc = study.MainDicomTags?.StudyDescription || study.RequestedProcedureDescription || 'Sem descrição';
-                        const formattedDate = date ? `${date.substring(6, 8)}/${date.substring(4, 6)}/${date.substring(0, 4)}` : 'Data ignorada';
-                        const formattedTime = time ? `${time.substring(0, 2)}:${time.substring(2, 4)}` : '';
-                        const isCurrent = study.ID === selectedStudyId;
-
-                        return (
-                          <button
-                            key={study.ID}
-                            onClick={() => {
-                              setSelectedStudyId(study.ID);
-                              setShowStudySelector(false);
-                            }}
-                            className={classNames(
-                              "w-full text-left p-3 rounded-xl border transition-all text-xs flex items-center justify-between gap-3",
-                              isCurrent
-                                ? "bg-emerald-950/30 border-emerald-500/50 text-emerald-300"
-                                : "bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white"
-                            )}
-                          >
-                            <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <p className="font-bold truncate text-[11px]">{desc}</p>
-                                <p className="text-[9px] opacity-75 mt-0.5">{formattedDate} {formattedTime} • ID: {study.MainDicomTags?.PatientID || '—'}</p>
-                              </div>
-                              <span className={classNames(
-                                "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 select-none",
-                                study.serverSource === 'backup' 
-                                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" 
-                                  : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                              )}>
-                                {study.serverSource === 'backup' ? 'Backup' : 'Principal'}
-                              </span>
-                            </div>
-                            {isCurrent && (
-                              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Main Preview Area */}
-                <div className="p-4 flex flex-col items-center justify-center shrink-0 border-b border-slate-800 bg-slate-900/50">
-                  {(() => {
-                    const activeInstance = dicomInstances[activeImageIndex];
-                    const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
-                    const activeServerSource = activeStudy?.serverSource || 'primary';
-                    if (!activeInstance) {
-                      return (
-                        <div 
-                          className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-slate-650 p-6 text-center"
-                          onWheel={(e) => {
-                            if (e.deltaY < 0) {
-                              handlePrevImage();
-                            } else if (e.deltaY > 0) {
-                              handleNextImage();
-                            }
-                          }}
-                        >
-                          <Eye size={32} className="opacity-25 mb-2" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Sem Imagem Selecionada</span>
-                        </div>
-                      );
-                    }
-                    const isBackup = activeServerSource === 'backup';
-                    const currentBaseUrl = isBackup
-                      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                      : (settings.dicomViewerUrl || 'http://localhost:8042');
-                    const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-                    const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-                    const proxyPath = getProxyEndpoint(settings, isBackup);
-                    const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-                    const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
-
-                    return (
-                      <div className="w-full flex flex-col gap-3">
-                        <div 
-                          onClick={() => setShowFullScreenImage(true)}
-                          onWheel={(e) => {
-                            if (e.deltaY < 0) {
-                              handlePrevImage();
-                            } else if (e.deltaY > 0) {
-                              handleNextImage();
-                            }
-                          }}
-                          className="relative aspect-square w-full bg-black rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center group shadow-inner cursor-zoom-in"
-                        >
-                          <DicomThumbnail 
-                            src={previewUrl} 
-                            alt={`Instance ${instanceNum}`}
-                            className="hover:scale-[1.02]"
-                            priority={true}
-                          />
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20"
-                            title="Anterior"
-                          >
-                            <ChevronLeft size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/60 hover:bg-black/85 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20"
-                            title="Próxima"
-                          >
-                            <ChevronRight size={16} />
-                          </button>
-                          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] font-black tracking-widest text-slate-300 uppercase shadow-md animate-fade-in z-20">
-                            FOTO {activeImageIndex + 1} / {dicomInstances.length}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 px-1">
-                          <span>Instância: {instanceNum}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Thumbnails Grid List or Error State */}
-                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {dicomLoading && dicomInstances.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-center">
-                      <Loader2 size={24} className="animate-spin text-brand-500 mb-3" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Buscando Exames no PACS...</span>
-                    </div>
-                  ) : dicomError && dicomInstances.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-900/30 flex flex-col items-center text-center gap-2.5 my-4">
-                      <AlertTriangle className="text-amber-500" size={24} />
-                      <p className="text-[10px] text-amber-200/80 font-medium leading-relaxed">
-                        {dicomError}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setDicomRefreshKey(prev => prev + 1)}
-                        className="h-7 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 active:scale-95 text-white text-[9px] font-black uppercase tracking-wider transition-all"
-                      >
-                        Tentar Novamente
-                      </button>
-                    </div>
-                  ) : dicomInstances.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-center px-4">
-                      <AlertCircle className="text-slate-500 mb-3" size={24} />
-                      <span className="text-[10px] font-black uppercase tracking-wider block text-slate-300">Nenhum Estudo Selecionado</span>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-2">
-                      {dicomInstances.map((instance, idx) => {
-                        const isActive = idx === activeImageIndex;
-                        const isBackup = instance.serverSource === 'backup';
-                        const currentBaseUrl = isBackup
-                          ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                          : (settings.dicomViewerUrl || 'http://localhost:8042');
-                        const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-                        const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
-                        const proxyPath = getProxyEndpoint(settings, isBackup);
-                        const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-                        
-                        return (
-                          <button
-                            key={instance.ID}
-                            onClick={() => setActiveImageIndex(idx)}
-                            className={classNames(
-                              "relative aspect-square bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md",
-                              isActive 
-                                ? "border-emerald-500 ring-2 ring-emerald-500/25 scale-[0.98]" 
-                                : "border-slate-800 hover:border-slate-600 hover:scale-[1.02]"
-                            )}
-                          >
-                            <DicomThumbnail src={previewUrl} alt={`Instance ${idx + 1}`} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <DicomViewerSidebar
+                dicomInstances={dicomInstances}
+                activeImageIndex={activeImageIndex}
+                setActiveImageIndex={setActiveImageIndex}
+                handlePrevImage={handlePrevImage}
+                handleNextImage={handleNextImage}
+                selectedStudyId={selectedStudyId}
+                setSelectedStudyId={setSelectedStudyId}
+                candidateStudies={candidateStudies}
+                settings={settings}
+                dicomLoading={dicomLoading}
+                dicomError={dicomError}
+                setDicomRefreshKey={setDicomRefreshKey}
+                setShowFullScreenImage={setShowFullScreenImage}
+                onClose={() => setShowIntegratedViewer(false)}
+                showStudySelector={showStudySelector}
+                setShowStudySelector={setShowStudySelector}
+                pacsConnected={pacsConnected}
+                pacsBackupConnected={pacsBackupConnected}
+                activePacsServer={activePacsServer}
+                setActivePacsServer={setActivePacsServer}
+                externalViewerUrl={externalViewerUrl}
+                setShowDicomImages={setShowDicomImages}
+              />
             )}
 
             {/* Main Workspace */}
@@ -879,8 +664,10 @@ export function ExamEditor({ examId }: Props) {
                     : true
                 }
                 status={exam.status}
+                examArea={exam.area || template?.area}
                 hasGoogleDoc={!!exam.googleDocId}
                 onCopy={handleCopy}
+                onShowCalculators={(calcId) => { setCalcModalInitialId(calcId || null); setShowCalculators(true); }}
                 onRefine={() => {
                   if (currentRole === 'recepcao') {
                     showToast('Acesso restrito: Secretárias não utilizam Laud.IA.', 'error');
@@ -908,6 +695,30 @@ export function ExamEditor({ examId }: Props) {
                     : (settings.geminiModel || 'gemini-3.5-flash')
                 }
               />
+
+              {/* ── LAUD.IA Cascade Status Hint ── */}
+              {isAdmin && template && !template.aiInstructions?.trim() && currentRole !== 'recepcao' && (
+                <div className="border-b border-violet-100 bg-violet-50/50 px-4 py-2 shrink-0 flex items-center justify-between gap-3 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <Zap size={12} className="text-violet-400 shrink-0" />
+                    <span className="text-[10px] text-violet-600 font-semibold">
+                      <span className="font-black text-violet-700">LAUD.IA:</span> Cascata ativa com{' '}
+                      {settings.aiAreaPrompts?.[template.area as import('../../types').ExamArea]
+                        ? <span className="text-emerald-600 font-black">Camada 1 + Área customizada</span>
+                        : <span className="text-blue-600 font-black">Camada 1 + Área padrão V2.0</span>
+                      }. Sem instruções específicas para este exame (Camada 3 vazia).
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setView({ name: 'laud-ia' })}
+                    className="text-[10px] font-black text-violet-600 hover:text-violet-800 uppercase tracking-widest whitespace-nowrap flex items-center gap-1 transition-colors"
+                    title="Abrir LAUD.IA para configurar o prompt deste exame"
+                  >
+                    <Sparkles size={10} />
+                    Configurar →
+                  </button>
+                </div>
+              )}
 
               {/* ── Snippet Picker Panel ── */}
               {showSnippets && (
@@ -973,6 +784,44 @@ export function ExamEditor({ examId }: Props) {
                 </div>
               )}
 
+              {/* ── Anamnese Panel ── */}
+              <div className="border-b border-indigo-100 bg-indigo-50/20 shrink-0">
+                <button
+                  onClick={() => setShowCustomForm(s => !s)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText size={13} className="text-indigo-650" />
+                    <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">Anamnese</span>
+                    {exam.anamnesis && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                    )}
+                  </div>
+                  <ChevronDown size={13} className={classNames("text-indigo-500 transition-transform", showCustomForm && "rotate-180")} />
+                </button>
+                {showCustomForm && (
+                  <div className="px-4 pb-4 space-y-4 animate-in fade-in duration-150 border-t border-indigo-100/30 pt-3">
+                    {/* Anamnesis Field */}
+                    <div className="flex flex-col space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-indigo-500 tracking-wider">Anamnese / Queixas Clínicas</label>
+                      <textarea
+                        value={exam.anamnesis || ''}
+                        onChange={(e) => updateItem('exams', exam.id, { anamnesis: e.target.value })}
+                        disabled={exam.status === 'finalizado' || currentRole === 'recepcao'}
+                        rows={4}
+                        className="w-full text-xs font-semibold text-ink-700 bg-white border border-indigo-200 rounded-xl p-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed placeholder-ink-400"
+                        placeholder="Escreva os sintomas, queixas clínicas ou histórico clínico rápido do paciente..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Histórico Clínico do Paciente (C2) ── */}
+              {patient && (patient.history || patient.notes || patient.insurance) && (
+                <PatientHistoryPanel patient={patient} />
+              )}
+
           <div className="flex-1 overflow-hidden relative flex flex-col">
             <AnimatePresence>
               {isGenerating && (
@@ -989,9 +838,15 @@ export function ExamEditor({ examId }: Props) {
                         <Sparkles size={32} className="animate-spin-slow" />
                       </div>
                       <div className="text-center space-y-1">
-                        <p className="text-[10px] font-black text-brand-600 uppercase tracking-[0.3em] ml-1">Processamento LAUD.IA</p>
-                        <p className="text-xl font-black text-ink-900 tracking-tight">Otimizando Inteligência Clínica</p>
-                        <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest pt-1">Aguarde a finalização dos tópicos...</p>
+                        <p className="text-[10px] font-black text-brand-600 uppercase tracking-[0.3em] ml-1">
+                          {isReasoning ? 'Raciocínio Clínico LAUD.IA' : 'Processamento LAUD.IA'}
+                        </p>
+                        <p className="text-xl font-black text-ink-900 tracking-tight">
+                          {isReasoning ? 'Analisando Estruturas e Medidas' : 'Otimizando Inteligência Clínica'}
+                        </p>
+                        <p className="text-[10px] text-ink-400 font-bold uppercase tracking-widest pt-1">
+                          {isReasoning ? 'A IA está realizando a auto-auditoria clínica...' : 'Aguarde a finalização dos tópicos...'}
+                        </p>
                       </div>
                       <div className="w-48 h-1.5 bg-ink-50 rounded-full overflow-hidden">
                         <motion.div 
@@ -1048,10 +903,10 @@ export function ExamEditor({ examId }: Props) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 30 }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col z-[300] overflow-hidden"
+              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[300] overflow-hidden"
             >
               {/* Premium Header with Mesh-style Gradient */}
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-brand-600/30 via-brand-800/10 to-transparent pointer-events-none" />
                 <div className="absolute top-[-50%] left-[-10%] w-[120%] h-[200%] bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.1),transparent_50%)] animate-pulse pointer-events-none" />
                 
@@ -1061,7 +916,7 @@ export function ExamEditor({ examId }: Props) {
                   </div>
                   <div>
                     <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copiloto</span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
+                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
                   </div>
                 </div>
                 
@@ -1101,14 +956,39 @@ export function ExamEditor({ examId }: Props) {
           )}
         </AnimatePresence>
 
+        {/* Suggestion chips from B6 proactive AI — appear above FAB after generation */}
+        <AnimatePresence>
+          {!showCopilot && copilotSuggestions.length > 0 && exam.status !== 'finalizado' && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              className="fixed bottom-44 md:bottom-28 right-6 md:right-8 z-[79] flex flex-col gap-1.5 items-end"
+            >
+              {copilotSuggestions.map((sug, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setCopilotPrompt(sug.text);
+                    setShowCopilot(true);
+                  }}
+                  className="max-w-[220px] px-3 py-1.5 bg-white/95 backdrop-blur-sm border border-brand-200 text-brand-800 rounded-full text-[11px] font-semibold shadow-md hover:bg-brand-50 hover:border-brand-400 transition-all active:scale-95 text-right"
+                >
+                  {sug.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* FAB Toggle Copilot — oculto e fechado ao finalizar */}
         {exam.status !== 'finalizado' ? (
           <button
-            onClick={() => setShowCopilot(!showCopilot)}
+            onClick={() => { setShowCopilot(!showCopilot); if (!showCopilot) clearSuggestions(); }}
             className={classNames(
               "fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2",
-              showCopilot 
-                ? "bg-white text-ink-900 border-ink-100" 
+              showCopilot
+                ? "bg-white text-ink-900 border-ink-100"
                 : "bg-brand-600 text-white border-brand-500 shadow-brand-500/30"
             )}
           >
@@ -1182,7 +1062,7 @@ export function ExamEditor({ examId }: Props) {
       )}
 
       {/* Prompt Preview Modal */}
-      {showPromptPreview && template && patient && (
+      {isAdmin && showPromptPreview && template && patient && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowPromptPreview(false)}>
           <div className="absolute inset-0 bg-ink-900/60 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -1255,49 +1135,7 @@ export function ExamEditor({ examId }: Props) {
         />
       )}
 
-      {/* Edit Patient Modal */}
-      <AnimatePresence>
-        {showEditPatient && patient && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowEditPatient(false)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl flex flex-col"
-            >
-              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
-                    <UserCog size={20} />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-black text-slate-800 uppercase tracking-tight">Editar Paciente</h2>
-                    <p className="text-xs font-semibold text-slate-500">Atualize os dados cadastrais e clínicos do paciente</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowEditPatient(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-slate-400 hover:text-slate-600 border border-slate-200 shadow-sm transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="p-6 overflow-y-auto">
-                <PatientForm
-                  initial={patient}
-                  onCancel={() => setShowEditPatient(false)}
-                  onSubmit={async (data) => {
-                    await updateItem('patients', patient.id, data);
-                    setShowEditPatient(false);
-                    showToast('Dados do paciente atualizados com sucesso', 'success');
-                  }}
-                />
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+
 
       {showVersionsModal && exam && (
         <ReportVersionsModal
@@ -1322,27 +1160,23 @@ export function ExamEditor({ examId }: Props) {
 
       <AnimatePresence>
           {showCalculators && (
-          <CalculatorModal 
+          <CalculatorModal
             initialCalcId={calcModalInitialId || undefined}
-            area={exam.area} 
+            area={exam.area}
             examDateMs={exam.createdAt}
-            reportContent={reportContent}
-            onClose={() => setShowCalculators(false)} 
+            onClose={() => setShowCalculators(false)}
             onSendToCopilot={(text) => {
               setCopilotPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
               setShowCalculators(false);
               if (!showCopilot) setShowCopilot(true);
             }}
+            onInsertToReport={(html) => {
+              editorRef.current?.insertContent(html);
+              setShowCalculators(false);
+            }}
             calculatorData={exam.calculatorData}
             onSaveCalculatorData={async (data) => {
-              // Fix 17: only write to Firestore — useDocument hook propagates reactively, no direct mutation
               await updateItem('exams', exam.id, { calculatorData: data });
-            }}
-            onAppendToForm={(text) => {
-              const currentForm = exam.customFormValue || '';
-              const newForm = currentForm ? currentForm + '\n\n' + text : text;
-              updateItem('exams', exam.id, { customFormValue: newForm });
-              showToast('Inserido no Formulário com sucesso!', 'success');
             }}
           />
         )}
@@ -1396,6 +1230,7 @@ export function ExamEditor({ examId }: Props) {
           examDate={exam.createdAt}
           selectedInstances={selectedInstancesForPrint}
           gridType={selectedGridType}
+          localUrls={printLocalUrls}
         />
       )}
 
@@ -1470,6 +1305,15 @@ export function ExamEditor({ examId }: Props) {
           })()}
         </div>
       )}
+        </div>
+      )}
+      {isPrintingImages && (
+        <div className="fixed inset-0 z-[9999] bg-zinc-950/80 backdrop-blur-md flex flex-col items-center justify-center gap-4 animate-fade-in text-white font-sans select-none">
+          <Loader2 size={40} className="animate-spin text-emerald-500" />
+          <div className="text-center space-y-1.5">
+            <h3 className="text-sm font-black uppercase tracking-wider text-zinc-100">Otimizando imagens para impressão</h3>
+            <p className="text-xs text-emerald-400 font-black tracking-widest">{printProgress}</p>
+          </div>
         </div>
       )}
     </>

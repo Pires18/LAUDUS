@@ -2,6 +2,25 @@ export const config = {
   runtime: 'edge',
 };
 
+// In-memory rate limiter — resets per Edge instance restart.
+// For distributed rate limiting, replace with Vercel KV.
+const RATE_LIMIT = 20;         // max requests
+const RATE_WINDOW_MS = 60_000; // per 60 seconds
+
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
+
+function checkRateLimit(uid: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(uid);
+  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
+    rateLimitMap.set(uid, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -9,7 +28,7 @@ export default async function handler(req: Request) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-api-key, anthropic-version, anthropic-beta',
+        'Access-Control-Allow-Headers': 'Content-Type, x-uid, anthropic-version, anthropic-beta',
       },
     });
   }
@@ -19,18 +38,30 @@ export default async function handler(req: Request) {
   }
 
   try {
+    // Rate limiting per uid
+    const uid = (req.headers.get('x-uid') || 'anonymous').slice(0, 64);
+    if (!checkRateLimit(uid)) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Tente novamente em instantes.' }),
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
     const headers = new Headers();
     headers.set('content-type', 'application/json');
-    
-    // O header 'anthropic-dangerous-direct-browser-access' NÃO é mais necessário
-    // pois a chamada agora parte do servidor Edge da Vercel.
 
-    const apiKey = req.headers.get('x-api-key');
-    if (apiKey) headers.set('x-api-key', apiKey);
-    
+    let apiKey = (req.headers.get('x-api-key') || req.headers.get('x-anthropic-key') || '').trim();
+    if (!apiKey) {
+      apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+    }
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: 'API key not configured on server' }), { status: 503 });
+    }
+    headers.set('x-api-key', apiKey);
+
     const anthropicVersion = req.headers.get('anthropic-version');
     if (anthropicVersion) headers.set('anthropic-version', anthropicVersion);
-    
+
     const anthropicBeta = req.headers.get('anthropic-beta');
     if (anthropicBeta) headers.set('anthropic-beta', anthropicBeta);
 

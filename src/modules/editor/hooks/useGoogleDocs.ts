@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { Patient, ExamRequest, Clinic, AppSettings } from '../../../types';
+import { logger } from '../../../utils/logger';
 import { syncGoogleDoc, cleanupGoogleDoc } from '../utils/googleDocSync';
 
 interface UseGoogleDocsProps {
@@ -28,7 +29,7 @@ export function useGoogleDocs({
     try {
       return await syncGoogleDoc(examId, reportContent, patient, exam, clinic, settings);
     } catch (err: unknown) {
-      console.error('[useGoogleDocs] Erro ao criar Doc:', err);
+      logger.error('[useGoogleDocs] Erro ao criar Doc:', err);
       const message = err instanceof Error ? err.message : 'Erro ao sincronizar com Google Docs';
       showToast(message, 'error');
       throw err;

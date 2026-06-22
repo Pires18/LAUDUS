@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ExamRequest } from '../../../types';
-import { X, Clock, FileText, SplitSquareHorizontal, CheckCircle2, CalendarDays } from 'lucide-react';
+import { X, Clock, FileText, SplitSquareHorizontal, CheckCircle2 } from 'lucide-react';
 import { formatDateTime, classNames } from '../../../utils/format';
+import { useConfirm } from '../../../hooks/useConfirm';
 
 interface ReportVersionsModalProps {
   exam: ExamRequest;
@@ -15,7 +16,7 @@ const TRIGGER_LABELS: Record<string, { label: string; className: string }> = {
   'generation': { label: 'Geração Inicial', className: 'bg-blue-50 text-blue-700 border-blue-200' },
   'refine':     { label: 'Refinamento',    className: 'bg-purple-50 text-purple-700 border-purple-200' },
   'copilot':    { label: 'Laud.IA Copilot', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  'manual':     { label: 'Edição Manual',   className: 'bg-slate-50 text-slate-700 border-slate-200' },
+  'manual':     { label: 'Edição Manual',   className: 'bg-ink-50 text-ink-700 border-ink-200' },
 };
 
 export function ReportVersionsModal({
@@ -25,6 +26,7 @@ export function ReportVersionsModal({
   onClose,
   showToast,
 }: ReportVersionsModalProps) {
+  const confirm = useConfirm();
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [compareMode, setCompareMode] = useState(false);
 
@@ -43,9 +45,15 @@ export function ReportVersionsModal({
 
   const selectedVersion = selectedIdx !== null ? versions[selectedIdx] : null;
 
-  const handleRestoreClick = () => {
+  const handleRestoreClick = async () => {
     if (!selectedVersion) return;
-    if (window.confirm('Tem certeza de que deseja restaurar esta versão do laudo? Seu conteúdo atual será arquivado.')) {
+    const ok = await confirm({
+      title: 'Restaurar Versão',
+      message: 'Tem certeza de que deseja restaurar esta versão do laudo? Seu conteúdo atual será arquivado.',
+      confirmLabel: 'Restaurar',
+      variant: 'warning',
+    });
+    if (ok) {
       onRestore(selectedVersion.content);
       showToast('Versão anterior restaurada com sucesso! ✓', 'success');
       onClose();
@@ -53,11 +61,11 @@ export function ReportVersionsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[110] bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-0 lg:p-6 animate-fade-in">
-      <div className="bg-white w-full h-full lg:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden max-w-[1300px] max-h-[850px] border border-slate-100">
+    <div className="fixed inset-0 z-[110] bg-ink-900/75 backdrop-blur-md flex items-center justify-center p-0 lg:p-6 animate-fade-in">
+      <div className="bg-white w-full h-full lg:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden max-w-[1300px] max-h-[850px] border border-ink-100">
         
         {/* Header */}
-        <div className="bg-slate-900 px-6 py-4 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="bg-ink-900 px-6 py-4 flex items-center justify-between shrink-0 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-teal-700/20 via-transparent to-transparent pointer-events-none" />
           <div className="relative flex items-center gap-4 z-10">
             <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center shadow-inner">
@@ -67,7 +75,7 @@ export function ReportVersionsModal({
               <h2 className="text-base font-black text-white uppercase tracking-tight leading-tight">
                 Versões do Laudo
               </h2>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+              <p className="text-[11px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">
                 {exam.examType} · {versions.length} versão/versões salvas
               </p>
             </div>
@@ -101,21 +109,21 @@ export function ReportVersionsModal({
 
         <div className="flex flex-1 min-h-0">
           {/* Sidebar - Timeline de Versões */}
-          <aside className="w-[280px] lg:w-[320px] bg-slate-50 border-r border-slate-100 flex flex-col shrink-0 overflow-y-auto custom-scrollbar p-3 space-y-2">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em] block mb-2 px-1">
+          <aside className="w-[280px] lg:w-[320px] bg-ink-50 border-r border-ink-100 flex flex-col shrink-0 overflow-y-auto custom-scrollbar p-3 space-y-2">
+            <span className="text-[9px] font-black text-ink-400 uppercase tracking-[0.15em] block mb-2 px-1">
               Linha do Tempo
             </span>
 
             {versions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 gap-3 text-center">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
-                  <FileText size={20} className="text-slate-300" />
+                <div className="w-12 h-12 rounded-xl bg-ink-100 flex items-center justify-center">
+                  <FileText size={20} className="text-ink-300" />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                  <p className="text-xs font-black text-ink-500 uppercase tracking-wider">
                     Sem Histórico de Versões
                   </p>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1 leading-relaxed">
+                  <p className="text-[10px] text-ink-400 font-semibold mt-1 leading-relaxed">
                     Novas versões serão criadas automaticamente ao modificar o laudo com Laud.IA.
                   </p>
                 </div>
@@ -133,7 +141,7 @@ export function ReportVersionsModal({
                       "w-full text-left p-3.5 rounded-xl border transition-all relative overflow-hidden group flex flex-col gap-1.5",
                       isSelected
                         ? "bg-white border-teal-200 shadow-md shadow-teal-500/5"
-                        : "bg-white/60 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-sm"
+                        : "bg-white/60 border-transparent hover:bg-white hover:border-ink-200 hover:shadow-sm"
                     )}
                   >
                     {isSelected && (
@@ -154,14 +162,14 @@ export function ReportVersionsModal({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 mt-1 text-slate-500">
-                      <Clock size={11} className="text-slate-300" />
+                    <div className="flex items-center gap-1.5 mt-1 text-ink-500">
+                      <Clock size={11} className="text-ink-300" />
                       <span className="text-[10px] font-black">
                         {formatDateTime(ver.timestamp)}
                       </span>
                     </div>
 
-                    <span className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[240px]">
+                    <span className="text-[9px] text-ink-400 font-bold uppercase truncate max-w-[240px]">
                       Tamanho: {Math.round(ver.content.length / 1024 * 10) / 10} KB
                     </span>
                   </button>
@@ -171,17 +179,17 @@ export function ReportVersionsModal({
           </aside>
 
           {/* Content Area */}
-          <main className="flex-1 flex flex-col min-h-0 bg-slate-50/30">
+          <main className="flex-1 flex flex-col min-h-0 bg-ink-50/30">
             {!selectedVersion ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center p-10">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-                  <FileText size={28} className="text-slate-300" />
+                <div className="w-16 h-16 rounded-2xl bg-ink-100 flex items-center justify-center">
+                  <FileText size={28} className="text-ink-300" />
                 </div>
                 <div>
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  <p className="text-xs font-black text-ink-400 uppercase tracking-widest">
                     Histórico Vazio
                   </p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">
+                  <p className="text-[10px] text-ink-400 font-medium mt-1 leading-relaxed">
                     Nenhum snapshot de versão prévia foi gerado para este laudo ainda.
                   </p>
                 </div>
@@ -190,11 +198,11 @@ export function ReportVersionsModal({
               /* Compare Split View */
               <div className="flex-1 flex min-h-0 overflow-hidden">
                 {/* Versão Selecionada (esquerda) */}
-                <div className="flex-1 flex flex-col border-r border-slate-200 min-w-0">
-                  <div className="px-5 py-3 border-b bg-white border-slate-100 flex items-center justify-between shrink-0">
+                <div className="flex-1 flex flex-col border-r border-ink-200 min-w-0">
+                  <div className="px-5 py-3 border-b bg-white border-ink-100 flex items-center justify-between shrink-0">
                     <div>
-                      <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">Versão Selecionada</p>
-                      <p className="text-[9px] text-slate-400 font-medium mt-0.5">{formatDateTime(selectedVersion.timestamp)}</p>
+                      <p className="text-[11px] font-black text-ink-900 uppercase tracking-tight">Versão Selecionada</p>
+                      <p className="text-[9px] text-ink-400 font-medium mt-0.5">{formatDateTime(selectedVersion.timestamp)}</p>
                     </div>
                     <button
                       onClick={handleRestoreClick}
@@ -214,10 +222,10 @@ export function ReportVersionsModal({
 
                 {/* Versão Atual (direita) */}
                 <div className="flex-1 flex flex-col min-w-0">
-                  <div className="px-5 py-3 border-b bg-white border-slate-100 flex items-center justify-between shrink-0">
+                  <div className="px-5 py-3 border-b bg-white border-ink-100 flex items-center justify-between shrink-0">
                     <div>
-                      <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">Estado Atual do Editor</p>
-                      <p className="text-[9px] text-slate-400 font-medium mt-0.5">Laudo em edição</p>
+                      <p className="text-[11px] font-black text-ink-900 uppercase tracking-tight">Estado Atual do Editor</p>
+                      <p className="text-[9px] text-ink-400 font-medium mt-0.5">Laudo em edição</p>
                     </div>
                   </div>
                   <div className="flex-1 overflow-auto p-6 lg:p-10 bg-teal-50/[0.03] custom-scrollbar relative">
@@ -232,10 +240,10 @@ export function ReportVersionsModal({
             ) : (
               /* Simple View */
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="px-5 py-3 border-b bg-white border-slate-100 flex items-center justify-between shrink-0">
+                <div className="px-5 py-3 border-b bg-white border-ink-100 flex items-center justify-between shrink-0">
                   <div>
-                    <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">Conteúdo da Versão</p>
-                    <p className="text-[9px] text-slate-400 font-medium mt-0.5">
+                    <p className="text-[11px] font-black text-ink-900 uppercase tracking-tight">Conteúdo da Versão</p>
+                    <p className="text-[9px] text-ink-400 font-medium mt-0.5">
                       Criado em {formatDateTime(selectedVersion.timestamp)} via {TRIGGER_LABELS[selectedVersion.trigger]?.label || 'Edição'}
                     </p>
                   </div>

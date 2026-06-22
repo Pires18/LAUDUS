@@ -68,8 +68,8 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
       }
     }
 
-    const summary = currentGa 
-      ? `[Idade Gestacional Calculada]\nIG: ${currentGa} (Base: ${method === 'dum' ? 'DUM' : 'USG Anterior'})\nDDP: ${eddStr || '---'}`
+    const summary = currentGa
+      ? `Idade gestacional: ${currentGa} (calculada pela ${method === 'dum' ? 'DUM' : 'USG anterior'}). DDP: ${eddStr || '---'}.`
       : null;
 
     onChange({
@@ -111,7 +111,7 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
               key={m.id}
               onClick={() => setMethod(m.id as any)}
               className={classNames(
-                "flex-1 p-4 rounded-[1.5rem] border-2 transition-all text-left",
+                "flex-1 p-4 rounded-2xl border-2 transition-all text-left",
                 method === m.id 
                   ? "bg-brand-600 text-white border-brand-500 shadow-lg shadow-brand-100" 
                   : "bg-white text-ink-400 border-ink-100 hover:bg-ink-50"
@@ -167,7 +167,7 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
           />
         </div>
       ) : (
-        <div className="py-12 border-2 border-dashed border-ink-100 rounded-[2.5rem] text-center space-y-3">
+        <div className="py-12 border-2 border-dashed border-ink-100 rounded-2xl text-center space-y-3">
           <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200 animate-pulse">
              <Clock size={32} />
           </div>

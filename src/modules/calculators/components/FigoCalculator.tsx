@@ -80,7 +80,7 @@ export function FigoCalculator({ value, onChange }: CalculatorProps) {
 
     onChange({
       myomas: updatedMyomas,
-      _summary: summaries.length > 0 ? `Classificação FIGO (Leiomiomas):\n${summaries.join('\n')}` : null
+      _summary: summaries.length > 0 ? `FIGO (Leiomiomas): ${summaries.join(' | ')}` : null
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myomas]);
