@@ -376,7 +376,15 @@ export function DicomControlCenter() {
                       />
                     </div>
                     <div>
-                      <label className="label">Tipo de Visualizador DICOM</label>
+                      <label className="label flex items-center gap-1.5 relative">
+                        Tipo de Visualizador DICOM
+                        <span className="group relative cursor-help">
+                          <Info size={12} className="text-ink-400 hover:text-emerald-600 transition-colors inline-block" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            Selecione o visualizador PACS integrado de sua preferência. Stone Web Viewer é o padrão recomendado.
+                          </span>
+                        </span>
+                      </label>
                       <select
                         className="input h-11 text-sm"
                         value={draft.dicomViewerType || 'stone'}
@@ -401,7 +409,15 @@ export function DicomControlCenter() {
 
                     {draft.dicomViewerType === 'custom' && (
                       <div className="md:col-span-2">
-                        <label className="label">Padrão da URL do Visualizador</label>
+                        <label className="label flex items-center gap-1.5 relative">
+                          Padrão da URL do Visualizador
+                          <span className="group relative cursor-help">
+                            <Info size={12} className="text-ink-400 hover:text-emerald-600 transition-colors inline-block" />
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                              Use os placeholders de substituição como {"{{baseUrl}}"} e {"{{StudyInstanceUID}}"} para montar a rota do visualizador personalizado.
+                            </span>
+                          </span>
+                        </label>
                         <input
                           className="input h-11 text-sm"
                           value={draft.dicomViewerUrlPattern || ''}

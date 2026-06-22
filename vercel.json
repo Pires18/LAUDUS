@@ -1,4 +1,33 @@
 {
+  "functions": {
+    "api/abacatepay-webhook.ts": {
+      "maxDuration": 30
+    },
+    "api/abacatepay-checkout.ts": {
+      "maxDuration": 20
+    },
+    "api/reset-monthly-reports.ts": {
+      "maxDuration": 60
+    },
+    "api/promote-admin.ts": {
+      "maxDuration": 15
+    },
+    "api/abacatepay-portal.ts": {
+      "maxDuration": 10
+    },
+    "api/abacatepay-cancel.ts": {
+      "maxDuration": 20
+    },
+    "api/abacatepay-test.ts": {
+      "maxDuration": 15
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/reset-monthly-reports",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",
@@ -15,6 +44,23 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/api/:path*",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, x-webhook-signature"
         }
       ]
     }

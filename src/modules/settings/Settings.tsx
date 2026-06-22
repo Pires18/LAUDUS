@@ -196,10 +196,10 @@ export function Settings() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as SettingsTab)}
               className={classNames(
-                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-shrink-0',
+                'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-300 transform active:scale-95 whitespace-nowrap flex-shrink-0',
                 isActive
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                  : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
+                  ? 'bg-indigo-650 text-white shadow-md shadow-indigo-500/20 scale-[1.02] border border-indigo-750/10'
+                  : 'text-ink-500 hover:text-ink-900 hover:bg-white/70 hover:scale-[1.01]'
               )}
             >
               <tab.icon size={13} />
@@ -380,7 +380,15 @@ export function Settings() {
 
                   <div className="grid grid-cols-2 gap-4 mb-5">
                     <div>
-                      <label className="label">Número do CRM</label>
+                      <label className="label flex items-center gap-1.5 relative">
+                        Número do CRM
+                        <span className="group relative cursor-help">
+                          <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            O CRM é obrigatório para validade jurídica de seus laudos. Insira no formato Número-UF (ex: 123456-SP).
+                          </span>
+                        </span>
+                      </label>
                       <input
                         className="input h-14"
                         value={draft.physicianCRM || ''}
@@ -389,7 +397,15 @@ export function Settings() {
                       />
                     </div>
                     <div>
-                      <label className="label">RQE (Especialidade)</label>
+                      <label className="label flex items-center gap-1.5 relative">
+                        RQE (Especialidade)
+                        <span className="group relative cursor-help">
+                          <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            O RQE (Registro de Qualificação de Especialidade) serve para certificar legalmente a sua especialidade nos laudos.
+                          </span>
+                        </span>
+                      </label>
                       <input
                         className="input h-14"
                         value={draft.physicianRQE || ''}
@@ -400,7 +416,15 @@ export function Settings() {
                   </div>
 
                   <div className="space-y-3 py-5 border-t border-ink-50">
-                    <label className="label">Assinatura Digitalizada (Imagem)</label>
+                    <label className="label flex items-center gap-1.5 relative">
+                      Assinatura Digitalizada (Imagem)
+                      <span className="group relative cursor-help">
+                        <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
+                        <span className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                          Faça upload da imagem da sua assinatura manuscrita (PNG com fundo transparente) para inserção nítida nos laudos em PDF.
+                        </span>
+                      </span>
+                    </label>
                     <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-ink-50/50 rounded-2xl border border-ink-100">
                       <div className="w-40 h-20 bg-white border border-ink-200 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 relative">
                         {draft.signatureImageUrl ? (

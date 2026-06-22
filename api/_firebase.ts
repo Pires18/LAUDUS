@@ -1,14 +1,6 @@
-import { createRequire } from 'module';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
-// CJS (Vercel): `require` exists globally. ESM (Vite SSR): must use createRequire.
-declare const require: any;
-const _require: (id: string) => any =
-  typeof require !== 'undefined' ? require : createRequire(import.meta.url);
-
-// Vite SSR does not inject non-VITE_ vars into process.env — load .env manually.
-// On Vercel the file won't exist, so this is a no-op there.
 function loadDotEnv() {
   const envPath = resolve(process.cwd(), '.env');
   if (!existsSync(envPath)) return;
@@ -29,35 +21,50 @@ function loadDotEnv() {
   } catch { /* ignore */ }
 }
 
-loadDotEnv();
+function getCredentials() {
+  loadDotEnv();
+  return {
+    projectId:   process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'laudus',
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  };
+}
 
-let _initialized = false;
+// Single initialization promise prevents race conditions when getDb() and
+// getAdminAuth() are called in parallel within the same serverless invocation.
+let _initPromise: Promise<void> | null = null;
+let _db: any   = null;
+let _auth: any = null;
 
-function initApp() {
-  if (_initialized) return;
-  const { initializeApp, getApps, cert } = _require('firebase-admin/app');
-  if (!getApps().length) {
-    const projectId   = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'laudus';
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-    if (projectId && clientEmail && privateKey) {
-      initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
-    } else {
-      console.error('[FIREBASE] Credenciais ausentes:', { projectId, hasEmail: !!clientEmail, hasKey: !!privateKey });
-      initializeApp({ projectId });
+async function ensureInit() {
+  if (_initPromise) return _initPromise;
+  _initPromise = (async () => {
+    const { initializeApp, getApps, cert } = await import('firebase-admin/app');
+    if (!getApps().length) {
+      const { projectId, clientEmail, privateKey } = getCredentials();
+      if (clientEmail && privateKey) {
+        initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+      } else {
+        console.error('[FIREBASE] Credenciais ausentes — PROJECT_ID:', projectId, 'EMAIL:', !!clientEmail, 'KEY:', !!privateKey);
+        initializeApp({ projectId });
+      }
     }
-  }
-  _initialized = true;
+  })();
+  return _initPromise;
 }
 
-export function getDb() {
-  initApp();
-  const { getFirestore } = _require('firebase-admin/firestore');
-  return getFirestore();
+export async function getDb() {
+  if (_db) return _db;
+  await ensureInit();
+  const { getFirestore } = await import('firebase-admin/firestore');
+  _db = getFirestore();
+  return _db;
 }
 
-export function getAdminAuth() {
-  initApp();
-  const { getAuth } = _require('firebase-admin/auth');
-  return getAuth();
+export async function getAdminAuth() {
+  if (_auth) return _auth;
+  await ensureInit();
+  const { getAuth } = await import('firebase-admin/auth');
+  _auth = getAuth();
+  return _auth;
 }

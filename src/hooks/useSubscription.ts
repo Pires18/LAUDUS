@@ -231,11 +231,13 @@ export function useSubscription(): SubscriptionState {
         // Reset check
         const thirtyDays = 30 * 24 * 60 * 60 * 1000;
         if (sub.lastResetAt && Date.now() > sub.lastResetAt + thirtyDays) {
-          fetch('/api/reset-monthly-reports', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: uid, subscriptionId: sub.id }),
-          }).catch((err) => console.error('Erro ao resetar laudos mensais:', err));
+          auth.currentUser?.getIdToken().then((idToken) =>
+            fetch('/api/reset-monthly-reports', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+              body: JSON.stringify({ userId: uid, subscriptionId: sub.id }),
+            })
+          ).catch((err) => console.error('Erro ao resetar laudos mensais:', err));
         }
 
         setState({

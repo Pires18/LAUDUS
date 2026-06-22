@@ -868,8 +868,8 @@ function AbacatePayTab() {
     },
     {
       num: '04', color: 'violet',
-      title: 'Configurar Segredo HMAC',
-      desc: 'Gere um segredo aleatório (botão abaixo), copie e cadastre em AbacatePay → Webhooks → Secret. Salve o mesmo valor no campo "Segredo do Webhook" abaixo. Esse segredo valida a autenticidade de cada evento.',
+      title: 'Configurar Segredo do Webhook',
+      desc: 'Gere um segredo aleatório (botão abaixo), copie e cadastre em AbacatePay → Webhooks → Secret. Salve o mesmo valor no campo "Segredo do Webhook" abaixo. A validação aceita tanto o segredo via query string (?webhookSecret=...) quanto a assinatura HMAC-SHA256 no header X-Webhook-Signature — qualquer um autentica o evento.',
       extra: null,
     },
     {
@@ -881,7 +881,7 @@ function AbacatePayTab() {
     {
       num: '06', color: 'rose',
       title: 'Configurar Variáveis de Ambiente (Vercel)',
-      desc: 'No painel Vercel do projeto, adicione: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY (credenciais de conta de serviço Firebase) e ABACATEPAY_WEBHOOK_SECRET (o segredo do passo 4). Sem essas variáveis, o webhook não consegue escrever no Firestore.',
+      desc: 'No painel Vercel (Settings → Environment Variables), adicione: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY (credenciais de conta de serviço Firebase), ABACATEPAY_WEBHOOK_SECRET (segredo do passo 4) e CRON_SECRET (senha aleatória para proteger o reset mensal automático). Sem CRON_SECRET o job diário de reset de quotas não executa.',
       extra: null,
     },
   ];

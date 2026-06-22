@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
     }
     const token = authHeader.split('Bearer ')[1];
 
-    const auth = getAdminAuth();
+    const auth = await getAdminAuth();
     const decodedToken = await auth.verifyIdToken(token);
     const authEmail = decodedToken.email || '';
     const authUid   = decodedToken.uid;
@@ -35,7 +35,7 @@ export default async function handler(req: any, res: any) {
       return res.status(403).json({ error: 'Apenas o Super Admin pode ser promovido.' });
     }
 
-    const db = getDb();
+    const db = await getDb();
     await db.collection('users').doc(userId).set({ role: 'admin', updatedAt: Date.now() }, { merge: true });
 
     console.log(`[PROMOTE-ADMIN] Super Admin promovido: UID ${userId}`);

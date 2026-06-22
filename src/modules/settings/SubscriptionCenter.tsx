@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useApp } from '../../store/app';
 import { createSupportTicket, getAiUsageStats } from '../../store/db';
-import { doc, updateDoc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
-import { firestore } from '../../lib/firebase';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { firestore, auth } from '../../lib/firebase';
 import { classNames } from '../../utils/format';
 import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText,
   Building2, RefreshCw, ChevronDown, ChevronUp,
-  Package, ExternalLink, ShieldCheck, Calendar, TrendingUp,
+  Package, ExternalLink, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -22,6 +22,8 @@ interface LaudoStats {
 interface AddonsConfig {
   calculators?:  { price: number; description: string; enabled: boolean };
   pacs?:         { price: number; description: string; enabled: boolean; assisted?: boolean };
+  appointments?: { price: number; description: string; enabled: boolean };
+  clinics?:      { price: number; description: string; enabled: boolean };
   extraReport?:  { price: number; description: string; enabled: boolean };
   extraClinic?:  { price: number; description: string; enabled: boolean };
   tokenLite?:    { price: number; bundleSize: number; description: string; enabled: boolean };
@@ -31,6 +33,8 @@ interface AddonsConfig {
 const ADDONS_DEFAULT: AddonsConfig = {
   calculators: { price: 49,    description: 'Calculadoras clínicas integradas ao editor.',        enabled: true },
   pacs:        { price: 0,     description: 'PACS/DICOM com worklist e sincronização de exames.', enabled: true },
+  appointments: { price: 39,   description: 'Agendamentos e gestão de agenda do médico.',          enabled: true },
+  clinics:     { price: 49,    description: 'Módulo de clínicas para multi-unidades.',             enabled: true },
   extraReport: { price: 1.50,  description: 'Laudo extra além da quota (inclui 1 Token Lite/Pro).', enabled: true },
   extraClinic: { price: 29,    description: 'Clínica extra além da quota do plano.',              enabled: true },
   tokenLite:   { price: 9.90,  bundleSize: 50,  description: 'Pacote de 50 laudos com Motor Lite.', enabled: true },
@@ -42,7 +46,7 @@ const ADDONS_DEFAULT: AddonsConfig = {
 export function SubscriptionCenter() {
   const {
     subscription, isActive, isTrialing, isPastDue, isCanceled,
-    hasCalculators, hasPacs, reportsUsed, reportsQuota, reportsRemaining,
+    hasCalculators, hasPacs, hasAppointments, hasClinics, reportsUsed, reportsQuota, reportsRemaining,
     trialDaysLeft, motorProEnabled, motorOptions,
   } = useSubscription();
 
@@ -143,9 +147,10 @@ export function SubscriptionCenter() {
     if (!user) return;
     setLoadingAddon(addon);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/abacatepay-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ userId: user.uid, email: user.email, type: 'addon', addon }),
       });
       const data = await res.json();
@@ -166,9 +171,10 @@ export function SubscriptionCenter() {
     if (!user) return;
     setLoadingAddon(planId);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/abacatepay-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ userId: user.uid, email: user.email, type: 'subscription', planId }),
       });
       const data = await res.json();
@@ -210,9 +216,19 @@ export function SubscriptionCenter() {
     if (!subscription || !user) return;
     if (!window.confirm('Deseja cancelar a assinatura? O acesso à LAUD.IA será bloqueado ao fim do período faturado.')) return;
     try {
-      await updateDoc(doc(firestore, 'subscriptions', subscription.id), { status: 'canceled', canceledAt: Date.now() });
-      await updateDoc(doc(firestore, 'users', user.uid), { subscriptionStatus: 'canceled' });
-      showToast('Assinatura cancelada.', 'info');
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/abacatepay-cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+        body: JSON.stringify({ userId: user.uid, subscriptionId: subscription.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao cancelar.');
+      if (data.gatewayCancelPending) {
+        showToast('Assinatura cancelada. A cobrança recorrente será encerrada pelo suporte em breve.', 'info');
+      } else {
+        showToast('Assinatura cancelada com sucesso.', 'info');
+      }
     } catch (err: any) { showToast(err.message || 'Falha ao cancelar.', 'error'); }
   };
 
@@ -487,10 +503,9 @@ export function SubscriptionCenter() {
 
       {/* ═══ 3. ADD-ONS E MÓDULOS ════════════════════════════════════════════ */}
       <Card>
-        <SectionHeader icon={Package} title="Módulos e Add-ons" />
+        <SectionHeader icon={Package} title="Funcionalidades / Módulos Extras" />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {/* Calculadoras */}
           <AddonCard
             icon={Calculator} iconColor="indigo"
@@ -517,6 +532,34 @@ export function SubscriptionCenter() {
             disabled={pacsRequested}
           />
 
+          {/* Agendamentos */}
+          <AddonCard
+            icon={CalendarDays} iconColor="amber"
+            title="Módulo de Agendamentos"
+            description={ac.appointments?.description ?? ADDONS_DEFAULT.appointments!.description}
+            price={`R$ ${(ac.appointments?.price ?? 39).toFixed(2).replace('.', ',')}/mês`}
+            active={hasAppointments}
+            actionLabel="Assinar Módulo"
+            onAction={() => handleBuyAddon('appointments')}
+            loading={loadingAddon === 'appointments'}
+          />
+
+          {/* Clínicas */}
+          <AddonCard
+            icon={Hospital} iconColor="teal"
+            title="Módulo de Clínicas"
+            description={ac.clinics?.description ?? ADDONS_DEFAULT.clinics!.description}
+            price={`R$ ${(ac.clinics?.price ?? 49).toFixed(2).replace('.', ',')}/mês`}
+            active={hasClinics}
+            actionLabel="Assinar Módulo"
+            onAction={() => handleBuyAddon('clinics')}
+            loading={loadingAddon === 'clinics'}
+          />
+        </div>
+
+        <SectionHeader icon={Plus} title="Recursos Adicionais (Consumíveis)" />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Pacote Laudos Lite */}
           <AddonCard
             icon={Zap} iconColor="violet"

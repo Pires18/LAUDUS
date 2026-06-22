@@ -445,6 +445,17 @@ export interface SupportTicket {
   createdAt: number;
   updatedAt: number;
   type?: string;
+  category?: 'ia_help' | 'billing' | 'pacs_setup' | 'technical_issue' | 'other';
+  rating?: number;
+  ratingComment?: string;
+  adminNotes?: Array<{ timestamp: number; author: string; text: string }>;
+  diagnostics?: {
+    browser: string;
+    os: string;
+    screenResolution: string;
+    reportsRemaining: number;
+    activePlan: string;
+  };
 }
 
 /** Plano de assinatura SaaS */

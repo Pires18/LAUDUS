@@ -203,58 +203,52 @@ function localOrthancWorklistPlugin() {
           req.url && (
             req.url.startsWith('/api/abacatepay-checkout') ||
             req.url.startsWith('/api/abacatepay-webhook') ||
+            req.url.startsWith('/api/abacatepay-portal') ||
             req.url.startsWith('/api/abacatepay-test') ||
             req.url.startsWith('/api/reset-monthly-reports') ||
-            req.url.startsWith('/api/promote-admin')
+            req.url.startsWith('/api/promote-admin') ||
+            req.url.startsWith('/api/abacatepay-cancel')
           )
         ) {
           const parsedUrl = new URL(req.url, 'http://localhost');
           const pathName = parsedUrl.pathname;
-          
+
           const runServerless = async (filePath: string) => {
             try {
               const mod = await server.ssrLoadModule(filePath);
               const handler = mod.default || mod;
-              
-              // Helper to inject Express-like status/json/send methods to response
-              res.status = (code: number) => {
-                res.statusCode = code;
-                return res;
-              };
+
+              res.status = (code: number) => { res.statusCode = code; return res; };
               res.json = (data: any) => {
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify(data));
                 return res;
               };
-              res.send = (data: any) => {
-                res.end(data);
+              res.send = (data: any) => { res.end(data); return res; };
+              res.writeHead = res.writeHead || ((code: number, headers: any) => {
+                res.statusCode = code;
+                Object.entries(headers || {}).forEach(([k, v]) => res.setHeader(k, v as string));
                 return res;
-              };
+              });
 
-              // Parse body for POST/PUT requests
               if (req.method === 'POST' || req.method === 'PUT') {
                 let body = '';
                 await new Promise<void>((resolve) => {
                   req.on('data', (chunk: any) => { body += chunk; });
                   req.on('end', () => { resolve(); });
                 });
-                try {
-                  req.body = JSON.parse(body);
-                } catch {
-                  req.body = body;
-                }
+                // Store raw body so handlers with bodyParser:false (e.g. webhook) can read it.
+                req._rawBody = body;
+                try { req.body = JSON.parse(body); } catch { req.body = body; }
               } else {
                 req.body = {};
+                req._rawBody = '';
               }
 
-              // Bind query params to req.query
-              const query: Record<string, string> = {};
-              parsedUrl.searchParams.forEach((val, key) => {
-                query[key] = val;
-              });
-              req.query = query;
+              const queryParams: Record<string, string> = {};
+              parsedUrl.searchParams.forEach((val, key) => { queryParams[key] = val; });
+              req.query = queryParams;
 
-              // Run the handler
               await handler(req, res);
             } catch (err: any) {
               console.error(`[Serverless Dev Proxy] Error in ${filePath}:`, err);
@@ -268,12 +262,18 @@ function localOrthancWorklistPlugin() {
             await runServerless('./api/abacatepay-checkout.ts');
           } else if (pathName === '/api/abacatepay-webhook') {
             await runServerless('./api/abacatepay-webhook.ts');
+          } else if (pathName === '/api/abacatepay-portal') {
+            await runServerless('./api/abacatepay-portal.ts');
           } else if (pathName === '/api/abacatepay-test') {
             await runServerless('./api/abacatepay-test.ts');
           } else if (pathName === '/api/reset-monthly-reports') {
             await runServerless('./api/reset-monthly-reports.ts');
           } else if (pathName === '/api/promote-admin') {
             await runServerless('./api/promote-admin.ts');
+          } else if (pathName === '/api/abacatepay-cancel') {
+            await runServerless('./api/abacatepay-cancel.ts');
+          } else {
+            next();
           }
         } else {
           next();
