@@ -1,5 +1,5 @@
-import { getDb } from './_firebase';
-import { verifyAuth, isAdmin } from './_auth';
+import { getDb } from './_firebase.js';
+import { verifyAuth, isAdmin } from './_auth.js';
 
 /**
  * Cancela a assinatura recorrente. Diferente do cancelamento local anterior,

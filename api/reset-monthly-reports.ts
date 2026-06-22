@@ -1,4 +1,4 @@
-import { getDb, getAdminAuth } from './_firebase';
+import { getDb, getAdminAuth } from './_firebase.js';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;

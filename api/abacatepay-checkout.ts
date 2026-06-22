@@ -1,6 +1,6 @@
-import { getDb } from './_firebase';
-import { verifyAuth, isProduction } from './_auth';
-import { mapAddonKey, ADDON_NAMES, resolveAddon } from './_pricing';
+import { getDb } from './_firebase.js';
+import { verifyAuth, isProduction } from './_auth.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon } from './_pricing.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

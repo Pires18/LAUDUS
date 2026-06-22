@@ -1,6 +1,6 @@
-import { getDb } from './_firebase';
-import { isProduction } from './_auth';
-import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom } from './_pricing';
+import { getDb } from './_firebase.js';
+import { isProduction } from './_auth.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom } from './_pricing.js';
 import crypto from 'crypto';
 
 export const config = {

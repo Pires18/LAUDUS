@@ -1,4 +1,4 @@
-import { getAdminAuth } from './_firebase';
+import { getAdminAuth } from './_firebase.js';
 
 export interface AuthedUser {
   uid: string;
