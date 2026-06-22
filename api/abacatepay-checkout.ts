@@ -46,8 +46,9 @@ export default async function handler(req: any, res: any) {
         return res.status(503).json({ error: 'Gateway de pagamento não configurado. Contate o suporte.' });
       }
       // Em dev/preview: fluxo mock para testes locais.
-      const publicBase = (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
-        || (req.headers.origin as string | undefined)
+      // Prioridade: origin do browser (correto para redirect do usuário), depois VITE_PUBLIC_URL.
+      const publicBase = (req.headers.origin as string | undefined)
+        || (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
         || 'http://localhost:5173';
       console.log(`[ABACATEPAY] Mock (dev) para ${email} via ${publicBase}`);
       const mockUrl = `${publicBase}/api/abacatepay-webhook?mock=true&userId=${userId}&type=${type || 'subscription'}&addon=${addon || ''}&planId=${planId || ''}`;
@@ -94,8 +95,11 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const returnBase = (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
-      || (req.headers.origin as string | undefined)
+    // returnUrl é onde o BROWSER do usuário vai após o pagamento.
+    // req.headers.origin é o origin correto (localhost:5173 em dev, domínio real em prod).
+    // VITE_PUBLIC_URL fica como fallback — é a URL do servidor/webhook, não do browser.
+    const returnBase = (req.headers.origin as string | undefined)
+      || (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
       || 'http://localhost:5173';
 
     const itemId = abacatePayProductId || `${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${Date.now()}`;

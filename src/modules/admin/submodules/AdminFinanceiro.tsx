@@ -757,6 +757,7 @@ function AbacatePayTab() {
       ? `${window.location.origin}/api/abacatepay-webhook`
       : 'https://seu-dominio.vercel.app/api/abacatepay-webhook';
   const isNgrok = webhookUrl.includes('ngrok') || webhookUrl.includes('tunnel');
+  const isVercelProd = webhookUrl.includes('vercel.app') || (webhookUrl.startsWith('https://') && !isNgrok && !webhookUrl.includes('localhost'));
 
   const isKeyConfigured    = config.apiKey.length > 10;
   const isSecretConfigured = config.webhookSecret.length > 10;
@@ -852,7 +853,7 @@ function AbacatePayTab() {
               {webhookCopied ? <CheckCheck size={12} className="text-emerald-500" /> : <Copy size={12} />}
             </button>
           </div>
-          {!isNgrok && !webhookUrl.startsWith('https://') && (
+          {!isNgrok && !isVercelProd && !webhookUrl.startsWith('https://') && (
             <div className="flex items-center gap-1.5 text-[9px] text-amber-600 font-bold">
               <AlertTriangle size={10} />
               URL local (HTTP) — AbacatePay exige HTTPS. Configure ngrok: defina <code className="font-mono bg-amber-50 px-1 rounded">VITE_PUBLIC_URL</code> no .env com a URL ngrok e reinicie o servidor.
@@ -861,6 +862,11 @@ function AbacatePayTab() {
           {isNgrok && (
             <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-bold">
               <Check size={10} /> URL HTTPS via ngrok — pronta para usar no AbacatePay
+            </div>
+          )}
+          {isVercelProd && (
+            <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-bold">
+              <Check size={10} /> URL de produção (Vercel) — registre esta URL no painel AbacatePay
             </div>
           )}
         </div>
