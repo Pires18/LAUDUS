@@ -1,5 +1,6 @@
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
+import { CollectionError } from '../../components/CollectionError';
 import { useAdmin } from '../../hooks/useAdmin';
 import { PageHeader } from '../../components/PageHeader';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -31,7 +32,7 @@ export function Templates() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
 
 
-  const { data: templates, loading } = useCollection<ReportTemplate>('templates');
+  const { data: templates, loading, error: templatesError } = useCollection<ReportTemplate>('templates');
   const { data: clinics } = useCollection<Clinic>('clinics');
 
   const filtered = templates.filter((t) => {
@@ -207,7 +208,9 @@ export function Templates() {
 
         {/* ─── TEMPLATES GRID ─── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading ? (
+          {templatesError ? (
+            <div className="col-span-full"><CollectionError message={templatesError} /></div>
+          ) : loading ? (
             [1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)
           ) : sorted.length === 0 ? (
             <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-ink-200 shadow-sm">

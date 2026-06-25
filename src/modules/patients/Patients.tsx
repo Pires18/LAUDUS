@@ -1,5 +1,6 @@
 import { useApp } from '../../store/app';
 import { usePaginatedCollection, orderBy, where } from '../../hooks/useFirestore';
+import { CollectionError } from '../../components/CollectionError';
 import { PageHeader } from '../../components/PageHeader';
 import { Modal } from '../../components/Modal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -22,7 +23,7 @@ export function Patients() {
     ? [orderBy('name', 'asc'), where('name', '>=', searchPrefix), where('name', '<=', searchPrefix + '\uf8ff')] 
     : [orderBy('name', 'asc')];
 
-  const { data: patients, loading, hasMore, loadMore } = usePaginatedCollection<Patient>('patients', {
+  const { data: patients, loading, error: patientsError, hasMore, loadMore } = usePaginatedCollection<Patient>('patients', {
     constraints,
     initialLimit: 50
   });
@@ -117,7 +118,9 @@ export function Patients() {
 
         {/* ─── PATIENTS TABLE ─── */}
         <div className="bg-white border border-ink-200 rounded-2xl overflow-hidden shadow-sm">
-          {loading ? (
+          {patientsError ? (
+            <CollectionError message={patientsError} />
+          ) : loading ? (
             <div className="p-4">
               <ListSkeleton count={4} />
             </div>

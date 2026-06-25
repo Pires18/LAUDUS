@@ -1,6 +1,7 @@
 import { useApp } from '../../store/app';
 import { useCollection, usePaginatedCollection, orderBy, where } from '../../hooks/useFirestore';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { CollectionError } from '../../components/CollectionError';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
@@ -44,7 +45,7 @@ export function Worklist() {
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [syncingExamId, setSyncingExamId] = useState<string | null>(null);
 
-  const { data: exams, loading: examsLoading, hasMore: hasMoreFromServer, loadMore } = usePaginatedCollection<ExamRequest>('exams', {
+  const { data: exams, loading: examsLoading, error: examsError, hasMore: hasMoreFromServer, loadMore } = usePaginatedCollection<ExamRequest>('exams', {
     constraints: [
       ...(selectedClinicId ? [where('clinicId', '==', selectedClinicId)] : []),
       orderBy('createdAt', 'desc')
@@ -383,7 +384,9 @@ export function Worklist() {
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-50">
-            {examsLoading ? (
+            {examsError ? (
+              <tr><td colSpan={6}><CollectionError message={examsError} /></td></tr>
+            ) : examsLoading ? (
               [1, 2, 3, 4].map(i => (
                 <tr key={i}>
                   <td colSpan={6} className="px-4 xl:px-5 py-4"><Skeleton className="h-10 w-full rounded-xl" /></td>

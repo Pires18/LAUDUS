@@ -3,9 +3,9 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
-import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings, ClipboardPen, Check, X as XIcon } from 'lucide-react';
 import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
 import { where } from 'firebase/firestore';
@@ -20,6 +20,10 @@ export function PatientDetail({ patientId }: Props) {
   const [editing, setEditing] = useState(false);
   const [selectedExamForModal, setSelectedExamForModal] = useState<ExamRequest | null>(null);
   const [modalTab, setModalTab] = useState<'metadata' | 'patient' | 'consent'>('metadata');
+  const [editingHistory, setEditingHistory] = useState(false);
+  const [historyDraft, setHistoryDraft] = useState('');
+  const [savingHistory, setSavingHistory] = useState(false);
+  const historyRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: patient, loading: patientLoading } = useDocument<Patient>('patients', patientId);
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams', {
@@ -65,6 +69,26 @@ export function PatientDetail({ patientId }: Props) {
     await updateItem('patients', patient.id, data);
     setEditing(false);
     showToast('Paciente atualizado', 'success');
+  }
+
+  function startEditingHistory() {
+    setHistoryDraft(patient?.history || '');
+    setEditingHistory(true);
+    setTimeout(() => historyRef.current?.focus(), 50);
+  }
+
+  async function handleSaveHistory() {
+    if (!patient) return;
+    setSavingHistory(true);
+    try {
+      await updateItem('patients', patient.id, { history: historyDraft, updatedAt: Date.now() });
+      setEditingHistory(false);
+      showToast('Histórico clínico atualizado', 'success');
+    } catch {
+      showToast('Erro ao salvar histórico', 'error');
+    } finally {
+      setSavingHistory(false);
+    }
   }
 
   const fullAddress = [
@@ -208,14 +232,63 @@ export function PatientDetail({ patientId }: Props) {
                   <span className="font-black text-ink-900 font-mono text-[11px] mt-0.5 tracking-tighter">{patient.insuranceNumber}</span>
                 </div>
               )}
-              {patient.history && (
-                <div className="pt-1">
-                  <span className="text-ink-500 font-medium block mb-2 text-xs">Histórico Clínico:</span>
-                  <div className="p-3 bg-ink-50 rounded-xl border border-ink-100 text-xs text-ink-700 leading-relaxed whitespace-pre-wrap font-medium max-h-[80px] overflow-y-auto">
+              <div className="pt-1 border-t border-ink-50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-ink-500 font-medium text-xs flex items-center gap-1.5">
+                    <ClipboardPen size={12} className="text-brand-500" /> Histórico Clínico
+                  </span>
+                  {!editingHistory && (
+                    <button
+                      onClick={startEditingHistory}
+                      className="text-[10px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-wider flex items-center gap-1 transition-colors"
+                    >
+                      <Edit size={10} /> Editar
+                    </button>
+                  )}
+                </div>
+                {editingHistory ? (
+                  <div className="space-y-2">
+                    <textarea
+                      ref={historyRef}
+                      value={historyDraft}
+                      onChange={e => setHistoryDraft(e.target.value)}
+                      rows={4}
+                      className="w-full p-3 bg-white border-2 border-brand-300 rounded-xl text-xs text-ink-900 leading-relaxed resize-none focus:outline-none focus:border-brand-500 transition-colors"
+                      placeholder="Antecedentes relevantes, comorbidades, cirurgias prévias..."
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleSaveHistory}
+                        disabled={savingHistory}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-brand-700 transition-all disabled:opacity-50"
+                      >
+                        {savingHistory ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                        Salvar
+                      </button>
+                      <button
+                        onClick={() => setEditingHistory(false)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ink-100 text-ink-600 text-[10px] font-black uppercase tracking-wider hover:bg-ink-200 transition-all"
+                      >
+                        <XIcon size={10} /> Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : patient.history ? (
+                  <div
+                    onClick={startEditingHistory}
+                    className="p-3 bg-ink-50 rounded-xl border border-ink-100 text-xs text-ink-700 leading-relaxed whitespace-pre-wrap font-medium max-h-[160px] overflow-y-auto cursor-pointer hover:border-brand-200 hover:bg-brand-50/30 transition-colors"
+                  >
                     {patient.history}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <button
+                    onClick={startEditingHistory}
+                    className="w-full p-3 bg-ink-50 rounded-xl border border-dashed border-ink-200 text-xs text-ink-400 font-medium hover:border-brand-300 hover:bg-brand-50/30 hover:text-brand-500 transition-all text-left"
+                  >
+                    Nenhum histórico registrado. Clique para adicionar.
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

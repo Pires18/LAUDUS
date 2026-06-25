@@ -1,4 +1,6 @@
-import { useEffect, useState, ReactNode, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, ReactNode, lazy, Suspense } from 'react';
+import { useCollection } from './hooks/useFirestore';
+import { Clinic } from './types';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, firestore } from './lib/firebase';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -12,6 +14,7 @@ import { PageTransition } from './components/PageTransition';
 import { Toast } from './components/Toast';
 import { CommandPalette } from './components/CommandPalette';
 import { CreateExamModal } from './components/CreateExamModal';
+import { ClinicSessionModal } from './components/ClinicSessionModal';
 import { SupportCenterModal } from './components/SupportCenterModal';
 import { BroadcastBanner } from './components/BroadcastBanner';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
@@ -105,19 +108,19 @@ function AuthenticatedApp() {
 
   useEffect(() => {
     loadSettings();
-    
+
     // Atualiza apenas o último login do usuário ativo
     const syncUserLogin = async () => {
       const user = auth.currentUser;
       if (!user) return;
-      
+
       const userRef = doc(firestore, 'users', user.uid);
-      await setDoc(userRef, { 
+      await setDoc(userRef, {
         lastLogin: Date.now(),
-        updatedAt: Date.now() 
+        updatedAt: Date.now()
       }, { merge: true });
     };
-    
+
     syncUserLogin();
   }, [loadSettings]);
 
@@ -166,11 +169,42 @@ function AuthenticatedApp() {
       <Toast />
       <CommandPalette />
       {showCreateExamModal && <CreateExamModal onClose={() => setShowCreateExamModal(false)} />}
+      <ClinicSessionCheck />
       <SupportCenterModal />
       <PWAUpdatePrompt />
       <GlobalConfirmDialog />
     </div>
   );
+}
+
+function ClinicSessionCheck() {
+  const { selectedClinicId, setSelectedClinic, settings, updateSettings } = useApp();
+  const { data: clinics } = useCollection<Clinic>('clinics');
+  const [showModal, setShowModal] = useState(false);
+  const checked = useRef(false);
+
+  useEffect(() => {
+    if (checked.current || clinics.length < 2) return;
+    const appState = useApp.getState();
+    if (!appState.selectedClinicId && !appState.settings.defaultClinicId) {
+      checked.current = true;
+      setShowModal(true);
+    } else {
+      checked.current = true;
+    }
+  }, [clinics]);
+
+  function handleSelect(clinicId: string | null, remember: boolean) {
+    setSelectedClinic(clinicId);
+    if (remember && clinicId) {
+      updateSettings({ defaultClinicId: clinicId });
+    }
+    setShowModal(false);
+  }
+
+  if (!showModal) return null;
+  const activeClinics = clinics.filter(c => c.active !== false);
+  return <ClinicSessionModal clinics={activeClinics} onSelect={handleSelect} />;
 }
 
 function GlobalConfirmDialog() {
