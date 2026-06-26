@@ -31,12 +31,16 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
     notes: initial?.notes ?? '',
   });
 
+  const [submitted, setSubmitted] = useState(false);
+  const nameInvalid = submitted && !data.name.trim();
+
   const u = (k: keyof typeof data, v: any) => setData(d => ({ ...d, [k]: v }));
   const ua = (k: keyof typeof data.address, v: any) =>
     setData(d => ({ ...d, address: { ...d.address, [k]: v } }));
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setSubmitted(true);
     if (!data.name.trim()) return;
     onSubmit(data);
   }
@@ -48,7 +52,16 @@ export function PatientForm({ initial, onSubmit, onCancel }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="col-span-1 md:col-span-2">
             <label className="label">Nome completo *</label>
-            <input className="input" required value={data.name} onChange={e => u('name', e.target.value)} />
+            <input
+              className={`input ${nameInvalid ? 'border-rose-400 focus:border-rose-500' : ''}`}
+              required
+              value={data.name}
+              onChange={e => u('name', e.target.value)}
+              aria-invalid={nameInvalid}
+            />
+            {nameInvalid && (
+              <p className="text-[11px] font-bold text-rose-600 mt-1">Informe o nome completo do paciente.</p>
+            )}
           </div>
           <div>
             <label className="label">Data de nascimento</label>

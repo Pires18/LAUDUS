@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
-  X, Search, UserPlus, ArrowRight, Loader2, Sparkles, 
-  ChevronRight, CalendarDays, AlertCircle, RotateCcw
+  X, Search, UserPlus, ArrowRight, Loader2, Sparkles,
+  ChevronRight, CalendarDays, AlertCircle, RotateCcw, Check
 } from 'lucide-react';
 import { Patient, ReportTemplate, Clinic, EXAM_AREAS, ExamArea, Appointment } from '../../../types';
 import { classNames } from '../../../utils/format';
@@ -272,10 +272,10 @@ export function CreateAppointmentModal({
                   )}
                 >
                   <div className={classNames(
-                    "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black shadow-sm",
-                    isActive || isPast ? "bg-ink-900 text-white" : "bg-ink-200 text-ink-400"
+                    "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black shadow-sm transition-colors",
+                    isPast ? "bg-emerald-600 text-white" : isActive ? "bg-ink-900 text-white" : "bg-ink-200 text-ink-400"
                   )}>
-                    {s.step}
+                    {isPast ? <Check size={11} strokeWidth={3} /> : s.step}
                   </div>
                   <span className={classNames(
                     "text-[9px] font-black uppercase tracking-wider",
@@ -612,6 +612,14 @@ export function CreateAppointmentModal({
                     onChange={(e) => { setAppointmentDate(e.target.value); setAppointmentTime(''); }}
                     className="w-full h-11 px-3 bg-white border border-ink-200 rounded-xl font-bold text-xs focus:border-ink-400 outline-none shadow-sm"
                   />
+                  {appointmentDate && (
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-brand-700 uppercase tracking-wider">
+                      <CalendarDays size={12} className="text-brand-500" />
+                      {new Date(appointmentDate + 'T00:00:00').toLocaleDateString('pt-BR', {
+                        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+                      })}
+                    </span>
+                  )}
                 </div>
 
                 {/* Slots Grid */}
@@ -705,15 +713,22 @@ export function CreateAppointmentModal({
               Prosseguir <ArrowRight size={12} />
             </button>
           ) : modalStep === 3 ? (
-            <button 
-              type="button"
-              onClick={handleConfirm}
-              disabled={loading || !appointmentTime}
-              className="px-5 h-10 bg-ink-950 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              Confirmar Agendamento
-            </button>
+            <div className="flex items-center gap-3">
+              {!appointmentTime && (
+                <span className="hidden sm:inline text-[9px] font-bold text-amber-600 uppercase tracking-wider">
+                  Selecione um horário
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={loading || !appointmentTime}
+                className="px-5 h-10 bg-ink-950 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                Confirmar Agendamento
+              </button>
+            </div>
           ) : (
             <div className="w-10" />
           )}
