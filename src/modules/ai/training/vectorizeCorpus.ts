@@ -2,7 +2,7 @@ import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { firestore, auth } from '../../../lib/firebase';
 import { AppSettings } from '../../../types';
 import { logger } from '../../../utils/logger';
-import { embedText, embedTextBatch, probeEmbedding } from './embeddings';
+import { embedText, embedTextBatch, resolveWorkingEmbeddingModel } from './embeddings';
 import { ExcellenceEntry } from './excellenceCorpus';
 
 // ═══════════════════════════════════════════════════════════════
@@ -58,7 +58,13 @@ export async function vectorizeCorpus(
   const result: VectorizeResult = { totalPending: pending.length, vectorized: 0, failed: 0 };
   if (pending.length === 0) return result;
 
-  let chunkIndex = 0;
+  // 1b. Descobre qual modelo de embedding funciona com a chave atual.
+  //     Se nenhum funcionar, aborta cedo com o diagnóstico real.
+  const { model: workingModel, diagnostics } = await resolveWorkingEmbeddingModel(settings);
+  if (!workingModel) {
+    throw new Error(`Vetorização indisponível — nenhum modelo de embedding respondeu. ${diagnostics}`);
+  }
+  logger.info(`[Vectorize] ${diagnostics}`);
 
   // 2. Processa em lotes.
   for (let i = 0; i < pending.length; i += batchSize) {
@@ -67,38 +73,21 @@ export async function vectorizeCorpus(
 
     let vectors: number[][];
     try {
-      vectors = await embedTextBatch(inputs, settings);
+      vectors = await embedTextBatch(inputs, settings, undefined, workingModel);
     } catch (err) {
       logger.warn('[Vectorize] Falha no lote, seguindo:', err);
       vectors = chunk.map(() => []);
     }
 
     // 2a. Se o batch falhou inteiro, tenta embedding individual (o endpoint
-    //     :embedContent é mais simples e pode estar disponível mesmo quando
-    //     o :batchEmbedContents não está).
+    //     :embedContent é mais simples; pode funcionar onde o batch não vai).
     const batchAllEmpty = vectors.every((v) => !v || v.length === 0);
     if (batchAllEmpty) {
       logger.warn('[Vectorize] Batch vazio — tentando embedding individual no lote.');
       for (let j = 0; j < chunk.length; j++) {
-        vectors[j] = await embedText(inputs[j], settings);
+        vectors[j] = await embedText(inputs[j], settings, undefined, workingModel);
         await sleep(250);
       }
-    }
-
-    // 2b. Abort precoce: se o PRIMEIRO lote falhou em batch E individual, a
-    //     API de embeddings está indisponível — não adianta esperar 500+.
-    const stillAllEmpty = vectors.every((v) => !v || v.length === 0);
-    if (chunkIndex === 0 && stillAllEmpty) {
-      // Sonda para revelar o motivo HTTP real do problema.
-      const probe = await probeEmbedding(settings);
-      const hint = probe.detail.includes('generateContent') || probe.detail.includes('not found')
-        ? ' (provável: proxy /api/gemini desatualizado — falta o suporte a embeddings; publique o deploy mais recente).'
-        : probe.status === 403 || probe.detail.toLowerCase().includes('permission') || probe.detail.toLowerCase().includes('api key')
-          ? ' (provável: chave Gemini sem acesso ao modelo de embeddings).'
-          : '';
-      throw new Error(
-        `Vetorização indisponível — embeddings retornaram HTTP ${probe.status}.${hint} Detalhe: ${probe.detail.slice(0, 200) || 'sem corpo'}`
-      );
     }
 
     // 3. Grava os embeddings preenchidos.
@@ -116,7 +105,6 @@ export async function vectorizeCorpus(
     });
     if (writes > 0) await batch.commit();
 
-    chunkIndex++;
     options.onProgress?.(Math.min(i + chunk.length, pending.length), pending.length);
 
     if (i + batchSize < pending.length) await sleep(throttleMs);

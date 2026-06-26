@@ -15,13 +15,25 @@ import { logger } from '../../../utils/logger';
 export const EMBEDDING_MODEL = 'text-embedding-004';
 
 /**
+ * Modelos de embedding candidatos, em ordem de preferência. Chaves
+ * diferentes do Gemini têm acesso a modelos diferentes — testamos em
+ * cascata e usamos o primeiro que responder com vetor.
+ */
+export const EMBEDDING_MODEL_CANDIDATES = [
+  'text-embedding-004',
+  'gemini-embedding-001',
+  'embedding-001',
+];
+
+/**
  * Sonda de diagnóstico: faz UMA chamada de embedding e devolve o status
  * HTTP real e um trecho do corpo da resposta. Serve para descobrir por
  * que a vetorização falha (404 modelo/endpoint, 403 chave, proxy antigo
  * roteando para generateContent, etc.).
  */
 export async function probeEmbedding(
-  settings: AppSettings
+  settings: AppSettings,
+  model: string = EMBEDDING_MODEL
 ): Promise<{ ok: boolean; status: number; detail: string }> {
   try {
     const response = await fetch('/api/gemini', {
@@ -29,12 +41,12 @@ export async function probeEmbedding(
       headers: {
         'Content-Type': 'application/json',
         'x-uid': auth.currentUser?.uid || 'anonymous',
-        'x-gemini-model': EMBEDDING_MODEL,
+        'x-gemini-model': model,
         'x-gemini-task': 'embed',
         'x-api-key': settings.geminiApiKey || '',
       },
       body: JSON.stringify({
-        model: `models/${EMBEDDING_MODEL}`,
+        model: `models/${model}`,
         content: { parts: [{ text: 'teste de diagnóstico' }] },
       }),
     });
@@ -43,6 +55,25 @@ export async function probeEmbedding(
   } catch (e: any) {
     return { ok: false, status: 0, detail: e?.message || String(e) };
   }
+}
+
+/**
+ * Descobre qual modelo de embedding funciona com a chave atual, testando
+ * os candidatos em cascata. Retorna o modelo funcional (ou null) e um
+ * diagnóstico legível com o status de cada tentativa.
+ */
+export async function resolveWorkingEmbeddingModel(
+  settings: AppSettings
+): Promise<{ model: string | null; diagnostics: string }> {
+  const tried: string[] = [];
+  for (const model of EMBEDDING_MODEL_CANDIDATES) {
+    const probe = await probeEmbedding(settings, model);
+    if (probe.ok) {
+      return { model, diagnostics: `Modelo de embedding ativo: ${model}.` };
+    }
+    tried.push(`${model} → HTTP ${probe.status}: ${probe.detail.slice(0, 120)}`);
+  }
+  return { model: null, diagnostics: tried.join(' | ') };
 }
 
 /** Similaridade de cosseno entre dois vetores. Retorna [-1, 1]. */
@@ -68,7 +99,8 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 export async function embedText(
   text: string,
   settings: AppSettings,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  model: string = EMBEDDING_MODEL
 ): Promise<number[]> {
   const clean = (text || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000);
   if (clean.length < 3) return [];
@@ -79,12 +111,12 @@ export async function embedText(
       headers: {
         'Content-Type': 'application/json',
         'x-uid': auth.currentUser?.uid || 'anonymous',
-        'x-gemini-model': EMBEDDING_MODEL,
+        'x-gemini-model': model,
         'x-gemini-task': 'embed',
         'x-api-key': settings.geminiApiKey || '',
       },
       body: JSON.stringify({
-        model: `models/${EMBEDDING_MODEL}`,
+        model: `models/${model}`,
         content: { parts: [{ text: clean }] },
       }),
       signal,
@@ -112,7 +144,8 @@ export async function embedText(
 export async function embedTextBatch(
   texts: string[],
   settings: AppSettings,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  model: string = EMBEDDING_MODEL
 ): Promise<number[][]> {
   const cleaned = texts.map((t) => (t || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000));
   if (cleaned.length === 0) return [];
@@ -126,13 +159,13 @@ export async function embedTextBatch(
         headers: {
           'Content-Type': 'application/json',
           'x-uid': auth.currentUser?.uid || 'anonymous',
-          'x-gemini-model': EMBEDDING_MODEL,
+          'x-gemini-model': model,
           'x-gemini-task': 'embed-batch',
           'x-api-key': settings.geminiApiKey || '',
         },
         body: JSON.stringify({
           requests: cleaned.map((text) => ({
-            model: `models/${EMBEDDING_MODEL}`,
+            model: `models/${model}`,
             content: { parts: [{ text: text || ' ' }] },
           })),
         }),
