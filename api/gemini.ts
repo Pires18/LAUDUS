@@ -59,8 +59,11 @@ export default async function handler(req: Request) {
 
     let endpoint: string;
     if (task === 'embed') {
-      // Vetorização para retrieval semântico (text-embedding-004).
+      // Vetorização única (text-embedding-004).
       endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`;
+    } else if (task === 'embed-batch') {
+      // Vetorização em lote — muitos textos por chamada (bootstrap do corpus).
+      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:batchEmbedContents?key=${apiKey}`;
     } else if (isStream) {
       endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
     } else {

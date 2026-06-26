@@ -71,3 +71,53 @@ export async function embedText(
     return [];
   }
 }
+
+/**
+ * Vetoriza vários textos em UMA chamada (batchEmbedContents). Reduz
+ * drasticamente o número de requisições (essencial para o bootstrap do
+ * corpus). Retorna um vetor por texto, na mesma ordem; entradas inválidas
+ * recebem []. Em falha total, retorna array de [] do mesmo tamanho.
+ */
+export async function embedTextBatch(
+  texts: string[],
+  settings: AppSettings,
+  signal?: AbortSignal
+): Promise<number[][]> {
+  const cleaned = texts.map((t) => (t || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000));
+  if (cleaned.length === 0) return [];
+
+  try {
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
+        'x-gemini-model': EMBEDDING_MODEL,
+        'x-gemini-task': 'embed-batch',
+        'x-api-key': settings.geminiApiKey || '',
+      },
+      body: JSON.stringify({
+        requests: cleaned.map((text) => ({
+          model: `models/${EMBEDDING_MODEL}`,
+          content: { parts: [{ text: text || ' ' }] },
+        })),
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      logger.warn('[Embeddings] Batch proxy falhou:', response.status);
+      return cleaned.map(() => []);
+    }
+    const result = await response.json();
+    const embeddings = result?.embeddings;
+    if (!Array.isArray(embeddings)) return cleaned.map(() => []);
+    return cleaned.map((_, i) => {
+      const v = embeddings[i]?.values;
+      return Array.isArray(v) ? v : [];
+    });
+  } catch (err) {
+    logger.warn('[Embeddings] Erro no batch de vetorização:', err);
+    return cleaned.map(() => []);
+  }
+}

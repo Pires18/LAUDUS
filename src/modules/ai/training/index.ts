@@ -34,6 +34,7 @@ export * from './experiment';
 export * from './qualityMetrics';
 export * from './feedbackStore';
 export * from './backfill';
+export * from './vectorizeCorpus';
 
 // Fase 2 — peças de produção reexportadas para conveniência
 export { verifyReport } from '../verification';

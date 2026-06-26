@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/app';
 import {
   Loader2, ShieldCheck, Gauge, AlertTriangle, PlayCircle, Sparkles,
-  GraduationCap, Library, RefreshCw, TrendingUp, Cpu, DownloadCloud,
+  GraduationCap, Library, RefreshCw, TrendingUp, Cpu, DownloadCloud, Binary,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -14,6 +14,8 @@ import {
   aggregatePatterns,
   buildCalibrationBlock,
   backfillCorpusFromFinalized,
+  vectorizeCorpus,
+  countPendingVectorization,
   runHarness,
   createEngineGenerator,
   GOLDEN_DATASET,
@@ -48,17 +50,24 @@ export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) 
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
 
+  // Vetorização (retrieval semântico)
+  const [pendingVec, setPendingVec] = useState(0);
+  const [vectorizing, setVectorizing] = useState(false);
+  const [vecProgress, setVecProgress] = useState<{ done: number; total: number } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [records, signals, corpus] = await Promise.all([
+      const [records, signals, corpus, pending] = await Promise.all([
         listQualityRecords(1000),
         listCorrectionSignals(500),
         listExcellenceCorpus(undefined, 500),
+        countPendingVectorization(),
       ]);
       setMetrics(aggregateQualityMetrics(records));
       setCalibration(buildCalibrationBlock(aggregatePatterns(signals, 5)));
       setCorpusCount(corpus.length);
+      setPendingVec(pending.pending);
     } finally {
       setLoading(false);
     }
@@ -119,6 +128,27 @@ export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) 
     }
   }, [settings, showToast, confirm, load]);
 
+  const handleVectorize = useCallback(async () => {
+    setVectorizing(true);
+    setVecProgress({ done: 0, total: pendingVec });
+    try {
+      const r = await vectorizeCorpus(settings, {
+        onProgress: (done, total) => setVecProgress({ done, total }),
+      });
+      showToast(
+        `Vetorização concluída: ${r.vectorized}/${r.totalPending} laudos. Retrieval semântico ativo.` +
+        (r.failed > 0 ? ` (${r.failed} falharam — rode novamente para reprocessar)` : ''),
+        r.vectorized > 0 ? 'success' : 'info'
+      );
+      await load();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Falha na vetorização', 'error');
+    } finally {
+      setVectorizing(false);
+      setVecProgress(null);
+    }
+  }, [settings, showToast, pendingVec, load]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-ink-400">
@@ -156,19 +186,34 @@ export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) 
               <p className="text-[11px] text-ink-500 leading-relaxed">
                 {corpusCount === 0
                   ? 'Importe seus laudos finalizados (anonimizados) para a IA aprender seu padrão imediatamente.'
-                  : 'Importe novos laudos finalizados a qualquer momento — a importação não duplica os já existentes.'}
+                  : pendingVec > 0
+                    ? `${pendingVec} laudo(s) sem vetor — vetorize para ativar o retrieval semântico (caso clinicamente mais parecido).`
+                    : 'Corpus vetorizado · retrieval semântico ativo. Importe novos laudos a qualquer momento.'}
               </p>
             </div>
           </div>
-          <button
-            onClick={handleBackfill}
-            disabled={importing}
-            className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95 shrink-0"
-          >
-            {importing
-              ? <><Loader2 size={12} className="animate-spin" /> {importProgress?.done ?? 0}/{importProgress?.total ?? 0}</>
-              : <><DownloadCloud size={12} /> Importar laudos finalizados</>}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {pendingVec > 0 && (
+              <button
+                onClick={handleVectorize}
+                disabled={vectorizing || importing}
+                className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+              >
+                {vectorizing
+                  ? <><Loader2 size={12} className="animate-spin" /> {vecProgress?.done ?? 0}/{vecProgress?.total ?? 0}</>
+                  : <><Binary size={12} /> Vetorizar ({pendingVec})</>}
+              </button>
+            )}
+            <button
+              onClick={handleBackfill}
+              disabled={importing || vectorizing}
+              className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+            >
+              {importing
+                ? <><Loader2 size={12} className="animate-spin" /> {importProgress?.done ?? 0}/{importProgress?.total ?? 0}</>
+                : <><DownloadCloud size={12} /> Importar laudos finalizados</>}
+            </button>
+          </div>
         </div>
       )}
 
