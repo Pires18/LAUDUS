@@ -19,16 +19,32 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
+// Marcador de versão do proxy — permite confirmar qual build está no ar.
+// Acesse /api/gemini?ping=1 no navegador: se aparecer "embed" e
+// "embed-batch" em features, o suporte a embeddings está publicado.
+const PROXY_VERSION = 'v2-embeddings-2026-06';
+
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, x-uid, x-gemini-model, x-gemini-stream, x-gemini-task, x-api-key',
       },
     });
+  }
+
+  // Health/version check (GET ?ping=1) — sem consumir API nem chave.
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    if (url.searchParams.has('ping')) {
+      return new Response(
+        JSON.stringify({ proxy: PROXY_VERSION, features: ['generate', 'stream', 'embed', 'embed-batch'] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   if (req.method !== 'POST') {
