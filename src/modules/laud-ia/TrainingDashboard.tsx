@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../store/app';
 import {
   Loader2, ShieldCheck, Gauge, AlertTriangle, PlayCircle, Sparkles,
-  GraduationCap, Library, RefreshCw, TrendingUp, Cpu,
+  GraduationCap, Library, RefreshCw, TrendingUp, Cpu, DownloadCloud,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
+import { useConfirm } from '../../hooks/useConfirm';
 import {
   listQualityRecords,
   listCorrectionSignals,
@@ -12,6 +13,7 @@ import {
   aggregateQualityMetrics,
   aggregatePatterns,
   buildCalibrationBlock,
+  backfillCorpusFromFinalized,
   runHarness,
   createEngineGenerator,
   GOLDEN_DATASET,
@@ -32,6 +34,7 @@ const DIMENSIONS: EvalDimension[] = ['fidelity', 'completeness', 'safety', 'nume
 
 export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) {
   const { settings, showToast } = useApp();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [metrics, setMetrics] = useState<QualityAggregate | null>(null);
   const [calibration, setCalibration] = useState('');
@@ -40,6 +43,10 @@ export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [run, setRun] = useState<EvalRunResult | null>(null);
+
+  // Backfill (importação de laudos finalizados)
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +90,35 @@ export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) 
     }
   }, [settings, showToast]);
 
+  const handleBackfill = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Importar laudos finalizados',
+      message: 'Seus laudos finalizados serão anonimizados (LGPD) e adicionados ao Corpus de Excelência para a IA aprender seu padrão. Laudos truncados ou com dados pessoais residuais são ignorados. Esta ação é segura e idempotente (não duplica).',
+      confirmLabel: 'Importar agora',
+      variant: 'info',
+    });
+    if (!ok) return;
+
+    setImporting(true);
+    setImportProgress({ done: 0, total: 0 });
+    try {
+      const r = await backfillCorpusFromFinalized(settings, {
+        minAuditScore: 60,
+        onProgress: (done, total) => setImportProgress({ done, total }),
+      });
+      showToast(
+        `Importação concluída: ${r.imported} laudo(s) no corpus (de ${r.total}). Ignorados — já existentes: ${r.skippedExisting}, baixa qualidade/limite: ${r.skippedLowQuality}, PII: ${r.skippedPII}, vazios: ${r.skippedEmpty}.`,
+        r.imported > 0 ? 'success' : 'info'
+      );
+      await load();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Falha na importação', 'error');
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+    }
+  }, [settings, showToast, confirm, load]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-ink-400">
@@ -104,6 +140,37 @@ export function TrainingDashboard({ readOnly = false }: { readOnly?: boolean }) 
         <Kpi icon={Library}      label="Corpus excelência"  value={`${corpusCount}`} tone="violet" />
         <Kpi icon={GraduationCap} label="Laudos avaliados"  value={hasData ? `${metrics!.totalReports}` : '0'} tone="slate" />
       </div>
+
+      {/* ── Corpus de Excelência: bootstrap com laudos finalizados ── */}
+      {!readOnly && (
+        <div className={classNames(
+          'rounded-2xl border p-5 flex items-center justify-between gap-4 flex-wrap',
+          corpusCount === 0 ? 'bg-indigo-50/60 border-indigo-200' : 'bg-white border-ink-100 shadow-sm'
+        )}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+              <Library size={20} />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-sm font-black text-ink-900">Corpus de Excelência · {corpusCount} laudo(s)</h4>
+              <p className="text-[11px] text-ink-500 leading-relaxed">
+                {corpusCount === 0
+                  ? 'Importe seus laudos finalizados (anonimizados) para a IA aprender seu padrão imediatamente.'
+                  : 'Importe novos laudos finalizados a qualquer momento — a importação não duplica os já existentes.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleBackfill}
+            disabled={importing}
+            className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95 shrink-0"
+          >
+            {importing
+              ? <><Loader2 size={12} className="animate-spin" /> {importProgress?.done ?? 0}/{importProgress?.total ?? 0}</>
+              : <><DownloadCloud size={12} /> Importar laudos finalizados</>}
+          </button>
+        </div>
+      )}
 
       {/* ── Lite vs Pro + Piores áreas ── */}
       {hasData && (
