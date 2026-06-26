@@ -1,7 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { updateItem, getRecentFinalizedReports, getPatientPreviousExams, saveVersionSnapshot, deleteWorklistEntry } from '../../../store/db';
 import { ExamStatus, ReportTemplate, Patient, AppSettings } from '../../../types';
-import { generateReportStream, generateMockReport } from '../../ai/engine';
+import { generateReportStream, generateMockReport, auditReportQuality } from '../../ai/engine';
+import { routeMotor } from '../../ai/router';
+import { verifyReport } from '../../ai/verification';
+import { classifyCorrection } from '../../ai/training/feedback';
+import { recordCorrectionSignal, recordQualityRecord } from '../../ai/training/feedbackStore';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
 import { getInitialReportContent } from '../../templates/utils';
 import { logger } from '../../../utils/logger';
@@ -36,6 +40,10 @@ export function useExamActions({
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef<string | null>(null);
+  // Loop de feedback (Fase 3): captura da geração inicial e contagem de refinamentos.
+  const initialGeneratedRef = useRef<string | null>(null);
+  const refinementCountRef = useRef(0);
+  const lastMotorRef = useRef<'lite' | 'pro'>('lite');
   const debouncedSave = useCallback(
     (reportContent: string, force: boolean = false) => {
       latestContentRef.current = reportContent;
@@ -94,6 +102,25 @@ export function useExamActions({
 
     setIsGenerating(true);
     setIsReasoning(true);
+
+    // Roteador inteligente (Fase 2): red flag clínico força o Motor Pro,
+    // ignorando a escolha do usuário (segurança nunca otimizada por custo).
+    const decision = routeMotor({
+      area: template.area,
+      examType: template.name,
+      clinicalIndication,
+      anamnesis,
+      userMotor: settings.selectedMotor,
+    });
+    lastMotorRef.current = decision.recommendedMotor;
+    const effectiveSettings: AppSettings =
+      decision.recommendedMotor !== settings.selectedMotor
+        ? { ...settings, selectedMotor: decision.recommendedMotor }
+        : settings;
+    if (decision.forcedPro && settings.selectedMotor !== 'pro') {
+      showToast('Motor Pro ativado automaticamente: sinal clínico de alerta detectado.', 'info');
+    }
+
     try {
       const [previousExams, patientPreviousExams] = await Promise.all([
         settings.aiTrainingEnabled
@@ -121,7 +148,7 @@ export function useExamActions({
             examId,
             template,
             patient,
-            settings,
+            settings: effectiveSettings,
             clinicalIndication,
             requestingPhysician,
             anamnesis,
@@ -146,7 +173,7 @@ export function useExamActions({
             currentReport,
             template,
             patient,
-            settings,
+            settings: effectiveSettings,
             clinicalIndication,
             requestingPhysician,
             anamnesis,
@@ -167,9 +194,16 @@ export function useExamActions({
 
         // Sanitização obrigatória do HTML antes de salvar (prevenção XSS)
         html = sanitizeHtml(html);
-        
+
         // Proteção contra laudos em branco
         if (html && html.trim().length > 10) {
+          // Loop de feedback: snapshot da 1ª geração (base do diff no finalize).
+          if (isFirstGeneration) {
+            initialGeneratedRef.current = html;
+            refinementCountRef.current = 0;
+          } else {
+            refinementCountRef.current += 1;
+          }
           onReportChange(html);
           await updateItem('exams', examId, { reportContent: html });
         } else {
@@ -201,7 +235,7 @@ export function useExamActions({
     }
   }, [template, patient, settings, clinicalIndication, requestingPhysician, anamnesis, examId, examDateMs, onReportChange, showToast]);
 
-  const updateStatus = useCallback(async (status: ExamStatus) => {
+  const updateStatus = useCallback(async (status: ExamStatus, finalReport?: string) => {
     try {
       await updateItem('exams', examId, {
         status,
@@ -215,11 +249,51 @@ export function useExamActions({
         deleteWorklistEntry(examId, settings).catch((err) => {
           logger.warn('[useExamActions] Falha silenciosa ao remover worklist do PACS:', err);
         });
+
+        // Loop de feedback (Fase 3/4): captura do delta geração→final + qualidade.
+        // Best-effort, totalmente assíncrono — nunca bloqueia a finalização.
+        if (finalReport && template && initialGeneratedRef.current) {
+          captureFinalizationFeedback(finalReport);
+        }
       }
     } catch (err) {
       showToast('Erro ao atualizar status', 'error');
     }
-  }, [examId, settings, showToast]);
+  }, [examId, settings, showToast, template, anamnesis, clinicalIndication]);
+
+  /** Persiste sinal de correção + registro de qualidade ao finalizar. */
+  const captureFinalizationFeedback = useCallback((finalReport: string) => {
+    if (!template) return;
+    try {
+      const initial = initialGeneratedRef.current || '';
+      const motor = lastMotorRef.current;
+      const signal = classifyCorrection(initial, finalReport, {
+        area: template.area,
+        examType: template.name,
+        motor,
+      });
+      const audit = auditReportQuality(finalReport, template.area);
+      const verification = verifyReport(finalReport, {
+        area: template.area,
+        anamnesis,
+        clinicalIndication,
+      });
+
+      void recordCorrectionSignal(signal);
+      void recordQualityRecord({
+        area: template.area,
+        examType: template.name,
+        motor,
+        auditScore: audit.score,
+        refinementCount: refinementCountRef.current,
+        safetyPassed: verification.passed && !signal.critical,
+        latencyMs: 0,
+        timestamp: Date.now(),
+      });
+    } catch (err) {
+      logger.warn('[useExamActions] Falha ao capturar feedback de finalização:', err);
+    }
+  }, [template, anamnesis, clinicalIndication]);
 
   return {
     isGenerating,

@@ -8,7 +8,8 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText, Star } from 'lucide-react';
+import { addToExcellenceCorpus } from '../ai/training/excellenceCorpus';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { logger } from '../../utils/logger';
@@ -352,7 +353,7 @@ export function ExamEditor({ examId }: Props) {
         }
       }
     }
-    await updateStatus(newStatus);
+    await updateStatus(newStatus, reportContentRef.current);
   }, [clinic?.googleDocsTemplateId, exam, patient, createGoogleDoc, showToast, updateStatus]);
 
   const handleCopy = useCallback(async () => {
@@ -365,6 +366,33 @@ export function ExamEditor({ examId }: Props) {
       showToast('Erro ao copiar: ' + message, 'error');
     }
   }, [exam, patient, reportContent, settings, showToast]);
+
+  // Corpus de Excelência (Fase 3): marca o laudo atual como exemplar.
+  const [markingExcellent, setMarkingExcellent] = useState(false);
+  const handleMarkExcellent = useCallback(async () => {
+    if (!exam || !template || !reportContent) return;
+    setMarkingExcellent(true);
+    try {
+      await addToExcellenceCorpus({
+        area: template.area,
+        examType: template.name,
+        motor: settings.selectedMotor === 'pro' ? 'pro' : 'lite',
+        reportHtml: reportContent,
+        clinicalIndication: exam.clinicalIndication,
+        anamnesis: (exam as any).anamnesis,
+        patient,
+        qualityTags: ['estrutura', 'fraseologia'],
+        sourceExamId: examId,
+        settings,
+      });
+      showToast('Laudo adicionado ao Corpus de Excelência ⭐', 'success');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Erro ao adicionar ao corpus';
+      showToast(message, 'error');
+    } finally {
+      setMarkingExcellent(false);
+    }
+  }, [exam, template, patient, reportContent, settings, examId, showToast]);
 
   const handleReset = useCallback(async () => {
     if (!template) return;
@@ -598,6 +626,22 @@ export function ExamEditor({ examId }: Props) {
             googleDocUrl={exam.googleDocUrl || null}
             saveState={saveState}
           />
+
+          {/* Corpus de Excelência — disponível ao finalizar com treino ativo */}
+          {settings.aiTrainingEnabled && exam.status === 'finalizado' && currentRole !== 'recepcao' && (
+            <div className="bg-amber-50/60 border-b border-amber-100 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
+              <Star size={12} className="text-amber-500" />
+              <span>Laudo exemplar? Adicione ao Corpus de Excelência para a IA aprender seu padrão (anonimizado).</span>
+              <button
+                className="underline ml-1 font-medium disabled:opacity-50 inline-flex items-center gap-1"
+                onClick={handleMarkExcellent}
+                disabled={markingExcellent}
+              >
+                {markingExcellent ? <Loader2 size={11} className="animate-spin" /> : <Star size={11} />}
+                Marcar como Excelente
+              </button>
+            </div>
+          )}
 
           {/* AVISO API KEY — apenas para Gemini (Anthropic é gerenciado server-side) */}
           {settings.aiProvider === 'gemini' && !settings.geminiApiKey && (

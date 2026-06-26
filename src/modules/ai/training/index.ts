@@ -32,6 +32,7 @@ export * from './feedback';
 export * from './promptRegistry';
 export * from './experiment';
 export * from './qualityMetrics';
+export * from './feedbackStore';
 
 // Fase 2 — peças de produção reexportadas para conveniência
 export { verifyReport } from '../verification';
