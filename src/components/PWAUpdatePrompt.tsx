@@ -1,73 +1,63 @@
-import { useState, useEffect } from 'react';
-import { Download, X, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Download, X, RefreshCw, Loader2 } from 'lucide-react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import { logger } from '../utils/logger';
 
 /**
- * PWAUpdatePrompt — Exibe um banner elegante quando uma nova versão
- * do Service Worker está disponível, permitindo que o usuário atualize.
+ * PWAUpdatePrompt — Banner de atualização do sistema.
+ *
+ * Usa a API oficial do vite-plugin-pwa (useRegisterSW), que registra o
+ * Service Worker, detecta novas versões de forma confiável e aplica a
+ * atualização via SKIP_WAITING + reload — sem depender de gambiarra de
+ * mensagem manual. Verifica atualizações periodicamente (a cada 30 min)
+ * e também quando a aba volta ao foco.
  */
+const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000; // 30 min
+
 export function PWAUpdatePrompt() {
-  const [showUpdate, setShowUpdate] = useState(false);
-  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [applying, setApplying] = useState(false);
 
-  useEffect(() => {
-    // Only run in production (SW not active in dev)
-    if (!('serviceWorker' in navigator)) return;
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegisteredSW(swUrl, registration) {
+      if (!registration) return;
+      logger.info('[PWA] Service Worker registrado.');
 
-    const handleControllerChange = () => {
-      // New SW activated — reload to apply
-      window.location.reload();
-    };
+      // Checagem periódica de novas versões.
+      setInterval(() => {
+        registration.update().catch(() => {});
+      }, UPDATE_CHECK_INTERVAL);
 
-    const checkForUpdates = async () => {
+      // Checa também ao voltar o foco para a aba.
+      const onFocus = () => registration.update().catch(() => {});
+      window.addEventListener('focus', onFocus);
+    },
+    onRegisterError(err) {
+      logger.warn('[PWA] Falha ao registrar Service Worker:', err);
+    },
+  });
+
+  const handleUpdate = async () => {
+    setApplying(true);
+    try {
+      // true → aplica skipWaiting e recarrega a página de forma confiável.
+      await updateServiceWorker(true);
+    } catch (err) {
+      logger.warn('[PWA] Falha ao atualizar — recarregando manualmente:', err);
+      // Fallback duro: limpa caches e recarrega.
       try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (!reg) return;
-
-        // Listen for new installing worker
-        const onUpdateFound = () => {
-          const newWorker = reg.installing;
-          if (!newWorker) return;
-
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version installed but waiting — prompt user
-              setRegistration(reg);
-              setShowUpdate(true);
-            }
-          });
-        };
-
-        reg.addEventListener('updatefound', onUpdateFound);
-
-        // Also check if there's already a waiting worker
-        if (reg.waiting && navigator.serviceWorker.controller) {
-          setRegistration(reg);
-          setShowUpdate(true);
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
         }
-
-        navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-
-        return () => {
-          reg.removeEventListener('updatefound', onUpdateFound);
-          navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-        };
-      } catch (err) {
-        logger.warn('[PWA Update] Erro ao verificar atualização:', err);
-      }
-    };
-
-    checkForUpdates();
-  }, []);
-
-  const handleUpdate = () => {
-    if (registration?.waiting) {
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      } catch { /* ignore */ }
+      window.location.reload();
     }
-    setShowUpdate(false);
   };
 
-  if (!showUpdate) return null;
+  if (!needRefresh) return null;
 
   return (
     <div className="pwa-banner pwa-banner-bottom bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-[0_-8px_30px_rgba(0,0,0,0.15)]">
@@ -83,14 +73,16 @@ export function PWAUpdatePrompt() {
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={handleUpdate}
-          className="h-9 px-4 rounded-xl bg-white text-brand-700 font-black text-[10px] uppercase tracking-widest hover:bg-white/90 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+          disabled={applying}
+          className="h-9 px-4 rounded-xl bg-white text-brand-700 font-black text-[10px] uppercase tracking-widest hover:bg-white/90 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-60"
         >
-          <RefreshCw size={12} />
-          Atualizar
+          {applying ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {applying ? 'Atualizando…' : 'Atualizar'}
         </button>
         <button
-          onClick={() => setShowUpdate(false)}
-          className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+          onClick={() => setNeedRefresh(false)}
+          disabled={applying}
+          className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors disabled:opacity-60"
           aria-label="Fechar"
         >
           <X size={14} />

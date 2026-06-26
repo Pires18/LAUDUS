@@ -325,8 +325,12 @@ export default defineConfig({
     react(),
     localOrthancWorklistPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // Modo "prompt": o usuário decide quando aplicar a nova versão
+      // (evita reload automático no meio de um laudo). O SW passa a
+      // escutar a mensagem SKIP_WAITING, fazendo o botão "Atualizar"
+      // funcionar de verdade.
+      registerType: 'prompt',
+      injectRegister: null,
       includeAssets: ['favicon.svg', 'icons/*.png', 'logo-icon.png'],
       manifest: {
         id: '/',
@@ -394,7 +398,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB — handles large main bundle
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
+        // skipWaiting é controlado via mensagem (modo prompt) — não force aqui.
         clientsClaim: true,
         runtimeCaching: [
           {
