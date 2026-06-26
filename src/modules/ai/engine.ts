@@ -92,11 +92,13 @@ const PRICING: Record<string, { input: number, output: number }> = {
   'claude-3-7-sonnet-latest':    { input: 3.0,   output: 15.0  },
   'claude-opus-4-5':             { input: 15.0,  output: 75.0  },
   'claude-3-haiku-20240307':     { input: 0.25,  output: 1.25  },
-  // Gemini
-  'gemini-3.5-flash':            { input: 0.075, output: 0.30  },
-  'gemini-3.1-pro-preview':      { input: 1.25,  output: 5.0   },
-  'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
-  'gemini-2.5-pro-preview-06-05':   { input: 1.25, output: 10.0 },
+  // Gemini — real API IDs
+  'gemini-2.0-flash':               { input: 0.075, output: 0.30  },
+  'gemini-2.5-flash-preview-05-20': { input: 0.15,  output: 0.60  },
+  'gemini-2.5-pro-preview-06-05':   { input: 1.25,  output: 10.0  },
+  // Gemini — aliases legados (configurações salvas em Firestore antes da migração)
+  'gemini-3.5-flash':               { input: 0.075, output: 0.30  },
+  'gemini-3.1-pro-preview':         { input: 1.25,  output: 5.0   },
 };
 
 function recordMetrics(m: CallMetrics) {
@@ -721,19 +723,17 @@ ${contextMessage}`;
 export function resolveGeminiModel(rawModel: string | undefined): string {
   const raw = (rawModel || '').toLowerCase();
 
-  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
   if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
   if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
   if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
-  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
+  if (raw.includes('pro'))                           return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('flash'))                         return 'gemini-2.0-flash';
 
-  return 'gemini-3.5-flash';
+  return 'gemini-2.0-flash';
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
-  const modelToUse = settings.geminiModel || 'gemini-3.5-flash';
+  const modelToUse = settings.geminiModel || 'gemini-2.0-flash';
   return resolveGeminiModel(modelToUse);
 }
 
@@ -772,7 +772,7 @@ async function resolveMotorConfigAndCheckQuota(
   mode: string
 ): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; uid?: string }> {
   const uid = auth.currentUser?.uid;
-  let resolvedModelName = 'gemini-3.5-flash';
+  let resolvedModelName = 'gemini-2.0-flash';
 
   if (!uid) {
     return { resolvedProvider: 'gemini', resolvedModelName };
@@ -806,8 +806,8 @@ async function resolveMotorConfigAndCheckQuota(
       const motorConfigRef = doc(firestore, 'global_config', 'motor_config');
       const motorConfigSnap = await getDoc(motorConfigRef);
       const motorConfig = {
-        lite: { model: 'gemini-3.5-flash' },
-        pro:  { model: 'gemini-3.1-pro-preview' }
+        lite: { model: 'gemini-2.0-flash' },
+        pro:  { model: 'gemini-2.5-pro-preview-06-05' }
       };
 
       if (motorConfigSnap.exists()) {

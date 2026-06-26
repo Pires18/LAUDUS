@@ -52,7 +52,7 @@ export default async function handler(req: Request) {
       return new Response(JSON.stringify({ error: 'Gemini API key not configured on server' }), { status: 503 });
     }
 
-    const model = req.headers.get('x-gemini-model') || 'gemini-3.5-flash';
+    const model = req.headers.get('x-gemini-model') || 'gemini-2.0-flash';
     const isStream = req.headers.get('x-gemini-stream') === 'true';
     const body = await req.text();
 
