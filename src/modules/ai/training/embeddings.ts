@@ -86,38 +86,49 @@ export async function embedTextBatch(
   const cleaned = texts.map((t) => (t || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 8000));
   if (cleaned.length === 0) return [];
 
-  try {
-    const response = await fetch('/api/gemini', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-uid': auth.currentUser?.uid || 'anonymous',
-        'x-gemini-model': EMBEDDING_MODEL,
-        'x-gemini-task': 'embed-batch',
-        'x-api-key': settings.geminiApiKey || '',
-      },
-      body: JSON.stringify({
-        requests: cleaned.map((text) => ({
-          model: `models/${EMBEDDING_MODEL}`,
-          content: { parts: [{ text: text || ' ' }] },
-        })),
-      }),
-      signal,
-    });
+  const empties = () => cleaned.map(() => [] as number[]);
 
-    if (!response.ok) {
-      logger.warn('[Embeddings] Batch proxy falhou:', response.status);
-      return cleaned.map(() => []);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-uid': auth.currentUser?.uid || 'anonymous',
+          'x-gemini-model': EMBEDDING_MODEL,
+          'x-gemini-task': 'embed-batch',
+          'x-api-key': settings.geminiApiKey || '',
+        },
+        body: JSON.stringify({
+          requests: cleaned.map((text) => ({
+            model: `models/${EMBEDDING_MODEL}`,
+            content: { parts: [{ text: text || ' ' }] },
+          })),
+        }),
+        signal,
+      });
+
+      if (response.status === 429 || response.status === 503) {
+        if (attempt < 2) { await new Promise((r) => setTimeout(r, 4000)); continue; }
+        logger.warn('[Embeddings] Batch rate-limited:', response.status);
+        return empties();
+      }
+      if (!response.ok) {
+        logger.warn('[Embeddings] Batch proxy falhou:', response.status);
+        return empties();
+      }
+      const result = await response.json();
+      const embeddings = result?.embeddings;
+      if (!Array.isArray(embeddings)) return empties();
+      return cleaned.map((_, i) => {
+        const v = embeddings[i]?.values;
+        return Array.isArray(v) ? v : [];
+      });
+    } catch (err) {
+      if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000)); continue; }
+      logger.warn('[Embeddings] Erro no batch de vetorização:', err);
+      return empties();
     }
-    const result = await response.json();
-    const embeddings = result?.embeddings;
-    if (!Array.isArray(embeddings)) return cleaned.map(() => []);
-    return cleaned.map((_, i) => {
-      const v = embeddings[i]?.values;
-      return Array.isArray(v) ? v : [];
-    });
-  } catch (err) {
-    logger.warn('[Embeddings] Erro no batch de vetorização:', err);
-    return cleaned.map(() => []);
   }
+  return empties();
 }

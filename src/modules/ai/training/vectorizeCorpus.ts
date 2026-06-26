@@ -2,7 +2,7 @@ import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { firestore, auth } from '../../../lib/firebase';
 import { AppSettings } from '../../../types';
 import { logger } from '../../../utils/logger';
-import { embedTextBatch } from './embeddings';
+import { embedText, embedTextBatch } from './embeddings';
 import { ExcellenceEntry } from './excellenceCorpus';
 
 // ═══════════════════════════════════════════════════════════════
@@ -58,6 +58,8 @@ export async function vectorizeCorpus(
   const result: VectorizeResult = { totalPending: pending.length, vectorized: 0, failed: 0 };
   if (pending.length === 0) return result;
 
+  let chunkIndex = 0;
+
   // 2. Processa em lotes.
   for (let i = 0; i < pending.length; i += batchSize) {
     const chunk = pending.slice(i, i + batchSize);
@@ -71,7 +73,28 @@ export async function vectorizeCorpus(
       vectors = chunk.map(() => []);
     }
 
-    // 3. Grava os embeddings que vieram preenchidos.
+    // 2a. Se o batch falhou inteiro, tenta embedding individual (o endpoint
+    //     :embedContent é mais simples e pode estar disponível mesmo quando
+    //     o :batchEmbedContents não está).
+    const batchAllEmpty = vectors.every((v) => !v || v.length === 0);
+    if (batchAllEmpty) {
+      logger.warn('[Vectorize] Batch vazio — tentando embedding individual no lote.');
+      for (let j = 0; j < chunk.length; j++) {
+        vectors[j] = await embedText(inputs[j], settings);
+        await sleep(250);
+      }
+    }
+
+    // 2b. Abort precoce: se o PRIMEIRO lote falhou em batch E individual, a
+    //     API de embeddings está indisponível — não adianta esperar 500+.
+    const stillAllEmpty = vectors.every((v) => !v || v.length === 0);
+    if (chunkIndex === 0 && stillAllEmpty) {
+      throw new Error(
+        'API de embeddings indisponível (/api/gemini). Verifique se o deploy mais recente está publicado e se a função serverless está ativa (não funciona em "vite dev" local — use o preview/produção da Vercel).'
+      );
+    }
+
+    // 3. Grava os embeddings preenchidos.
     const batch = writeBatch(firestore);
     let writes = 0;
     chunk.forEach((entry, j) => {
@@ -86,6 +109,7 @@ export async function vectorizeCorpus(
     });
     if (writes > 0) await batch.commit();
 
+    chunkIndex++;
     options.onProgress?.(Math.min(i + chunk.length, pending.length), pending.length);
 
     if (i + batchSize < pending.length) await sleep(throttleMs);
