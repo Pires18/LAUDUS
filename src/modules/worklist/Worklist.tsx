@@ -3,7 +3,7 @@ import { useCollection, usePaginatedCollection, orderBy, where } from '../../hoo
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CollectionError } from '../../components/CollectionError';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
-import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem } from '../../store/db';
+import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem, countExamsByStatus, type ExamStatusCounts } from '../../store/db';
 import { formatDateTime, classNames } from '../../utils/format';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
@@ -135,12 +135,40 @@ export function Worklist() {
   const visibleExams = filtered;
   const hasMore = hasMoreFromServer;
 
-  const counts = {
+  // Há filtro secundário (busca/área/data) ativo? Nesse caso as contagens
+  // refletem o conjunto filtrado no cliente.
+  const secondaryFilterActive =
+    areaFilter !== 'todas' || dateFilter !== 'todos' || !!search.trim();
+
+  // Quando o usuário filtra/busca, carregamos TODAS as páginas do servidor
+  // para que a busca e as contagens cubram o conjunto completo (e não apenas
+  // a primeira página de 100 laudos).
+  useEffect(() => {
+    if (secondaryFilterActive && hasMoreFromServer) loadMore();
+  }, [secondaryFilterActive, hasMoreFromServer, exams.length]);
+
+  // Contagens reais por status via agregação do servidor — independentes da
+  // paginação. Refletem o total verdadeiro no banco para a clínica atual.
+  const [serverCounts, setServerCounts] = useState<ExamStatusCounts | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    countExamsByStatus(selectedClinicId)
+      .then((c) => { if (!cancelled) setServerCounts(c); })
+      .catch((err) => logger.warn('[Worklist] Falha ao contar laudos no servidor:', err));
+    return () => { cancelled = true; };
+  }, [selectedClinicId, exams.length]);
+
+  const clientCounts: ExamStatusCounts = {
     todos:         filteredWithoutStatus.length,
     pendente:      filteredWithoutStatus.filter(e => e.status === 'pendente').length,
     'em-andamento': filteredWithoutStatus.filter(e => e.status === 'em-andamento').length,
     finalizado:    filteredWithoutStatus.filter(e => e.status === 'finalizado').length,
   };
+
+  // Sem filtro secundário → contagens reais do servidor (precisas).
+  // Com filtro secundário → contagens do conjunto filtrado (já carregado por completo).
+  const counts: ExamStatusCounts =
+    !secondaryFilterActive && serverCounts ? serverCounts : clientCounts;
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -293,11 +321,16 @@ export function Worklist() {
               placeholder="Buscar paciente, exame ou ID..."
               className="w-full h-9 pl-9 pr-3 bg-ink-50 border border-ink-200 focus:border-brand-400 rounded-xl focus:ring-2 focus:ring-brand-400/10 outline-none transition-all text-sm text-ink-800 placeholder-ink-400"
             />
-            {search && (
+            {secondaryFilterActive && hasMore ? (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-brand-500">
+                <Loader2 size={12} className="animate-spin" />
+                Carregando…
+              </span>
+            ) : search ? (
               <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600">
                 <X size={13} />
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Date pills */}

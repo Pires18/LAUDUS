@@ -20,6 +20,7 @@ import {
   writeBatch,
   QueryConstraint,
   limit,
+  getCountFromServer,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
@@ -671,6 +672,44 @@ export async function countWhere(
   const q = query(colRef, where(field, '==', value));
   const snap = await getDocs(q);
   return snap.size;
+}
+
+export interface ExamStatusCounts {
+  todos: number;
+  pendente: number;
+  'em-andamento': number;
+  finalizado: number;
+}
+
+/**
+ * Conta laudos por status usando agregação do servidor (getCountFromServer),
+ * de forma INDEPENDENTE da paginação — as contagens refletem o total real no
+ * banco, não apenas a página carregada. Respeita o filtro de clínica.
+ */
+export async function countExamsByStatus(
+  clinicId?: string | null
+): Promise<ExamStatusCounts> {
+  const colRef = getCollectionRef('exams');
+  const clinicConstraint = clinicId ? [where('clinicId', '==', clinicId)] : [];
+  const statuses: Array<keyof Omit<ExamStatusCounts, 'todos'>> = [
+    'pendente',
+    'em-andamento',
+    'finalizado',
+  ];
+
+  const [total, ...byStatus] = await Promise.all([
+    getCountFromServer(query(colRef, ...clinicConstraint)),
+    ...statuses.map((s) =>
+      getCountFromServer(query(colRef, ...clinicConstraint, where('status', '==', s)))
+    ),
+  ]);
+
+  return {
+    todos: total.data().count,
+    pendente: byStatus[0].data().count,
+    'em-andamento': byStatus[1].data().count,
+    finalizado: byStatus[2].data().count,
+  };
 }
 
 /**

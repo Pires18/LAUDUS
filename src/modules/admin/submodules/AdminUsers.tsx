@@ -15,6 +15,7 @@ import {
   ChevronDown, Trash2, Filter, Sparkles, Edit2, Calculator, Database
 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { friendlyFirebaseError } from '../../../utils/firebaseErrors';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { Modal } from '../../../components/Modal';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -71,8 +72,8 @@ export function AdminUsers() {
       );
       await addAuditLog({ action: 'ALTERAR_CARGO', details: `Cargo de ${roleChangeTarget.name} alterado para ${newRole}.`, module: 'AdminUsers' });
       showToast(`Papel de ${roleChangeTarget.name} alterado para ${newRole}`, 'success');
-    } catch {
-      showToast('Erro ao alterar papel', 'error');
+    } catch (err) {
+      showToast(friendlyFirebaseError(err, 'Erro ao alterar papel'), 'error');
     } finally {
       setIsProcessing(null);
       setRoleChangeTarget(null);
@@ -92,8 +93,8 @@ export function AdminUsers() {
       );
       await addAuditLog({ action: 'ALTERAR_STATUS_USUARIO', details: `Status de ${statusChangeTarget.name} alterado para ${newStatus ? 'Ativo' : 'Inativo'}.`, module: 'AdminUsers' });
       showToast(`Usuário ${newStatus ? 'ativado' : 'desativado'} com sucesso`, 'success');
-    } catch {
-      showToast('Erro ao alterar status', 'error');
+    } catch (err) {
+      showToast(friendlyFirebaseError(err, 'Erro ao alterar status'), 'error');
     } finally {
       setIsProcessing(null);
       setStatusChangeTarget(null);
@@ -111,8 +112,8 @@ export function AdminUsers() {
       );
       await addAuditLog({ action: 'EXCLUIR_USUARIO', details: `Usuário ${deleteTarget.name} excluído do sistema.`, module: 'AdminUsers' });
       showToast(`Usuário ${deleteTarget.name} removido com sucesso`, 'success');
-    } catch {
-      showToast('Erro ao remover usuário', 'error');
+    } catch (err) {
+      showToast(friendlyFirebaseError(err, 'Erro ao remover usuário'), 'error');
     } finally {
       setIsProcessing(null);
       setDeleteTarget(null);
@@ -126,8 +127,8 @@ export function AdminUsers() {
       const userRef = doc(firestore, 'users', u.id);
       await updateDoc(userRef, { motorProEnabled: !u.motorProEnabled, updatedAt: Date.now() });
       showToast('Permissão de Motor Pro alterada.', 'success');
-    } catch (err: any) {
-      showToast('Erro: ' + err.message, 'error');
+    } catch (err) {
+      showToast(friendlyFirebaseError(err, 'Erro ao alterar Motor Pro'), 'error');
     } finally {
       setIsProcessing(null);
     }
@@ -144,8 +145,8 @@ export function AdminUsers() {
       const userRef = doc(firestore, 'users', u.id);
       await updateDoc(userRef, { reportsQuota: newVal, updatedAt: Date.now() });
       showToast('Quota mensal atualizada.', 'success');
-    } catch (err: any) {
-      showToast('Erro: ' + err.message, 'error');
+    } catch (err) {
+      showToast(friendlyFirebaseError(err, 'Erro ao atualizar quota'), 'error');
     } finally {
       setIsProcessing(null);
     }

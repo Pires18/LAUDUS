@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../store/app';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
@@ -9,7 +9,7 @@ import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
   Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
-  Users, LogOut, CalendarDays, Database
+  Users, LogOut, CalendarDays, Database, Search, X
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { LogoIcon } from './LogoIcon';
@@ -56,12 +56,48 @@ export function Sidebar() {
   }, [isTablet]);
 
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
+  const [clinicSearch, setClinicSearch] = useState('');
+  const clinicDropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: clinics } = useCollection<Clinic>('clinics');
   const { data: exams } = useCollection<ExamRequest>('exams');
 
   const selectedClinic = clinics.find(c => c.id === selectedClinicId);
   const pendingCount = exams.filter(e => e.status === 'pendente' && (!selectedClinicId || e.clinicId === selectedClinicId)).length;
+
+  // Contagem de laudos pendentes por clínica (para o seletor).
+  const pendingByClinic = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of exams) {
+      if (e.status !== 'pendente' || !e.clinicId) continue;
+      map.set(e.clinicId, (map.get(e.clinicId) || 0) + 1);
+    }
+    return map;
+  }, [exams]);
+
+  // Clínicas filtradas pela busca, ATIVAS primeiro e ordenadas por nome.
+  const visibleClinics = useMemo(() => {
+    const q = clinicSearch.trim().toLowerCase();
+    return clinics
+      .filter(c => !q || c.name.toLowerCase().includes(q))
+      .sort((a, b) => {
+        if (!!a.active !== !!b.active) return a.active ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [clinics, clinicSearch]);
+
+  // Fecha o dropdown ao clicar fora.
+  useEffect(() => {
+    if (!showClinicDropdown) return;
+    function handleClickOutside(ev: MouseEvent) {
+      if (clinicDropdownRef.current && !clinicDropdownRef.current.contains(ev.target as Node)) {
+        setShowClinicDropdown(false);
+        setClinicSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showClinicDropdown]);
 
   return (
     <aside
@@ -95,9 +131,9 @@ export function Sidebar() {
 
       {/* Clinic Selector */}
       {!collapsed && clinics.length > 0 && (
-        <div className="p-3 border-b border-ink-50 relative">
+        <div className="p-3 border-b border-ink-50 relative" ref={clinicDropdownRef}>
           <button
-            onClick={() => setShowClinicDropdown(!showClinicDropdown)}
+            onClick={() => { setShowClinicDropdown(!showClinicDropdown); setClinicSearch(''); }}
             className="w-full flex items-center justify-between bg-ink-50 hover:bg-ink-100 px-3 py-2 rounded-lg transition-colors border border-ink-200"
           >
             <div className="flex items-center gap-2 truncate">

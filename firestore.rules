@@ -1,0 +1,125 @@
+rules_version = '2';
+
+// ============================================================================
+// LAUD.US — Regras de Segurança do Firestore (RBAC)
+//
+// Modelo de dados:
+//   • Coleções por usuário:   users/{uid}/{collection}/{doc}
+//       (templates, exams, patients, clinics, appointments, settings, ...)
+//   • Coleções globais (raiz): users, subscriptions, saas_plans,
+//       audit_logs, support_tickets, transactions, global_config, system
+//
+// Princípios:
+//   • Todo acesso exige autenticação.
+//   • Cada usuário é dono total da sua subárvore users/{uid}/**.
+//   • Admins (super admin por e-mail OU role == 'admin') administram as
+//     coleções globais de usuários e planos — corrige o "erro de permissão"
+//     ao editar usuários/assinaturas pelo painel admin.
+//   • Webhooks de pagamento usam o Admin SDK no servidor e ignoram estas
+//     regras (acesso privilegiado), portanto não precisam de exceções aqui.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers ----------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'matheuskpires@gmail.com';
+    }
+
+    // Lê o role do próprio documento do usuário (users/{uid}).
+    function isAdmin() {
+      return isSuperAdmin()
+        || (isSignedIn()
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---- Coleção de usuários + subárvore por usuário ----------------------
+    match /users/{userId} {
+      // O próprio usuário lê/cria seu doc; admin gerencia qualquer usuário.
+      allow read, create: if isOwner(userId) || isAdmin();
+      // Atualização/exclusão: dono (perfil próprio) ou admin (gestão de cargos,
+      // status, motorProEnabled, reportsQuota, subscriptionStatus, ...).
+      allow update, delete: if isOwner(userId) || isAdmin();
+
+      // Máscaras de laudo: visíveis a qualquer usuário autenticado
+      // (modelos "do sistema" pertencem ao admin e são lidos por todos).
+      match /templates/{templateId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // Demais dados da subárvore do usuário: dono ou admin.
+      match /{document=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // ---- Assinaturas / planos do cliente ----------------------------------
+    match /subscriptions/{subId} {
+      // Dono lê a própria assinatura; admin lê/gerencia todas.
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ---- Catálogo de planos SaaS ------------------------------------------
+    match /saas_plans/{planId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- Logs de auditoria -------------------------------------------------
+    match /audit_logs/{logId} {
+      // Qualquer usuário autenticado pode registrar uma ação; somente admin lê.
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ---- Tickets de suporte ------------------------------------------------
+    match /support_tickets/{ticketId} {
+      // Usuário cria/lê/atualiza o próprio ticket; admin gerencia todos.
+      allow read, update: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+
+      // Mensagens dentro do ticket.
+      match /{document=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // ---- Transações financeiras (sensível) --------------------------------
+    match /transactions/{txId} {
+      allow read: if isAdmin();
+      allow write: if false; // somente Admin SDK (webhooks) escreve
+    }
+
+    // ---- Configuração global e mensagens de sistema -----------------------
+    match /global_config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---- Bloqueio padrão ---------------------------------------------------
+    // Qualquer caminho não declarado acima é negado por omissão.
+  }
+}

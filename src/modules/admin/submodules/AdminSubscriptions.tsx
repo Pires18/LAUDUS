@@ -9,6 +9,7 @@ import {
 import { doc, updateDoc, setDoc, deleteField, getDoc } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { classNames } from '../../../utils/format';
+import { friendlyFirebaseError } from '../../../utils/firebaseErrors';
 
 interface PricingConfig {
   basePlanPrice: number;
@@ -86,7 +87,7 @@ export function AdminSubscriptions() {
       await updateDoc(userRef, { motorProEnabled: !currentVal, updatedAt: Date.now() });
       showToast('Permissão de Motor Pro alterada.', 'success');
     } catch (err: any) {
-      showToast('Erro: ' + err.message, 'error');
+      showToast(friendlyFirebaseError(err), 'error');
     } finally {
       setUpdatingUser(null);
     }
@@ -103,7 +104,7 @@ export function AdminSubscriptions() {
       await updateDoc(doc(firestore, 'subscriptions', `sub_${userId}`), { reportsQuota: newVal, updatedAt: Date.now() }).catch(() => {});
       showToast('Quota mensal atualizada.', 'success');
     } catch (err: any) {
-      showToast('Erro: ' + err.message, 'error');
+      showToast(friendlyFirebaseError(err), 'error');
     } finally {
       setUpdatingUser(null);
     }
@@ -120,7 +121,7 @@ export function AdminSubscriptions() {
       await setDoc(subRef, { id: subId, userId, addons: nextAddons, updatedAt: Date.now() }, { merge: true });
       showToast(`Add-on ${addon.toUpperCase()} alterado.`, 'success');
     } catch (err: any) {
-      showToast('Erro: ' + err.message, 'error');
+      showToast(friendlyFirebaseError(err), 'error');
     } finally {
       setUpdatingUser(null);
     }
@@ -146,7 +147,7 @@ export function AdminSubscriptions() {
       });
       showToast('Médico migrado com sucesso.', 'success');
     } catch (err: any) {
-      showToast('Erro na migração: ' + err.message, 'error');
+      showToast(friendlyFirebaseError(err, 'Erro na migração'), 'error');
     } finally {
       setUpdatingUser(null);
     }
@@ -160,7 +161,7 @@ export function AdminSubscriptions() {
       await updateDoc(doc(firestore, 'users', userId), { subscriptionStatus: 'canceled' });
       showToast('Assinatura cancelada.', 'info');
     } catch (err: any) {
-      showToast('Erro: ' + err.message, 'error');
+      showToast(friendlyFirebaseError(err), 'error');
     } finally {
       setUpdatingUser(null);
     }
@@ -179,7 +180,7 @@ export function AdminSubscriptions() {
       await updateDoc(doc(firestore, 'users', userId), { subscriptionStatus: 'active', updatedAt: now });
       showToast('Assinatura reativada com sucesso.', 'success');
     } catch (err: any) {
-      showToast('Erro ao reativar: ' + err.message, 'error');
+      showToast(friendlyFirebaseError(err, 'Erro ao reativar'), 'error');
     } finally {
       setUpdatingUser(null);
     }
