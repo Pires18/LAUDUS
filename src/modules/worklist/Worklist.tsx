@@ -140,12 +140,14 @@ export function Worklist() {
   const secondaryFilterActive =
     areaFilter !== 'todas' || dateFilter !== 'todos' || !!search.trim();
 
-  // Quando o usuário filtra/busca, carregamos TODAS as páginas do servidor
-  // para que a busca e as contagens cubram o conjunto completo (e não apenas
-  // a primeira página de 100 laudos).
+  // Quando o usuário restringe a lista (busca/área/data OU seleciona um status
+  // específico), carregamos TODAS as páginas do servidor. Isso garante que a
+  // lista exibida corresponda às contagens reais — sem isso, ao clicar em
+  // "Finalizado" a lista mostraria só os finalizados da 1ª página de 100.
+  const shouldLoadAll = secondaryFilterActive || statusFilter !== 'todos';
   useEffect(() => {
-    if (secondaryFilterActive && hasMoreFromServer) loadMore();
-  }, [secondaryFilterActive, hasMoreFromServer, exams.length]);
+    if (shouldLoadAll && hasMoreFromServer) loadMore();
+  }, [shouldLoadAll, hasMoreFromServer, exams.length]);
 
   // Contagens reais por status via agregação do servidor — independentes da
   // paginação. Refletem o total verdadeiro no banco para a clínica atual.
@@ -321,7 +323,7 @@ export function Worklist() {
               placeholder="Buscar paciente, exame ou ID..."
               className="w-full h-9 pl-9 pr-3 bg-ink-50 border border-ink-200 focus:border-brand-400 rounded-xl focus:ring-2 focus:ring-brand-400/10 outline-none transition-all text-sm text-ink-800 placeholder-ink-400"
             />
-            {secondaryFilterActive && hasMore ? (
+            {shouldLoadAll && hasMore ? (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-brand-500">
                 <Loader2 size={12} className="animate-spin" />
                 Carregando…

@@ -172,6 +172,11 @@ export function ExamEditor({ examId }: Props) {
     isManualCheck: false
   });
 
+  // Ao trocar de estudo PACS, volta para a primeira imagem do novo estudo.
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedStudyId]);
+
   const handlePrevImage = useCallback(() => {
     setActiveImageIndex(prev => (prev > 0 ? prev - 1 : prev));
   }, []);

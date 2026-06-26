@@ -9,7 +9,7 @@ import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
   Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
-  Users, LogOut, CalendarDays, Database, Search, X
+  Users, LogOut, CalendarDays, Database, Search, X, Sun, Moon, Monitor
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { LogoIcon } from './LogoIcon';
@@ -42,8 +42,9 @@ function useIsTablet() {
 export function Sidebar() {
   const {
     view, setView, selectedClinicId, setSelectedClinic,
-    showToast, setShowCreateExamModal, setShowSupportModal, settings
+    showToast, setShowCreateExamModal, setShowSupportModal, settings, updateSettings
   } = useApp();
+  const themePref = settings.theme || 'system';
   const { user, signOut } = useAuth();
   const { isAdmin, role } = useAdmin();
   const { hasPacs, hasCalculators, hasAppointments, hasClinics } = useSubscription();
@@ -346,6 +347,13 @@ export function Sidebar() {
               </div>
             )}
             <button
+              onClick={() => updateSettings({ theme: themePref === 'light' ? 'dark' : themePref === 'dark' ? 'system' : 'light' })}
+              className="w-8 h-8 rounded-full bg-ink-50 text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-all duration-300 flex items-center justify-center border border-ink-200 shadow-sm hover:scale-110 active:scale-95"
+              title={`Tema: ${themePref === 'light' ? 'Claro' : themePref === 'dark' ? 'Escuro' : 'Automático'}`}
+            >
+              {themePref === 'light' ? <Sun size={13} /> : themePref === 'dark' ? <Moon size={13} /> : <Monitor size={13} />}
+            </button>
+            <button
               onClick={signOut}
               className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all duration-300 flex items-center justify-center border border-rose-100 shadow-sm hover:scale-110 active:scale-95"
               title="Sair da Conta"
@@ -396,6 +404,30 @@ export function Sidebar() {
 
         {!collapsed && (
           <div className="px-5 pb-5 animate-fade-in flex flex-col gap-2.5">
+            {/* Theme switcher */}
+            <div className="flex items-center gap-1 p-1 bg-ink-50 rounded-xl border border-ink-200">
+              {([
+                { key: 'light', label: 'Claro', icon: Sun },
+                { key: 'dark', label: 'Escuro', icon: Moon },
+                { key: 'system', label: 'Auto', icon: Monitor },
+              ] as const).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => updateSettings({ theme: key })}
+                  className={classNames(
+                    'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all',
+                    themePref === key
+                      ? 'bg-white text-brand-700 shadow-sm border border-ink-200'
+                      : 'text-ink-500 hover:text-ink-800'
+                  )}
+                  title={`Tema: ${label}`}
+                >
+                  <Icon size={12} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 text-[9px] bg-ink-50 text-ink-600 px-3 py-1.5 rounded-full font-bold border border-ink-200 uppercase tracking-widest">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />

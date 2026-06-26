@@ -174,6 +174,9 @@ export function useDicomSync({
   const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   const selectedStudyIdRef = useRef<string | null>(null);
+  // Último estudo cujas instâncias já foram carregadas — evita refetch redundante
+  // a cada polling e permite detectar troca manual de estudo pelo usuário.
+  const lastFetchedStudyIdRef = useRef<string | null>(null);
   const internalChangeSelectedStudy = useCallback((id: string | null) => {
     setSelectedStudyId(id);
     selectedStudyIdRef.current = id;
@@ -255,6 +258,46 @@ export function useDicomSync({
     settings.dicomPassword,
     settings.dicomBackupPassword
   ]);
+
+  // Troca manual de estudo: quando o usuário seleciona outro estudo do paciente,
+  // carrega imediatamente as imagens daquele estudo (sem esperar o polling).
+  useEffect(() => {
+    if (!selectedStudyId) return;
+    if (selectedStudyId === lastFetchedStudyIdRef.current) return;
+    const study = candidateStudies.find((c) => c.ID === selectedStudyId);
+    if (!study) return;
+
+    let active = true;
+    lastFetchedStudyIdRef.current = selectedStudyId;
+    setActiveServer(study.serverSource as 'primary' | 'backup');
+    studyCacheRef.current = {
+      studyId: study.ID,
+      serverSource: study.serverSource,
+      studyUID: study.MainDicomTags?.StudyInstanceUID,
+      timestamp: Date.now(),
+    };
+
+    (async () => {
+      setDicomLoading(true);
+      setDicomError(null);
+      // Limpa as imagens do estudo anterior para feedback visual imediato.
+      setDicomInstances([]);
+      setHasDicomImages(false);
+      try {
+        await fetchInstancesForStudy(study.ID, study.serverSource, study.MainDicomTags?.StudyInstanceUID);
+        if (active) setDicomStatus('found');
+      } catch (e) {
+        if (active) {
+          setDicomStatus('error');
+          setDicomError('Falha ao carregar imagens do estudo selecionado.');
+        }
+      } finally {
+        if (active) setDicomLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [selectedStudyId, candidateStudies, fetchInstancesForStudy]);
 
   useEffect(() => {
     let active = true;
@@ -399,6 +442,7 @@ export function useDicomSync({
             timestamp: Date.now()
           };
 
+          lastFetchedStudyIdRef.current = activeStudy.ID;
           await fetchInstancesForStudy(activeStudy.ID, activeStudy.serverSource, activeStudy.MainDicomTags?.StudyInstanceUID);
         }
       } catch (e: any) {

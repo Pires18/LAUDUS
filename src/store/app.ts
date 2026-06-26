@@ -4,6 +4,7 @@ import { User } from 'firebase/auth';
 import { AppSettings, Patient, ExamStatus } from '../types';
 import { getSettings, saveSettings } from './db';
 import { logger } from '../utils/logger';
+import { setTheme } from '../utils/theme';
 
 type View =
   | { name: 'dashboard' }
@@ -108,6 +109,8 @@ export const useApp = create<AppState>()(
         s.anthropicModel = 'claude-sonnet-4-6';
       }
       set({ settings: s });
+      // Aplica o tema salvo do usuário (mantém localStorage em sincronia).
+      if (s.theme) setTheme(s.theme);
       // Se tem clínica padrão nas settings, seta como selecionada
       if (s.defaultClinicId) {
         set({ selectedClinicId: s.defaultClinicId });
@@ -118,8 +121,10 @@ export const useApp = create<AppState>()(
   },
   updateSettings: async (patch) => {
     const next = { ...get().settings, ...patch };
-    await saveSettings(next);
+    // Aplica o tema na hora (antes do await) para resposta imediata da UI.
+    if (patch.theme) setTheme(patch.theme);
     set({ settings: next });
+    await saveSettings(next);
   },
 
   // ── Toast ──

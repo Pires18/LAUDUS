@@ -18,7 +18,56 @@
 
   /* Brand RGB for glow effects */
   --brand-500-rgb: 17, 134, 231;
+
+  /* ── Escala semântica "ink" (modo claro) — triplets RGB p/ Tailwind ── */
+  --ink-50:  246 247 249;
+  --ink-100: 236 238 242;
+  --ink-200: 213 218 226;
+  --ink-300: 176 185 200;
+  --ink-400: 133 146 168;
+  --ink-500: 103 116 141;
+  --ink-600: 82 93 116;
+  --ink-700: 67 76 95;
+  --ink-800: 58 65 81;
+  --ink-900: 52 57 69;
+
+  /* Superfície de cartões/painéis (claro = branco) */
+  --surface: 255 255 255;
 }
+
+/* ════════════════════════════════════════════
+   MODO ESCURO — rampa "ink" invertida + superfícies
+   (ink-50 = mais escuro · ink-900 = quase branco)
+   ════════════════════════════════════════════ */
+html.dark {
+  --ink-50:  24 26 31;
+  --ink-100: 31 34 41;
+  --ink-200: 44 48 58;
+  --ink-300: 62 68 82;
+  --ink-400: 120 130 150;
+  --ink-500: 150 160 178;
+  --ink-600: 180 188 202;
+  --ink-700: 205 211 221;
+  --ink-800: 226 230 237;
+  --ink-900: 240 242 246;
+
+  /* Cartões um pouco acima do fundo da página */
+  --surface: 26 28 34;
+
+  color-scheme: dark;
+}
+
+html.dark body,
+html.dark #root {
+  background-color: #0d0e11;
+  color: rgb(var(--ink-900));
+}
+
+/* Remapeia os usos literais de branco/preto para o tema escuro, sem tocar nos
+   componentes individualmente. `text-white` (em botões coloridos) é preservado. */
+html.dark .bg-white { background-color: rgb(var(--surface)) !important; }
+html.dark .text-black { color: rgb(var(--ink-900)) !important; }
+html.dark .border-white { border-color: rgb(var(--ink-200)) !important; }
 
 html, body, #root {
   /* 100dvh: dynamic viewport height — handles Safari mobile URL bar correctly */

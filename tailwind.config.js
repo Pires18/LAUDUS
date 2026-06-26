@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     screens: {
       xs: '475px',
@@ -24,18 +25,22 @@ export default {
           800: '#0a4884',
           900: '#0d3d6e',
         },
+        // Escala semântica de cinzas — mapeada para variáveis CSS para suportar
+        // modo escuro (a rampa é invertida no .dark). Ver src/styles/index.css.
         ink: {
-          50: '#f6f7f9',
-          100: '#eceef2',
-          200: '#d5dae2',
-          300: '#b0b9c8',
-          400: '#8592a8',
-          500: '#67748d',
-          600: '#525d74',
-          700: '#434c5f',
-          800: '#3a4151',
-          900: '#343945',
-        }
+          50:  'rgb(var(--ink-50) / <alpha-value>)',
+          100: 'rgb(var(--ink-100) / <alpha-value>)',
+          200: 'rgb(var(--ink-200) / <alpha-value>)',
+          300: 'rgb(var(--ink-300) / <alpha-value>)',
+          400: 'rgb(var(--ink-400) / <alpha-value>)',
+          500: 'rgb(var(--ink-500) / <alpha-value>)',
+          600: 'rgb(var(--ink-600) / <alpha-value>)',
+          700: 'rgb(var(--ink-700) / <alpha-value>)',
+          800: 'rgb(var(--ink-800) / <alpha-value>)',
+          900: 'rgb(var(--ink-900) / <alpha-value>)',
+        },
+        // Superfície de cartões/painéis (substitui o uso literal de "white").
+        surface: 'rgb(var(--surface) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['Inter', 'Outfit', 'system-ui', 'sans-serif'],

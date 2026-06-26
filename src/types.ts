@@ -174,6 +174,8 @@ export interface DicomDevice {
 export interface AppSettings {
   /** Papel atual do usuário no sistema (para fins de simulação/teste) */
   currentRole?: UserRole;
+  /** Preferência de tema da interface */
+  theme?: 'light' | 'dark' | 'system';
   geminiApiKey?: string;
   geminiModel: string;
   geminiModelPro?: string;

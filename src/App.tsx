@@ -24,6 +24,7 @@ import { Loader2 } from 'lucide-react';
 
 import { classNames } from './utils/format';
 import { logger } from './utils/logger';
+import { watchSystemTheme } from './utils/theme';
 import { useConfirmStore } from './hooks/useConfirm';
 import { useSubscription } from './hooks/useSubscription';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -359,6 +360,11 @@ export default function App() {
 function AuthRouter() {
   const { user, setUser } = useApp();
   const [authChecked, setAuthChecked] = useState(false);
+
+  // Reage a mudanças do tema do SO quando a preferência é "system".
+  useEffect(() => {
+    return watchSystemTheme(() => useApp.getState().settings.theme || 'system');
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
