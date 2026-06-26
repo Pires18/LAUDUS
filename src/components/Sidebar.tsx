@@ -154,33 +154,69 @@ export function Sidebar() {
 
           {showClinicDropdown && (
             <div className="absolute top-full left-3 right-3 mt-1 bg-white border border-ink-200 shadow-lg rounded-xl overflow-hidden z-50 animate-scale-in">
+              {clinics.length > 5 && (
+                <div className="p-2 border-b border-ink-100">
+                  <div className="relative">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                    <input
+                      autoFocus
+                      value={clinicSearch}
+                      onChange={(e) => setClinicSearch(e.target.value)}
+                      placeholder="Buscar clínica..."
+                      className="w-full h-8 pl-8 pr-7 bg-ink-50 border border-ink-200 rounded-lg text-xs outline-none focus:border-brand-400"
+                    />
+                    {clinicSearch && (
+                      <button onClick={() => setClinicSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <button
-                onClick={() => { setSelectedClinic(null); setShowClinicDropdown(false); showToast('Filtro removido', 'info'); }}
+                onClick={() => { setSelectedClinic(null); setShowClinicDropdown(false); setClinicSearch(''); showToast('Filtro removido', 'info'); }}
                 className={classNames(
-                  "w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2",
+                  "w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center justify-between gap-2",
                   !selectedClinicId ? "bg-brand-50 text-brand-700 font-medium" : "hover:bg-ink-50 text-ink-700"
                 )}
               >
-                <ClipboardList size={14} /> Todas as Clínicas
+                <span className="flex items-center gap-2"><ClipboardList size={14} /> Todas as Clínicas</span>
+                {pendingCount > 0 && (
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{pendingCount}</span>
+                )}
               </button>
-              <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                {clinics.map(c => (
+              <div className="max-h-56 overflow-y-auto custom-scrollbar">
+                {visibleClinics.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-[11px] text-ink-400 font-medium">Nenhuma clínica encontrada.</p>
+                ) : visibleClinics.map(c => {
+                  const clinicPending = pendingByClinic.get(c.id) || 0;
+                  return (
                   <button
                     key={c.id}
-                    onClick={() => { setSelectedClinic(c.id); setShowClinicDropdown(false); showToast(`Filtrando: ${c.name}`, 'info'); }}
+                    onClick={() => { setSelectedClinic(c.id); setShowClinicDropdown(false); setClinicSearch(''); showToast(`Filtrando: ${c.name}`, 'info'); }}
                     className={classNames(
-                      "w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center gap-2 truncate",
-                      selectedClinicId === c.id ? "bg-brand-50 text-brand-700 font-medium" : "hover:bg-ink-50 text-ink-700"
+                      "w-full text-left px-3 py-2.5 text-xs transition-colors flex items-center justify-between gap-2",
+                      selectedClinicId === c.id ? "bg-brand-50 text-brand-700 font-medium" : "hover:bg-ink-50 text-ink-700",
+                      !c.active && "opacity-60"
                     )}
                   >
-                    {c.logoUrl ? (
-                      <img src={c.logoUrl} alt="" className="w-4 h-4 rounded object-cover" />
-                    ) : (
-                      <Hospital size={14} className={selectedClinicId === c.id ? "text-brand-600" : "text-ink-400"} />
+                    <span className="flex items-center gap-2 truncate min-w-0">
+                      {c.logoUrl ? (
+                        <img src={c.logoUrl} alt="" className="w-4 h-4 rounded object-cover shrink-0" />
+                      ) : (
+                        <Hospital size={14} className={classNames("shrink-0", selectedClinicId === c.id ? "text-brand-600" : "text-ink-400")} />
+                      )}
+                      <span className="truncate">{c.name}</span>
+                      {!c.active && (
+                        <span className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded bg-ink-100 text-ink-500 shrink-0">Inativa</span>
+                      )}
+                    </span>
+                    {clinicPending > 0 && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">{clinicPending}</span>
                     )}
-                    <span className="truncate">{c.name}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

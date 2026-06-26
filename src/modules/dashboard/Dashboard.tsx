@@ -143,7 +143,10 @@ export function Dashboard() {
 
   const displayName = settings.physicianName || user?.displayName || 'Especialista';
   const hasDrPrefix = /^(dr|dra)\.?\s+/i.test(displayName);
-  const greetingName = hasDrPrefix ? displayName : `Dr. ${displayName}`;
+  const isClinicalRole = (settings.currentRole || 'medico') !== 'recepcao';
+  const greetingName = hasDrPrefix || !isClinicalRole ? displayName : `Dr. ${displayName}`;
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
   return (
     <div className="module-container">
@@ -165,7 +168,7 @@ export function Dashboard() {
               )}
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-ink-900 tracking-tight leading-tight">
-              Olá, <span className="text-brand-600">{greetingName}</span>
+              {timeGreeting}, <span className="text-brand-600">{greetingName}</span>
             </h1>
             {stats.pending > 0 && (
               <p className="text-xs text-ink-500 mt-1 font-medium">
