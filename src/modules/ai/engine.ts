@@ -6,6 +6,7 @@ import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
 import { getMotorProfile } from './motorProfiles';
+import { retrieveFewShotBlock } from './training/augment';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
@@ -771,6 +772,31 @@ function detectArea(params: GenerateReportParams | CopilotParams | RefineParams)
   return '';
 }
 
+/**
+ * Augmenta o prompt de geração com exemplos few-shot do Corpus de
+ * Excelência (Fase 3). Só atua no modo geração e quando aiTrainingEnabled.
+ * Degrada graciosamente: qualquer falha mantém o prompt original.
+ */
+async function augmentWithRetrieval(
+  built: BuiltPrompt,
+  params: GenerateReportParams,
+  settings: AppSettings,
+  motor: 'lite' | 'pro',
+  signal?: AbortSignal
+): Promise<BuiltPrompt> {
+  const block = await retrieveFewShotBlock({
+    area: params.template.area,
+    examType: params.template.name,
+    motor,
+    clinicalIndication: params.clinicalIndication,
+    anamnesis: params.anamnesis,
+    settings,
+    signal,
+  });
+  if (!block) return built;
+  return { ...built, universalContext: `${built.universalContext}\n\n${block}` };
+}
+
 // ─── Helpers para Controle de Motor (Lite/Pro) e Quota de Laudos ─────────────
 
 async function resolveMotorConfigAndCheckQuota(
@@ -890,6 +916,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     built = buildRefinePrompt({ ...(params as RefineParams), settings: callSettings });
   } else {
     built = buildPrompt({ ...(params as GenerateReportParams), settings: callSettings });
+    built = await augmentWithRetrieval(built, params as GenerateReportParams, callSettings, resolvedMotor, signal);
   }
 
   try {
@@ -961,6 +988,7 @@ export async function generateReportStream(
     built = buildRefinePrompt({ ...(params as RefineParams), settings: callSettings });
   } else {
     built = buildPrompt({ ...(params as GenerateReportParams), settings: callSettings });
+    built = await augmentWithRetrieval(built, params as GenerateReportParams, callSettings, resolvedMotor, signal);
   }
 
   try {

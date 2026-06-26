@@ -26,7 +26,7 @@ export default async function handler(req: Request) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-uid, x-gemini-model, x-gemini-stream',
+        'Access-Control-Allow-Headers': 'Content-Type, x-uid, x-gemini-model, x-gemini-stream, x-gemini-task, x-api-key',
       },
     });
   }
@@ -54,11 +54,18 @@ export default async function handler(req: Request) {
 
     const model = req.headers.get('x-gemini-model') || 'gemini-3.5-flash';
     const isStream = req.headers.get('x-gemini-stream') === 'true';
+    const task = req.headers.get('x-gemini-task') || 'generate';
     const body = await req.text();
 
-    const endpoint = isStream
-      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`
-      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    let endpoint: string;
+    if (task === 'embed') {
+      // Vetorização para retrieval semântico (text-embedding-004).
+      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`;
+    } else if (isStream) {
+      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+    } else {
+      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    }
 
     const response = await fetch(endpoint, {
       method: 'POST',

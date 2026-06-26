@@ -22,6 +22,12 @@ export * from './harness';
 export * from './engineGenerator';
 export * from './goldenDataset';
 
+// Fase 3 — Aprendizado: corpus, retrieval semântico, loop de feedback
+export * from './embeddings';
+export * from './excellenceCorpus';
+export * from './retrieval';
+export * from './feedback';
+
 // Fase 2 — peças de produção reexportadas para conveniência
 export { verifyReport } from '../verification';
 export type { VerificationReport, VerificationIssue, VerificationContext } from '../verification';
