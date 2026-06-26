@@ -1,5 +1,6 @@
 import { AppSettings } from '../../../types';
 import { auditReportQuality } from '../engine';
+import { verifyReport } from '../verification';
 import { judgeReport } from './evaluator';
 import {
   GoldenCase,
@@ -84,16 +85,26 @@ export async function evaluateCase(
   // 1. Geração
   const gen = await generate(goldenCase, signal);
 
-  // 2. Verificações determinísticas
+  // 2. Verificações determinísticas (estrutura + anti-alucinação)
   const audit = auditReportQuality(gen.report, goldenCase.area);
+  const verification = verifyReport(gen.report, {
+    area: goldenCase.area,
+    anamnesis: goldenCase.input.anamnesis,
+    clinicalIndication: goldenCase.input.clinicalIndication,
+  });
+  const deterministicIssues = [...audit.issues, ...verification.issues];
   const failedAssertions = checkAssertions(gen.report, goldenCase.hardAssertions);
 
   // 3. Juiz LLM
   const dimensions = await judgeReport(goldenCase, gen.report, settings, signal);
 
-  // Score ponderado, com penalidade por asserção determinística falha.
+  // Score ponderado, com penalidade por asserção e por erro de verificação.
+  const verificationErrors = verification.issues.filter((i) => i.severity === 'error').length;
   let weightedScore = weightedFromDimensions(dimensions);
-  weightedScore = Math.max(0, weightedScore - failedAssertions.length * ASSERTION_PENALTY);
+  weightedScore = Math.max(
+    0,
+    weightedScore - failedAssertions.length * ASSERTION_PENALTY - verificationErrors * ASSERTION_PENALTY
+  );
 
   // Gate de segurança: nenhuma asserção de 'safety' pode falhar E o juiz
   // precisa atribuir nota de segurança acima do limiar.
@@ -109,7 +120,7 @@ export async function evaluateCase(
     weightedScore,
     dimensions,
     failedAssertions,
-    deterministicIssues: audit.issues,
+    deterministicIssues,
     latencyMs: gen.latencyMs,
     generatedReport: gen.report,
     safetyPassed,

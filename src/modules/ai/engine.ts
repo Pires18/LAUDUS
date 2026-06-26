@@ -5,6 +5,7 @@ import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
+import { getMotorProfile } from './motorProfiles';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
@@ -277,6 +278,11 @@ function buildUniversalContext(settings: AppSettings): string {
   const rules = settings.aiRigidRules || DEFAULT_RIGID_RULES;
 
   const parts = [master, global, skeleton, rules];
+
+  // Diferenciação Lite/Pro: injeta a modulação de comportamento do motor
+  // efetivo (resolvido após o pro-gating em resolveMotorConfigAndCheckQuota).
+  parts.push(getMotorProfile(settings.selectedMotor));
+
   if (settings.aiFastMode) {
     parts.push(`═══════════════════════════════════════════
 ATENÇÃO: MODO RÁPIDO ATIVADO (SEM RACIOCÍNIO)
@@ -770,12 +776,13 @@ function detectArea(params: GenerateReportParams | CopilotParams | RefineParams)
 async function resolveMotorConfigAndCheckQuota(
   settings: AppSettings,
   mode: string
-): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; uid?: string }> {
+): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; resolvedMotor: 'lite' | 'pro'; uid?: string }> {
   const uid = auth.currentUser?.uid;
   let resolvedModelName = 'gemini-3.5-flash';
+  let resolvedMotor: 'lite' | 'pro' = settings.selectedMotor === 'pro' ? 'pro' : 'lite';
 
   if (!uid) {
-    return { resolvedProvider: 'gemini', resolvedModelName };
+    return { resolvedProvider: 'gemini', resolvedModelName, resolvedMotor };
   }
 
   try {
@@ -802,6 +809,7 @@ async function resolveMotorConfigAndCheckQuota(
       if (chosenMotor === 'pro' && !motorProEnabled) {
         chosenMotor = 'lite';
       }
+      resolvedMotor = chosenMotor;
 
       const motorConfigRef = doc(firestore, 'global_config', 'motor_config');
       const motorConfigSnap = await getDoc(motorConfigRef);
@@ -825,7 +833,7 @@ async function resolveMotorConfigAndCheckQuota(
     logger.error('Erro ao resolver motor e cota:', err);
   }
 
-  return { resolvedProvider: 'gemini', resolvedModelName, uid };
+  return { resolvedProvider: 'gemini', resolvedModelName, resolvedMotor, uid };
 }
 
 async function incrementReportUsage(uid: string) {
@@ -866,21 +874,22 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
   const area = detectArea(params);
   const t0 = Date.now();
 
-  const { resolvedModelName, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+  const { resolvedModelName, resolvedMotor, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
 
   const callSettings = {
     ...settings,
     aiProvider: 'gemini' as const,
     geminiModel: resolvedModelName,
+    selectedMotor: resolvedMotor,
   };
 
   let built: BuiltPrompt;
   if (mode === 'copilot') {
-    built = buildCopilotPrompt(params as CopilotParams);
+    built = buildCopilotPrompt({ ...(params as CopilotParams), settings: callSettings });
   } else if (mode === 'refine') {
-    built = buildRefinePrompt(params as RefineParams);
+    built = buildRefinePrompt({ ...(params as RefineParams), settings: callSettings });
   } else {
-    built = buildPrompt(params as GenerateReportParams);
+    built = buildPrompt({ ...(params as GenerateReportParams), settings: callSettings });
   }
 
   try {
@@ -936,21 +945,22 @@ export async function generateReportStream(
   const area = detectArea(params);
   const t0 = Date.now();
 
-  const { resolvedModelName, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+  const { resolvedModelName, resolvedMotor, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
 
   const callSettings = {
     ...settings,
     aiProvider: 'gemini' as const,
     geminiModel: resolvedModelName,
+    selectedMotor: resolvedMotor,
   };
 
   let built: BuiltPrompt;
   if (mode === 'copilot') {
-    built = buildCopilotPrompt(params as CopilotParams);
+    built = buildCopilotPrompt({ ...(params as CopilotParams), settings: callSettings });
   } else if (mode === 'refine') {
-    built = buildRefinePrompt(params as RefineParams);
+    built = buildRefinePrompt({ ...(params as RefineParams), settings: callSettings });
   } else {
-    built = buildPrompt(params as GenerateReportParams);
+    built = buildPrompt({ ...(params as GenerateReportParams), settings: callSettings });
   }
 
   try {

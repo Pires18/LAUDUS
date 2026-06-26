@@ -91,8 +91,8 @@ export interface EvalResult {
   dimensions: DimensionScore[];
   /** Asserções determinísticas que falharam. */
   failedAssertions: HardAssertion[];
-  /** Resultado das verificações estruturais locais (auditReportQuality). */
-  deterministicIssues: Array<{ type: string; severity: 'error' | 'warning'; message: string }>;
+  /** Resultado das verificações determinísticas (auditReportQuality + verifyReport). */
+  deterministicIssues: Array<{ type: string; severity: 'error' | 'warning' | 'info'; message: string }>;
   latencyMs: number;
   generatedReport: string;
   /** True se nenhuma asserção de segurança falhou (gate crítico). */

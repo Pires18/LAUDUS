@@ -21,3 +21,11 @@ export * from './evaluator';
 export * from './harness';
 export * from './engineGenerator';
 export * from './goldenDataset';
+
+// Fase 2 — peças de produção reexportadas para conveniência
+export { verifyReport } from '../verification';
+export type { VerificationReport, VerificationIssue, VerificationContext } from '../verification';
+export { routeMotor } from '../router';
+export type { RouterInput, RouterDecision } from '../router';
+export { getMotorProfile, LITE_PROFILE, PRO_PROFILE } from '../motorProfiles';
+export type { Motor } from '../motorProfiles';
