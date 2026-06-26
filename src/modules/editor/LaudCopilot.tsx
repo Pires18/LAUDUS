@@ -10,6 +10,7 @@ import { updateItem, saveVersionSnapshot, getRecentFinalizedReports } from '../.
 import { logger } from '../../utils/logger';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
+import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -1175,6 +1176,16 @@ export function LaudCopilot({
                                 <CheckCircle2 size={11} className="text-emerald-500 ml-auto" />
                               )}
                             </div>
+
+                            {/* Avaliação da proposta (auditoria + anti-alucinação) */}
+                            <ReportQualityPanel
+                              html={proposal}
+                              area={exam.area || template?.area}
+                              anamnesis={exam.anamnesis}
+                              clinicalIndication={exam.clinicalIndication}
+                              compact
+                            />
+
                             <button
                               disabled={isGenerating}
                               onClick={async () => {

@@ -10,6 +10,7 @@ import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
 import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText, Star } from 'lucide-react';
 import { addToExcellenceCorpus } from '../ai/training/excellenceCorpus';
+import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { logger } from '../../utils/logger';
@@ -739,6 +740,23 @@ export function ExamEditor({ examId }: Props) {
                     : (settings.geminiModel || 'gemini-3.5-flash')
                 }
               />
+
+              {/* ── Avaliação de Qualidade (auditoria + anti-alucinação) ── */}
+              {!isGenerating && currentRole !== 'recepcao' && (() => {
+                const initialContent = template ? getInitialReportContent(template) : '';
+                const cleanCurrent = reportContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
+                const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
+                const isMask = cleanCurrent === '' || cleanCurrent === cleanInitial;
+                if (isMask) return null;
+                return (
+                  <ReportQualityPanel
+                    html={reportContent}
+                    area={exam.area || template?.area}
+                    anamnesis={(exam as any).anamnesis}
+                    clinicalIndication={exam.clinicalIndication}
+                  />
+                );
+              })()}
 
               {/* ── LAUD.IA Cascade Status Hint ── */}
               {isAdmin && template && !template.aiInstructions?.trim() && currentRole !== 'recepcao' && (
