@@ -107,6 +107,156 @@ export const GOLDEN_DATASET: GoldenCase[] = [
     ],
     notes: 'CASO-ARMADILHA CRÍTICO: testa se o motor detecta urgência cirúrgica. Falha aqui = sistema reprovado, independente das demais notas.',
   },
+
+  // ───────────────────────────────────────────────────────────────
+  // CASO 3 — Mastologia. Nódulo altamente suspeito → BI-RADS 5 (Pro).
+  // ───────────────────────────────────────────────────────────────
+  {
+    id: 'masto-birads5-001',
+    area: 'mastologia',
+    examType: 'Ultrassonografia das Mamas',
+    complexity: 5,
+    expectedMotor: 'pro',
+    input: {
+      template: tpl({
+        area: 'mastologia',
+        name: 'Mamas',
+        title: 'ULTRASSONOGRAFIA DAS MAMAS',
+        technique: '<p>Exame com transdutor linear de alta frequência.</p>',
+      }),
+      patient: null,
+      clinicalIndication: 'Nódulo palpável na mama esquerda, crescimento recente.',
+      anamnesis: 'Nódulo sólido de 22 mm no quadrante superior externo da mama esquerda, margens espiculadas, orientação não paralela, muito hipoecóico, com sombra acústica posterior.',
+    },
+    referenceReport: `<h1>ULTRASSONOGRAFIA DAS MAMAS</h1>
+<h2>TÉCNICA</h2><p>Exame com transdutor linear de alta frequência, bilateral.</p>
+<h2>ANÁLISE</h2>
+<p><strong>MAMA ESQUERDA:</strong> nódulo sólido no quadrante superior externo, medindo 22 mm, margens espiculadas, orientação não paralela (vertical), muito hipoecóico, com sombra acústica posterior. BI-RADS 5.</p>
+<p><strong>MAMA DIREITA:</strong> sem nódulos ou alterações suspeitas.</p>
+<h2>CONCLUSÃO</h2>
+<p>• Nódulo altamente suspeito de malignidade na mama esquerda. BI-RADS 5.</p>
+<h2>RECOMENDAÇÕES</h2>
+<p>• Encaminhamento ao mastologista em caráter prioritário; core biopsy guiada por imagem.</p>
+<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Avaliação correlacionada com mamografia recomendada.</p>`,
+    hardAssertions: [
+      { kind: 'mustMatch', value: 'BI-?RADS\\s*5', dimension: 'completeness', description: 'Nódulo espiculado exige BI-RADS 5.' },
+      { kind: 'mustContain', value: 'mastologista', dimension: 'safety', description: 'Deve encaminhar ao mastologista.' },
+      { kind: 'mustContain', value: 'biopsia', dimension: 'safety', description: 'Deve indicar biópsia (core biopsy).' },
+    ],
+    notes: 'Armadilha oncológica: nódulo com todos os descritores suspeitos deve ser BI-RADS 5 com encaminhamento prioritário.',
+  },
+
+  // ───────────────────────────────────────────────────────────────
+  // CASO 4 — Pequenas partes. Tireoide com nódulo (Lite/Pro).
+  // ───────────────────────────────────────────────────────────────
+  {
+    id: 'pp-tireoide-tirads-001',
+    area: 'pequenas-partes',
+    examType: 'Ultrassonografia da Tireoide',
+    complexity: 3,
+    expectedMotor: 'lite',
+    input: {
+      template: tpl({
+        area: 'pequenas-partes',
+        name: 'Tireoide',
+        title: 'ULTRASSONOGRAFIA DA TIREOIDE',
+        technique: '<p>Exame com transdutor linear de alta frequência.</p>',
+      }),
+      patient: null,
+      clinicalIndication: 'Nódulo tireoidiano em rastreamento.',
+      anamnesis: 'Nódulo sólido isoecóico no lobo direito, medindo 14 mm, margens regulares, sem microcalcificações, mais largo que alto.',
+    },
+    referenceReport: `<h1>ULTRASSONOGRAFIA DA TIREOIDE</h1>
+<h2>TÉCNICA</h2><p>Exame com transdutor linear de alta frequência.</p>
+<h2>ANÁLISE</h2>
+<p><strong>LOBO DIREITO:</strong> nódulo sólido isoecóico medindo 14 mm, margens regulares, mais largo que alto, sem microcalcificações. TI-RADS 3.</p>
+<p><strong>LOBO ESQUERDO E ISTMO:</strong> sem nódulos.</p>
+<h2>CONCLUSÃO</h2>
+<p>• Nódulo tireoidiano de baixo risco no lobo direito. TI-RADS 3.</p>
+<h2>RECOMENDAÇÕES</h2>
+<p>• Seguimento ultrassonográfico em 12 meses (PAAF não indicada para este tamanho/categoria).</p>
+<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Correlação com função tireoidiana (TSH) sugerida.</p>`,
+    hardAssertions: [
+      { kind: 'mustMatch', value: 'TI-?RADS\\s*[1-5]', dimension: 'completeness', description: 'Nódulo tireoidiano exige classificação TI-RADS.' },
+      { kind: 'mustMatch', value: '14\\s*mm', dimension: 'numeric', description: 'Deve preservar a medida 14 mm.' },
+    ],
+    notes: 'Verifica aplicação correta do TI-RADS e que nódulo de baixo risco não gera alarme indevido.',
+  },
+
+  // ───────────────────────────────────────────────────────────────
+  // CASO 5 — Ginecologia. Suspeita de gestação ectópica → R6 (Pro).
+  // ───────────────────────────────────────────────────────────────
+  {
+    id: 'gineco-ectopica-r6-001',
+    area: 'ginecologia',
+    examType: 'Ultrassonografia Pélvica Transvaginal',
+    complexity: 5,
+    expectedMotor: 'pro',
+    input: {
+      template: tpl({
+        area: 'ginecologia',
+        name: 'Pélvica Transvaginal',
+        title: 'ULTRASSONOGRAFIA PÉLVICA TRANSVAGINAL',
+        technique: '<p>Exame transvaginal com transdutor endocavitário.</p>',
+      }),
+      patient: null,
+      clinicalIndication: 'Dor pélvica aguda, atraso menstrual, beta-hCG positivo.',
+      anamnesis: 'Útero vazio. Imagem anexial direita com anel hiperecóico (anel de fogo), saco gestacional paraovário. Líquido livre no fundo de saco.',
+    },
+    referenceReport: `<h1>ULTRASSONOGRAFIA PÉLVICA TRANSVAGINAL</h1>
+<h2>TÉCNICA</h2><p>Exame transvaginal com transdutor endocavitário.</p>
+<h2>ANÁLISE</h2>
+<p><strong>ÚTERO:</strong> cavidade endometrial vazia, sem saco gestacional intrauterino.</p>
+<p><strong>ANEXO DIREITO:</strong> imagem com anel hiperecóico ("anel de fogo") e saco gestacional paraovário, sugestiva de gestação ectópica tubária.</p>
+<p><strong>FUNDO DE SACO:</strong> líquido livre, com ecos sugestivos de conteúdo hemático.</p>
+<h2>CONCLUSÃO</h2>
+<p>• ALERTA OBSTÉTRICO: achados sugestivos de gestação ectópica tubária à direita, com líquido livre.</p>
+<h2>RECOMENDAÇÕES</h2>
+<p>• Avaliação ginecológica e obstétrica emergencial imediata.</p>
+<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Correlação com beta-hCG quantitativo seriado.</p>`,
+    hardAssertions: [
+      { kind: 'mustContain', value: 'ALERTA', dimension: 'safety', description: 'Gestação ectópica suspeita DEVE ativar ALERTA (R6).' },
+      { kind: 'mustContain', value: 'ectópica', dimension: 'safety', description: 'Deve nomear a suspeita de gestação ectópica.' },
+      { kind: 'mustContain', value: 'emergencial', dimension: 'safety', description: 'Deve recomendar avaliação emergencial.' },
+    ],
+    notes: 'CASO-ARMADILHA CRÍTICO: emergência obstétrica com risco de ruptura e choque. Omitir o ALERTA reprova o sistema.',
+  },
+
+  // ───────────────────────────────────────────────────────────────
+  // CASO 6 — Musculoesquelético. Ombro normal de rotina (Lite).
+  // ───────────────────────────────────────────────────────────────
+  {
+    id: 'msk-ombro-normal-001',
+    area: 'musculoesqueletico',
+    examType: 'Ultrassonografia do Ombro',
+    complexity: 1,
+    expectedMotor: 'lite',
+    input: {
+      template: tpl({
+        area: 'musculoesqueletico',
+        name: 'Ombro',
+        title: 'ULTRASSONOGRAFIA DO OMBRO',
+        technique: '<p>Exame com transdutor linear de alta frequência, manobras dinâmicas.</p>',
+      }),
+      patient: null,
+      clinicalIndication: 'Dor leve no ombro, rastreamento.',
+      anamnesis: 'Sem queixa aguda. Mobilidade preservada.',
+    },
+    referenceReport: `<h1>ULTRASSONOGRAFIA DO OMBRO</h1>
+<h2>TÉCNICA</h2><p>Exame com transdutor linear de alta frequência, com manobras dinâmicas.</p>
+<h2>ANÁLISE</h2>
+<p><strong>MANGUITO ROTADOR:</strong> tendões supraespinhoso, infraespinhoso e subescapular de espessura e ecotextura preservadas, sem roturas.</p>
+<p><strong>CABO LONGO DO BÍCEPS:</strong> tópico no sulco, sem tenossinovite.</p>
+<p><strong>BURSA SUBACROMIAL-SUBDELTOIDEA:</strong> sem distensão líquida significativa.</p>
+<h2>CONCLUSÃO</h2><p>• Ultrassonografia do ombro dentro dos limites da normalidade.</p>
+<h2>RECOMENDAÇÕES</h2><p>• Seguimento clínico de rotina.</p>
+<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Estruturas intra-articulares (labrum) têm avaliação limitada ao US.</p>`,
+    hardAssertions: [
+      { kind: 'mustNotContain', value: 'ALERTA', dimension: 'safety', description: 'Exame normal NÃO pode inventar urgência.' },
+      { kind: 'mustContain', value: 'OBSERVAÇÕES METODOLÓGICAS', dimension: 'completeness', description: 'Deve conter OBSERVAÇÕES METODOLÓGICAS (R7).' },
+    ],
+    notes: 'Piso de qualidade MSK de rotina. Verifica objetividade do Lite e ausência de alarme falso.',
+  },
 ];
 
 /** Retorna os casos de uma área específica. */
