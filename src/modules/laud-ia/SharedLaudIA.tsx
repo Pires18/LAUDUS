@@ -1834,81 +1834,14 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
             TAB: TRAINING
         ══════════════════════════════════ */}
         {activeTab === 'training' && (
-          <div className="space-y-5 animate-fade-in">
-            {/* ── Controle: ativar aprendizado + mimetismo ── */}
-            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <GraduationCap size={22} />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-black text-ink-900">Aprendizado Contínuo</h4>
-                    <p className="text-xs text-ink-500">A IA aprende com seus laudos, correções e exemplos marcados.</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={classNames('text-[10px] font-black uppercase tracking-widest', localSettings.aiTrainingEnabled ? 'text-emerald-600' : 'text-ink-400')}>
-                    {localSettings.aiTrainingEnabled ? 'Ativo' : 'Inativo'}
-                  </span>
-                  <button
-                    onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
-                    className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
-                      localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
-                    )}
-                  >
-                    <span className={classNames('pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
-                      localSettings.aiTrainingEnabled ? 'translate-x-5' : 'translate-x-0'
-                    )} />
-                  </button>
-                </div>
-              </div>
-
-              <div className={classNames('mt-5 pt-5 border-t border-ink-100 grid lg:grid-cols-2 gap-5 transition-opacity duration-300', !localSettings.aiTrainingEnabled && 'opacity-40 pointer-events-none')}>
-                {/* Mimetismo (contexto de laudos anteriores) */}
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-ink-700 flex items-center gap-2">
-                    Exames Contextuais (mimetismo)
-                    <span className="text-indigo-600 font-black">{localSettings.aiTrainingContextSize || 3}</span>
-                  </label>
-                  <input
-                    type="range" min="1" max="10"
-                    value={localSettings.aiTrainingContextSize || 3}
-                    onChange={(e) => setLocalSettings({ ...localSettings, aiTrainingContextSize: parseInt(e.target.value) })}
-                    className="w-full h-2 bg-ink-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                  />
-                  <div className="flex justify-between text-[9px] text-ink-400 font-bold uppercase tracking-widest">
-                    <span>1 — Rápido</span>
-                    <span className="text-indigo-600">3-5 Ideal</span>
-                    <span>10 — Lento</span>
-                  </div>
-                  <p className="text-[10px] text-ink-500 leading-relaxed pt-1">
-                    Quantos laudos finalizados da mesma especialidade são enviados como contexto, junto aos exemplos do Corpus de Excelência.
-                  </p>
-                </div>
-
-                {/* Pilares do aprendizado */}
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Corpus de Excelência', desc: 'Laudos marcados como exemplares (RAG)' },
-                    { label: 'Loop de Correções', desc: 'Aprende com o que você edita ao finalizar' },
-                    { label: 'Roteador de Motor', desc: 'Red flag clínico força o Pro' },
-                    { label: 'Verificação', desc: 'Rede anti-alucinação determinística' },
-                  ].map(item => (
-                    <div key={item.label} className="p-3 bg-ink-50 border border-ink-100 rounded-xl">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                        <span className="text-[10px] font-black text-ink-800">{item.label}</span>
-                      </div>
-                      <p className="text-[10px] text-ink-500 leading-relaxed">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ── Dashboard de métricas + Harness ── */}
-            <TrainingDashboard readOnly={readOnly} />
+          <div className="animate-fade-in">
+            <TrainingDashboard
+              readOnly={readOnly}
+              trainingEnabled={!!localSettings.aiTrainingEnabled}
+              onToggleTraining={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
+              contextSize={localSettings.aiTrainingContextSize || 3}
+              onContextSizeChange={(n) => setLocalSettings({ ...localSettings, aiTrainingContextSize: n })}
+            />
           </div>
         )}
 
