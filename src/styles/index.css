@@ -36,38 +36,66 @@
 }
 
 /* ════════════════════════════════════════════
-   MODO ESCURO — rampa "ink" invertida + superfícies
-   (ink-50 = mais escuro · ink-900 = quase branco)
+   MODO ESCURO
+   A escala "ink" tem uso DUPLO: como cor de TEXTO (ink-700..900 = claro) e
+   como SUPERFÍCIE de acento escuro (bg-ink-700..900 + text-white). Por isso a
+   rampa é invertida para texto/bordas/superfícies sutis, e os fundos de acento
+   (bg-ink-700/800/900) são tratados à parte para permanecerem escuros.
    ════════════════════════════════════════════ */
 html.dark {
-  --ink-50:  24 26 31;
-  --ink-100: 31 34 41;
-  --ink-200: 44 48 58;
-  --ink-300: 62 68 82;
-  --ink-400: 120 130 150;
-  --ink-500: 150 160 178;
-  --ink-600: 180 188 202;
-  --ink-700: 205 211 221;
-  --ink-800: 226 230 237;
-  --ink-900: 240 242 246;
+  /* Rampa de texto/superfícies sutis (50 = mais escuro · 900 = quase branco) */
+  --ink-50:  20 23 28;
+  --ink-100: 28 32 39;
+  --ink-200: 43 49 60;
+  --ink-300: 60 67 81;
+  --ink-400: 126 137 156;
+  --ink-500: 155 165 183;
+  --ink-600: 186 194 208;
+  --ink-700: 210 216 226;
+  --ink-800: 228 232 240;
+  --ink-900: 244 247 251;
 
-  /* Cartões um pouco acima do fundo da página */
-  --surface: 26 28 34;
+  /* Cartões/painéis — claramente elevados sobre o fundo da página */
+  --surface: 30 34 42;
+
+  /* Fundos de acento escuro (botões/abas "primários" que usam text-white) */
+  --accent-700: 55 62 76;
+  --accent-800: 45 51 63;
+  --accent-900: 36 41 51;
 
   color-scheme: dark;
 }
 
 html.dark body,
 html.dark #root {
-  background-color: #0d0e11;
+  background-color: #0b0d11;
   color: rgb(var(--ink-900));
 }
 
-/* Remapeia os usos literais de branco/preto para o tema escuro, sem tocar nos
-   componentes individualmente. `text-white` (em botões coloridos) é preservado. */
+/* Superfícies "brancas" → superfície de cartão escura.
+   `text-white` (em botões coloridos) é preservado. */
 html.dark .bg-white { background-color: rgb(var(--surface)) !important; }
 html.dark .text-black { color: rgb(var(--ink-900)) !important; }
 html.dark .border-white { border-color: rgb(var(--ink-200)) !important; }
+
+/* Fundos de acento escuro — mantêm contraste com text-white (não invertem). */
+html.dark .bg-ink-900 { background-color: rgb(var(--accent-900)) !important; }
+html.dark .bg-ink-800 { background-color: rgb(var(--accent-800)) !important; }
+html.dark .bg-ink-700 { background-color: rgb(var(--accent-700)) !important; }
+html.dark .hover\:bg-ink-900:hover { background-color: rgb(var(--accent-800)) !important; }
+html.dark .hover\:bg-ink-800:hover { background-color: rgb(var(--accent-700)) !important; }
+html.dark .border-ink-900 { border-color: rgb(var(--accent-800)) !important; }
+html.dark .border-ink-800 { border-color: rgb(var(--accent-700)) !important; }
+
+/* Gradientes de acento escuro (caixas de ícone/cabeçalhos com ícone branco). */
+html.dark .from-ink-700 {
+  --tw-gradient-from: rgb(var(--accent-700)) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(var(--accent-700) / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html.dark .to-ink-900 {
+  --tw-gradient-to: rgb(var(--accent-900)) var(--tw-gradient-to-position);
+}
 
 html, body, #root {
   /* 100dvh: dynamic viewport height — handles Safari mobile URL bar correctly */
