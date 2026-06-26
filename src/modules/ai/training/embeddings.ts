@@ -14,6 +14,37 @@ import { logger } from '../../../utils/logger';
 
 export const EMBEDDING_MODEL = 'text-embedding-004';
 
+/**
+ * Sonda de diagnóstico: faz UMA chamada de embedding e devolve o status
+ * HTTP real e um trecho do corpo da resposta. Serve para descobrir por
+ * que a vetorização falha (404 modelo/endpoint, 403 chave, proxy antigo
+ * roteando para generateContent, etc.).
+ */
+export async function probeEmbedding(
+  settings: AppSettings
+): Promise<{ ok: boolean; status: number; detail: string }> {
+  try {
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-uid': auth.currentUser?.uid || 'anonymous',
+        'x-gemini-model': EMBEDDING_MODEL,
+        'x-gemini-task': 'embed',
+        'x-api-key': settings.geminiApiKey || '',
+      },
+      body: JSON.stringify({
+        model: `models/${EMBEDDING_MODEL}`,
+        content: { parts: [{ text: 'teste de diagnóstico' }] },
+      }),
+    });
+    const detail = (await response.text()).slice(0, 400);
+    return { ok: response.ok, status: response.status, detail };
+  } catch (e: any) {
+    return { ok: false, status: 0, detail: e?.message || String(e) };
+  }
+}
+
 /** Similaridade de cosseno entre dois vetores. Retorna [-1, 1]. */
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (!a || !b || a.length === 0 || a.length !== b.length) return 0;

@@ -2,7 +2,7 @@ import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 import { firestore, auth } from '../../../lib/firebase';
 import { AppSettings } from '../../../types';
 import { logger } from '../../../utils/logger';
-import { embedText, embedTextBatch } from './embeddings';
+import { embedText, embedTextBatch, probeEmbedding } from './embeddings';
 import { ExcellenceEntry } from './excellenceCorpus';
 
 // ═══════════════════════════════════════════════════════════════
@@ -89,8 +89,15 @@ export async function vectorizeCorpus(
     //     API de embeddings está indisponível — não adianta esperar 500+.
     const stillAllEmpty = vectors.every((v) => !v || v.length === 0);
     if (chunkIndex === 0 && stillAllEmpty) {
+      // Sonda para revelar o motivo HTTP real do problema.
+      const probe = await probeEmbedding(settings);
+      const hint = probe.detail.includes('generateContent') || probe.detail.includes('not found')
+        ? ' (provável: proxy /api/gemini desatualizado — falta o suporte a embeddings; publique o deploy mais recente).'
+        : probe.status === 403 || probe.detail.toLowerCase().includes('permission') || probe.detail.toLowerCase().includes('api key')
+          ? ' (provável: chave Gemini sem acesso ao modelo de embeddings).'
+          : '';
       throw new Error(
-        'API de embeddings indisponível (/api/gemini). Verifique se o deploy mais recente está publicado e se a função serverless está ativa (não funciona em "vite dev" local — use o preview/produção da Vercel).'
+        `Vetorização indisponível — embeddings retornaram HTTP ${probe.status}.${hint} Detalhe: ${probe.detail.slice(0, 200) || 'sem corpo'}`
       );
     }
 
