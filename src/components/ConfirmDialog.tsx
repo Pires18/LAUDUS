@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -37,10 +38,12 @@ export function ConfirmDialog({
 
   const IconComponent = variant === 'info' ? Info : AlertTriangle;
 
-  return (
+  // Renderiza via portal no <body> e com z-index acima de qualquer Modal
+  // (z-[150]) — assim a confirmação nunca fica "atrás" do formulário aberto.
+  return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -81,7 +84,8 @@ export function ConfirmDialog({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 

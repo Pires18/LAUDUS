@@ -204,7 +204,9 @@ function appointmentReducer(state: AppointmentFormState, action: AppointmentActi
         newPatientInsurance: '',
         selectedPatient: null,
         selectedTemplate: null,
-        appointmentDate: getLocalDateStr(new Date()),
+        // Pré-seleciona o dia que o usuário está visualizando no calendário,
+        // para que o agendamento caia no dia escolhido (e não em "hoje").
+        appointmentDate: state.dateFilter || getLocalDateStr(new Date()),
         appointmentTime: '',
         appointmentNotes: '',
         appointmentPriority: 'normal',

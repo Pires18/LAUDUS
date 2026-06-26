@@ -100,17 +100,19 @@ export function CreateAppointmentModal({
     }
   }, [clinics, selectedClinic, setSelectedClinic]);
 
-  // Find next available date on clinic change or open
+  // Ao trocar de clínica/abrir: respeita o dia já selecionado pelo usuário se
+  // ele for um dia de atendimento; caso contrário, sugere o próximo disponível
+  // A PARTIR do dia selecionado (não de "hoje").
   useEffect(() => {
     if (selectedClinic && appointments) {
       if (lastClinicIdRef.current !== selectedClinic.id) {
-        const todayStr = getLocalDateStr(new Date());
-        const nextDate = findNextAvailableDate(selectedClinic, todayStr, appointments);
-        setAppointmentDate(nextDate);
         lastClinicIdRef.current = selectedClinic.id;
+        const baseStr = appointmentDate || getLocalDateStr(new Date());
+        const nextDate = findNextAvailableDate(selectedClinic, baseStr, appointments);
+        setAppointmentDate(nextDate);
       }
     }
-  }, [selectedClinic, appointments, setAppointmentDate]);
+  }, [selectedClinic, appointments, appointmentDate, setAppointmentDate]);
 
   // Patients filtering with improved phone/CPF match
   const filteredPatients = useMemo(() => {

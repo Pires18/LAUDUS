@@ -31,15 +31,14 @@ function geminiProxyFetch(
 function resolveGeminiModel(rawModel?: string): string {
   const raw = (rawModel || '').toLowerCase();
 
-  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
-  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
-  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
-  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
+  if (raw.includes('1.5') && raw.includes('pro'))   return 'gemini-1.5-pro';
+  if (raw.includes('pro'))                           return 'gemini-2.5-pro';
+  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.0-flash';
+  if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
+  if (raw.includes('flash'))                         return 'gemini-2.5-flash';
+  if (/^gemini-(1\.5|2\.0|2\.5)-/.test(raw))         return rawModel as string;
 
-  return 'gemini-3.5-flash';
+  return 'gemini-2.5-flash';
 }
 import {
   DEFAULT_CUSTOM_FORM_PROMPT,
