@@ -28,6 +28,11 @@ export * from './excellenceCorpus';
 export * from './retrieval';
 export * from './feedback';
 
+// Fase 4 — Evolução contínua: versionamento, experimentação, métricas
+export * from './promptRegistry';
+export * from './experiment';
+export * from './qualityMetrics';
+
 // Fase 2 — peças de produção reexportadas para conveniência
 export { verifyReport } from '../verification';
 export type { VerificationReport, VerificationIssue, VerificationContext } from '../verification';
