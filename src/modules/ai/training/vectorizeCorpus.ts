@@ -38,6 +38,9 @@ function corpusRef() {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Documentos por commit no Firestore (vetores são grandes — manter baixo). */
+const FIRESTORE_COMMIT_SIZE = 10;
+
 /**
  * Vetoriza todas as entradas do corpus sem embedding. Idempotente:
  * processa apenas o que falta. Seguro contra rate limit.
@@ -46,7 +49,7 @@ export async function vectorizeCorpus(
   settings: AppSettings,
   options: VectorizeOptions = {}
 ): Promise<VectorizeResult> {
-  const batchSize = options.batchSize ?? 64;
+  const batchSize = options.batchSize ?? 32;
   const throttleMs = options.throttleMs ?? 3500;
 
   // 1. Carrega entradas sem embedding.
@@ -90,20 +93,29 @@ export async function vectorizeCorpus(
       }
     }
 
-    // 3. Grava os embeddings preenchidos.
-    const batch = writeBatch(firestore);
-    let writes = 0;
+    // 3. Coleta os embeddings válidos do lote.
+    const toWrite: Array<{ id: string; vec: number[] }> = [];
     chunk.forEach((entry, j) => {
       const vec = vectors[j];
-      if (vec && vec.length > 0) {
-        batch.set(doc(corpusRef(), entry.id), { embedding: vec }, { merge: true });
-        writes++;
-        result.vectorized++;
-      } else {
-        result.failed++;
-      }
+      if (vec && vec.length > 0) toWrite.push({ id: entry.id, vec });
+      else result.failed++;
     });
-    if (writes > 0) await batch.commit();
+
+    // 4. Grava no Firestore em SUB-LOTES pequenos. Cada embedding tem
+    //    centenas/milhares de floats; um lote grande estoura o limite de
+    //    tamanho de transação do Firestore ("Transaction too big").
+    for (let k = 0; k < toWrite.length; k += FIRESTORE_COMMIT_SIZE) {
+      const sub = toWrite.slice(k, k + FIRESTORE_COMMIT_SIZE);
+      const batch = writeBatch(firestore);
+      sub.forEach((w) => batch.set(doc(corpusRef(), w.id), { embedding: w.vec }, { merge: true }));
+      try {
+        await batch.commit();
+        result.vectorized += sub.length;
+      } catch (err) {
+        logger.warn('[Vectorize] Falha ao gravar sub-lote no Firestore:', err);
+        result.failed += sub.length;
+      }
+    }
 
     options.onProgress?.(Math.min(i + chunk.length, pending.length), pending.length);
 
