@@ -4,7 +4,7 @@ import { useCollection } from '../../hooks/useFirestore';
 import {
   ShieldCheck, Users, History,
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
-  Megaphone, Trash2, Loader2, DollarSign, CreditCard
+  Megaphone, Trash2, Loader2, DollarSign, CreditCard, GraduationCap
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { setBroadcast } from '../../store/db';
@@ -16,9 +16,10 @@ import { AdminAudit } from './submodules/AdminAudit';
 import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
 import { AdminFinanceiro } from './submodules/AdminFinanceiro';
+import { AdminTraining } from './submodules/AdminTraining';
 import { SharedLaudIA } from '../laud-ia/SharedLaudIA';
 
-type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia';
+type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia' | 'training';
 
 export function Admin() {
   const { view } = useApp();
@@ -27,6 +28,7 @@ export function Admin() {
   const tabs = [
     { id: 'overview',    label: 'Geral',              icon: LayoutDashboard },
     { id: 'laud-ia',    label: 'LAUD.IA',            icon: Sparkles        },
+    { id: 'training',   label: 'Training',            icon: GraduationCap   },
     { id: 'users',      label: 'Usuários & Planos',  icon: Users           },
     { id: 'financeiro', label: 'Financeiro',          icon: DollarSign      },
     { id: 'audit',      label: 'Auditoria',           icon: History         },
@@ -78,6 +80,7 @@ export function Admin() {
         <div className="animate-fade-in-up">
           {activeTab === 'overview'    && <AdminOverview onNavigate={setActiveTab} />}
           {activeTab === 'laud-ia'    && <SharedLaudIA />}
+          {activeTab === 'training'   && <AdminTraining />}
           {activeTab === 'users'      && <AdminUsersSubscriptions />}
           {activeTab === 'financeiro' && <AdminFinanceiro />}
           {activeTab === 'audit'      && <AdminAudit />}
