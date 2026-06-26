@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { anonymizeReport, detectResidualPII } from '../modules/ai/training/anonymize';
 import { GOLDEN_DATASET, goldenCasesByArea } from '../modules/ai/training/goldenDataset';
-import { DIMENSION_WEIGHTS } from '../modules/ai/training/types';
+import { DIMENSION_WEIGHTS, HardAssertion } from '../modules/ai/training/types';
+import { checkAssertions } from '../modules/ai/training/harness';
 import { Patient } from '../types';
 
 // ═══════════════════════════════════════════════════════════════
@@ -91,6 +92,32 @@ describe('DIMENSION_WEIGHTS', () => {
 
   it('prioriza fidelidade e segurança (juntas ≥ 50%)', () => {
     expect(DIMENSION_WEIGHTS.fidelity + DIMENSION_WEIGHTS.safety).toBeGreaterThanOrEqual(0.5);
+  });
+});
+
+describe('checkAssertions', () => {
+  const a = (kind: HardAssertion['kind'], value: string): HardAssertion => ({
+    kind, value, dimension: 'safety', description: 't',
+  });
+
+  it('casa "biopsia" mesmo quando o laudo escreve "biópsia" (sem acento)', () => {
+    const report = '<p>Recomenda-se biópsia guiada por imagem.</p>';
+    expect(checkAssertions(report, [a('mustContain', 'biopsia')])).toHaveLength(0);
+  });
+
+  it('ignora tags HTML no casamento', () => {
+    const report = '<p>BI-RADS <strong>5</strong></p>';
+    expect(checkAssertions(report, [a('mustMatch', 'bi-?rads\\s*5')])).toHaveLength(0);
+  });
+
+  it('mustNotContain falha quando o termo (com acento) está presente', () => {
+    const report = '<p>ALERTA VASCULAR.</p>';
+    expect(checkAssertions(report, [a('mustNotContain', 'alerta')])).toHaveLength(1);
+  });
+
+  it('reporta asserção mustContain não satisfeita', () => {
+    const report = '<p>Exame normal.</p>';
+    expect(checkAssertions(report, [a('mustContain', 'aneurisma')])).toHaveLength(1);
   });
 });
 

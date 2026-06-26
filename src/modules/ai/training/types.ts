@@ -124,6 +124,8 @@ export interface HarnessOptions {
   area?: ExamArea;
   /** Identificador da versão de prompt sendo testada (auditoria). */
   promptVersion?: string;
+  /** Intervalo entre casos (ms) para respeitar o rate limit. Default 2500. */
+  throttleMs?: number;
   /** Callback de progresso (caso N de M). */
   onProgress?: (done: number, total: number, current: EvalResult) => void;
 }

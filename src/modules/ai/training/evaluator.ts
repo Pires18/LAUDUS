@@ -55,6 +55,8 @@ function resolveJudgeModel(settings: AppSettings): string {
   return resolveGeminiModel(proHint);
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function judgeFetch(
   model: string,
   systemContext: string,
@@ -62,34 +64,52 @@ async function judgeFetch(
   apiKey?: string,
   signal?: AbortSignal
 ): Promise<string> {
-  const response = await fetch('/api/gemini', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-uid': auth.currentUser?.uid || 'anonymous',
-      'x-gemini-model': model,
-      'x-gemini-stream': 'false',
-      'x-api-key': apiKey || '',
-    },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemContext }] },
-      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-      generationConfig: {
-        temperature: 0.0, // determinismo máximo para o juiz
-        topP: 0.9,
-        maxOutputTokens: 2048,
-        responseMimeType: 'application/json',
-      },
-    }),
-    signal,
-  });
+  // Retry com backoff: o juiz usa o motor Pro e pode receber 429 (rate
+  // limit) ou 503 transitórios. Falhar sem retry zeraria o caso à toa.
+  const maxAttempts = 3;
+  let lastErr: any;
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Juiz LLM falhou (${response.status}): ${errText}`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-uid': auth.currentUser?.uid || 'anonymous',
+          'x-gemini-model': model,
+          'x-gemini-stream': 'false',
+          'x-api-key': apiKey || '',
+        },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemContext }] },
+          contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+          generationConfig: {
+            temperature: 0.0, // determinismo máximo para o juiz
+            topP: 0.9,
+            maxOutputTokens: 2048,
+            responseMimeType: 'application/json',
+          },
+        }),
+        signal,
+      });
+
+      if (response.status === 429 || response.status === 503) {
+        lastErr = new Error(`Juiz LLM ${response.status} (tentativa ${attempt})`);
+        if (attempt < maxAttempts) { await sleep(attempt * 4000); continue; }
+        throw lastErr;
+      }
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Juiz LLM falhou (${response.status}): ${errText}`);
+      }
+      const result = await response.json();
+      return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts) { await sleep(attempt * 4000); continue; }
+    }
   }
-  const result = await response.json();
-  return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  throw lastErr;
 }
 
 interface RawJudgeScore {

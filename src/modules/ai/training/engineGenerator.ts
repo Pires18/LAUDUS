@@ -22,9 +22,13 @@ import { GenerateFn, GenerationOutput } from './harness';
 export function createEngineGenerator(baseSettings: AppSettings): GenerateFn {
   return async (goldenCase: GoldenCase, signal?: AbortSignal): Promise<GenerationOutput> => {
     // Força o motor esperado pelo caso, preservando o resto das configs.
+    // Desativa a augmentação por retrieval durante a avaliação: o harness
+    // mede o PROMPT BASE (sem reforço do corpus), o que dá uma linha de
+    // base limpa e elimina 1 chamada de API por caso (menos rate-limit).
     const settings: AppSettings = {
       ...baseSettings,
       selectedMotor: goldenCase.expectedMotor,
+      aiTrainingEnabled: false,
     };
 
     const params: GenerateReportParams = {

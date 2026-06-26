@@ -43,20 +43,31 @@ export type GenerateFn = (goldenCase: GoldenCase, signal?: AbortSignal) => Promi
 
 const ALL_DIMENSIONS: EvalDimension[] = ['fidelity', 'completeness', 'safety', 'numeric', 'style'];
 
+/** Normaliza texto para casamento robusto: remove acentos, tags e baixa caixa. */
+function normalizeForMatch(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, ' ')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
 /** Avalia as asserções determinísticas contra o laudo gerado. */
-function checkAssertions(report: string, assertions: HardAssertion[] = []): HardAssertion[] {
+export function checkAssertions(report: string, assertions: HardAssertion[] = []): HardAssertion[] {
   const failed: HardAssertion[] = [];
-  const haystack = report.toLowerCase();
+  // Casamento insensível a acentos e a tags HTML (ex.: "biópsia" casa "biopsia").
+  const haystack = normalizeForMatch(report);
 
   for (const a of assertions) {
     let ok = true;
     if (a.kind === 'mustContain') {
-      ok = haystack.includes(a.value.toLowerCase());
+      ok = haystack.includes(normalizeForMatch(a.value));
     } else if (a.kind === 'mustNotContain') {
-      ok = !haystack.includes(a.value.toLowerCase());
+      ok = !haystack.includes(normalizeForMatch(a.value));
     } else if (a.kind === 'mustMatch') {
       try {
-        ok = new RegExp(a.value, 'i').test(report);
+        // Regex testada contra o texto normalizado (sem acento/tags).
+        ok = new RegExp(a.value, 'i').test(normalizeForMatch(report));
       } catch {
         ok = false;
       }
@@ -154,10 +165,16 @@ export async function runHarness(
   const selected = selectCases(cases, options);
   const results: EvalResult[] = [];
 
+  // Espaçamento entre casos para respeitar o rate limit do proxy (20 req/min).
+  // Cada caso faz ~2 chamadas (geração + juiz); um intervalo evita rajadas.
+  const throttleMs = options.throttleMs ?? 2500;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
   for (let i = 0; i < selected.length; i++) {
     const result = await evaluateCase(selected[i], generate, settings);
     results.push(result);
     options.onProgress?.(i + 1, selected.length, result);
+    if (i < selected.length - 1) await sleep(throttleMs);
   }
 
   // Agregações
