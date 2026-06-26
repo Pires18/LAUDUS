@@ -50,7 +50,9 @@ export function Worklist() {
       ...(selectedClinicId ? [where('clinicId', '==', selectedClinicId)] : []),
       orderBy('createdAt', 'desc')
     ],
-    initialLimit: PAGE_SIZE
+    initialLimit: PAGE_SIZE,
+    // Garante re-subscrição ao trocar de clínica (toString de constraints é inútil).
+    queryKey: `clinic:${selectedClinicId ?? 'all'}`
   });
 
   const { data: patients } = useCollection<Patient>('patients');

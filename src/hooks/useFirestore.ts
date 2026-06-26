@@ -27,6 +27,14 @@ interface UseCollectionOptions {
   constraints?: QueryConstraint[];
   enabled?: boolean;
   isGlobal?: boolean;
+  /**
+   * Discriminador estável da query. Necessário porque QueryConstraint.toString()
+   * retorna sempre "[object Object]" — sem isto, trocar where('clinicId','==',A)
+   * por where('clinicId','==',B) NÃO re-subscreve (a worklist não recarrega ao
+   * trocar de clínica). Passe um valor que mude junto com os filtros (ex.: o id
+   * da clínica selecionada).
+   */
+  queryKey?: string;
 }
 
 export function useCollection<T extends { id: string }>(
@@ -223,15 +231,22 @@ export function usePaginatedCollection<T extends { id: string }>(
   collectionName: string,
   options: UseCollectionOptions & { initialLimit?: number } = {}
 ) {
-  const { constraints = [], enabled = true, isGlobal = false, initialLimit = 50 } = options;
+  const { constraints = [], enabled = true, isGlobal = false, initialLimit = 50, queryKey } = options;
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentLimit, setCurrentLimit] = useState(initialLimit);
   const [hasMore, setHasMore] = useState(true);
 
-  // Serialize constraints for dependency array
-  const constraintKey = JSON.stringify(constraints.map((c) => c.toString()));
+  // Serialize constraints for dependency array. QueryConstraint.toString() é
+  // inútil ("[object Object]"), então o queryKey do chamador é o que torna a
+  // chave sensível a filtros por valor (ex.: troca de clínica).
+  const constraintKey = JSON.stringify(constraints.map((c) => c.toString())) + '|' + (queryKey ?? '');
+
+  // Ao mudar a query (ex.: trocar de clínica), reinicia a paginação na 1ª página.
+  useEffect(() => {
+    setCurrentLimit(initialLimit);
+  }, [constraintKey, initialLimit]);
 
   useEffect(() => {
     if (!enabled || !auth.currentUser) {

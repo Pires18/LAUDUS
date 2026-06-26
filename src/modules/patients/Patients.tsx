@@ -25,7 +25,9 @@ export function Patients() {
 
   const { data: patients, loading, error: patientsError, hasMore, loadMore } = usePaginatedCollection<Patient>('patients', {
     constraints,
-    initialLimit: 50
+    initialLimit: 50,
+    // Re-subscreve quando o termo de busca muda (toString de constraints é inútil).
+    queryKey: search ? `search:${searchPrefix}` : 'all'
   });
 
   // Filtro local adicional caso a busca prefixada traga maiúsculas/minúsculas diferentes, ou para buscar por CPF
