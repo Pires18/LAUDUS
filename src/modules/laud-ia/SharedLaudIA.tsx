@@ -32,6 +32,7 @@ import { useCollection } from '../../hooks/useFirestore';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
 import { updateItem, getAiUsageStats } from '../../store/db';
+import { TrainingDashboard } from './TrainingDashboard';
 
 type TabId = 'prompts' | 'templates' | 'engine' | 'training' | 'status';
 
@@ -534,8 +535,6 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
   }, [histFrom, histTo]);
 
   const { data: templates } = useCollection<ReportTemplate>('templates');
-  const { data: exams } = useCollection<any>('exams');
-  const finalizedCount = exams.filter(e => e.status === 'finalizado').length;
   const [selectedAreaFilter, setSelectedAreaFilter] = useState<ExamArea | ''>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [editingTemplatePrompt, setEditingTemplatePrompt] = useState<string>('');
@@ -929,7 +928,10 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-black text-ink-900 tracking-tight">LAUD.IA</h2>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-600 text-[9px] font-black uppercase tracking-widest">v2.0</span>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-600 text-[9px] font-black uppercase tracking-widest">v2.1</span>
+                {localSettings.aiTrainingEnabled && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-600 text-[9px] font-black uppercase tracking-widest">⬤ Training</span>
+                )}
                 {!hasApiKey && (
                   <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/20 text-amber-600 text-[9px] font-black uppercase tracking-widest">⚠ API KEY</span>
                 )}
@@ -1832,52 +1834,41 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
             TAB: TRAINING
         ══════════════════════════════════ */}
         {activeTab === 'training' && (
-          <div className="max-w-2xl space-y-5 animate-fade-in">
-            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 sm:p-7">
-              <div className="flex items-center justify-between mb-6">
+          <div className="space-y-5 animate-fade-in">
+            {/* ── Controle: ativar aprendizado + mimetismo ── */}
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                     <GraduationCap size={22} />
                   </div>
                   <div>
-                    <h4 className="text-base font-black text-ink-900">Aprendizado por Estilo</h4>
-                    <p className="text-xs text-ink-500">A IA aprende com seus laudos finalizados.</p>
+                    <h4 className="text-base font-black text-ink-900">Aprendizado Contínuo</h4>
+                    <p className="text-xs text-ink-500">A IA aprende com seus laudos, correções e exemplos marcados.</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
-                  className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
-                    localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
-                  )}
-                >
-                  <span className={classNames('pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
-                    localSettings.aiTrainingEnabled ? 'translate-x-5' : 'translate-x-0'
-                  )} />
-                </button>
+                <div className="flex items-center gap-3">
+                  <span className={classNames('text-[10px] font-black uppercase tracking-widest', localSettings.aiTrainingEnabled ? 'text-emerald-600' : 'text-ink-400')}>
+                    {localSettings.aiTrainingEnabled ? 'Ativo' : 'Inativo'}
+                  </span>
+                  <button
+                    onClick={() => setLocalSettings({ ...localSettings, aiTrainingEnabled: !localSettings.aiTrainingEnabled })}
+                    className={classNames('relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
+                      localSettings.aiTrainingEnabled ? 'bg-indigo-600' : 'bg-ink-200'
+                    )}
+                  >
+                    <span className={classNames('pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
+                      localSettings.aiTrainingEnabled ? 'translate-x-5' : 'translate-x-0'
+                    )} />
+                  </button>
+                </div>
               </div>
 
-              <div className={classNames('space-y-5 transition-opacity duration-300', !localSettings.aiTrainingEnabled && 'opacity-40 pointer-events-none')}>
-                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
-                  <strong>Como funciona:</strong> O LAUD.IA enviará seus últimos laudos finalizados da mesma especialidade como contexto para mimetizar seu vocabulário, estilo e estrutura preferida.
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { icon: Database, label: 'No Banco', value: finalizedCount.toString(), color: 'indigo' },
-                    { icon: TrendingUp, label: 'Mimetismo', value: String(localSettings.aiTrainingContextSize || 3), color: 'violet' },
-                    { icon: FlaskConical, label: 'Qualidade', value: localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 5 ? 'Alta' : localSettings.aiTrainingContextSize && localSettings.aiTrainingContextSize >= 3 ? 'Média' : 'Baixa', color: 'emerald' },
-                  ].map((stat) => (
-                    <div key={stat.label} className={`p-3 bg-${stat.color}-50 border border-${stat.color}-100 rounded-xl text-center`}>
-                      <stat.icon size={16} className={`text-${stat.color}-600 mx-auto mb-1`} />
-                      <span className={`text-lg font-black text-${stat.color}-900 block`}>{stat.value}</span>
-                      <span className={`text-[9px] font-black text-${stat.color}-600 uppercase tracking-widest`}>{stat.label}</span>
-                    </div>
-                  ))}
-                </div>
-
+              <div className={classNames('mt-5 pt-5 border-t border-ink-100 grid lg:grid-cols-2 gap-5 transition-opacity duration-300', !localSettings.aiTrainingEnabled && 'opacity-40 pointer-events-none')}>
+                {/* Mimetismo (contexto de laudos anteriores) */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold text-ink-700 flex items-center gap-2">
-                    Exames Contextuais
+                  <label className="text-sm font-bold text-ink-700 flex items-center gap-2">
+                    Exames Contextuais (mimetismo)
                     <span className="text-indigo-600 font-black">{localSettings.aiTrainingContextSize || 3}</span>
                   </label>
                   <input
@@ -1891,14 +1882,18 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     <span className="text-indigo-600">3-5 Ideal</span>
                     <span>10 — Lento</span>
                   </div>
+                  <p className="text-[10px] text-ink-500 leading-relaxed pt-1">
+                    Quantos laudos finalizados da mesma especialidade são enviados como contexto, junto aos exemplos do Corpus de Excelência.
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-ink-100">
+                {/* Pilares do aprendizado */}
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Estilo de Escrita', desc: 'Tom, pontuação e fraseologia do médico' },
-                    { label: 'Vocabulário CBR', desc: 'Termos preferenciais por órgão' },
-                    { label: 'Nível de Detalhe', desc: 'Densidade descritiva morfológica' },
-                    { label: 'Padrão de Conduta', desc: 'Verbos e estrutura das recomendações' },
+                    { label: 'Corpus de Excelência', desc: 'Laudos marcados como exemplares (RAG)' },
+                    { label: 'Loop de Correções', desc: 'Aprende com o que você edita ao finalizar' },
+                    { label: 'Roteador de Motor', desc: 'Red flag clínico força o Pro' },
+                    { label: 'Verificação', desc: 'Rede anti-alucinação determinística' },
                   ].map(item => (
                     <div key={item.label} className="p-3 bg-ink-50 border border-ink-100 rounded-xl">
                       <div className="flex items-center gap-1.5 mb-1">
@@ -1911,6 +1906,9 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                 </div>
               </div>
             </div>
+
+            {/* ── Dashboard de métricas + Harness ── */}
+            <TrainingDashboard readOnly={readOnly} />
           </div>
         )}
 
