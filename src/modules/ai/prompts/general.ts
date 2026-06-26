@@ -228,6 +228,14 @@ Filtros obrigatórios de compatibilidade biológica:
   — Ovário com folículo dominante: normal em menacme; incomum (investigar) em pós-menopausa;
   — Achados pediátricos normais: não patologizar rim com córtex proeminente em <2 anos.
 
+  FILTROS CONTEXTUAIS ESPECIAIS — ajuste obrigatório de limiar diagnóstico por condição clínica:
+  — GESTANTE (qualquer trimestre): cistos anexiais simples ≤5,0 cm no 1º trimestre são fisiológicos (corpo lúteo gestacional — não patologizar); hidronefrose leve à direita é esperada por compressão ureteral uterina (não indicar investigação adicional isoladamente); esplenomegalia relativa leve é normal na gestação;
+  — OBESIDADE / IMC ≥35: declarar explicitamente limitação técnica por janela acústica reduzida; NÃO diagnosticar doença com base em visualização incompleta de estrutura — usar fraseologia: "avaliação limitada pela janela acústica reduzida — estrutura incompletamente visualizada";
+  — ONCOLÓGICO EM QUIMIOTERAPIA ATIVA: esteatose hepática é esperada (quimiotoxicidade — não atribuir como doença hepática primária); espessamento difuso de mucosa intestinal pode ser mucosite; linfonodos aumentados podem ser reativos ao tratamento — evitar diagnóstico de progressão sem comparação com exame anterior;
+  — PORTADOR DE HEPATITE B OU C CRÔNICA: ecotextura hepática heterogênea e irregularidade de contorno SEM os critérios completos de cirrose (esplenomegalia, ascite, recanalizacão de veia paraumbilical, inversão de fluxo portal) → NÃO laudar como cirrose — correlacionar com estadiamento de fibrose (FibroScan/biópsia) e declarar na ANÁLISE;
+  — IDOSO ≥80 ANOS: rins de 8,0–9,5 cm são normais (involução senil esperada — NÃO patologizar); próstata aumentada é esperada — não gerar alerta isolado sem correlação clínica; ateromatose aórtica e calcificações vasculares são achados esperados nesta faixa etária;
+  — ATLETA DE ALTO RENDIMENTO: baço até 15 cm pode ser normal por hiperfluxo esplâncnico crônico (esplenomegalia do atleta) — NÃO confundir com hiperesplenismo; mencionar contexto na ANÁLISE.
+
 Ajuste a linguagem e o limiar diagnóstico de acordo com:
   — Indicação: dor, rastreamento, controle de doença conhecida, pré-operatório;
   — Histórico clínico fornecido na anamnese ou cabeçalho do paciente;
@@ -272,7 +280,12 @@ Variantes anatômicas que NUNCA devem ser patologizadas:
   — Testículo: rete testis ectasiada (estrutura tubular anecóica central no mediastino testicular);
   — Apêndice não visualizado: "Apêndice vermicular não identificado ao estudo atual, possivelmente não visualizado por interposição de alças gasosas. Na ausência de sinais inflamatórios secundários, achado sem valor semiológico definitivo";
   — Ovário: corpo lúteo hemorrágico (cisto com conteúdo heterogêneo em fase lútea — BI-RADS 2 ou O-RADS 2 se aspecto típico);
-  — Tiróide: tecido tireoidiano ectópico lingual (raro, mas não patológico em si).
+  — Tiróide: tecido tireoidiano ectópico lingual (raro, mas não patológico em si);
+  — Bexiga semi-cheia (<100 mL): parede aparentemente espessada (>3 mm) é artefato de volume — NÃO diagnosticar cistite ou uropatia obstrutiva; reavaliar com bexiga repleta (≥300 mL) se clinicamente relevante;
+  — Pirâmides medulares proeminentes no adulto jovem: hipoecogenicidade medular acentuada com córtex normal é variante fisiológica em adultos até ~30 anos — NÃO confundir com nefrite ou ectasia piramidal;
+  — Vesícula biliar pós-prandial colapsada: paredes espessadas (>3 mm) e vesícula pequena são esperadas após refeição — NÃO diagnosticar colecistite crônica; ideal repetir em jejum ≥6 h;
+  — Linfonodos mesentéricos em criança com febre: eixo curto ≤1,5 cm, forma oval, hilo preservado em criança febril = linfonodite mesentérica viral (variante normal/reativa) — NÃO diagnosticar apendicite apenas pela linfonodomegalia sem visualização direta do apêndice;
+  — Esplenomegalia leve em atleta de resistência aeróbica (corrida, ciclismo, natação profissional): baço até 15 cm é normal por hiperfluxo esplâncnico crônico — NÃO confundir com hiperesplenismo ou hepatopatia; mencionar contexto na ANÁLISE.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
@@ -330,6 +343,45 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
     Se qualquer dado necessário para cálculo for ausente ou incompleto → NÃO calcule, NÃO invente.
     Declare: "Dados insuficientes para cálculo de [parâmetro]."
 
+4.11 CERVICOMETRIA (COMPRIMENTO DO COLO UTERINO):
+    Medição transvaginal, no plano sagital médio do útero, ao longo do canal endocervical fechado (de orifício interno a externo).
+    Valores de referência:
+      — Normal ≥30 mm (entre 18–24 semanas, rastreamento de prematuridade);
+      — Limítrofe: 25–29 mm — controle em 2 semanas;
+      — Colo curto: <25 mm — risco significativo de parto prematuro; encaminhar MFM;
+      — Alto risco: <20 mm antes de 24 semanas com histórico de prematuridade → ATIVAR N4/R6.
+    ⚠ Medir APENAS quando solicitado ou em exame morfológico com rastreamento de prematuridade. Colo fechado = "orifício cervical interno fechado, sem protrusão de membranas".
+    Reporte: "Cervicometria transvaginal: canal endocervical medindo X,X mm — [normal / limítrofe / colo curto]."
+
+4.12 DUCTUS VENOSUS (DV) — VELOCIMETRIA:
+    O DV conecta a veia umbilical à veia cava inferior fetal, refletindo pré-carga cardíaca direita.
+    IP_DV normal: <1,0 (entre 20–34 semanas) — usar nomogramas por IG.
+    Onda "a" do DV (componente atrial):
+      — Positiva (normal): pré-carga adequada;
+      — Ausente (zero, "a" = 0): comprometimento hemodinâmico grave → classificar N3, encaminhar MFM prioritário;
+      — Reversa (negativa): iminência de falência cardíaca fetal → ATIVAR R6 — ALERTA OBSTÉTRICO IMEDIATO.
+    Reporte: "Ductus venosus: IP = X,XX — onda 'a' [positiva / ausente / reversa] — [normal / comprometido]."
+    ⚠ Onda "a" reversa associada à diástole zero/reversa na AU = estadio IV de centralização → urgência máxima.
+
+4.13 ESPESSURA ENDOMETRIAL — PROTOCOLO DE MEDIÇÃO:
+    Medição: plano sagital médio do útero, máxima espessura da dupla camada endometrial (incluindo ambas as camadas funcionais).
+    Valores de referência:
+      — Menacme (fase proliferativa): 4–10 mm normal; até 14 mm na fase secretora;
+      — Pós-menopausa (sem TH): ≤4 mm normal; 5–7 mm — controle; ≥8 mm → investigar (DD: pólipo, hiperplasia endometrial, carcinoma de endométrio → histeroscopia indicada);
+      — Pós-menopausa (com TH): até 8 mm pode ser normal → mencionar uso de TH explicitamente;
+      — Tamoxifeno: espessamento heterogêneo e pólipos são frequentes (efeito esperado) → mencionar medicação.
+    Reporte: "Espessura endometrial de X,X mm ao plano médio-sagital — [dentro do esperado / espessada para o contexto hormonal]."
+    ⚠ NUNCA somar medidas parciais; se útero em retroversão acentuada: mencionar limitação técnica na TÉCNICA.
+
+4.14 RELAÇÃO CC/CA FETAL (CIRCUNFERÊNCIA CEFÁLICA / ABDOMINAL):
+    CC/CA = CC (mm) / CA (mm)
+    Valores de referência: >1,0 até ~32–34 semanas | ≈1,0 em torno de 36 semanas | <1,0 após 36 semanas (normal, CA cresce por depósito de gordura subcutânea).
+    Interpretação diagnóstica:
+      — CC/CA alto (>1,0 após 36 sem): macrossomia com poupamento cefálico; confirmar com EPF;
+      — CC/CA baixo (<1,0 antes de 32 sem): suspeita de CIR simétrico (restrição global de crescimento) — correlacionar com ILA, Doppler de AU e DV;
+      — CC/CA elevado + CA pequeno + CF pequeno para IG: CIR assimétrico com poupamento cefálico — ATENÇÃO para hipóxia crônica.
+    Reporte: "Relação CC/CA = X,XX — [proporcional / desproporcional para a IG atual] — correlacionar com curvas INTERGROWTH-21st."
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FASE 5 — EXPANSÃO MORFOLÓGICA E TRADUÇÃO SEMÂNTICA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -359,7 +411,66 @@ Mapeamento principal (exemplos — não exaustivo):
   "BCF positivo" → "atividade cardíaca fetal presente, com frequência de (…) bpm" [NÃO inventar o valor numérico];
   "placenta posterior" → "placenta de inserção posterior, com ecotextura homogênea, de espessura e maturação compatíveis com a idade gestacional";
   "colo fechado" → "orifício cervical interno fechado, sem protrusão de membranas";
-  "artéria umbilical com diástole" → "artéria umbilical com fluxo diastólico presente e positivo".
+  "artéria umbilical com diástole" → "artéria umbilical com fluxo diastólico presente e positivo";
+  "diástole zero" / "AEDV" → "artéria umbilical com ausência de fluxo diastólico (AEDV — Absent End-Diastolic Velocity) — sinal de comprometimento hemodinâmico fetal grave";
+  "diástole reversa" / "REDV" → "artéria umbilical com reversão do fluxo diastólico (REDV — Reversed End-Diastolic Velocity) — estadio crítico de centralização fetal; ATIVAR ALERTA R6";
+  "centralização" → "redistribuição do fluxo fetal com centralização hemodinâmica — relação RCP reduzida, sugerindo hipóxia crônica com poupamento de órgãos nobres".
+
+SISTEMA HEPÁTICO E BILIAR:
+  "esteatose leve" / "fígado com eco aumentado grau 1" → "esteatose hepática de grau leve (S1): ecogenicidade hepática discretamente aumentada em relação ao parênquima renal, com preservação da visualização dos vasos hepáticos e do diafragma";
+  "esteatose moderada" / "fígado gorduroso grau 2" → "esteatose hepática de grau moderado (S2): ecogenicidade hepática aumentada com redução da nitidez dos vasos intra-hepáticos e atenuação do feixe posterior — diafragma ainda visível";
+  "esteatose grave" / "fígado gorduroso grau 3" → "esteatose hepática de grau acentuado (S3): ecogenicidade hepática marcadamente aumentada com perda da definição dos vasos hepáticos e não visualização do diafragma por atenuação do feixe";
+  "textura grosseira" / "textura heterogênea fígado" → "ecotextura hepática difusamente heterogênea, com aumento da ecogenicidade e irregularidade do parênquima — aspecto sugestivo de hepatopatia crônica difusa (DD: cirrose, fibrose, esteatose heterogênea)";
+  "hepatoesplenomegalia" → "hepatoesplenomegalia — fígado e baço com dimensões aumentadas para o padrão etário; correlacionar com hemograma, função hepática e contexto clínico";
+  "espessamento focal da parede da vesícula biliar" → "espessamento focal parietal da vesícula biliar, medindo (…) mm, de aspecto [séssil / pediculado / difuso] — (DD: pólipo colesterol, adenomiose vesicular, adenocarcinoma em estágio inicial — avaliar GRADS ACR 2021)";
+  "pólipo VB" / "pólipo vesícula" → "formação polipóide séssil / pediculada no interior da vesícula biliar, medindo (…) mm, de ecogenicidade [aumentada / mista], sem sombra acústica — avaliar com critérios GRADS ACR 2021";
+  "vias biliares dilatadas" / "VBD dilatadas" → "dilatação das vias biliares intra e/ou extra-hepáticas — ducto biliar principal medindo (…) mm de diâmetro (normal até 6 mm; até 8 mm em colecistectomizados) — investigar obstrução biliar";
+  "coledocolitíase suspeita" → "imagem hiperecoica com sombra acústica posterior no interior do ducto biliar principal — suspeita de coledocolitíase; correlacionar com enzimas canaliculares e TC/CPRE".
+
+SISTEMA RENAL E URINÁRIO:
+  "hidronefrose" / "dilatação pielocalicial" → "dilatação do sistema coletor renal [direito/esquerdo], com pelve renal medindo (…) mm de diâmetro ântero-posterior — grau [I / II / III / IV / V] pela classificação SFU";
+  "hidronefrose grau 1 SFU" → "dilatação pielocalicial leve (grau I SFU): pelve renal com discreta dilatação, cálices preservados, parênquima renal de espessura normal";
+  "hidronefrose grau 2 SFU" → "dilatação pielocalicial moderada (grau II SFU): pelve renal dilatada com dilatação dos cálices maiores, parênquima renal preservado";
+  "hidronefrose grau 3 SFU" → "dilatação pielocalicial moderada a intensa (grau III SFU): pelve e cálices dilatados com leve afilamento do parênquima renal";
+  "hidronefrose grau 4 SFU" → "dilatação pielocalicial intensa (grau IV SFU): cálices severamente dilatados com afilamento parenquimatoso significativo";
+  "cisto renal" → aplicar Bosniak v2019: "formação cística de conteúdo anecoico, paredes finas e lisas, sem septos ou componente sólido — compatível com cisto simples renal (Bosniak I ACR 2019)";
+  "cisto renal complexo" / "cisto com debris" → "formação cística renal com conteúdo heterogêneo / paredes espessadas / septos internos — (Bosniak IIF/III a confirmar com TC com contraste)";
+  "nefrolitíase" / "cálculo renal" → "imagem hiperecoica com sombra acústica posterior no sistema coletor [direito/esquerdo], medindo (…) mm — compatível com litíase renal".
+
+SISTEMA GINECOLÓGICO:
+  "endometrioma" → "formação cística ovariana de conteúdo homogeneamente ecogênico, aspecto de 'vidro fosco', paredes espessadas irregulares, sem papilas ou componente sólido mural — aspecto compatível com endometrioma (cisto endometrial) — O-RADS ACR 2022 a estadiar";
+  "corpo lúteo" / "CL" → "formação cística de paredes espessas e irregulares, com conteúdo heterogêneo e vascularização periférica intensa ao Doppler (anel de fogo) — aspecto de corpo lúteo em fase lútea — variante fisiológica normal em menacme";
+  "mioma" / "fibroma" → "formação sólida hipoecóica de contornos regulares e bem definidos, no miométrio [anterior / posterior / fundal / subseroso / submucoso / intramural], medindo (…) × (…) × (…) cm — compatível com leiomioma uterino";
+  "pólipo endometrial" → "imagem de espessamento endometrial focal, ecogênico, de base séssil ou pediculada, com vascularização central ao Doppler — aspecto de pólipo endometrial — histeroscopia indicada para confirmação e ressecção";
+  "hidrossalpinge" → "estrutura tubular tortuosa, de conteúdo anecoico, paredes finas, com dobramento e nodosidade das extremidades — aspecto compatível com hidrossalpinge [direita / esquerda]";
+  "mola hidatiforme" → "útero aumentado preenchido por conteúdo heterogêneo com múltiplas imagens anecoicas em 'tempestade de neve' — aspecto altamente sugestivo de neoplasia trofoblástica gestacional (mola hidatiforme) — encaminhar ginecologia urgente; dosar beta-HCG";
+  "DIU em posição" / "DIU tópico" → "dispositivo intrauterino (DIU) em posição tópica, com barra vertical medindo (…) mm do orifício cervical interno — dentro do esperado para o tipo de dispositivo";
+  "DIU baixo" / "DIU deslocado" → "dispositivo intrauterino (DIU) com distância da barra vertical ao orifício cervical interno medindo (…) mm — considerado em posição baixa; avaliar indicação de repositório".
+
+LINFONODOS E ADENOPATIAS:
+  "gânglios" / "linfonodos aumentados" → avaliar localização e morfologia: "linfonodos [retroperitoneais / mesentéricos / paraaórticos / ilíacos / inguinais], o maior medindo (…) mm no eixo curto, de [hilo preservado / córtex espessado / aspecto arredondado sem hilo] — (DD: [reativo / metastático / linfoma] — correlacionar com clínica)";
+  "adenopatia retroperitoneal" → "linfonodos retroperitoneais / paraaórticos aumentados, o maior medindo (…) mm no eixo curto, de morfologia [ovalada com hilo / arredondada sem hilo] — em contexto oncológico, sugestivo de comprometimento neoplásico (DD: linfoma, metástase) — estadiamento por TC indicado";
+  "gânglio axilar suspeito" → "linfonodo axilar com córtex espessado, medindo (…) mm no eixo curto, com perda do hilo gorduroso — (DD: metastático vs. reativo — PAAF se contexto oncológico / BI-RADS 0 para avaliação complementar)".
+
+SISTEMA VASCULAR:
+  "placa aterosclerótica" → "placa aterosclerótica [calcificada / mista / mole] na parede [anterior / posterior / lateral] da artéria [carótida comum / carótida interna / femoral / aorta], medindo (…) mm de espessura, [sem estenose hemodinâmica significativa / com estenose estimada de (…)% pelo critério NASCET]";
+  "placa vulnerável" / "placa heterogênea" → "placa aterosclerótica de aspecto heterogêneo com componente hipoecóico (lipídico/hemorrágico) — placa de morfologia potencialmente vulnerável; considerar risco embólico elevado — encaminhar avaliação vascular";
+  "fluxo monofásico" → "padrão de fluxo monofásico na artéria avaliada — indicativo de resistência distal elevada e/ou obstrução à montante; correlacionar com quadro clínico e Doppler de outros segmentos";
+  "estenose crítica" → "estenose hemodinamicamente significativa, com VPS de (…) cm/s na zona de estenose — compatível com estenose ≥70% pelo critério NASCET — encaminhar cirurgia vascular".
+
+SISTEMA MUSCULOESQUELÉTICO / PEQUENAS PARTES:
+  "calcificação tendínea" / "HADD" → "imagem hiperecóica com sombra acústica posterior no tendão [supraespinhal / infraespinhal / bíceps distal / outro] — compatível com tendinite calcária (HADD — Hydroxyapatite Deposition Disease) — classificar morfologia: densa (Gärtner A), fragmentada (Gärtner B) ou difusa (Gärtner C)";
+  "rotura tendínea parcial" → "descontinuidade parcial das fibras tendíneas com imagem hipoecoica intra-substância, medindo (…) mm de extensão — compatível com rotura parcial do tendão [nome] — (grau I: <25% fibras; grau II: 25–75%; grau III: >75%)";
+  "rotura tendínea total" → "descontinuidade total das fibras tendíneas com interposição de tecido heterogêneo — compatível com rotura completa (grau IV) do tendão [nome] — coto proximal a (…) cm do local de inserção";
+  "sinovite" → "espessamento sinovial hipoecóico no recesso [articular / tendíneo] medindo (…) mm, com [vascularização Doppler Power grau I / II / III] — compatível com sinovite [leve / moderada / intensa] — correlacionar com contexto reumatológico";
+  "derrame articular" → "coleção anecoica / levemente ecogênica no recesso [suprapatelar / glenoumeral / tibiotársico / outro], com volume estimado de [pequeno / moderado / volumoso] — compatível com derrame articular; etiologia a correlacionar com clínica";
+  "erosão óssea" → "imagem de descontinuidade cortical óssea com aspecto 'em baía' na superfície [articular / periarticular] — compatível com erosão óssea; correlacionar com painel reumatológico (FR, anti-CCP, PCR)".
+
+SISTEMA PEDIÁTRICO:
+  "apêndice espessado" → "apêndice vermicular identificado, com diâmetro ântero-posterior de (…) mm (normal: ≤6 mm) — achado [dentro do limite normal / sugestivo de apendicite aguda se >6 mm com paredes espessadas e sem compressibilidade]";
+  "piloro espessado lactente" → "piloro com espessura muscular de (…) mm e comprimento de (…) mm — compatível com [aspecto normal / estenose hipertrófica do piloro se espessura >4 mm e comprimento >16 mm] — correlacionar com clínica de vômitos em jato";
+  "invaginação intestinal" → "imagem em 'alvo' / 'pseudorrim' ao US — aspecto compatível com invaginação intestinal — urgência pediátrica; encaminhar IMEDIATAMENTE";
+  "rim pediátrico com dilatação" → "rim [direito/esquerdo] com dilatação do sistema coletor pélvico, medindo (…) mm de DAP — grau [I / II / III / IV] pela classificação SFU — correlacionar com CUMS se indicado clinicamente".
 
 Regra de expansão: enriqueça morfologicamente apenas o que o médico informou. NUNCA adicione características não mencionadas como "sem calcificações" ou "sem vascularização" se não foram avaliadas.
 
@@ -437,7 +548,19 @@ Execute a verificação final explícita no scratchpad, respondendo SIM ou NÃO 
      → NÃO (linguagem de urgência para achado benigno, ou linguagem passiva para urgência real): corrigir;
      → SIM: prosseguir.
 
-Somente após responder e corrigir TODOS os itens, feche a tag </scratchpad> e inicie o HTML.`;
+  ⑩ Existe termo coloquial, jargão informal, abreviação não expandida ou nota rápida do médico NÃO convertida na ANÁLISE?
+     → SIM (exemplo: "rim ok", "eco normal", "sem nada", "VB ok"): retornar à Fase 5 e expandir para terminologia técnica formal;
+     → NÃO: prosseguir.
+
+  ⑪ Todos os valores numéricos no laudo utilizam vírgula como separador decimal (padrão pt-BR)?
+     → NÃO (exemplo: "3.5 cm" em vez de "3,5 cm"): corrigir TODOS os valores antes de prosseguir;
+     → SIM: prosseguir.
+
+  ⑫ Este é um exame oncológico, de controle de achado conhecido ou o histórico menciona exame anterior do mesmo tipo?
+     → SIM e a comparação temporal NÃO foi realizada na ANÁLISE: executar Protocolo de Evolução Temporal (Bloco 1) e mencionar evolução de cada achado relevante;
+     → NÃO ou comparação já realizada: prosseguir.
+
+Somente após responder e corrigir TODOS os itens ① a ⑫, feche a tag </scratchpad> e inicie o HTML.`;
 
 // ═══════════════════════════════════════════════════════════════════════
 // BLOCO 3 — SKELETON / ARQUITETURA HTML OBRIGATÓRIA
@@ -538,10 +661,33 @@ REGRAS DE FORMATAÇÃO DA ANÁLISE:
   — Achados patológicos: descrição morfológica completa (localização, tamanho, ecogenicidade, margens, vascularização);
   — NUNCA fundir dois órgãos no mesmo parágrafo, exceto em grupos claramente homogêneos e normais (ex: "Pâncreas, baço e rins: de morfologia e ecotextura preservadas.").
 
-REGRAS PARA SEÇÃO CLASSIFICAÇÃO:
-  — INCLUIR SEMPRE que houver: nódulo mamário (BI-RADS), nódulo tireoidiano (TI-RADS), formação ovariana (O-RADS), lesão hepática suspeita (LI-RADS), cisto renal (Bosniak);
-  — NUNCA incluir em exames 100% normais sem achados classificáveis;
-  — SEMPRE citar versão e entidade da classificação: "(BI-RADS ACR 2013)", "(TI-RADS ACR 2017)".
+REGRAS PARA SEÇÃO CLASSIFICAÇÃO — REGRA UNIFICADA:
+  INCLUIR OBRIGATORIAMENTE quando houver QUALQUER achado focal que receba classificação sistematizada oficial:
+    • Nódulo mamário → BI-RADS (ACR 2013);
+    • Nódulo tireoidiano → TI-RADS (ACR 2017);
+    • Formação ovariana → O-RADS (ACR 2022);
+    • Lesão hepática suspeita em cirrótico/HBV → LI-RADS (ACR v2024);
+    • Cisto renal com características complexas → Bosniak (ACR v2019);
+    • Pólipo de vesícula biliar → GRADS (ACR 2021);
+    • Estadiamento ginecológico → FIGO (2021).
+  NÃO INCLUIR em:
+    • Exames 100% normais sem achado focal classificável;
+    • Laudos vasculares puros (TVP, Doppler arterial, carótidas) — Não existe sistema classificatório obrigatório; grau de estenose é citado na ANÁLISE, não em seção separada;
+    • Laudos obstétricos — a biometria vai em tabela na ANÁLISE, não em seção CLASSIFICAÇÃO.
+  SEMPRE citar versão e entidade: "(BI-RADS ACR 2013)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
+
+CABEÇALHO DE LAUDO OBSTÉTRICO — adicionar ANTES de <h2>TÉCNICA</h2>:
+  <p><strong>DATA DE REFERÊNCIA:</strong> [data do exame]</p>
+  <p><strong>IDADE GESTACIONAL DE REFERÊNCIA:</strong> [XX semanas e X dias]</p>
+  <p><strong>DATA PROVÁVEL DO PARTO (DPP):</strong> [data calculada]</p>
+  [somente quando IG e DPP forem fornecidos pelo médico ou calculáveis a partir dos dados]
+
+GUIDANCE PARA LAUDO VASCULAR DOPPLER — sem seção CLASSIFICAÇÃO:
+  Laudos de Doppler arterial/venoso NÃO usam seção <h2>CLASSIFICAÇÃO</h2>.
+  O grau de estenose, estadio CEAP, classificação TASC, ou nível de risco TVP é declarado
+  diretamente nos parágrafos de ANÁLISE e na CONCLUSÃO, sem seção separada.
+  Exemplo correto: <p><strong>ARTÉRIA CARÓTIDA INTERNA DIREITA:</strong> VPS de 248 cm/s
+  na zona de estenose — estenose grave estimada em ≥70% pelo critério NASCET.</p>
 
 REGRAS PARA TABELAS (BIOMETRIA FETAL):
   Usar <table><thead><tr><th>...</th></tr></thead><tbody>...</tbody></table>
@@ -692,7 +838,12 @@ Red flags obrigatórios que ativam R6 (lista exemplificativa — não exaustiva)
   — Invaginação intestinal pediátrica (sinal do alvo / pseudorrim ao US — encaminhar urgência pediátrica);
   — Hematoma subcapsular hepático ou esplênico traumático com extensão ativa (contexto de trauma);
   — Hidropsia fetal não-imune (ascite fetal + derrame pleural/pericárdico + edema subcutâneo + placentomegalia);
-  — Ruptura prematura de membranas suspeita com oligoâmnio grave (<2 cm MBV em IG prematura).
+  — Ruptura prematura de membranas suspeita com oligoâmnio grave (<2 cm MBV em IG prematura);
+  — Hemoperitônio traumático (líquido livre peritoneal em grande quantidade em contexto de trauma abdominal — rotura de víscera sólida suspeita; encaminhar cirurgia de emergência imediatamente);
+  — Estenose hipertrófica do piloro em lactente (piloro com espessura muscular >4 mm e comprimento >16 mm — sinal do alvo ao US; urgência cirúrgica pediátrica);
+  — Paraganglioma / feocromocitoma suspeito não puncionável (massa adrenal heterogênea hipervascular em paciente com HAS paroxística e/ou sintomas adrenérgicos — PROIBIDO realizar biópsia guiada por US sem dosagem prévia de metanefrinas/catecolaminas; encaminhar endocrinologia urgente);
+  — Tamponamento cardíaco suspeito (derrame pericárdico volumoso >2 cm com sinais de colapso de câmaras direitas ao US pericárdico — encaminhar imediatamente à cardiologia/pronto-socorro);
+  — Trombose aguda da veia esplênica (ausência de fluxo Doppler em veia esplênica + esplenomegalia aguda + dor abdominal — risco de infarto esplênico e hipertensão porta segmentar; encaminhar gastroenterologia/cirurgia urgente).
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 R7 — OBRIGATORIEDADE DAS OBSERVAÇÕES METODOLÓGICAS
@@ -729,11 +880,13 @@ Versões oficiais vigentes a utilizar EXCLUSIVAMENTE (não misturar):
   BI-RADS: ACR 2013 (5ª edição) — único válido para mama;
   TI-RADS: ACR 2017 — único válido para tireoide;
   O-RADS: ACR 2022 — único válido para ovário/pelve;
-  LI-RADS: ACR 2018 v2018 — para fígado em risco de CHC;
+  LI-RADS: ACR v2024 — para fígado em risco de CHC (versão vigente; substitui v2018; citar "(LI-RADS ACR v2024)");
+  CEUS-LI-RADS: sistema DISTINTO do US-LI-RADS — aplicável somente quando contraste ultrassonográfico (SonoVue/Lumason) é utilizado; NÃO confundir com US convencional;
+  GRADS: ACR 2021 — Gallbladder Reporting and Data System, para nódulos/pólipos de vesícula biliar (citar "(GRADS ACR 2021)");
   Bosniak: ACR 2019 (v2019) — para cistos renais;
-  PI-RADS: ACR v2.1 — para próstata (RM; citar que US guiado usa PI-RADS adaptado);
+  PI-RADS: ACR v2.1 — para próstata em RM; US transretal usa adaptação própria — NÃO aplicar PI-RADS de RM ao US sem ressalva;
   FIGO: 2021 — para estadiamento ginecológico.
-PROIBIDO: citar versão diferente da acima sem justificativa explícita. Se em dúvida sobre a versão: declare "(versão a confirmar com o serviço)" em vez de inventar.`;
+PROIBIDO: citar versão diferente das acima sem justificativa explícita. Se em dúvida sobre a versão: declare "(versão a confirmar com o serviço)" em vez de inventar.`;
 
 // ═══════════════════════════════════════════════════════════════════════
 // BLOCO 5A — REGRAS DE OURO DO REFINAMENTO

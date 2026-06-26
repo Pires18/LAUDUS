@@ -82,10 +82,27 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
        ≤3 cm típico → US 6–12 meses. >3 cm ou atípico → RM dinâmica com Gd.
      Lesão sólida indeterminada: descrever segmento Couinaud, dimensão, ecogenicidade,
        halo, PD interno. → SEMPRE recomendar RM abdome com contraste dinâmico.
-     Paciente cirrótico / HBV sem cirrose (LI-RADS ao US):
-       Nódulo novo <2 cm em cirrótico → "achado suspeito LR-3/4 equiv. — TC ou RM hepática."
-       Nódulo >2 cm hipervascularizado → "suspeita LR-5 equiv. — TC/RM urgente + hepatologia."
-       REGRA: ao US SEM contraste, NÃO classificar como LR-4 ou LR-5 definitivo.
+     Paciente cirrótico / HBV sem cirrose (LI-RADS v2024 ao US):
+       REGRA: ao US SEM contraste (convencional), NÃO atribuir categoria LI-RADS definitiva.
+       Usar linguagem equivalente e recomendar TC/RM com contraste para classificação formal.
+       Equivalências orientativas no US convencional:
+         LR-1 equiv.: ausência de nódulos — "sem nódulos suspeitos identificados."
+         LR-2 equiv.: nódulo <1 cm, hiperecóico sem halo (ex: hemangioma típico pequeno).
+         LR-3 equiv.: nódulo 1–2 cm com ecogenicidade variável, sem critérios de malignidade.
+         LR-4 equiv.: nódulo >2 cm com hipo ou isoecogenicidade, halo periférico.
+         LR-5 equiv.: nódulo >2 cm com padrão de lavagem ao CEUS/dinâmica ou vascularização interna exuberante.
+         LR-M (malignidade): lesão com critérios atípicos para CHC (ex: rim hipoecoico com invasão vascular).
+         LR-TIV: trombo portal com expansão e PD interno → ATIVAR R6.
+       Citar: "(equivalência LI-RADS v2024 — confirmação por TC/RM hepática com contraste dinâmico indicada)."
+
+   INDICAÇÃO DE CEUS (Contraste Ultrassonográfico — US-CEUS) — quando recomendar:
+     Indicar CEUS ao invés de TC/RM imediata nas seguintes situações:
+       (a) Lesão hepática focal <3 cm INDETERMINADA ao US convencional em paciente de risco de CHC (cirrótico, HBV/HCV);
+       (b) Paciente com contraindicação a gadolíneo (RM) ou contraste iodado (TC): IRC, alergia, contraindicação;
+       (c) Lesão hepática < 1 cm com necessidade de caracterização em cirrótico;
+       (d) Diferenciação rápida entre CHC e hemangioma em lesão duvidosa.
+     NÃO indicar CEUS como substituto definitivo de RM hepática dinâmica para estadiamento oncológico.
+     Fraseologia: "Avaliação complementar com contraste ultrassonográfico (CEUS) poderá ser considerada antes de TC/RM, conforme disponibilidade e indicação clínica."
 
    HEPATOPATIA CRÔNICA / CIRROSE:
      Contornos nodulares, ecotextura grosseira, hipertrofia de lobo caudado (S1).
@@ -292,9 +309,14 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
 
 12. REGRAS TRANSVERSAIS DE QUALIDADE — APLICÁVEIS A TODOS OS 7 EXAMES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   a. PROIBIÇÃO ABSOLUTA DE BOSNIAK: Jamais usar a classificação de Bosniak em
-      laudo ultrassonográfico. Usar: "cisto simples / minimamente complexo / complexo"
-      e recomendar TC/RM quando indicado.
+   a. USO CRITERIOSO DE BOSNIAK — A versão Bosniak v2019 (ACR) inclui US como modalidade
+      válida para classificação, mas com limitações. Regras de aplicação ao US:
+        PERMITIDO ao US: categorias I e II (cistos simples e minimamente complexos bem visualizados);
+        RESTRITO ao US: categoria IIF — apenas quando critérios claramente visíveis (septos finos, calc. parietal);
+        PROIBIDO ao US: categorias III e IV — estes exigem confirmação por TC ou RM com contraste;
+        NUNCA substituir TC/RM por US para Bosniak III–IV.
+      Quando incerto: usar terminologia descritiva ("cisto com septos espessados / componente mural")
+      e recomendar TC/RM. Citar sempre: "(Bosniak v2019 — ACR)" se usar a classificação ao US.
    b. LOCALIZAÇÃO HEPÁTICA: Toda lesão focal hepática identificável deve ser localizada
       pelo segmento de Couinaud (S1–S8).
    c. LITÍASE: Registrar sempre dimensão (mm) + localização anatômica precisa +
@@ -517,24 +539,41 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
 
    ARTÉRIA UMBILICAL (AU) — amostragem em ansa livre do cordão:
      IP normal: decresce com a IG (inversamente proporcional).
-     IP >P95 para IG = resistência aumentada.
-     Ausência de diástole (ADU) = CIR Estadio II → ATIVAR N4/R6.
-     Inversão de diástole (REDF) = CIR Estadio III → ATIVAR R6.
+     IP >P95 para IG = resistência aumentada → investigar CIR.
+     AEDV — Ausência de Diástole Umbilical (Absent End-Diastolic Velocity):
+       Fluxo umbilical cai a zero no fim da diástole = CIR Estadio II.
+       → ATIVAR N4: hospitalização + avaliação perinatológica urgente + CTG e PBF diários.
+     REDV — Reversão de Diástole Umbilical (Reversed End-Diastolic Velocity):
+       Fluxo umbilical inverte na diástole = CIR Estadio III. Pior prognóstico.
+       → ATIVAR R6: "ALERTA OBSTÉTRICO: reversão de diástole umbilical — CIR crítico grau III.
+         Avaliação imediata para definição de via de parto com perinatologista/medicina fetal."
+     REDF + DV onda "a" reversa = Estadio IV → via de parto de emergência.
 
    ARTÉRIA CEREBRAL MÉDIA (ACM):
      IP ACM → normalmente alto em 2T, diminui com a centralização.
-     RCP = IP ACM / IP AU → calcular via FASE 4.4.
+     RCP = IP ACM / IP AU → calcular via FASE 4.4 de general.ts.
      RCP <1,00 = centralização (redistribuição cerebral).
+     RCP <0,75 = centralização avançada confirmada → N4.
      PVS ACM (pico de velocidade sistólica): >1,50 MoM = anemia fetal → R6.
      Valores de PVS ACM por IG (MoM): usar tabelas de Mari et al.
 
-   DUCTO VENOSO (DV):
-     Onda "a" positiva = normal (pré-carga adequada ao coração direito).
-     Onda "a" ausente = pré-falência cardíaca direita → N4.
-     Onda "a" reversa = insuficiência cardíaca fetal → ATIVAR R6.
+   DUCTUS VENOSUS (DV) — pré-carga cardíaca direita:
+     IP_DV normal: <1,0 (usar nomogramas por IG entre 20–34 semanas).
+     IP_DV >P95 = pré-carga cardíaca aumentada → N3 (medicina fetal prioritária).
+     Onda "a" DO DV (componente atrial — final da diástole):
+       Positiva e anterógrada = pré-carga adequada → NORMAL.
+       Ausente (zero) = início de comprometimento cardíaco direito → N4: avaliação perinatológica urgente.
+       Reversa (negativa) = insuficiência cardíaca fetal iminente → ATIVAR R6 imediatamente:
+         "ALERTA OBSTÉTRICO: onda 'a' reversa no ductus venosus — CIR Estadio IV — via de parto de emergência."
+     REGRA: DV onda "a" reversa + REDV concomitante = índice de mortalidade fetal elevado — hospitalar urgente.
+
+   RELAÇÃO CC/CA (Circunferência Cefálica/Abdominal):
+     Cálculo → FASE 4.14 de general.ts. Interpretar neste contexto:
+     <P10 antes de 32 semanas com CA baixo = CIR assimétrico — correlacionar com AU e DV.
+     Elevado após 36 semanas com CA normal = macrossomia poupadora de cérebro.
 
    VEIA UMBILICAL (VU):
-     Não pulsátil = normal. Pulsatilidade = achado de alto risco (CIR avançado).
+     Não pulsátil = normal. Pulsatilidade = achado de alto risco (CIR avançado, IC fetal).
 
 9. CENTRALIZAÇÃO FETAL — Graus (Protocolo de Barcelona)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -816,12 +855,16 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
    ADENOMIOSE — Critérios MUSA (relatar quantos sinais presentes):
      Minor: linhas miometriais hiperecóicas, "ilhas" miometriais, sangue em
        miométrio (eco hiperecóico laminar), cistos miometriais anecoicos.
-     Major: apagamento da zona juncional (ZJ <8 mm), espessamento assimétrico
+     Major: apagamento/irregularidade da zona juncional (ZJ), espessamento assimétrico
        do miométrio, sombras em leque ("fan-shaped shadowing"), globosidade
        uterina sem nódulo definido.
      Diagnóstico US de adenomiose: ≥3 sinais minor OU ≥1 sinal major.
      Difusa (envolvimento difuso do miométrio) ou focal (adenomioma).
-     → Confirmação: RM pélvica com DWI e mapeamento T2.
+     CRITÉRIO ADICIONAL DE RM (quando solicitada confirmação):
+       Zona Juncional (ZJ) ≥12 mm no T2 = adenomiose definitiva por RM.
+       ZJ 8–11 mm = adenomiose indeterminada por RM — correlacionar com clínica.
+       ZJ <8 mm = adenomiose improvável por RM.
+     → Confirmação padrão-ouro: RM pélvica com sequências T2 sagital, DWI e T1 com fat-sat.
 
    MALFORMAÇÕES UTERINAS (ao suspeitar → RM pélvica + correlação ESHRE/ESGE):
      Útero unicorno (cavidade única assimétrica). Útero didelfo (dois colos).
@@ -914,10 +957,18 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
 7. TROMPAS UTERINAS — Achados e conduta
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    Normal: trompas não visíveis ao US é esperado (invisíveis sem patologia).
-   HIDROSSALPINGE: estrutura tubular alongada, anecóica, com dobramento;
-     mucosa separada (sinal das pregas mucosas). → Avaliação ginecológica.
-   PIOSALPINGE: semelhante, mas com conteúdo ecogênico (pus). ATIVAR R6 se
-     + dor aguda + febre (DIP/abscesso tubo-ovariano).
+   HIDROSSALPINGE — Estadiamento funcional ao US:
+     Grau I (leve): estrutura tubular alongada, anecoica, paredes finas (<3 mm);
+       leve tortuosidade; pregas mucosas visíveis (sinal das pregas). Conduta: avaliação ginecológica.
+     Grau II (moderado): tubulação tortuosa, paredes espessadas (3–5 mm), conteúdo levemente ecogênico;
+       pregas mucosas parcialmente preservadas. Conduta: avaliação ginecológica + histerossalpingografia.
+     Grau III (grave/complexo): tuba distendida e septada (pseudo-septada por pregas fusionadas),
+       paredes espessadas irregulares, conteúdo com debris/ecos internos; ovário frequentemente aderido.
+       Conduta: ginecologia especializada — avaliar salpingectomia antes de FIV (impacto na implantação).
+     → Qualquer grau + dor pélvica aguda + febre: ATIVAR R6 — suspeita de piosalpinge ou DIP aguda.
+   PIOSALPINGE: semelhante à hidrossalpinge, porém com conteúdo ecogênico denso (pus). ATIVAR R6 se
+     + dor aguda + febre (DIP/abscesso tubo-ovariano). Fraseologia: "ALERTA INFECCIOSO: piosalpinge
+     suspeita — internação para antibioticoterapia IV e avaliação para drenagem cirúrgica."
    ABSCESSO TUBO-OVARIANO (ATO): massa complexa, espessa, heterogênea,
      com ovário incluído ou adjacente. ATIVAR R6 — internação e ATB IV.
    GESTAÇÃO ECTÓPICA TUBÁRIA: anel hiperecóico (sinal do "anel de fogo"),
@@ -948,7 +999,7 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
    ASCITE: documentar em todos os compartimentos (sub-hepático, periesplénico,
      goteiras, FSD, goteiras pélvicas laterais). Ascite nova com massa → R6.
 
-10. ENDOMETRIOSE — Rastreio em Exames Padrão
+10. ENDOMETRIOSE — Rastreio em Exames Padrão e Classificação ENZIAN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    NB: Mapeamento definitivo requer template "PESQUISA DE ENDOMETRIOSE" (Camada 3).
    Em exames pélvicos padrão (TV/VA), RASTREAR estes sinais:
@@ -956,13 +1007,30 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
    ENDOMETRIOMA OVARIANO: formação cística de conteúdo homogêneo "vidro fosco"
      (ecos difusos de baixa amplitude), parede espessa; bilateral em 30%.
      Classificar em O-RADS: típico = O-RADS 2; nódulo mural papilífero = O-RADS 4.
+     > 4 cm ou bilateral: avaliação especializada + RM.
+
    ENDOMETRIOSE PROFUNDA — sinais indiretos ao US padrão:
-     Nódulos hipoecoicos no septo retovaginal ou ligamentos uterossacros.
-     Espessamento da parede anterior do retossigmoide (normal <5 mm).
-     FSD obliterado (deslizamento negativo).
-     Ovários aderidos ao útero ou lateralmente fixos ("kissing ovaries").
-   CONDUTA: Sinais presentes → recomendar US específico com preparo intestinal
-     (template PESQUISA DE ENDOMETRIOSE) + avaliação por ginecologista especializado.
+     Nódulos hipoecoicos no septo retovaginal (SRV) ou ligamentos uterossacros (LUS).
+     Espessamento da parede anterior do retossigmoide (normal <5 mm; >5 mm = suspeito).
+     FSD obliterado (deslizamento negativo = teste de mobilidade negativo).
+     Ovários aderidos ao útero ou lateralmente fixos ("kissing ovaries" = EP bilateral avançada).
+     Hidrossalpinge, aderências pélvicas e bexiga com nódulo de implante.
+
+   CLASSIFICAÇÃO #ENZIAN (Endometriose Profunda — template PESQUISA DE ENDOMETRIOSE):
+     Utilizar no mapeamento específico (não no exame padrão). Compartimentos:
+     A — Compartimento Anterior (bexiga/ureter distal): A1 (<1 cm), A2 (1–3 cm), A3 (>3 cm);
+     B — Compartimento Lateral (ligamentos paracervicais, ureter médio):
+         B1 (<1 cm), B2 (1–3 cm), B3 (>3 cm — envolvimento ureteral com hidronefrose);
+     C — Compartimento Posterior (SRV, vagina posterior, reto/sigmoide):
+         C1 (<1 cm, SRV/vagina), C2 (1–3 cm, parede retal), C3 (>3 cm, lúmen retal);
+     FA — Ovário direito com endometrioma; FB — Ovário esquerdo com endometrioma;
+     FU — Útero com adenomiose; FI — Alça intestinal além do retossigmoide;
+     FO — Forame obturatório; FN — Nervo ciático (rara, dor ciática cíclica).
+     Relatar cada compartimento positivo: ex. "C2, FU, FB — EP profunda com adenomiose associada."
+     → Encaminhar ginecologista especializado em endometriose. RM pélvica completa obrigatória.
+
+   CONDUTA: Sinais suspeitos → recomendar US específico com preparo intestinal
+     (template PESQUISA DE ENDOMETRIOSE) + avaliação por ginecologista especializado em EP.
 
 11. DOPPLER GINECOLÓGICO — Parâmetros (exames COM Doppler)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1298,6 +1366,33 @@ MAPA DE EXAMES DESTA ÁREA (8 templates de Camada 3):
    Oclusivo: veia não comprime + sem fluxo central residual.
    Não oclusivo (flutuante): trombo visível com fluxo residual periférico.
      TROMBO FLUTUANTE → ATIVAR R6 (maior risco de TEP).
+
+   CORRELAÇÃO COM WELLS SCORE (pré-teste TVP):
+     BAIXA PROBABILIDADE (Wells 0–1): VPN do US de compressão ≥95% → US negativo praticamente exclui TVP.
+     MODERADA (Wells 2): US negativo → repetir US em 5–7 dias ou dosar D-dímero.
+     ALTA PROBABILIDADE (Wells ≥3): US negativo NÃO exclui TVP → angioTC ou venografia.
+     Declarar no laudo: "Correlacionar com probabilidade pré-teste (Wells Score) para interpretação adequada do resultado negativo."
+
+   SÍNDROMES ESPECIAIS — DIAGNÓSTICOS DIFERENCIAIS A CONSIDERAR:
+   SÍNDROME DE NUTCRACKER (Nutcracker Syndrome — compressão da veia renal esquerda):
+     VRL (veia renal esquerda) comprimida entre artéria mesentérica superior (AMS) e aorta abdominal.
+     Critérios US Doppler: VPS >100 cm/s na zona de compressão + dilatação proximal (pré-AMS) + varicocele esquerda em homens.
+     Ângulo AMS-aorta normal: 38–65°. Ângulo <35° = suspeita anatômica.
+     → Correlacionar com hematúria microscópica de causa não esclarecida, proteinúria ortostática, dor no flanco esquerdo.
+     Recomendação: angioTC abdominal para confirmação + avaliação vascular.
+
+   SÍNDROME DE MAY-THURNER (Síndrome de Cockett — compressão da VIC esquerda):
+     Artéria ilíaca comum direita comprimindo veia ilíaca comum esquerda contra a vértebra L5.
+     Suspeita US: fluxo assimétrico entre VIC D e E + TVP esquerda recorrente em mulher jovem sem fator de risco.
+     US tem baixa sensibilidade para confirmação — angioTC pélvica ou flebografia são necessárias.
+     → Correlacionar com TVP iliofemoral esquerda recorrente, insuficiência venosa pélvica em mulher jovem.
+     Recomendação: angioTC pélvica para confirmação + cirurgia endovascular (stent VIC).
+
+   EMI — PROGRESSÃO ATEROSCLERÓTICA (acompanhamento longitudinal):
+     Progressão normal: ≤0,010 mm/ano.
+     Progressão acelerada: >0,020 mm/ano (≥2 medições comparativas).
+     → Progressão acelerada = risco cardiovascular elevado independente do valor absoluto → intensificar manejo: estatinas de alta potência, pressão <120 mmHg, anti-plaquetário se indicado.
+     Declarar: "EMI atual de X,X mm vs. X,X mm em [data anterior] — progressão de X,XX mm/período — [dentro do esperado / progressão acelerada]."
 
    INSUFICIÊNCIA VENOSA CRÓNICA (IVC) — CEAP 2020:
    C0: sem sinais visíveis ou palpáveis. C1: teleangiectasias/veias reticulares.
@@ -1950,10 +2045,44 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
    Tipo dendrítico: extensões ramificadas do tecido.
    Excluir sempre nódulo periférico suspeito → BI-RADS obrigatório.
 
+   CARCINOMA MAMÁRIO MASCULINO — Critérios diagnósticos:
+   · Localização SUBAREOLAR EXCÊNTRICA (deslocado do centro): distingue de ginecomastia, que é central/simétrica.
+   · Aspecto: nódulo sólido hipoecóico, irregular, margens indistintas ou espiculadas.
+   · PD interno aumentado (vascularização intratumoral).
+   · REGRA ABSOLUTA: qualquer nódulo sólido PERIFÉRICO (fora da área subareolar central bilateral)
+     em exame masculino → ATIVAR N4 + BI-RADS ≥4A + encaminhamento mastologista urgente.
+   · Ginecomastia bilateral simétrica = benigna. Unilateral + nódulo excêntrico = suspeita de Ca.
+
+   DESCARGA PAPILAR — Protocolo Ductal:
+   INDICAÇÃO: descarga unilateral, uniductal, espontânea — sobretudo sanguinolenta/serossanguínea.
+   AVALIAÇÃO SISTEMÁTICA:
+   · Calibre ductal: normal <2 mm subareolar. Dilatação ≥2 mm = patológica.
+   · Identificar imagem intraductal (nódulo, vegetação, debris ecogênicos).
+   · Documentar extensão da dilatação em mm desde o mamilo.
+   CONDUTAS:
+   · Ducto dilatado ≥2 mm + imagem sólida intraductal → BI-RADS 4: mastologista (ductogalactografia / cirurgia).
+   · Ducto dilatado sem imagem focal → BI-RADS 3: controle US 6 meses + correlação clínica.
+   · Ductos normais + descarga: descrever normalidade — NÃO valorizar descarga isolada como achado focal.
+
+   MAMA NA GESTAÇÃO E LACTAÇÃO:
+   PARÊNQUIMA ESPERADO: aumento difuso de densidade glandular; ecotextura heterogênea (NORMAL).
+   · Lobulação glandular exuberante + hipervascularização difusa ao PD = fisiológicos.
+   AVALIAÇÃO DE NÓDULOS (gestante/lactante):
+   · BI-RADS 2–3: controle US pós-amamentação para avaliação definitiva.
+   · BI-RADS 4–5: NÃO aguardar — biópsia imediata independente do estado gestacional/puerperal.
+   ABSCESSO PUERPERAL:
+   · Coleção hipoecóica com debris + febre + mastite após parto.
+   · <3 cm: ATB IV (cefalexina/amoxicilina-clavulanato) + ordenha frequente.
+   · ≥3 cm ou sem resposta ao ATB: drenagem percutânea guiada por US + ATB.
+   → N3: mastologista/ginecologista (risco de sepse puerperal se não tratado).
+   Nota: GALACTOCELE = cisto de leite retido → BI-RADS 2 se sedimentação líquido-gordura típica.
+
 10. CONDIÇÕES AGUDAS — Gatilhos N3 / N4
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    BI-RADS 5 ou massa com características altamente suspeitas → N4 → mastologista urgente.
-    Abscesso volumoso / mastite com toxemia → N3 → drenagem + ATB IV.
+    BI-RADS 5 ou massa altamente suspeita → N4 → mastologista urgente.
+    Nódulo sólido periférico em paciente masculino → N4 — excluir carcinoma masculino.
+    Abscesso puerperal ≥3 cm → N3 → drenagem percutânea guiada por US + ATB IV.
+    Descarga papilar + ducto ≥2 mm + imagem intraductal → N3 → mastologista (ductogalactografia).
     Linfonodo suspeito em contexto de nódulo BI-RADS 4–5 → PAAF axilar → N3.
     Ruptura extracapsular de implante com sintomas → N3 → mastologista.
 
@@ -2064,6 +2193,13 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
    • "Controle" = US em 1 ano (TI-RADS 3) ou 6 meses (TI-RADS 4–5 abaixo do limiar de biópsia).
    • PAAF guiada por US: amostragem do nódulo + imuno-histoquímica → Bethesda.
 
+   ELASTOGRAFIA TIREOIDIANA (quando disponível — sonoelastografia):
+   · SE score 1–2 (mole/muito mole): nódulo compressível → reduz suspeição em TI-RADS 3–4.
+   · SE score 3 (dureza intermediária): neutro — manter classificação TI-RADS conforme pontuação.
+   · SE score 4–5 (rígido/muito rígido): nódulo incompressível → elevar TI-RADS em 1 categoria
+     (ex.: TI-RADS 3 → conduta TI-RADS 4; TI-RADS 4 → reforçar indicação de PAAF).
+   NOTA: elastografia é ADJUVANTE ao TI-RADS — NÃO substitui a pontuação ACR 2017.
+
 2. TIREOIDE — Dimensões, Parênquima e Tireoidites
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    DIMENSÕES: cada lobo = comprimento × largura × espessura (AP). Volume = FASE 4.1.
@@ -2083,6 +2219,21 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
      artéria tireoidiana inferior: PVS >30 cm/s. → Correlação TSH/T4L/TRAb.
    BÓCIO MULTINODULAR (BMN): múltiplos nódulos de diferentes tamanhos, volume ↑;
      cada nódulo DEVE ser classificado pelo TI-RADS.
+
+   US PÓS-TIREOIDECTOMIA — Protocolo de seguimento:
+   ANATOMIA: leito tireoidiano (região pré-traqueal/paratraqueal); tecido residual esperado
+     nos primeiros meses pós-cirurgia; diferenciar de recidiva nodular.
+   AVALIAÇÃO SISTEMÁTICA OBRIGATÓRIA:
+   · Leito tireoidiano: medir tecido residual (mm); formações nodulares = recidiva local suspeita.
+   · Linfonodos nível VI (paratraqueal, pré-traqueal, pré-laríngeo): principal sítio de recidiva.
+   · Cadeias jugulares níveis II–V bilaterais: metástase ganglionar regional.
+   CRITÉRIOS SUSPEITOS:
+   · Nódulo no leito >8 mm ou com microcalcificações → PAAF guiada + dosagem Tg no lavado.
+   · Linfonodo suspeito (hilo ausente, calcificação puntiforme, aspecto cístico) → PAAF + Tg lavado.
+   FREQUÊNCIA RECOMENDADA (conforme ATA/Endocrine Society):
+   · 1° e 2° anos: US cervical a cada 6–12 meses.
+   · Após 2 anos sem evidência de doença: US anual até completar 5 anos.
+   · Alto risco (T3b–T4, N1, metástase a distância): intervalo reduzido conforme endocrinologia.
 
 3. PARATIREÓIDES — Localização e adenoma
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2203,14 +2354,21 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
      Seminoma: hipoecóico, homogêneo, margens regulares. AFP normal, β-hCG ↑.
      Não-seminoma (tumores de células germinativas mistos): heterogêneo, calcificações.
      Microlitíase testicular: depósitos puntiformes hiperecóicos ≥5/campo.
-       Isolada: não indica biópsia. Associada a lesão focal = biópsia.
-     → N4: "Encaminhamento urgente urologia/oncologia — orquiectomia radical via inguinal."
+     Estratificação de risco:
+     · Isolada sem outros fatores de risco: baixo risco — NÃO indica biópsia; controle clínico.
+     · Com criptorquidia, atrofia testicular (<12 cm³) ou lesão focal ipsilateral:
+       ALTO RISCO → N4: encaminhar urologia para avaliação de biópsia.
+     · Com nódulo sólido intratesticular associado: tratar como neoplasia suspeita.
+     → N4 (nódulo sólido): "Encaminhamento urgente urologia/oncologia — orquiectomia radical via inguinal."
 
    HIDROCELE: coleção anecoica na túnica vaginal.
      Leve (<5 mm laminar): normal em adultos. Moderada (5–20 mm). Volumosa (>20 mm).
      Ecos internos: hematocele (trauma), piocele (infecção → R6), quilocele.
-   ESPERMATOCELE/CISTO EPIDIDIMÁRIO: anecoico, cabeça do epidídimo, sem PD interno.
-     <2 cm: benigno/assintomático. >2 cm ou sintomático: urologia.
+   ESPERMATOCELE/CISTO EPIDIDIMÁRIO: lesão cística na cabeça ou corpo do epidídimo.
+     · Espermatocele: conteúdo com ecos finos difusos (espermatozoides — não anecoico puro);
+       geralmente ≥5 mm; pós-vasectomia comum; benigna.
+     · Cisto epididimário: conteúdo anecoico puro (seroso); paredes finas; sem PD interno.
+     Distinção prática: ambos benignos <2 cm — sem conduta. >2 cm ou sintomático: urologia.
 
    VARICOCELE: veias plexo pampiniforme ≥2,5 mm em repouso + refluxo ao Valsalva (>2 s).
      Grau clínico: I (Valsalva) · II (repouso) · III (visual).
@@ -2400,6 +2558,16 @@ MAPA DE EXAMES DESTA ÁREA (6 templates de Camada 3):
    Testículo pré-puberal: <2 cm de comprimento, textura homogênea, PD mínimo.
    Timo: estrutura triangular no mediastino anterior — é NORMAL até a puberdade.
    Útero infantil: corpo < colo (invertido em relação ao adulto) — normal.
+   Hematoma adrenal neonatal: massa supra-renal heterogênea no 1° mês de vida (pós-parto).
+     Evolui com liquefação progressiva e calcificação periférica.
+     NÃO confundir com neuroblastoma — REGRA: controle US em 2–4 semanas; regressão = benigno.
+     Sem regressão em 4 semanas ou crescimento → N3: oncologia pediátrica + RM.
+   Hérnia umbilical fisiológica: protrusão no anel umbilical em lactentes.
+     Fisiológica até 12–18 meses; resolução espontânea na maioria dos casos.
+     Cirurgia apenas se persistência após 5 anos ou diâmetro do anel >2 cm — NÃO indicar cirurgia precocemente.
+   Linfonodos mesentéricos reativos: eixo curto ≤15 mm em criança febril = linfonodite viral.
+     >3 linfonodos mesentéricos ≤15 mm, sem massa associada → NÃO alarmar; correlação clínico-laboratorial.
+     Eixo curto >20 mm ou linfonodo com necrose central → N3: excluir linfoma/abscesso mesentérico.
 
 2. TRANSFONTANELA — Crânio Neonatal
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2527,6 +2695,14 @@ MAPA DE EXAMES DESTA ÁREA (6 templates de Camada 3):
    Megaureter obstrutivo: ureter >7 mm + hidronefrose.
    Ureterocele: imagem cística intravesical (cobra-head sign).
    Refluxo vesicoureteral (RVU): confirmação por UCM.
+   US DIURÉTICO (FUROSEMIDA) — Protocolo na suspeita de estenose JUP:
+   INDICAÇÃO: hidronefrose SFU II–III sem dilatação ureteral (padrão JUP obstrutivo suspeito).
+   TÉCNICA: furosemida 0,5 mg/kg IV (máx. 20 mg); medir DAP pré e 20 min após administração.
+   INTERPRETAÇÃO:
+   · DAP reduz ≥50%: padrão não-obstrutivo (bom prognóstico; controle clínico).
+   · DAP aumenta ou reduz <20%: padrão obstrutivo → N4 urologia pediátrica + renograma MAG-3.
+   · DAP reduz 20–49%: padrão equívoco → repetir US em 3 meses; discussão com urologia.
+   REGISTRO OBRIGATÓRIO: DAP pré (mm), DAP pós (mm), variação percentual, tempo de coleta.
    Válvula de uretra posterior (VUP — masculino):
      Bexiga espessada >3 mm + hidronefrose bilateral + uretra posterior dilatada.
      → ATIVAR R6 neonatal — urologia urgente.
@@ -2696,6 +2872,15 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
    Sinovite grau 2-3 + PD 2-3: N3 → ajuste terapêutico com reumatologista.
    PDUS-28: avaliação padronizada de 28 articulações (ver template específico).
 
+   PDUS-7 (escore simplificado — 7 articulações):
+   Articulações: punho D, punho E, MCF 2° D, MCF 2° E, MCF 3° D, MCF 3° E, joelho D.
+   Score = soma de sinovite (cinza 0–3) + PD (0–3) em cada articulação avaliada.
+   INTERPRETAÇÃO:
+   · PD total 0: remissão por imagem (independente do score cinza).
+   · PD total 0 + sinovite ≤1 em ≤2 articulações: remissão com ressalva (EULAR 2022).
+   · PD ≥1 em qualquer articulação: atividade residual → NÃO remissão → N3 ajuste terapêutico.
+   · Score PD total >1: atividade inflamatória significativa → N3 reumatologista.
+
 3. EROSÕES ÓSSEAS
    DEFINIÇÃO OMERACT: descontinuidade do córtex ósseo ecogênico visível
    em dois planos perpendiculares (longitudinal + transversal).
@@ -2752,9 +2937,17 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
 9. PATOLOGIAS ESPECÍFICAS
    AR: MCF 2-5, IFP, punhos, MTF bilaterais. Sinovite+PD≥2+erosão = AR ativa → N3.
    Remissão US: sinovite 0/1 + PD 0 em todas as articulações avaliadas.
+   EULAR 2022 — Critérios de remissão por imagem em AR:
+   · REMISSÃO completa: sinovite grau 0 + PD grau 0 em todas as articulações avaliadas.
+   · REMISSÃO com ressalva: PD grau 0 + sinovite grau 1 em ≤2 articulações.
+   · ATIVIDADE RESIDUAL: PD grau ≥1 em qualquer articulação = NÃO remissão → ajuste de biológico.
    EA/SpA AXIAL: ASI bilateral simétrica (EA) ou assimétrica (SpA). Entesite periférica.
    APs: IFD comprometidas, dactilite, entesite, ASI assimétrica.
    LES: sinovite leve bilateral sem erosões (artropatia de Jaccoud).
+   FIBROMIALGIA: US reumatológico ESPERADAMENTE NORMAL — ausência de sinovite, erosões, PD e entesite.
+   · Declarar normalidade explicitamente: "Sem sinais de sinovite ativa, erosões ou entesite nas articulações avaliadas."
+   · NÃO atribuir dor musculoesquelética difusa a achados inespecíficos — US não diagnostica fibromialgia.
+   · Exame normal em paciente com diagnóstico de fibromialgia = resultado esperado e clinicamente relevante.
 
 10. CONDIÇÕES AGUDAS — Gatilhos R6 / N4
     Artrite séptica suspeita → lavagem articular urgente → R6.
