@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection,
   doc,
@@ -244,9 +244,16 @@ export function usePaginatedCollection<T extends { id: string }>(
   const constraintKey = JSON.stringify(constraints.map((c) => c.toString())) + '|' + (queryKey ?? '');
 
   // Ao mudar a query (ex.: trocar de clínica), reinicia a paginação na 1ª página.
+  // Usa atualização funcional com bail-out p/ não re-subscrever à toa quando já
+  // está na 1ª página (evita ciclos extras de carregamento ao entrar na tela).
   useEffect(() => {
-    setCurrentLimit(initialLimit);
+    setCurrentLimit((prev) => (prev === initialLimit ? prev : initialLimit));
   }, [constraintKey, initialLimit]);
+
+  // Mostra o esqueleto de carregamento apenas no PRIMEIRO load. Em
+  // re-subscrições (troca de clínica, limite, settle do uid) mantém os dados
+  // atuais visíveis para não "piscar".
+  const loadedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled || !auth.currentUser) {
@@ -254,7 +261,7 @@ export function usePaginatedCollection<T extends { id: string }>(
       return;
     }
 
-    setLoading(true);
+    if (!loadedRef.current) setLoading(true);
     const path = isGlobal ? collectionName : userPath(collectionName);
     const colRef = collection(firestore, path);
     const q = query(colRef, ...constraints, limit(currentLimit));
@@ -265,6 +272,7 @@ export function usePaginatedCollection<T extends { id: string }>(
         const docs = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as T));
         setData(docs);
         setHasMore(docs.length === currentLimit);
+        loadedRef.current = true;
         setLoading(false);
         setError(null);
       },
