@@ -30,6 +30,7 @@
   --ink-700: 67 76 95;
   --ink-800: 58 65 81;
   --ink-900: 52 57 69;
+  --ink-950: 20 23 28;
 
   /* Superfície de cartões/painéis (claro = branco) */
   --surface: 255 255 255;
@@ -54,6 +55,7 @@ html.dark {
   --ink-700: 210 216 226;
   --ink-800: 228 232 240;
   --ink-900: 244 247 251;
+  --ink-950: 250 251 253;
 
   /* Cartões/painéis — claramente elevados sobre o fundo da página */
   --surface: 30 34 42;
@@ -84,8 +86,19 @@ html.dark .bg-ink-800 { background-color: rgb(var(--accent-800)) !important; }
 html.dark .bg-ink-700 { background-color: rgb(var(--accent-700)) !important; }
 html.dark .hover\:bg-ink-900:hover { background-color: rgb(var(--accent-800)) !important; }
 html.dark .hover\:bg-ink-800:hover { background-color: rgb(var(--accent-700)) !important; }
+html.dark .bg-ink-950 { background-color: rgb(var(--accent-900)) !important; }
 html.dark .border-ink-900 { border-color: rgb(var(--accent-800)) !important; }
 html.dark .border-ink-800 { border-color: rgb(var(--accent-700)) !important; }
+
+/* Backdrops/overlays de modais: as variantes com opacidade (bg-ink-900/40 etc.)
+   usam a var ink-900 — que é CLARA no dark — virando um véu claro. Força um
+   escurecimento real (preto translúcido) para o fundo dos modais. */
+html.dark .bg-ink-900\/40 { background-color: rgb(0 0 0 / 0.55) !important; }
+html.dark .bg-ink-900\/50 { background-color: rgb(0 0 0 / 0.60) !important; }
+html.dark .bg-ink-900\/60 { background-color: rgb(0 0 0 / 0.66) !important; }
+html.dark .bg-ink-900\/65 { background-color: rgb(0 0 0 / 0.68) !important; }
+html.dark .bg-ink-900\/75 { background-color: rgb(0 0 0 / 0.76) !important; }
+html.dark .bg-ink-900\/90 { background-color: rgb(0 0 0 / 0.86) !important; }
 
 /* Gradientes de acento escuro (caixas de ícone/cabeçalhos com ícone branco). */
 html.dark .from-ink-700 {

@@ -38,6 +38,7 @@ export default {
           700: 'rgb(var(--ink-700) / <alpha-value>)',
           800: 'rgb(var(--ink-800) / <alpha-value>)',
           900: 'rgb(var(--ink-900) / <alpha-value>)',
+          950: 'rgb(var(--ink-950) / <alpha-value>)',
         },
         // Superfície de cartões/painéis (substitui o uso literal de "white").
         surface: 'rgb(var(--surface) / <alpha-value>)',
