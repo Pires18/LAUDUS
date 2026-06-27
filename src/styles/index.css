@@ -260,6 +260,31 @@ html.dark .prose :where(h1,h2,h3,h4,strong,b):not(:where([class~="not-prose"] *)
   color: rgb(var(--ink-900));
 }
 
+/* Texto colorido escuro (text-*-900, ex.: valores dos cards de calculadora)
+   → tom claro legível sobre a tinta escura. */
+html.dark .text-brand-900{color:rgb(187 221 253)!important}
+html.dark .text-emerald-900{color:rgb(167 243 208)!important}
+html.dark .text-amber-900{color:rgb(253 230 138)!important}
+html.dark .text-red-900{color:rgb(254 202 202)!important}
+html.dark .text-rose-900{color:rgb(254 205 211)!important}
+html.dark .text-blue-900{color:rgb(191 219 254)!important}
+html.dark .text-indigo-900{color:rgb(199 210 254)!important}
+html.dark .text-violet-900{color:rgb(221 214 254)!important}
+html.dark .text-teal-900{color:rgb(153 246 228)!important}
+html.dark .text-cyan-900{color:rgb(165 243 252)!important}
+
+/* Painéis translúcidos CLAROS (bg-white/50..90), usados como cartões/modais
+   das calculadoras → superfície escura translúcida. As variantes muito sutis
+   (/5../20), que são brilhos sobre fundos escuros, são preservadas. */
+html.dark .bg-white\/40{background-color:rgb(var(--surface) / 0.5)!important}
+html.dark .bg-white\/50{background-color:rgb(var(--surface) / 0.6)!important}
+html.dark .bg-white\/60{background-color:rgb(var(--surface) / 0.7)!important}
+html.dark .bg-white\/70{background-color:rgb(var(--surface) / 0.82)!important}
+html.dark .bg-white\/80{background-color:rgb(var(--surface) / 0.9)!important}
+html.dark .bg-white\/85{background-color:rgb(var(--surface) / 0.93)!important}
+html.dark .bg-white\/90{background-color:rgb(var(--surface) / 0.96)!important}
+html.dark .hover\:bg-white\/70:hover{background-color:rgb(var(--surface) / 0.7)!important}
+
 /* ── Polimentos finais do dark ── */
 html.dark ::selection { background: rgb(58 161 246 / 0.35); }
 html.dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgb(var(--ink-300)); }
