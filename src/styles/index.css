@@ -97,6 +97,133 @@ html.dark .to-ink-900 {
   --tw-gradient-to: rgb(var(--accent-900)) var(--tw-gradient-to-position);
 }
 
+/* ════════════════════════════════════════════
+   MODO ESCURO — CHIPS/BADGES/ALERTAS COLORIDOS
+   Os pastéis claros (bg-*-50/100 + text-*-600/700 + border-*-100/200) viram
+   tintas translúcidas escuras com texto mais claro — visual nativo de dark.
+   ════════════════════════════════════════════ */
+
+/* emerald */
+html.dark .bg-emerald-50{background-color:rgb(16 185 129/.13)!important}
+html.dark .bg-emerald-100{background-color:rgb(16 185 129/.22)!important}
+html.dark .text-emerald-600{color:rgb(52 211 153)!important}
+html.dark .text-emerald-700,html.dark .text-emerald-800{color:rgb(110 231 183)!important}
+html.dark .border-emerald-100{border-color:rgb(16 185 129/.22)!important}
+html.dark .border-emerald-200{border-color:rgb(16 185 129/.34)!important}
+
+/* brand */
+html.dark .bg-brand-50{background-color:rgb(17 134 231/.14)!important}
+html.dark .bg-brand-100{background-color:rgb(17 134 231/.24)!important}
+html.dark .text-brand-600{color:rgb(58 161 246)!important}
+html.dark .text-brand-700,html.dark .text-brand-800{color:rgb(127 193 251)!important}
+html.dark .border-brand-100{border-color:rgb(17 134 231/.24)!important}
+html.dark .border-brand-200{border-color:rgb(17 134 231/.36)!important}
+
+/* amber */
+html.dark .bg-amber-50{background-color:rgb(245 158 11/.13)!important}
+html.dark .bg-amber-100{background-color:rgb(245 158 11/.22)!important}
+html.dark .text-amber-600{color:rgb(251 191 36)!important}
+html.dark .text-amber-700,html.dark .text-amber-800{color:rgb(252 211 77)!important}
+html.dark .border-amber-100{border-color:rgb(245 158 11/.22)!important}
+html.dark .border-amber-200{border-color:rgb(245 158 11/.34)!important}
+
+/* rose */
+html.dark .bg-rose-50{background-color:rgb(244 63 94/.13)!important}
+html.dark .bg-rose-100{background-color:rgb(244 63 94/.22)!important}
+html.dark .text-rose-600{color:rgb(251 113 133)!important}
+html.dark .text-rose-700,html.dark .text-rose-800{color:rgb(253 164 175)!important}
+html.dark .border-rose-100{border-color:rgb(244 63 94/.22)!important}
+html.dark .border-rose-200{border-color:rgb(244 63 94/.34)!important}
+
+/* red */
+html.dark .bg-red-50{background-color:rgb(239 68 68/.13)!important}
+html.dark .bg-red-100{background-color:rgb(239 68 68/.22)!important}
+html.dark .text-red-600{color:rgb(248 113 113)!important}
+html.dark .text-red-700,html.dark .text-red-800{color:rgb(252 165 165)!important}
+html.dark .border-red-100{border-color:rgb(239 68 68/.22)!important}
+html.dark .border-red-200{border-color:rgb(239 68 68/.34)!important}
+
+/* blue */
+html.dark .bg-blue-50{background-color:rgb(59 130 246/.14)!important}
+html.dark .bg-blue-100{background-color:rgb(59 130 246/.24)!important}
+html.dark .text-blue-600{color:rgb(96 165 250)!important}
+html.dark .text-blue-700,html.dark .text-blue-800{color:rgb(147 197 253)!important}
+html.dark .border-blue-100{border-color:rgb(59 130 246/.24)!important}
+html.dark .border-blue-200{border-color:rgb(59 130 246/.36)!important}
+
+/* indigo */
+html.dark .bg-indigo-50{background-color:rgb(99 102 241/.14)!important}
+html.dark .bg-indigo-100{background-color:rgb(99 102 241/.24)!important}
+html.dark .text-indigo-600{color:rgb(129 140 248)!important}
+html.dark .text-indigo-700,html.dark .text-indigo-800{color:rgb(165 180 252)!important}
+html.dark .border-indigo-100{border-color:rgb(99 102 241/.24)!important}
+html.dark .border-indigo-200{border-color:rgb(99 102 241/.36)!important}
+
+/* violet */
+html.dark .bg-violet-50{background-color:rgb(139 92 246/.14)!important}
+html.dark .bg-violet-100{background-color:rgb(139 92 246/.24)!important}
+html.dark .text-violet-600{color:rgb(167 139 250)!important}
+html.dark .text-violet-700,html.dark .text-violet-800{color:rgb(196 181 253)!important}
+html.dark .border-violet-100{border-color:rgb(139 92 246/.24)!important}
+html.dark .border-violet-200{border-color:rgb(139 92 246/.36)!important}
+
+/* pink */
+html.dark .bg-pink-50{background-color:rgb(236 72 153/.13)!important}
+html.dark .bg-pink-100{background-color:rgb(236 72 153/.22)!important}
+html.dark .text-pink-600{color:rgb(244 114 182)!important}
+html.dark .text-pink-700{color:rgb(249 168 212)!important}
+html.dark .border-pink-100{border-color:rgb(236 72 153/.22)!important}
+html.dark .border-pink-200{border-color:rgb(236 72 153/.34)!important}
+
+/* teal */
+html.dark .bg-teal-50{background-color:rgb(20 184 166/.13)!important}
+html.dark .bg-teal-100{background-color:rgb(20 184 166/.22)!important}
+html.dark .text-teal-600{color:rgb(45 212 191)!important}
+html.dark .text-teal-700{color:rgb(94 234 212)!important}
+html.dark .border-teal-100{border-color:rgb(20 184 166/.22)!important}
+html.dark .border-teal-200{border-color:rgb(20 184 166/.34)!important}
+
+/* purple */
+html.dark .bg-purple-50{background-color:rgb(168 85 247/.14)!important}
+html.dark .bg-purple-100{background-color:rgb(168 85 247/.24)!important}
+html.dark .text-purple-600{color:rgb(192 132 252)!important}
+html.dark .text-purple-700{color:rgb(216 180 254)!important}
+html.dark .border-purple-100{border-color:rgb(168 85 247/.24)!important}
+html.dark .border-purple-200{border-color:rgb(168 85 247/.36)!important}
+
+/* cyan */
+html.dark .bg-cyan-50{background-color:rgb(6 182 212/.14)!important}
+html.dark .bg-cyan-100{background-color:rgb(6 182 212/.24)!important}
+html.dark .text-cyan-600{color:rgb(34 211 238)!important}
+html.dark .text-cyan-700,html.dark .text-cyan-800{color:rgb(103 232 249)!important}
+html.dark .border-cyan-100{border-color:rgb(6 182 212/.24)!important}
+html.dark .border-cyan-200{border-color:rgb(6 182 212/.36)!important}
+
+/* orange */
+html.dark .bg-orange-50{background-color:rgb(249 115 22/.13)!important}
+html.dark .bg-orange-100{background-color:rgb(249 115 22/.22)!important}
+html.dark .text-orange-600{color:rgb(251 146 60)!important}
+html.dark .text-orange-700{color:rgb(253 186 116)!important}
+html.dark .border-orange-100{border-color:rgb(249 115 22/.22)!important}
+html.dark .border-orange-200{border-color:rgb(249 115 22/.34)!important}
+
+/* sky */
+html.dark .bg-sky-50{background-color:rgb(14 165 233/.14)!important}
+html.dark .text-sky-600{color:rgb(56 189 248)!important}
+html.dark .text-sky-700{color:rgb(125 211 252)!important}
+
+/* green / lime */
+html.dark .bg-green-50{background-color:rgb(34 197 94/.13)!important}
+html.dark .text-green-600{color:rgb(74 222 128)!important}
+html.dark .text-green-700{color:rgb(134 239 172)!important}
+html.dark .bg-lime-50{background-color:rgb(132 204 22/.13)!important}
+
+/* ── Polimentos finais do dark ── */
+html.dark ::selection { background: rgb(58 161 246 / 0.35); }
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgb(var(--ink-300)); }
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink-400)); }
+html.dark .custom-scrollbar { scrollbar-color: rgb(var(--ink-300)) transparent; }
+
 html, body, #root {
   /* 100dvh: dynamic viewport height — handles Safari mobile URL bar correctly */
   height: 100dvh;
