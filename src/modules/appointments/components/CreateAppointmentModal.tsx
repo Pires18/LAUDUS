@@ -700,7 +700,7 @@ export function CreateAppointmentModal({
             <button 
               type="button"
               onClick={() => setModalStep(2)}
-              className="px-5 h-10 bg-ink-950 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5"
+              className="px-5 h-10 bg-ink-900 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5"
             >
               Prosseguir <ArrowRight size={12} />
             </button>
@@ -708,7 +708,7 @@ export function CreateAppointmentModal({
             <button 
               type="button"
               onClick={() => setModalStep(3)}
-              className="px-5 h-10 bg-ink-950 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5"
+              className="px-5 h-10 bg-ink-900 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5"
             >
               Prosseguir <ArrowRight size={12} />
             </button>
@@ -723,7 +723,7 @@ export function CreateAppointmentModal({
                 type="button"
                 onClick={handleConfirm}
                 disabled={loading || !appointmentTime}
-                className="px-5 h-10 bg-ink-950 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 h-10 bg-ink-900 text-white font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                 Confirmar Agendamento

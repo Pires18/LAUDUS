@@ -157,7 +157,7 @@ export function RescheduleModal({
             type="button"
             onClick={handleConfirm}
             disabled={loading || !newTime}
-            className="px-5 h-10 bg-ink-950 text-white font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5 disabled:opacity-50"
+            className="px-5 h-10 bg-ink-900 text-white font-bold text-xs uppercase tracking-widest rounded-xl hover:bg-ink-800 transition-all flex items-center gap-1.5 disabled:opacity-50"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : null}
             Reagendar

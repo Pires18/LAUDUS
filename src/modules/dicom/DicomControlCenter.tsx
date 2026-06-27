@@ -380,7 +380,7 @@ export function DicomControlCenter() {
                         Tipo de Visualizador DICOM
                         <span className="group relative cursor-help">
                           <Info size={12} className="text-ink-400 hover:text-emerald-600 transition-colors inline-block" />
-                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-900 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
                             Selecione o visualizador PACS integrado de sua preferência. Stone Web Viewer é o padrão recomendado.
                           </span>
                         </span>
@@ -413,7 +413,7 @@ export function DicomControlCenter() {
                           Padrão da URL do Visualizador
                           <span className="group relative cursor-help">
                             <Info size={12} className="text-ink-400 hover:text-emerald-600 transition-colors inline-block" />
-                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-900 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
                               Use os placeholders de substituição como {"{{baseUrl}}"} e {"{{StudyInstanceUID}}"} para montar a rota do visualizador personalizado.
                             </span>
                           </span>
@@ -641,7 +641,7 @@ export function DicomControlCenter() {
                   <p className="text-[10px] text-ink-300 leading-relaxed">
                     Você pode acessar um manual de rede completo e detalhado com exemplos de arquivos de configuração em:
                   </p>
-                  <div className="bg-ink-950 p-2 rounded-xl border border-ink-800 font-mono text-[9px] text-brand-300 break-all select-all">
+                  <div className="bg-ink-900 p-2 rounded-xl border border-ink-800 font-mono text-[9px] text-brand-300 break-all select-all">
                     PACS_MANUAL.md
                   </div>
                 </div>

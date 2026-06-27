@@ -383,7 +383,7 @@ export function Settings() {
                       Número do CRM
                       <span className="group relative cursor-help">
                         <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-900 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
                           O CRM é obrigatório para validade jurídica de seus laudos. Insira no formato Número-UF (ex: 123456-SP).
                         </span>
                       </span>
@@ -400,7 +400,7 @@ export function Settings() {
                       RQE (Especialidade)
                       <span className="group relative cursor-help">
                         <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
-                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-ink-900 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
                           O RQE (Registro de Qualificação de Especialidade) serve para certificar legalmente a sua especialidade nos laudos.
                         </span>
                       </span>
@@ -419,7 +419,7 @@ export function Settings() {
                     Assinatura Digitalizada (Imagem)
                     <span className="group relative cursor-help">
                       <Info size={12} className="text-ink-400 hover:text-indigo-600 transition-colors inline-block" />
-                      <span className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-ink-950 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                      <span className="absolute bottom-full left-0 mb-2 w-64 p-2 bg-ink-900 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
                         Faça upload da imagem da sua assinatura manuscrita (PNG com fundo transparente) para inserção nítida nos laudos em PDF.
                       </span>
                     </span>
