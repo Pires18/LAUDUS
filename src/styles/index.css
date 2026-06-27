@@ -218,6 +218,35 @@ html.dark .text-green-600{color:rgb(74 222 128)!important}
 html.dark .text-green-700{color:rgb(134 239 172)!important}
 html.dark .bg-lime-50{background-color:rgb(132 204 22/.13)!important}
 
+/* ════════════════════════════════════════════
+   MODO ESCURO — EDITOR DE LAUDO (Tailwind Typography .prose)
+   O .prose/.prose-slate fixa cores escuras de texto que não se adaptam; sobre o
+   "papel" escuro o laudo ficava ilegível. Remapeia as variáveis do prose para
+   tons claros do tema, tornando o documento legível no modo escuro.
+   ════════════════════════════════════════════ */
+html.dark .prose {
+  --tw-prose-body: rgb(var(--ink-800));
+  --tw-prose-headings: rgb(var(--ink-900));
+  --tw-prose-lead: rgb(var(--ink-700));
+  --tw-prose-links: rgb(58 161 246);
+  --tw-prose-bold: rgb(var(--ink-900));
+  --tw-prose-counters: rgb(var(--ink-500));
+  --tw-prose-bullets: rgb(var(--ink-400));
+  --tw-prose-hr: rgb(var(--ink-200));
+  --tw-prose-quotes: rgb(var(--ink-800));
+  --tw-prose-quote-borders: rgb(var(--ink-200));
+  --tw-prose-captions: rgb(var(--ink-500));
+  --tw-prose-code: rgb(var(--ink-900));
+  --tw-prose-pre-code: rgb(var(--ink-800));
+  --tw-prose-pre-bg: rgb(var(--ink-100));
+  --tw-prose-th-borders: rgb(var(--ink-300));
+  --tw-prose-td-borders: rgb(var(--ink-200));
+  color: rgb(var(--ink-800));
+}
+html.dark .prose :where(h1,h2,h3,h4,strong,b):not(:where([class~="not-prose"] *)) {
+  color: rgb(var(--ink-900));
+}
+
 /* ── Polimentos finais do dark ── */
 html.dark ::selection { background: rgb(58 161 246 / 0.35); }
 html.dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgb(var(--ink-300)); }
@@ -421,6 +450,12 @@ html, body, #root {
     margin: 5mm;
     size: A4;
   }
+
+  /* Neutraliza o tema escuro na impressão: papel sempre branco, texto escuro,
+     independentemente do modo escuro estar ativo na tela. */
+  html.dark .bg-white { background-color: #ffffff !important; }
+  html.dark .prose { color: #1e293b !important; }
+  html.dark .prose :where(h1, h2, h3, h4, strong, b) { color: #0f172a !important; }
 
   html, body {
     height: auto !important;
