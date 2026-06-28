@@ -345,11 +345,11 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 
 4.11 CERVICOMETRIA (COMPRIMENTO DO COLO UTERINO):
     Medição transvaginal, no plano sagital médio do útero, ao longo do canal endocervical fechado (de orifício interno a externo).
-    Valores de referência:
-      — Normal ≥30 mm (entre 18–24 semanas, rastreamento de prematuridade);
-      — Limítrofe: 25–29 mm — controle em 2 semanas;
-      — Colo curto: <25 mm — risco significativo de parto prematuro; encaminhar MFM;
-      — Alto risco: <20 mm antes de 24 semanas com histórico de prematuridade → ATIVAR N4/R6.
+    Valores de referência (ISUOG 2020 — coerentes com as Camadas de Área e de Exame):
+      — Normal: ≥25 mm entre 18–24 semanas (≥30 mm após 24 semanas);
+      — Colo curto: <25 mm (18–24 sem) — risco aumentado de parto prematuro; conduta conforme histórico
+        (progesterona vaginal se sem prematuridade prévia; discutir cerclagem se PPT prévio <34 sem) → encaminhar MFM;
+      — Alto risco: <20 mm antes de 24 semanas → internação/avaliação perinatal → ATIVAR N4/R6.
     ⚠ Medir APENAS quando solicitado ou em exame morfológico com rastreamento de prematuridade. Colo fechado = "orifício cervical interno fechado, sem protrusão de membranas".
     Reporte: "Cervicometria transvaginal: canal endocervical medindo X,X mm — [normal / limítrofe / colo curto]."
 
@@ -886,7 +886,20 @@ Versões oficiais vigentes a utilizar EXCLUSIVAMENTE (não misturar):
   Bosniak: ACR 2019 (v2019) — para cistos renais;
   PI-RADS: ACR v2.1 — para próstata em RM; US transretal usa adaptação própria — NÃO aplicar PI-RADS de RM ao US sem ressalva;
   FIGO: 2021 — para estadiamento ginecológico.
-PROIBIDO: citar versão diferente das acima sem justificativa explícita. Se em dúvida sobre a versão: declare "(versão a confirmar com o serviço)" em vez de inventar.`;
+PROIBIDO: citar versão diferente das acima sem justificativa explícita. Se em dúvida sobre a versão: declare "(versão a confirmar com o serviço)" em vez de inventar.
+
+SISTEMAS ADJUNTOS E DE GRADAÇÃO (definidos nas INSTRUÇÕES DA ÁREA e DO EXAME — Camadas 2 e 3):
+Além dos sistemas "RADS" acima, as camadas de área/exame podem aplicar sistemas adjuntos e de
+gradação reconhecidos. Quando o template do exame os definir, eles são VÁLIDOS e devem ser usados:
+  — Ovário: IOTA Simple Rules / IOTA ADNEX (adjuntos ao O-RADS); FIGO-PALM-COEIN (SUA); FIGO miomas 0-8;
+  — Tireoide: pontuação ACR TI-RADS, EU-TIRADS, padrão vascular de Chammas, citologia de Bethesda;
+  — Hepático/biliar/renal: graduação de esteatose S1-S3, Tokyo TG18 (colecistite), SFU/UTD (hidronefrose);
+  — Vascular: NASCET/SRU 2003 (carótida), CEAP (venoso), Rutherford/Fontaine + ITB (arterial);
+  — MSK/Reumato: OMERACT + EULAR-OMERACT 0-3, Ellman (manguito), BAMIC (muscular);
+  — Mama/linfonodo: léxico BI-RADS + Bedi (cortical linfonodal); Robbins (níveis cervicais).
+LOCALIZAÇÃO NO LAUDO: apenas os sistemas "RADS" e Bosniak/GRADS/FIGO usam a seção <h2>CLASSIFICAÇÃO</h2>.
+Sistemas de gradação (SFU, CEAP, Rutherford, OMERACT, Bedi, Tokyo, BAMIC) e adjuntos (IOTA, Chammas)
+são declarados DENTRO da ANÁLISE, nunca em seção CLASSIFICAÇÃO separada. Citar sempre a entidade/ano.`;
 
 // ═══════════════════════════════════════════════════════════════════════
 // BLOCO 5A — REGRAS DE OURO DO REFINAMENTO

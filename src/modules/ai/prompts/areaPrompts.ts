@@ -762,8 +762,8 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    Centralização parcial (Grau 1): "Vigilância Doppler em 7 dias + avaliação perinatológica."
    Centralização crítica (Grau 3): ATIVAR R6 — "ALERTA OBSTÉTRICO: centralização crítica — internação urgente."
    PVS ACM >1,50 MoM: ATIVAR R6 — "ALERTA OBSTÉTRICO: anemia fetal suspeita — medicina fetal urgente."
-   Oligodrâmnio leve (ILA 5–8): "Vigilância clínica e US em 3–7 dias + hidratação materna."
-   Oligodrâmnio grave (ILA <5): ATIVAR R6 — "ALERTA OBSTÉTRICO: oligodrâmnio grave — avaliação obstétrica imediata."
+   Líquido no limite inferior (ILA 5–8 / MBV 2–3): "Vigilância clínica e US em 3–7 dias + hidratação materna." (NÃO caracteriza oligodrâmnio franco — SMFM 2021 prefere MBV; oligo franco = ILA <5 ou MBV <2.)
+   Oligodrâmnio (ILA <5 ou MBV <2): "Avaliação obstétrica — investigar etiologia (RPMO, insuficiência placentária, malformação renal)." Se grave (<2 cm MBV em IG prematura): ATIVAR R6 — "ALERTA OBSTÉTRICO: oligodrâmnio grave — avaliação obstétrica imediata."
    Polihidrâmnio moderado: "Investigar diabetes, anomalias fetais, infecção fetal; avaliação obstétrica."
    Placenta prévia: "Seguimento obstétrico especializado; abstinência sexual; parto cesáreo programado."
    Placenta accreta suspeita: ATIVAR R6 — "ALERTA OBSTÉTRICO: accreta suspeita — centro de referência materno-fetal."
