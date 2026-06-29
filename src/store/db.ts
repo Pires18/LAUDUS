@@ -982,16 +982,24 @@ export async function clearAllSupportTickets(): Promise<void> {
  * Retorna a URL correta do PACS baseada no ambiente atual (Vercel vs Local)
  */
 export function getActivePacsUrl(settings: AppSettings, isBackup = false): string {
-  const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-  
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isVercel = host.includes('laud.us') || host.includes('vercel.app');
+  // Em dev (localhost), o proxy é o middleware do Vite, que faz o fetch a partir
+  // DESTA máquina. Como ela alcança o Orthanc apenas via Tailscale (não pelo IP
+  // local da clínica), preferimos a URL pública Tailscale aqui também — assim o
+  // localhost passa a enxergar as imagens igual ao Vercel. Sem URL pública
+  // configurada, mantém o IP local (deploy on-premise na própria rede do Orthanc).
+  const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+  const preferPublic = isVercel || isLocalhost;
+
   if (isBackup) {
-    return (isVercel && settings.dicomBackupTailscalePublicUrl) 
-      ? settings.dicomBackupTailscalePublicUrl 
+    return (preferPublic && settings.dicomBackupTailscalePublicUrl)
+      ? settings.dicomBackupTailscalePublicUrl
       : (settings.dicomBackupViewerUrl || 'http://localhost:8042');
   }
-  
-  return (isVercel && settings.dicomTailscalePublicUrl) 
-    ? settings.dicomTailscalePublicUrl 
+
+  return (preferPublic && settings.dicomTailscalePublicUrl)
+    ? settings.dicomTailscalePublicUrl
     : (settings.dicomViewerUrl || 'http://localhost:8042');
 }
 
