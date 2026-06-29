@@ -431,8 +431,8 @@ export function ExamEditor({ examId }: Props) {
     showToast('Preparando imagens para a impressão...', 'info');
 
     const localUrlsMap: Record<string, string> = {};
-    const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-    const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
+    const primaryBaseUrl = getActivePacsUrl(settings, false);
+    const backupBaseUrl = getActivePacsUrl(settings, true);
 
     try {
       for (let i = 0; i < instances.length; i++) {
@@ -1336,9 +1336,7 @@ export function ExamEditor({ examId }: Props) {
             const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
             const activeServerSource = activeStudy?.serverSource || 'primary';
             const isBackup = activeServerSource === 'backup';
-            const currentBaseUrl = isBackup
-              ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-              : (settings.dicomViewerUrl || 'http://localhost:8042');
+            const currentBaseUrl = getActivePacsUrl(settings, isBackup);
             const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
             const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
             const proxyPath = getProxyEndpoint(settings, isBackup);

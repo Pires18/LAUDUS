@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { getProxyEndpoint } from '../../../store/db';
+import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
 import { ExamRequest, Patient } from '../../../types';
 import { getStudyInstanceUID } from '../../../utils/dicom';
 import { logger } from '../../../utils/logger';
@@ -200,7 +200,9 @@ export function useDicomSync({
 
   const fetchInstancesForStudy = useCallback(async (studyId: string, serverSource: 'primary' | 'backup', studyInstanceUID?: string) => {
     const isBackupStudy = serverSource === 'backup';
-    const currentUrl = isBackupStudy ? (settings.dicomBackupViewerUrl || 'http://localhost:8042') : (settings.dicomViewerUrl || 'http://localhost:8042');
+    // Resolve a base igual ao "Testar PACS" (getActivePacsUrl): na nuvem usa a URL
+    // pública Tailscale quando configurada, evitando apontar para um IP local inacessível.
+    const currentUrl = getActivePacsUrl(settings, isBackupStudy);
     const currentAuth = isBackupStudy 
       ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` 
       : `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
@@ -253,6 +255,8 @@ export function useDicomSync({
   }, [
     settings.dicomViewerUrl,
     settings.dicomBackupViewerUrl,
+    settings.dicomTailscalePublicUrl,
+    settings.dicomBackupTailscalePublicUrl,
     settings.dicomUsername,
     settings.dicomBackupUsername,
     settings.dicomPassword,
@@ -316,11 +320,15 @@ export function useDicomSync({
         setDicomError(null);
       }
       try {
-        const baseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
+        const baseUrl = getActivePacsUrl(settings, false);
         const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
-        
-        const backupUrl = settings.dicomBackupViewerUrl;
-        const backupAuth = backupUrl ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
+
+        // Backup é considerado configurado se houver URL local OU URL pública Tailscale.
+        // A base é resolvida via getActivePacsUrl (igual ao "Testar PACS"), garantindo que
+        // o editor consulte o backup mesmo quando só a URL pública estiver preenchida.
+        const backupConfigured = !!(settings.dicomBackupViewerUrl || settings.dicomBackupTailscalePublicUrl);
+        const backupUrl = backupConfigured ? getActivePacsUrl(settings, true) : '';
+        const backupAuth = backupConfigured ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
 
         const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 2500) => {
           const controller = new AbortController();
@@ -494,9 +502,11 @@ export function useDicomSync({
     patient?.id,
     settings.dicomSyncEnabled,
     settings.dicomViewerUrl,
+    settings.dicomTailscalePublicUrl,
     settings.dicomUsername,
     settings.dicomPassword,
     settings.dicomBackupViewerUrl,
+    settings.dicomBackupTailscalePublicUrl,
     settings.dicomBackupUsername,
     settings.dicomBackupPassword,
     dicomRefreshKey,
