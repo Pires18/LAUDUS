@@ -984,11 +984,11 @@ export async function clearAllSupportTickets(): Promise<void> {
 export function getActivePacsUrl(settings: AppSettings, isBackup = false): string {
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const isVercel = host.includes('laud.us') || host.includes('vercel.app');
-  // Em dev (localhost), o proxy é o middleware do Vite, que faz o fetch a partir
-  // DESTA máquina. Como ela alcança o Orthanc apenas via Tailscale (não pelo IP
-  // local da clínica), preferimos a URL pública Tailscale aqui também — assim o
-  // localhost passa a enxergar as imagens igual ao Vercel. Sem URL pública
-  // configurada, mantém o IP local (deploy on-premise na própria rede do Orthanc).
+  // No localhost (dev), o proxy é o middleware do Vite, que faz o fetch a partir
+  // DESTA máquina. Ela alcança o Orthanc apenas via Tailscale (não pelo IP local
+  // da clínica), então preferimos a URL pública Tailscale aqui também — fazendo o
+  // localhost enxergar as imagens igual ao Vercel. Sem URL pública configurada,
+  // mantém o IP local (deploy on-premise na própria rede do Orthanc).
   const isLocalhost = host === 'localhost' || host === '127.0.0.1';
   const preferPublic = isVercel || isLocalhost;
 
