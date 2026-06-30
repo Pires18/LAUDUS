@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../store/app';
 import {
@@ -44,7 +45,7 @@ export function OnboardingScreen() {
         const featured = list.find((p: any) => p.featured);
         setSelectedPlanId(featured?.id || list[0]?.id || '');
       } catch (err) {
-        console.error('Erro ao buscar planos:', err);
+        logger.error('Erro ao buscar planos:', err);
       } finally {
         setLoadingPlans(false);
       }

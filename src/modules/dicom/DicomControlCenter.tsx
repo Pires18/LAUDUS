@@ -837,6 +837,11 @@ export function DicomControlCenter() {
                       </div>
 
                       <div className="space-y-4">
+                        <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-100 text-emerald-900 text-xs leading-relaxed space-y-1">
+                          <strong className="block font-bold">Gateway único (worklist + imagens)</strong>
+                          O agente agora também faz proxy do Orthanc em <code>/api/orthanc-proxy</code>. Basta expor o agente via <strong>Tailscale Funnel (HTTPS)</strong> e preencher a "URL do Agente Local" — uma única exposição atende tanto a gravação de worklist (.wl) quanto a visualização de imagens na nuvem. Sem o agente exposto em HTTPS, a Worklist funciona no localhost mas falha no Vercel.
+                        </div>
+
                         <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
                           <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">1. Execução Manual Temporária</h4>
                           <p className="text-xs text-ink-600 leading-relaxed">
@@ -1055,6 +1060,11 @@ export function DicomControlCenter() {
                                 <td className="px-4 py-3 font-bold text-ink-800">Erro de Mixed Content no navegador</td>
                                 <td className="px-4 py-3">Browser em HTTPS tentando consumir IP em HTTP comum.</td>
                                 <td className="px-4 py-3">Configure HTTPS no Tailscale e use a URL pública ts.net:8443 no painel.</td>
+                              </tr>
+                              <tr>
+                                <td className="px-4 py-3 font-bold text-ink-800">Worklist falha só na nuvem (Vercel)</td>
+                                <td className="px-4 py-3">Agente Local não exposto/HTTPS — a nuvem não alcança a porta 3000 da clínica.</td>
+                                <td className="px-4 py-3">Exponha o agente via Tailscale Funnel em HTTPS e preencha a "URL do Agente Local" com o endereço <code>https://...ts.net</code>.</td>
                               </tr>
                               <tr>
                                 <td className="px-4 py-3 font-bold text-ink-800">Ultrassom não localiza pacientes</td>

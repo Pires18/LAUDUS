@@ -1,5 +1,6 @@
 import { Patient } from '../types';
 import { logger } from './logger';
+import { getWorklistEndpoint } from '../store/db';
 
 /**
  * Envia um exame para a Worklist do Orthanc (Primário e Backup)
@@ -33,23 +34,25 @@ export async function syncExamToOrthancWorklist(
       ? settings.dicomDevices?.find((d: any) => d.id === deviceId) || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' }
       : settings.dicomDevices?.[0] || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
-    // Decide o endpoint: na nuvem (laud.us/vercel) com agente configurado, vai direto
-    // ao agente remoto da clínica; rodando localmente (dev ou app na máquina da clínica),
-    // usa '/api/worklist' same-origin, que gera o arquivo NESTA máquina via Vite/servidor local.
-    const isVercel = typeof window !== 'undefined' &&
-      (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-
     // Principal Sync
     let primarySuccess = false;
     let primaryAttempted = false;
     let primaryError = '';
 
     if (settings.dicomSyncEnabled !== false && patient.id !== 'ANONIMO') {
+<<<<<<< HEAD
       primaryAttempted = true;
       const url = (isVercel && settings.dicomLocalAgentUrl)
         ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
         : '/api/worklist';
         
+=======
+      // Same-origin '/api/worklist': no local o Vite grava o .wl nesta máquina;
+      // no Vercel a função serverless encaminha server-side ao agente público
+      // (localAgentUrl do corpo) — mesmo canal confiável usado pelas imagens.
+      const url = getWorklistEndpoint(settings, false);
+
+>>>>>>> 034e10db6ec44061ae38dc0b95d08af3724700b0
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -86,10 +89,8 @@ export async function syncExamToOrthancWorklist(
     if (settings.dicomBackupSyncEnabled && patient.id !== 'ANONIMO') {
       backupAttempted = true;
       try {
-        const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
-          ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-          : '/api/worklist';
-          
+        const urlBackup = getWorklistEndpoint(settings, true);
+
         const backupRes = await fetch(urlBackup, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

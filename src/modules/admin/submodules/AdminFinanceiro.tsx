@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, ReactNode } from 'react';
+import { logger } from '../../../utils/logger';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
   deleteDoc, updateDoc,
@@ -1404,7 +1405,7 @@ function TransactionsTab() {
       list.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
       setTransactions(list);
     } catch (err) {
-      console.error(err);
+      logger.error('Erro ao carregar transações:', err);
       showToast('Erro ao carregar transações.', 'error');
     } finally {
       setLoading(false);

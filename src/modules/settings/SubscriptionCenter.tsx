@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logger } from '../../utils/logger';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useApp } from '../../store/app';
 import { createSupportTicket, getAiUsageStats } from '../../store/db';
@@ -108,7 +109,7 @@ export function SubscriptionCenter() {
       list.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
       setUserTransactions(list);
     } catch (err) {
-      console.error('Erro ao buscar transações do usuário:', err);
+      logger.error('Erro ao buscar transações do usuário:', err);
     } finally {
       setLoadingTransactions(false);
     }

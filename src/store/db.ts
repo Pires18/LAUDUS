@@ -130,6 +130,22 @@ export function generateStandardId(prefix: string): string {
 
 const SETTINGS_DOC_ID = 'app';
 
+/** Modelos Anthropic legados que devem ser migrados para o modelo atual. */
+const LEGACY_ANTHROPIC_MODELS = new Set([
+  'claude-3-5-sonnet-latest',
+  'claude-3-7-sonnet-latest',
+  'claude-3-5-haiku-latest',
+]);
+export const CURRENT_ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+
+/** Migra (in-place) um modelo Anthropic legado para o modelo atual. Retorna o próprio objeto. */
+export function migrateLegacyAnthropicModel<T extends { anthropicModel?: string }>(s: T): T {
+  if (s.anthropicModel && LEGACY_ANTHROPIC_MODELS.has(s.anthropicModel)) {
+    s.anthropicModel = CURRENT_ANTHROPIC_MODEL;
+  }
+  return s;
+}
+
 export async function getSettings(): Promise<AppSettings> {
   try {
     const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
@@ -219,11 +235,7 @@ export async function getSettings(): Promise<AppSettings> {
       {
         version: 5,
         name: 'anthropic-model-upgrade-to-sonnet-4-6',
-        apply: (s) => {
-          if (s.anthropicModel === 'claude-3-5-sonnet-latest' || s.anthropicModel === 'claude-3-7-sonnet-latest' || s.anthropicModel === 'claude-3-5-haiku-latest') {
-            s.anthropicModel = 'claude-sonnet-4-6';
-          }
-        }
+        apply: (s) => { migrateLegacyAnthropicModel(s); }
       },
       {
         version: 6,
@@ -263,13 +275,13 @@ export async function getSettings(): Promise<AppSettings> {
     
     // Fallback de segurança para buscar prompts oficiais do administrador
     const isCurrentUserAdmin = auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
-    console.log('[DB] Resolvendo settings. Usuário:', auth.currentUser?.email, 'isAdmin:', isCurrentUserAdmin);
+    logger.info('[DB] Resolvendo settings. Usuário:', auth.currentUser?.email, 'isAdmin:', isCurrentUserAdmin);
 
     if (!isCurrentUserAdmin) {
-      console.log('[DB] Buscando configurações globais do administrador...');
+      logger.info('[DB] Buscando configurações globais do administrador...');
       const adminSettings = await getAdminSettings();
       if (adminSettings) {
-        console.log('[DB] Configurações globais do administrador carregadas com sucesso. Mesclando com configurações locais...');
+        logger.info('[DB] Configurações globais do administrador carregadas com sucesso. Mesclando com configurações locais...');
         const merged = {
           ...defaultSettings,
           ...data, // Configurações locais do médico (Motor, PACS, CRM, RQE, etc) prevalecem
@@ -292,12 +304,10 @@ export async function getSettings(): Promise<AppSettings> {
           aiTemperature: adminSettings.aiTemperature ?? data.aiTemperature ?? defaultSettings.aiTemperature,
         };
 
-        if (merged.anthropicModel === 'claude-3-5-sonnet-latest' || merged.anthropicModel === 'claude-3-7-sonnet-latest' || merged.anthropicModel === 'claude-3-5-haiku-latest') {
-          merged.anthropicModel = 'claude-sonnet-4-6';
-        }
+        migrateLegacyAnthropicModel(merged);
         return decryptDicomPasswords(merged);
       } else {
-        console.warn('[DB] getAdminSettings retornou null. O médico não pôde herdar as chaves e prompts do admin.');
+        logger.warn('[DB] getAdminSettings retornou null. O médico não pôde herdar as chaves e prompts do admin.');
       }
     }
     const finalData = { ...defaultSettings, ...data };
@@ -306,13 +316,11 @@ export async function getSettings(): Promise<AppSettings> {
     finalData.aiStructurePrompt = finalData.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
     finalData.aiRigidRules = finalData.aiRigidRules || DEFAULT_RIGID_RULES;
 
-    if (finalData.anthropicModel === 'claude-3-5-sonnet-latest' || finalData.anthropicModel === 'claude-3-7-sonnet-latest' || finalData.anthropicModel === 'claude-3-5-haiku-latest') {
-      finalData.anthropicModel = 'claude-sonnet-4-6';
-    }
+    migrateLegacyAnthropicModel(finalData);
 
     // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
     if (isCurrentUserAdmin || finalData.currentRole === 'admin') {
-      console.log('[DB] Usuário é administrador. Publicando/sincronizando configurações na coleção global (global_config/admin_settings)...');
+      logger.info('[DB] Usuário é administrador. Publicando/sincronizando configurações na coleção global (global_config/admin_settings)...');
       const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
       setDoc(globalDocRef, sanitize({
         ...finalData,
@@ -320,8 +328,8 @@ export async function getSettings(): Promise<AppSettings> {
         adminEmail: auth.currentUser?.email || '',
         updatedAt: Date.now()
       }), { merge: true })
-        .then(() => console.log('[DB] Sincronização global concluída.'))
-        .catch(err => console.error('[DB] Erro ao sincronizar global settings do admin:', err));
+        .then(() => logger.info('[DB] Sincronização global concluída.'))
+        .catch(err => logger.error('[DB] Erro ao sincronizar global settings do admin:', err));
     }
 
     return decryptDicomPasswords(finalData);
@@ -379,17 +387,17 @@ export async function resolveAdminUid(): Promise<string | null> {
     if (globalSnap.exists()) {
       const globalData = globalSnap.data();
       if (globalData && globalData.adminUid) {
-        console.log('[DB] UID do administrador resolvido do global_config:', globalData.adminUid);
+        logger.info('[DB] UID do administrador resolvido do global_config:', globalData.adminUid);
         cachedAdminUid = globalData.adminUid;
         return cachedAdminUid;
       }
     }
   } catch (err) {
-    console.warn('[DB] Erro ao buscar UID do admin em global_config:', err);
+    logger.warn('[DB] Erro ao buscar UID do admin em global_config:', err);
   }
 
   const adminEmail = (ADMIN_EMAIL || 'matheuskpires@gmail.com').trim().toLowerCase();
-  console.log('[DB] Buscando UID do admin via query de email na coleção users para:', adminEmail);
+  logger.info('[DB] Buscando UID do admin via query de email na coleção users para:', adminEmail);
   try {
     const q = query(
       collection(firestore, 'users'),
@@ -399,14 +407,14 @@ export async function resolveAdminUid(): Promise<string | null> {
     const snap = await getDocs(q);
     if (!snap.empty) {
       cachedAdminUid = snap.docs[0].id;
-      console.log('[DB] UID do administrador resolvido por email na coleção users:', cachedAdminUid);
+      logger.info('[DB] UID do administrador resolvido por email na coleção users:', cachedAdminUid);
       return cachedAdminUid;
     }
   } catch (err) {
-    console.warn('[DB] Falha ao buscar UID do administrador por email (provável restrição de regras do Firestore):', err);
+    logger.warn('[DB] Falha ao buscar UID do administrador por email (provável restrição de regras do Firestore):', err);
   }
   
-  console.log('[DB] Buscando UID do admin via query de role na coleção users...');
+  logger.info('[DB] Buscando UID do admin via query de role na coleção users...');
   try {
     const q = query(
       collection(firestore, 'users'),
@@ -416,63 +424,59 @@ export async function resolveAdminUid(): Promise<string | null> {
     const snap = await getDocs(q);
     if (!snap.empty) {
       cachedAdminUid = snap.docs[0].id;
-      console.log('[DB] UID do administrador resolvido por role na coleção users:', cachedAdminUid);
+      logger.info('[DB] UID do administrador resolvido por role na coleção users:', cachedAdminUid);
       return cachedAdminUid;
     }
   } catch (err) {
-    console.warn('[DB] Falha ao buscar UID do administrador por role (provável restrição de regras do Firestore):', err);
+    logger.warn('[DB] Falha ao buscar UID do administrador por role (provável restrição de regras do Firestore):', err);
   }
   
   return null;
 }
 
 export async function getAdminSettings(): Promise<AppSettings | null> {
-  console.log('[DB] getAdminSettings iniciada...');
+  logger.info('[DB] getAdminSettings iniciada...');
   try {
     // 1. Tenta carregar primeiro do global_config para evitar queries bloqueadas na coleção de users
     const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
     const globalSnap = await getDoc(globalDocRef);
     if (globalSnap.exists()) {
       const globalData = globalSnap.data() as AppSettings & { adminUid?: string };
-      console.log('[DB] Documento global_config/admin_settings encontrado com sucesso. Chaves configuradas:', {
+      logger.info('[DB] Documento global_config/admin_settings encontrado com sucesso. Chaves configuradas:', {
         hasGeminiKey: !!globalData.geminiApiKey,
         hasAnthropicKey: !!globalData.anthropicApiKey
       });
       if (globalData.adminUid) {
         cachedAdminUid = globalData.adminUid;
       }
-      if (globalData.anthropicModel === 'claude-3-5-sonnet-latest' || globalData.anthropicModel === 'claude-3-7-sonnet-latest' || globalData.anthropicModel === 'claude-3-5-haiku-latest') {
-        globalData.anthropicModel = 'claude-sonnet-4-6';
-      }
+      migrateLegacyAnthropicModel(globalData);
       return globalData;
     } else {
-      console.warn('[DB] Documento global_config/admin_settings NÃO existe no Firestore.');
+      logger.warn('[DB] Documento global_config/admin_settings NÃO existe no Firestore.');
     }
 
     // 2. Fallback para carregar do documento de usuário se o global ainda não existir
-    console.log('[DB] Tentando carregar settings diretamente do documento do usuário administrador como fallback...');
+    logger.info('[DB] Tentando carregar settings diretamente do documento do usuário administrador como fallback...');
     const adminUid = await resolveAdminUid();
     if (adminUid) {
       const adminDocRef = doc(firestore, `users/${adminUid}/settings`, SETTINGS_DOC_ID);
       const adminSnap = await getDoc(adminDocRef);
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AppSettings;
-        console.log('[DB] Settings carregadas do fallback (documento do admin). Chaves:', {
+        logger.info('[DB] Settings carregadas do fallback (documento do admin). Chaves:', {
           hasGeminiKey: !!adminData.geminiApiKey,
           hasAnthropicKey: !!adminData.anthropicApiKey
         });
-        if (adminData.anthropicModel === 'claude-3-5-sonnet-latest' || adminData.anthropicModel === 'claude-3-7-sonnet-latest' || adminData.anthropicModel === 'claude-3-5-haiku-latest') {
-          adminData.anthropicModel = 'claude-sonnet-4-6';
-        }
+        migrateLegacyAnthropicModel(adminData);
         return adminData;
       } else {
-        console.warn(`[DB] Documento de settings do admin (users/${adminUid}/settings/app) não existe.`);
+        logger.warn(`[DB] Documento de settings do admin (users/${adminUid}/settings/app) não existe.`);
       }
     } else {
-      console.warn('[DB] Não foi possível resolver o adminUid para o fallback.');
+      logger.warn('[DB] Não foi possível resolver o adminUid para o fallback.');
     }
   } catch (e: any) {
-    console.error('[DB] Erro crítico ao carregar settings do administrador:', e);
+    logger.error('[DB] Erro crítico ao carregar settings do administrador:', e);
   }
   return null;
 }
@@ -485,7 +489,7 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
   // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
   const isCurrentUserAdmin = auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL.trim().toLowerCase();
   if (isCurrentUserAdmin || settings.currentRole === 'admin') {
-    console.log('[DB] Usuário é admin no saveSettings. Sincronizando com global_config/admin_settings...');
+    logger.info('[DB] Usuário é admin no saveSettings. Sincronizando com global_config/admin_settings...');
     const globalDocRef = doc(firestore, 'global_config', 'admin_settings');
     try {
       await setDoc(globalDocRef, sanitize({
@@ -494,9 +498,9 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
         adminEmail: auth.currentUser?.email || '',
         updatedAt: Date.now()
       }), { merge: true });
-      console.log('[DB] Sincronização global de settings efetuada no salvamento.');
+      logger.info('[DB] Sincronização global de settings efetuada no salvamento.');
     } catch (err) {
-      console.error('[DB] Falha crítica ao salvar global settings no Firestore:', err);
+      logger.error('[DB] Falha crítica ao salvar global settings no Firestore:', err);
       throw err;
     }
   }
@@ -1021,6 +1025,27 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 }
 
 /**
+ * Retorna o endpoint de Worklist (.wl) a ser utilizado.
+ *
+ * Usa SEMPRE `'/api/worklist'` same-origin — exatamente o mesmo padrão confiável
+ * do proxy de imagens, evitando as variáveis do lado do navegador (Mixed
+ * Content, CORS, pertencer ou não à tailnet):
+ *
+ * - **Local (dev / on-premise):** o middleware do Vite (ou o servidor local)
+ *   grava o arquivo `.wl` NESTA máquina, ignorando `localAgentUrl`.
+ * - **Nuvem (Vercel):** a função serverless `api/worklist.ts` encaminha a
+ *   requisição **server-side** para `localAgentUrl` (a URL pública HTTPS do
+ *   agente, principal ou backup), enviada no corpo. É o mesmo canal pelo qual
+ *   o Vercel já alcança o Orthanc para carregar as imagens.
+ *
+ * O parâmetro `isBackup` é mantido por simetria com {@link getProxyEndpoint};
+ * a escolha entre agente principal/backup é feita via `localAgentUrl` no corpo.
+ */
+export function getWorklistEndpoint(_settings: AppSettings, _isBackup = false): string {
+  return '/api/worklist';
+}
+
+/**
  * Remove o arquivo `.wl` de uma entrada da Worklist DICOM do Orthanc.
  *
  * Chamado em dois cenários:
@@ -1037,15 +1062,10 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 export async function deleteWorklistEntry(examId: string, settings: AppSettings): Promise<void> {
   if (settings.dicomSyncEnabled === false) return;
 
-  // Na nuvem (laud.us/vercel) com agente configurado vai direto ao agente remoto;
-  // localmente usa '/api/worklist' same-origin (Vite/servidor local desta máquina).
-  const isVercel = typeof window !== 'undefined' &&
-    (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-
   // ── Primário ──
-  const primaryAgentUrl = (isVercel && settings.dicomLocalAgentUrl)
-    ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-    : '/api/worklist';
+  // Same-origin '/api/worklist' (Vite grava local OU serverless do Vercel
+  // encaminha server-side ao agente via localAgentUrl do corpo).
+  const primaryAgentUrl = getWorklistEndpoint(settings, false);
 
   const primaryPromise = fetch(primaryAgentUrl, {
     method: 'DELETE',
@@ -1062,9 +1082,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
   // ── Backup (se configurado) ──
   let backupPromise: Promise<void | Response> = Promise.resolve();
   if (settings.dicomBackupSyncEnabled) {
-    const backupAgentUrl = (isVercel && settings.dicomBackupLocalAgentUrl)
-      ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-      : '/api/worklist';
+    const backupAgentUrl = getWorklistEndpoint(settings, true);
 
     backupPromise = fetch(backupAgentUrl, {
       method: 'DELETE',

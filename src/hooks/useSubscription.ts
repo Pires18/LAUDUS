@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logger } from '../utils/logger';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 import { Subscription, SubscriptionAddon } from '../types';
@@ -237,7 +238,7 @@ export function useSubscription(): SubscriptionState {
               headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
               body: JSON.stringify({ userId: uid, subscriptionId: sub.id }),
             })
-          ).catch((err) => console.error('Erro ao resetar laudos mensais:', err));
+          ).catch((err) => logger.error('Erro ao resetar laudos mensais:', err));
         }
 
         setState({
