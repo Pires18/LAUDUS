@@ -24,11 +24,81 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ 
-      status: 'online', 
+    res.end(JSON.stringify({
+      status: 'online',
       message: 'Laudus Local Agent is running!',
       time: new Date().toISOString()
     }));
+    return;
+  }
+
+  // /api/orthanc-proxy -> Proxy para o Orthanc local (qualquer método)
+  // Permite que o agente seja o ÚNICO gateway exposto via Tailscale: além de
+  // gravar arquivos .wl, ele encaminha as chamadas REST ao Orthanc que roda na
+  // mesma máquina (localhost:8042). Assim a nuvem não precisa expor o Orthanc
+  // separadamente, e o getProxyEndpoint do app pode apontar para este agente.
+  if (req.url && req.url.startsWith('/api/orthanc-proxy')) {
+    (async () => {
+      try {
+        const parsedUrl = new URL(req.url, 'http://localhost');
+        const targetUrl = parsedUrl.searchParams.get('url');
+        if (!targetUrl) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'O parâmetro query "url" é obrigatório.' }));
+          return;
+        }
+
+        const targetUrlObj = new URL(targetUrl);
+        const headers = {};
+
+        // Credenciais: query params primeiro, depois embutidas na URL, senão padrão
+        const queryUsername = parsedUrl.searchParams.get('username');
+        const queryPassword = parsedUrl.searchParams.get('password');
+        if (queryUsername && queryPassword) {
+          headers['Authorization'] = `Basic ${Buffer.from(`${queryUsername}:${queryPassword}`).toString('base64')}`;
+        } else if (targetUrlObj.username && targetUrlObj.password) {
+          headers['Authorization'] = `Basic ${Buffer.from(`${targetUrlObj.username}:${targetUrlObj.password}`).toString('base64')}`;
+        } else {
+          headers['Authorization'] = `Basic ${Buffer.from('admin:123456789').toString('base64')}`;
+        }
+        if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
+
+        // Lê o corpo bruto para métodos com payload
+        let body;
+        if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+          body = await new Promise((resolve, reject) => {
+            const chunks = [];
+            req.on('data', (chunk) => chunks.push(chunk));
+            req.on('end', () => resolve(Buffer.concat(chunks)));
+            req.on('error', reject);
+          });
+        }
+
+        // Timeout: generoso para imagens/instâncias, curto para metadados
+        const controller = new AbortController();
+        const heavy = req.method === 'GET' && /\/(instances|preview|rendered|wado|file)/.test(targetUrl);
+        const timeoutId = setTimeout(() => controller.abort(), heavy ? 30000 : 10000);
+
+        const response = await fetch(targetUrl, { method: req.method, headers, body, signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        res.statusCode = response.status;
+        response.headers.forEach((value, key) => {
+          const k = key.toLowerCase();
+          if (k !== 'transfer-encoding' && k !== 'www-authenticate' && k !== 'content-encoding' && k !== 'connection' && k !== 'keep-alive') {
+            res.setHeader(key, value);
+          }
+        });
+        const arrayBuffer = await response.arrayBuffer();
+        res.end(Buffer.from(arrayBuffer));
+      } catch (err) {
+        console.error('[Agent Orthanc Proxy] Erro:', err.message);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: err.message || 'Erro ao conectar ao Orthanc local.' }));
+      }
+    })();
     return;
   }
 

@@ -1025,6 +1025,27 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 }
 
 /**
+ * Retorna o endpoint de Worklist (.wl) a ser utilizado.
+ *
+ * Usa SEMPRE `'/api/worklist'` same-origin — exatamente o mesmo padrão confiável
+ * do proxy de imagens, evitando as variáveis do lado do navegador (Mixed
+ * Content, CORS, pertencer ou não à tailnet):
+ *
+ * - **Local (dev / on-premise):** o middleware do Vite (ou o servidor local)
+ *   grava o arquivo `.wl` NESTA máquina, ignorando `localAgentUrl`.
+ * - **Nuvem (Vercel):** a função serverless `api/worklist.ts` encaminha a
+ *   requisição **server-side** para `localAgentUrl` (a URL pública HTTPS do
+ *   agente, principal ou backup), enviada no corpo. É o mesmo canal pelo qual
+ *   o Vercel já alcança o Orthanc para carregar as imagens.
+ *
+ * O parâmetro `isBackup` é mantido por simetria com {@link getProxyEndpoint};
+ * a escolha entre agente principal/backup é feita via `localAgentUrl` no corpo.
+ */
+export function getWorklistEndpoint(_settings: AppSettings, _isBackup = false): string {
+  return '/api/worklist';
+}
+
+/**
  * Remove o arquivo `.wl` de uma entrada da Worklist DICOM do Orthanc.
  *
  * Chamado em dois cenários:
@@ -1041,15 +1062,10 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 export async function deleteWorklistEntry(examId: string, settings: AppSettings): Promise<void> {
   if (settings.dicomSyncEnabled === false) return;
 
-  // Na nuvem (laud.us/vercel) com agente configurado vai direto ao agente remoto;
-  // localmente usa '/api/worklist' same-origin (Vite/servidor local desta máquina).
-  const isVercel = typeof window !== 'undefined' &&
-    (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-
   // ── Primário ──
-  const primaryAgentUrl = (isVercel && settings.dicomLocalAgentUrl)
-    ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-    : '/api/worklist';
+  // Same-origin '/api/worklist' (Vite grava local OU serverless do Vercel
+  // encaminha server-side ao agente via localAgentUrl do corpo).
+  const primaryAgentUrl = getWorklistEndpoint(settings, false);
 
   const primaryPromise = fetch(primaryAgentUrl, {
     method: 'DELETE',
@@ -1066,9 +1082,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
   // ── Backup (se configurado) ──
   let backupPromise: Promise<void | Response> = Promise.resolve();
   if (settings.dicomBackupSyncEnabled) {
-    const backupAgentUrl = (isVercel && settings.dicomBackupLocalAgentUrl)
-      ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-      : '/api/worklist';
+    const backupAgentUrl = getWorklistEndpoint(settings, true);
 
     backupPromise = fetch(backupAgentUrl, {
       method: 'DELETE',

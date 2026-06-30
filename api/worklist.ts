@@ -21,17 +21,33 @@ export default async function handler(req: any, res: any) {
   const localAgentUrl = body?.localAgentUrl;
 
   if (localAgentUrl) {
+    // Só encaminha para agentes HTTPS — a função roda em HTTPS e endereços HTTP
+    // puros seriam recusados/instáveis. Mixed Content não se aplica aqui (é
+    // server-to-server), mas exigir HTTPS evita destinos não-expostos.
+    if (!/^https:\/\//i.test(localAgentUrl)) {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        success: false,
+        error: 'A URL do Agente Local precisa ser HTTPS (ex: https://servidor.tailXXXX.ts.net) para funcionar na nuvem. Exponha o agente via Tailscale Funnel.'
+      }));
+      return;
+    }
     try {
       const targetUrl = `${localAgentUrl.replace(/\/$/, '')}/api/worklist`;
       console.log(`[Vercel Worklist Proxy] Forwarding ${req.method} request to: ${targetUrl}`);
-      
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(targetUrl, {
         method: req.method,
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       res.statusCode = response.status;
       res.setHeader('Content-Type', 'application/json');
@@ -40,11 +56,14 @@ export default async function handler(req: any, res: any) {
       return;
     } catch (err: any) {
       console.error('[Vercel Worklist Proxy Error]:', err);
+      const isTimeout = err?.name === 'AbortError';
       res.statusCode = 200; // Retorna 200 com success: false para exibir o erro amigável na UI
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         success: false,
-        error: `Não foi possível conectar ao Agente Local via Vercel. Certifique-se de que o Agente está ativo e acessível (Detalhes: ${err.message})`
+        error: isTimeout
+          ? 'O Agente Local não respondeu a tempo (timeout). Verifique se o agente está rodando e exposto via Tailscale Funnel.'
+          : `Não foi possível conectar ao Agente Local via Vercel. Certifique-se de que o Agente está ativo e acessível (Detalhes: ${err.message})`
       }));
       return;
     }
