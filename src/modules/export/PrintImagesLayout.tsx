@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { getProxyEndpoint } from '../../store/db';
+import { getProxyEndpoint, getActivePacsUrl } from '../../store/db';
 import { Patient, Clinic, AppSettings } from '../../types';
 import { calculateAge, formatDate } from '../../utils/format';
 
@@ -38,8 +38,8 @@ export function PrintImagesLayout({
     pages.push(selectedInstances.slice(i, i + chunkSize));
   }
 
-  const primaryBaseUrl = settings.dicomViewerUrl || 'http://localhost:8042';
-  const backupBaseUrl = settings.dicomBackupViewerUrl || primaryBaseUrl;
+  const primaryBaseUrl = getActivePacsUrl(settings, false);
+  const backupBaseUrl = getActivePacsUrl(settings, true);
 
   // Margens (mm) configuráveis pelo usuário — default 10mm em cada lado.
   const mTop = settings.pdfImagesMarginTop ?? 10;

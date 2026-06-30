@@ -5,7 +5,7 @@ import {
   Loader2, Camera, Printer, CheckSquare, Square,
   AlertTriangle, RefreshCw, Check
 } from 'lucide-react';
-import { getProxyEndpoint } from '../../../store/db';
+import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { DicomThumbnail } from './DicomThumbnail';
 
@@ -44,9 +44,7 @@ export function DicomImagesModal({
   // Viewport Active Image
   const [activeInstanceId, setActiveInstanceId] = useState<string | null>(null);
 
-  const baseUrl = activePacsServer === 'backup'
-    ? (settings.dicomBackupViewerUrl || 'http://localhost:8043')
-    : (settings.dicomViewerUrl || 'http://localhost:8042');
+  const baseUrl = getActivePacsUrl(settings, activePacsServer === 'backup');
 
   const initializedRef = useRef(false);
   const prevInstanceIdsRef = useRef<string[]>([]);
@@ -125,9 +123,7 @@ export function DicomImagesModal({
   const activeImageUrl = useMemo(() => {
     if (!activeInstance) return null;
     const isBackup = activeInstance.serverSource === 'backup';
-    const currentBaseUrl = isBackup
-      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-      : (settings.dicomViewerUrl || 'http://localhost:8042');
+    const currentBaseUrl = getActivePacsUrl(settings, isBackup);
     const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
     const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
     const proxyPath = getProxyEndpoint(settings, isBackup);
@@ -234,9 +230,7 @@ export function DicomImagesModal({
                     const isSelected = selectedIds.has(instance.ID);
                     const isActive = activeInstanceId === instance.ID;
                     const isBackup = instance.serverSource === 'backup';
-                    const currentBaseUrl = isBackup
-                      ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                      : (settings.dicomViewerUrl || 'http://localhost:8042');
+                    const currentBaseUrl = getActivePacsUrl(settings, isBackup);
                     const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
                     const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
                     const proxyPath = getProxyEndpoint(settings, isBackup);

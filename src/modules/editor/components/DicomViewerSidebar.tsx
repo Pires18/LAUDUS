@@ -1,7 +1,7 @@
 import { Loader2, AlertCircle, AlertTriangle, Eye, X, Printer, RefreshCw, SlidersHorizontal, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { DicomThumbnail } from './DicomThumbnail';
-import { getProxyEndpoint } from '../../../store/db';
+import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
 import type { AppSettings } from '../../../types';
 
 interface DicomViewerSidebarProps {
@@ -62,7 +62,7 @@ export function DicomViewerSidebar({
             <Loader2 size={12} className="animate-spin text-emerald-500" />
           )}
           <div className="flex items-center gap-3">
-            {settings.dicomBackupViewerUrl ? (
+            {(settings.dicomBackupViewerUrl || settings.dicomBackupTailscalePublicUrl) ? (
               <div className="flex items-center gap-2">
                 <select
                   value={activePacsServer}
@@ -247,9 +247,7 @@ export function DicomViewerSidebar({
             );
           }
           const isBackup = activeServerSource === 'backup';
-          const currentBaseUrl = isBackup
-            ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-            : (settings.dicomViewerUrl || 'http://localhost:8042');
+          const currentBaseUrl = getActivePacsUrl(settings, isBackup);
           const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
           const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
           const proxyPath = getProxyEndpoint(settings, isBackup);
@@ -333,9 +331,7 @@ export function DicomViewerSidebar({
             {dicomInstances.map((instance, idx) => {
               const isActive = idx === activeImageIndex;
               const isBackup = instance.serverSource === 'backup';
-              const currentBaseUrl = isBackup
-                ? (settings.dicomBackupViewerUrl || 'http://localhost:8042')
-                : (settings.dicomViewerUrl || 'http://localhost:8042');
+              const currentBaseUrl = getActivePacsUrl(settings, isBackup);
               const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
               const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
               const proxyPath = getProxyEndpoint(settings, isBackup);
