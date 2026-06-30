@@ -1,5 +1,29 @@
 # LAUD.US — Plano de Aprimoramento Oficial
-**Versão:** 2.0 → 3.0 · **Data:** Junho 2026 · **Status:** AGUARDANDO APROVAÇÃO
+**Versão:** 2.0 → 3.0 · **Data:** Junho 2026 · **Revisado:** 29/06/2026
+
+---
+
+## ✅ STATUS DE IMPLEMENTAÇÃO (atualizado 29/06/2026)
+
+Itens já implementados desde a redação original (19/06):
+
+| Item | Status |
+|---|---|
+| **D5** — Modelo padrão `claude-sonnet-4-6` + migração de legados | ✅ Feito (centralizado em `migrateLegacyAnthropicModel`) |
+| **A3** — Criptografia das senhas DICOM no Firestore | ✅ Feito (`utils/crypto.ts`, AES por UID) |
+| **A4** — Refatoração do `ExamEditor` | ✅ Parcial (1563 → ~1388 linhas; hooks/components extraídos) |
+| **D4** — Migrations de settings versionadas | ✅ Feito (`_settingsMigrationVersion`) |
+| Regras Firestore + tradução de erros admin | ✅ Feito (`firestore.rules`, `firebaseErrors.ts`) |
+| Contagem/busca server-side na Worklist | ✅ Feito (`countExamsByStatus`) |
+| **Licenciamento por código → Assinaturas AbacatePay** | ✅ Substituído (quotas mensais, add-ons, CRON de reset) |
+| Limpeza de código morto + dedup migração + logger | ✅ Feito (commits `113c052`, `4ec5fa2`) |
+
+**Ainda pendentes e recomendados:** A1 (chave IA server-side), A2 (rate limiting),
+D2 (admin em env var), B1/B2/B7 (streaming inicial, dashboard real, agenda→worklist),
+C2/C3 (histórico no editor, inserir calculadora no laudo), C6 (ditado por voz).
+
+> Observação: a tabela `PRICING` mantém modelos legados **propositalmente** (cálculo de custo
+> de registros históricos em `ai_usage`) — não tratar como item de limpeza.
 
 ---
 
