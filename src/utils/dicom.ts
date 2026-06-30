@@ -40,19 +40,12 @@ export async function syncExamToOrthancWorklist(
     let primaryError = '';
 
     if (settings.dicomSyncEnabled !== false && patient.id !== 'ANONIMO') {
-<<<<<<< HEAD
       primaryAttempted = true;
-      const url = (isVercel && settings.dicomLocalAgentUrl)
-        ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
-        : '/api/worklist';
-        
-=======
       // Same-origin '/api/worklist': no local o Vite grava o .wl nesta máquina;
       // no Vercel a função serverless encaminha server-side ao agente público
       // (localAgentUrl do corpo) — mesmo canal confiável usado pelas imagens.
       const url = getWorklistEndpoint(settings, false);
 
->>>>>>> 034e10db6ec44061ae38dc0b95d08af3724700b0
       try {
         const res = await fetch(url, {
           method: 'POST',
