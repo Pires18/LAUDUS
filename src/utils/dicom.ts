@@ -11,7 +11,7 @@ export async function syncExamToOrthancWorklist(
   settings: any,
   deviceId?: string,
   examDate?: number
-): Promise<{ success: boolean; backupSuccess?: boolean; error?: string }> {
+): Promise<{ success: boolean; primarySuccess?: boolean; backupSuccess?: boolean; error?: string }> {
   try {
     // Formata o nome para DICOM (Mantendo ordem natural em maiúsculas sem acentos)
     const dicomName = patient.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
@@ -41,9 +41,11 @@ export async function syncExamToOrthancWorklist(
 
     // Principal Sync
     let primarySuccess = false;
+    let primaryAttempted = false;
     let primaryError = '';
 
     if (settings.dicomSyncEnabled !== false && patient.id !== 'ANONIMO') {
+      primaryAttempted = true;
       const url = (isVercel && settings.dicomLocalAgentUrl)
         ? `${settings.dicomLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
         : '/api/worklist';
@@ -80,7 +82,9 @@ export async function syncExamToOrthancWorklist(
 
     // Backup Sync
     let backupSuccess = true;
+    let backupAttempted = false;
     if (settings.dicomBackupSyncEnabled && patient.id !== 'ANONIMO') {
+      backupAttempted = true;
       try {
         const urlBackup = (isVercel && settings.dicomBackupLocalAgentUrl)
           ? `${settings.dicomBackupLocalAgentUrl.replace(/\/$/, '')}/api/worklist`
@@ -112,11 +116,20 @@ export async function syncExamToOrthancWorklist(
       }
     }
 
-    if (primarySuccess) {
-      return { success: true, backupSuccess };
-    } else {
-      return { success: false, error: primaryError };
-    }
+    // Sucesso geral: basta UM destino habilitado ter gravado. Assim, se o primário
+    // (ex.: agente do Mac) estiver fora do ar mas o backup gravar, a worklist ainda
+    // é considerada enviada — o aparelho de US lê do backup. (primarySuccess já vem
+    // true quando o envio ao primário é pulado por anon/desabilitado.)
+    const overallSuccess = primarySuccess || (backupAttempted && backupSuccess);
+
+    return {
+      success: overallSuccess,
+      primarySuccess,
+      backupSuccess,
+      error: overallSuccess
+        ? undefined
+        : (primaryError || (primaryAttempted ? 'Falha ao enviar a worklist ao servidor.' : 'Nenhum servidor de worklist habilitado.'))
+    };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
