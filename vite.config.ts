@@ -5,6 +5,23 @@ import path from 'path'
 import { spawn } from 'child_process'
 import fs from 'fs'
 
+// Resolve o diretório da Worklist de forma IDÊNTICA para POST e DELETE.
+// Antes, o POST delegava o fallback ao generate_wl.py (que tem um default por SO)
+// enquanto o DELETE usava um default vazio no Mac — então o arquivo era gravado
+// num lugar e procurado em outro, deixando .wl órfãos. Centralizar aqui garante
+// que ambos resolvam exatamente o mesmo caminho.
+// Precedência: Docker > env var > outputDir do payload (settings) > fallback por SO.
+function resolveWorklistDir(payloadDir?: string): string {
+  if (process.env.RUNNING_IN_DOCKER === 'true') return '/app/pacs-worklist/';
+  return (
+    process.env.VITE_ORTHANC_WORKLIST_DIR ||
+    payloadDir ||
+    (process.platform === 'win32'
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+      : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/')
+  );
+}
+
 // Custom Plugin to handle local Orthanc Worklist files during development
 function localOrthancWorklistPlugin() {
   return {
@@ -125,18 +142,9 @@ function localOrthancWorklistPlugin() {
             req.on('end', () => {
               try {
                 const payload = JSON.parse(body);
-                // Se rodando no Docker, força o diretório da worklist para a montagem de volume
-                // Determine output directory based on environment variables or OS fallback
-                const defaultOutputDir = process.platform === 'win32'
-                  ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '';
+                // Diretório resolvido de forma centralizada (idêntico ao DELETE).
+                payload.outputDir = resolveWorklistDir(payload.outputDir);
 
-                payload.outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
-                
-                if (process.env.RUNNING_IN_DOCKER === 'true') {
-                  payload.outputDir = '/app/pacs-worklist/';
-                }
-                
                 // Resolve python executable — try env var first, then a fallback chain
                 const pythonScriptPath = path.resolve(__dirname, 'scripts', 'generate_wl.py');
 
@@ -213,13 +221,8 @@ function localOrthancWorklistPlugin() {
                   res.end(JSON.stringify({ success: false, error: "O campo 'examId' e obrigatorio." }));
                   return;
                 }
-                const defaultOutputDir = process.platform === 'win32'
-                  ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '';
-                let outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
-                if (process.env.RUNNING_IN_DOCKER === 'true') {
-                  outputDir = '/app/pacs-worklist/';
-                }
+                // Diretório resolvido de forma centralizada (idêntico ao POST).
+                const outputDir = resolveWorklistDir(payload.outputDir);
                 const filePath = path.join(outputDir, `agendamento_${examId}.wl`);
                 if (fs.existsSync(filePath)) {
                   fs.unlinkSync(filePath);
