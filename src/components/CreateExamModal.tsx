@@ -182,7 +182,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       await addItemWithId('exams', id, examData);
 
       // Sincronização local com a Worklist do Orthanc
-      const { success, backupSuccess, error } = await syncExamToOrthancWorklist(
+      const { success, primarySuccess, backupSuccess, error } = await syncExamToOrthancWorklist(
         id,
         template.name,
         { id: selectedPatient.id, name: selectedPatient.name, birthDate: selectedPatient.birthDate, gender: selectedPatient.gender },
@@ -190,10 +190,13 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         selectedDeviceId,
         examData.examDate
       );
-      
+
       if (!success) {
-        logger.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', error);
+        logger.warn('[Orthanc Sync] Falha ao enviar para o worklist:', error);
         showToast(`PACS: falha ao criar worklist — ${error || 'verifique o agente local e o Python/pydicom'}`, 'error');
+      } else if (!primarySuccess && backupSuccess) {
+        logger.warn('[Orthanc Sync] Primário indisponível — worklist criada apenas no backup');
+        showToast('PACS: principal indisponível — worklist criada no backup', 'success');
       } else if (backupSuccess === false) {
         logger.warn('[Orthanc Sync] Falha ao enviar para o backup do worklist');
         showToast('PACS: worklist principal criada, mas falhou no backup', 'error');

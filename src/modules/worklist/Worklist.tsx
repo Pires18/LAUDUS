@@ -197,17 +197,19 @@ export function Worklist() {
     if (syncingExamId) return;
     try {
       setSyncingExamId(exam.id);
-      const { success, backupSuccess, error } = await syncExamToOrthancWorklist(
+      const { success, primarySuccess, backupSuccess, error } = await syncExamToOrthancWorklist(
         exam.id, exam.examType,
         { id: exam.patientId, name: patientName, birthDate: patientBirthDate, gender: patientSex },
         settings
       );
-      if (success && backupSuccess !== false) {
-        showToast('Enviado para a Worklist do Orthanc' + (settings.dicomBackupSyncEnabled ? ' e Backup!' : '!'), 'success');
-      } else if (success && backupSuccess === false) {
+      if (!success) {
+        showToast('Erro ao sincronizar: ' + (error || 'Desconhecido'), 'error');
+      } else if (!primarySuccess && backupSuccess) {
+        showToast('Principal indisponível — enviado para o Backup.', 'success');
+      } else if (primarySuccess && backupSuccess === false) {
         showToast('Enviado para o principal, mas falhou no backup.', 'error');
       } else {
-        showToast('Erro ao sincronizar: ' + (error || 'Desconhecido'), 'error');
+        showToast('Enviado para a Worklist do Orthanc' + (settings.dicomBackupSyncEnabled ? ' e Backup!' : '!'), 'success');
       }
     } catch {
       showToast('Erro de conexão ao tentar sincronizar', 'error');

@@ -376,7 +376,10 @@ export function useDicomSync({
         };
 
         const queryPrimary = activePacsServer !== 'backup';
-        const queryBackup = activePacsServer !== 'primary' && !!backupUrl;
+        // Backup é sempre consultado quando configurado (mesmo no modo "Principal"):
+        // se o primário estiver caído, ele cobre as imagens automaticamente, sem
+        // depender do seletor — evita travar a visualização quando o Mac cai.
+        const queryBackup = !!backupUrl;
 
         if (active) {
           if (!queryPrimary) setPacsConnected('disconnected');
