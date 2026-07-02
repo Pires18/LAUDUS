@@ -1,5 +1,6 @@
 import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
 import { logger } from '../../../utils/logger';
 
 // ═══════════════════════════════════════════════════════════════
@@ -40,6 +41,7 @@ export async function probeEmbedding(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getIdToken()}`,
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'x-gemini-model': model,
         'x-gemini-task': 'embed',
@@ -110,6 +112,7 @@ export async function embedText(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getIdToken()}`,
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'x-gemini-model': model,
         'x-gemini-task': 'embed',
@@ -158,6 +161,7 @@ export async function embedTextBatch(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getIdToken()}`,
           'x-uid': auth.currentUser?.uid || 'anonymous',
           'x-gemini-model': model,
           'x-gemini-task': 'embed-batch',

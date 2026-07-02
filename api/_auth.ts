@@ -12,8 +12,13 @@ export interface AuthedUser {
 export async function verifyAuth(req: any): Promise<AuthedUser | null> {
   const header = req.headers?.authorization || req.headers?.Authorization;
   if (!header || typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  return verifyIdTokenString(header.slice('Bearer '.length).trim());
+}
+
+/** Verifica um ID token avulso (ex: recebido via query string para <img src>). */
+export async function verifyIdTokenString(token: string): Promise<AuthedUser | null> {
+  if (!token || typeof token !== 'string') return null;
   try {
-    const token = header.slice('Bearer '.length).trim();
     const auth = await getAdminAuth();
     const decoded = await auth.verifyIdToken(token);
     return { uid: decoded.uid, email: (decoded.email || '').toLowerCase() };

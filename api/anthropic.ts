@@ -1,3 +1,5 @@
+import { verifyAuthEdge } from './_edgeAuth.js';
+
 export const config = {
   runtime: 'edge',
 };
@@ -28,7 +30,7 @@ export default async function handler(req: Request) {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-uid, anthropic-version, anthropic-beta',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-uid, x-api-key, anthropic-version, anthropic-beta',
       },
     });
   }
@@ -38,8 +40,17 @@ export default async function handler(req: Request) {
   }
 
   try {
-    // Rate limiting per uid
-    const uid = (req.headers.get('x-uid') || 'anonymous').slice(0, 64);
+    // Autenticação obrigatória: token Firebase do usuário logado.
+    const authed = await verifyAuthEdge(req);
+    if (!authed) {
+      return new Response(
+        JSON.stringify({ error: 'Não autorizado. Faça login novamente.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Rate limiting pelo uid VERIFICADO (não pelo header auto-declarado).
+    const uid = authed.uid;
     if (!checkRateLimit(uid)) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Tente novamente em instantes.' }),

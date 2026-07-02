@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
+import { getProxyEndpoint, getActivePacsUrl, getDicomAuthParams } from '../../../store/db';
 import { ExamRequest, Patient } from '../../../types';
 import { getStudyInstanceUID } from '../../../utils/dicom';
 import { logger } from '../../../utils/logger';
@@ -203,9 +203,7 @@ export function useDicomSync({
     // Resolve a base igual ao "Testar PACS" (getActivePacsUrl): na nuvem usa a URL
     // pública Tailscale quando configurada, evitando apontar para um IP local inacessível.
     const currentUrl = getActivePacsUrl(settings, isBackupStudy);
-    const currentAuth = isBackupStudy 
-      ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` 
-      : `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+    const currentAuth = getDicomAuthParams(settings, isBackupStudy);
     const proxyPath = getProxyEndpoint(settings, isBackupStudy);
     
     try {
@@ -321,14 +319,14 @@ export function useDicomSync({
       }
       try {
         const baseUrl = getActivePacsUrl(settings, false);
-        const authParams = `&username=${encodeURIComponent(settings.dicomUsername || '')}&password=${encodeURIComponent(settings.dicomPassword || '')}`;
+        const authParams = getDicomAuthParams(settings, false);
 
         // Backup é considerado configurado se houver URL local OU URL pública Tailscale.
         // A base é resolvida via getActivePacsUrl (igual ao "Testar PACS"), garantindo que
         // o editor consulte o backup mesmo quando só a URL pública estiver preenchida.
         const backupConfigured = !!(settings.dicomBackupViewerUrl || settings.dicomBackupTailscalePublicUrl);
         const backupUrl = backupConfigured ? getActivePacsUrl(settings, true) : '';
-        const backupAuth = backupConfigured ? `&username=${encodeURIComponent(settings.dicomBackupUsername || '')}&password=${encodeURIComponent(settings.dicomBackupPassword || '')}` : '';
+        const backupAuth = backupConfigured ? getDicomAuthParams(settings, true) : '';
 
         const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 2500) => {
           const controller = new AbortController();

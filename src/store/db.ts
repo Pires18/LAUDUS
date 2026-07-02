@@ -28,6 +28,7 @@ import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_P
 import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
 import { encryptPassword, decryptPassword } from '../utils/crypto';
+import { getCachedIdToken } from '../lib/authToken';
 
 async function decryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
   settings: T
@@ -1025,6 +1026,22 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 }
 
 /**
+ * Monta os parâmetros de autenticação para URLs do proxy Orthanc:
+ * credenciais Basic do Orthanc + token Firebase exigido pelo proxy na nuvem
+ * (via query porque `<img src>` não suporta headers).
+ */
+export function getDicomAuthParams(
+  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword'>,
+  isBackup = false
+): string {
+  const username = isBackup ? settings.dicomBackupUsername : settings.dicomUsername;
+  const password = isBackup ? settings.dicomBackupPassword : settings.dicomPassword;
+  const token = getCachedIdToken();
+  return `&username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
+    + (token ? `&token=${encodeURIComponent(token)}` : '');
+}
+
+/**
  * Retorna o endpoint de Worklist (.wl) a ser utilizado.
  *
  * Usa SEMPRE `'/api/worklist'` same-origin — exatamente o mesmo padrão confiável
@@ -1069,7 +1086,10 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
 
   const primaryPromise = fetch(primaryAgentUrl, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getCachedIdToken()}`
+    },
     body: JSON.stringify({
       examId,
       outputDir: settings.dicomWorklistFolder,
@@ -1086,7 +1106,10 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
 
     backupPromise = fetch(backupAgentUrl, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getCachedIdToken()}`
+      },
       body: JSON.stringify({
         examId,
         outputDir: settings.dicomBackupWorklistFolder,

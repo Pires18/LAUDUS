@@ -1,7 +1,7 @@
 import { Loader2, AlertCircle, AlertTriangle, Eye, X, Printer, RefreshCw, SlidersHorizontal, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { DicomThumbnail } from './DicomThumbnail';
-import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
+import { getProxyEndpoint, getActivePacsUrl, getDicomAuthParams } from '../../../store/db';
 import type { AppSettings } from '../../../types';
 
 interface DicomViewerSidebarProps {
@@ -248,10 +248,8 @@ export function DicomViewerSidebar({
           }
           const isBackup = activeServerSource === 'backup';
           const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-          const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-          const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
           const proxyPath = getProxyEndpoint(settings, isBackup);
-          const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+          const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
           const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
           return (
@@ -332,10 +330,8 @@ export function DicomViewerSidebar({
               const isActive = idx === activeImageIndex;
               const isBackup = instance.serverSource === 'backup';
               const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-              const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-              const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
               const proxyPath = getProxyEndpoint(settings, isBackup);
-              const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+              const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
 
               return (
                 <button

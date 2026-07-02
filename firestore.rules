@@ -44,18 +44,52 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Campos que definem privilégio/cota/assinatura — SOMENTE admin (ou
+    // Admin SDK no servidor) pode alterá-los. Impede que um usuário comum
+    // se auto-promova a admin ou infle a própria cota.
+    function touchesProtectedUserFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'role', 'motorProEnabled', 'reportsQuota', 'clinicsQuota',
+        'subscriptionStatus', 'subscriptionId', 'licenseExpiresAt',
+        'active', 'addons', 'createdAt', 'email'
+      ]);
+    }
+
+    // O contador de uso mensal só pode crescer pelo cliente; o reset (zerar)
+    // é feito exclusivamente pelo CRON via Admin SDK.
+    function usageCounterOnlyIncreases() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['reportsUsedThisMonth'])
+        || request.resource.data.reportsUsedThisMonth >= resource.data.get('reportsUsedThisMonth', 0);
+    }
+
     // ---- Coleção de usuários + subárvore por usuário ----------------------
     match /users/{userId} {
-      // O próprio usuário lê/cria seu doc; admin gerencia qualquer usuário.
-      allow read, create: if isOwner(userId) || isAdmin();
-      // Atualização/exclusão: dono (perfil próprio) ou admin (gestão de cargos,
-      // status, motorProEnabled, reportsQuota, subscriptionStatus, ...).
-      allow update, delete: if isOwner(userId) || isAdmin();
+      // O próprio usuário lê seu doc; admin lê qualquer usuário.
+      allow read: if isOwner(userId) || isAdmin();
+      // Auto-provisionamento (trial) não pode nascer com privilégio de admin
+      // nem cotas acima do padrão. O Super Admin cai em isAdmin() (por e-mail).
+      allow create: if isAdmin()
+        || (isOwner(userId)
+            && request.resource.data.get('role', 'medico') != 'admin'
+            && request.resource.data.get('motorProEnabled', false) == false
+            && request.resource.data.get('reportsQuota', 0) <= 100
+            && request.resource.data.get('clinicsQuota', 0) <= 5);
+      // Dono atualiza o próprio perfil (nome, foto, lastLogin, uso), mas
+      // NUNCA os campos de privilégio/cota. Admin gerencia tudo.
+      allow update: if isAdmin()
+        || (isOwner(userId)
+            && !touchesProtectedUserFields()
+            && usageCounterOnlyIncreases());
+      allow delete: if isOwner(userId) || isAdmin();
 
-      // Máscaras de laudo: visíveis a qualquer usuário autenticado
-      // (modelos "do sistema" pertencem ao admin e são lidos por todos).
+      // Máscaras de laudo: o dono e o admin acessam as suas; as máscaras
+      // "do sistema" (subárvore de um admin) são legíveis por todos os
+      // usuários autenticados. Máscaras pessoais deixam de ser públicas.
       match /templates/{templateId} {
-        allow read: if isSignedIn();
+        allow read: if isOwner(userId) || isAdmin()
+          || (isSignedIn()
+              && get(/databases/$(database)/documents/users/$(userId)).data.role == 'admin');
         allow write: if isOwner(userId) || isAdmin();
       }
 
@@ -81,8 +115,9 @@ service cloud.firestore {
 
     // ---- Logs de auditoria -------------------------------------------------
     match /audit_logs/{logId} {
-      // Qualquer usuário autenticado pode registrar uma ação; somente admin lê.
-      allow create: if isSignedIn();
+      // Usuário registra ações em nome próprio (sem forjar autoria); admin lê.
+      allow create: if isAdmin()
+        || (isSignedIn() && request.resource.data.userId == request.auth.uid);
       allow read: if isAdmin();
       allow update, delete: if false;
     }
@@ -96,9 +131,11 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid;
       allow delete: if isAdmin();
 
-      // Mensagens dentro do ticket.
+      // Mensagens dentro do ticket: apenas o dono do ticket ou admin.
       match /{document=**} {
-        allow read, write: if isSignedIn();
+        allow read, write: if isAdmin()
+          || (isSignedIn()
+              && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid);
       }
     }
 

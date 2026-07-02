@@ -9,7 +9,7 @@ import {
   Copy, Check
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
-import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
+import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams } from '../../store/db';
 
 const JSON_TEMPLATE = `{
   "Name" : "PACS LAUDUS Principal",
@@ -93,10 +93,10 @@ export function DicomControlCenter() {
     setPacsTestResults(null);
     try {
       const primaryUrl = getActivePacsUrl(draft, false);
-      const primaryAuth = `&username=${encodeURIComponent(draft.dicomUsername || '')}&password=${encodeURIComponent(draft.dicomPassword || '')}`;
-      
+      const primaryAuth = getDicomAuthParams(draft, false);
+
       const backupUrl = draft.dicomBackupViewerUrl ? getActivePacsUrl(draft, true) : null;
-      const backupAuth = backupUrl ? `&username=${encodeURIComponent(draft.dicomBackupUsername || '')}&password=${encodeURIComponent(draft.dicomBackupPassword || '')}` : '';
+      const backupAuth = backupUrl ? getDicomAuthParams(draft, true) : '';
 
       // Test Primary
       const testPrimary = async () => {

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
 import { robustJsonParse } from '../../ai/json';
 import { logger } from '../../../utils/logger';
 
@@ -58,6 +59,7 @@ export function useCopilotSuggestions(settings: AppSettings) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await getIdToken()}`,
             'x-uid': auth.currentUser?.uid || 'anonymous',
             'x-gemini-model': resolveGeminiModelId(settings.geminiModel || ''),
             'x-gemini-stream': 'false',
@@ -78,6 +80,7 @@ export function useCopilotSuggestions(settings: AppSettings) {
         const response = await fetch('/api/anthropic', {
           method: 'POST',
           headers: {
+            'Authorization': `Bearer ${await getIdToken()}`,
             'x-uid': auth.currentUser?.uid || 'anonymous',
             'anthropic-version': '2023-06-01',
             'content-type': 'application/json',

@@ -3,6 +3,18 @@ import { AiProvider, BuiltPrompt } from '../types';
 import { robustJsonParse } from '../json';
 import { logger } from '../../../utils/logger';
 import { auth } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
+
+/** Headers de autenticação exigidos pelo proxy /api/anthropic. */
+async function proxyAuthHeaders(settings: AppSettings): Promise<Record<string, string>> {
+  const idToken = await getIdToken();
+  return {
+    'Authorization': `Bearer ${idToken}`,
+    'x-uid': auth.currentUser?.uid || 'anonymous',
+    'content-type': 'application/json',
+    'x-api-key': settings.anthropicApiKey || ''
+  };
+}
 
 export function getAnthropicBaseUrl(): string {
   const isLocalDev = typeof window !== 'undefined' &&
@@ -51,14 +63,13 @@ export class AnthropicProvider implements AiProvider {
       });
     }
 
+    const authHeaders = await proxyAuthHeaders(settings);
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-uid': auth.currentUser?.uid || 'anonymous',
+        ...authHeaders,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': this.getBetaHeader(settings),
-        'content-type': 'application/json',
-        'x-api-key': settings.anthropicApiKey || ''
+        'anthropic-beta': this.getBetaHeader(settings)
       },
       body: JSON.stringify({
         model: this.resolveModelName(settings, mode, area),
@@ -106,14 +117,13 @@ export class AnthropicProvider implements AiProvider {
       });
     }
 
+    const authHeaders = await proxyAuthHeaders(settings);
     const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
       method: 'POST',
       headers: {
-        'x-uid': auth.currentUser?.uid || 'anonymous',
+        ...authHeaders,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': this.getBetaHeader(settings),
-        'content-type': 'application/json',
-        'x-api-key': settings.anthropicApiKey || ''
+        'anthropic-beta': this.getBetaHeader(settings)
       },
       body: JSON.stringify({
         model: this.resolveModelName(settings, mode, area),
@@ -191,13 +201,12 @@ export class AnthropicProvider implements AiProvider {
       if (isRetry) {
         prompt += `\n\nATENÇÃO: A sua resposta anterior falhou ao ser processada como JSON. Erro: ${errorContext}. Por favor, retorne APENAS um JSON válido, sem texto adicional ou markdown.`;
       }
+      const authHeaders = await proxyAuthHeaders(settings);
       const response = await helpers.withRetry(() => fetch(`/api/anthropic`, {
         method: 'POST',
         headers: {
-          'x-uid': auth.currentUser?.uid || 'anonymous',
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'x-api-key': settings.anthropicApiKey || ''
+          ...authHeaders,
+          'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
           model: this.resolveModelName(settings, 'geral', 'geral'),

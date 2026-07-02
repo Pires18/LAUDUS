@@ -1,6 +1,7 @@
 import { Patient } from '../types';
 import { logger } from './logger';
 import { getWorklistEndpoint } from '../store/db';
+import { getCachedIdToken } from '../lib/authToken';
 
 /**
  * Envia um exame para a Worklist do Orthanc (Primário e Backup)
@@ -49,7 +50,10 @@ export async function syncExamToOrthancWorklist(
       try {
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getCachedIdToken()}`
+          },
           body: JSON.stringify({
             examId,
             patientName: dicomName,
@@ -86,7 +90,10 @@ export async function syncExamToOrthancWorklist(
 
         const backupRes = await fetch(urlBackup, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getCachedIdToken()}`
+          },
           body: JSON.stringify({
             examId,
             patientName: dicomName,

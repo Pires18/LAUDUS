@@ -3,8 +3,9 @@ import { logger } from '../../utils/logger';
 import { getRecentFinalizedReports } from '../../store/db';
 import { robustJsonParse } from './json';
 import { auth } from '../../lib/firebase';
+import { getIdToken } from '../../lib/authToken';
 
-function geminiProxyFetch(
+async function geminiProxyFetch(
   model: string,
   systemContext: string,
   userMessage: string,
@@ -15,6 +16,7 @@ function geminiProxyFetch(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await getIdToken()}`,
       'x-uid': auth.currentUser?.uid || 'anonymous',
       'x-gemini-model': model,
       'x-gemini-stream': 'false',

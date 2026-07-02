@@ -1,5 +1,6 @@
 import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
 import { robustJsonParse } from '../json';
 import { resolveGeminiModel } from '../engine';
 import { logger } from '../../../utils/logger';
@@ -75,6 +76,7 @@ async function judgeFetch(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getIdToken()}`,
           'x-uid': auth.currentUser?.uid || 'anonymous',
           'x-gemini-model': model,
           'x-gemini-stream': 'false',

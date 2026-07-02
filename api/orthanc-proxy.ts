@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'http';
+import { verifyAuth, verifyIdTokenString } from './_auth.js';
 
 // Desabilita o bodyParser padrão do Vercel Serverless Functions.
 // Isso impede que a Vercel tente analisar payloads binários brutos (como arquivos DICOM)
@@ -8,6 +9,35 @@ export const config = {
     bodyParser: false,
   },
 };
+
+/**
+ * Guarda anti-SSRF: na nuvem o proxy só pode alcançar servidores Orthanc
+ * públicos expostos via HTTPS (ex: Tailscale Funnel). Bloqueia IPs privados,
+ * loopback, link-local e endpoints de metadados de nuvem.
+ */
+function isBlockedTarget(url: URL): string | null {
+  if (url.protocol !== 'https:') {
+    return 'Na nuvem, o destino precisa ser HTTPS (ex: URL pública do Tailscale Funnel).';
+  }
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return 'Destino local não permitido.';
+  if (host.endsWith('.internal') || host === 'metadata.google.internal') return 'Destino interno não permitido.';
+  if (host.includes(':')) return 'Endereços IPv6 literais não são permitidos.';
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = parseInt(ipv4[1], 10);
+    const b = parseInt(ipv4[2], 10);
+    if (
+      a === 0 || a === 10 || a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254)
+    ) {
+      return 'Endereços IP privados/reservados não são permitidos.';
+    }
+  }
+  return null;
+}
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -44,11 +74,36 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  // Autenticação obrigatória na nuvem: header Authorization (fetch) ou
+  // parâmetro ?token= (URLs de <img src>, que não suportam headers).
+  if (process.env.VERCEL) {
+    const authed = (await verifyAuth(req))
+      || (query.token ? await verifyIdTokenString(String(query.token)) : null);
+    if (!authed) {
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' }));
+      return;
+    }
+  }
+
   try {
     const targetUrlObj = new URL(targetUrl);
+
+    if (process.env.VERCEL) {
+      const blocked = isBlockedTarget(targetUrlObj);
+      if (blocked) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: `Destino recusado: ${blocked}` }));
+        return;
+      }
+    }
+
     const headers: Record<string, string> = {};
 
-    // Extract credentials: query params first, then from the URL itself, otherwise default
+    // Credenciais do Orthanc: query params ou embutidas na URL. Sem
+    // credenciais, a requisição segue anônima (sem senha default).
     const queryUsername = query.username as string | undefined;
     const queryPassword = query.password as string | undefined;
 
@@ -57,10 +112,6 @@ export default async function handler(req: any, res: any) {
       headers['Authorization'] = `Basic ${authString}`;
     } else if (targetUrlObj.username && targetUrlObj.password) {
       const authString = Buffer.from(`${targetUrlObj.username}:${targetUrlObj.password}`).toString('base64');
-      headers['Authorization'] = `Basic ${authString}`;
-    } else {
-      // Default fallback
-      const authString = Buffer.from('admin:123456789').toString('base64');
       headers['Authorization'] = `Basic ${authString}`;
     }
 
