@@ -1,6 +1,7 @@
 import { getDb } from './_firebase.js';
 import { isProduction } from './_auth.js';
 import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom } from './_pricing.js';
+import { safeEqual } from './_secure.js';
 import crypto from 'crypto';
 
 export const config = {
@@ -35,22 +36,23 @@ function verifyWebhook(req: any, rawBody: string, secret: string): { ok: boolean
     return { ok: true };
   }
 
-  // Esquema 1: secret na query string.
-  const querySecret = req.query?.webhookSecret || req.query?.secret;
-  if (querySecret && String(querySecret) === secret) {
-    return { ok: true };
-  }
-
-  // Esquema 2: assinatura HMAC no header.
+  // Esquema 1 (preferencial): assinatura HMAC-SHA256 no header — vincula o
+  // segredo ao corpo da requisição, então é verificado primeiro.
   const signature = req.headers['x-webhook-signature'] || req.headers['X-Webhook-Signature'];
   if (signature) {
     const digestHex = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
     const digestB64 = crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
     const sig = String(signature);
-    if (sig === digestHex || sig === digestB64) {
+    if (safeEqual(sig, digestHex) || safeEqual(sig, digestB64)) {
       return { ok: true };
     }
     return { ok: false, reason: 'Assinatura inválida.' };
+  }
+
+  // Esquema 2 (fallback): secret na query string, comparado em tempo constante.
+  const querySecret = req.query?.webhookSecret || req.query?.secret;
+  if (querySecret && safeEqual(String(querySecret), secret)) {
+    return { ok: true };
   }
 
   return { ok: false, reason: 'Assinatura/segredo ausente.' };
