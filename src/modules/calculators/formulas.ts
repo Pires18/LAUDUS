@@ -52,6 +52,29 @@ export function gaFromMsd(msd: number): { weeks: number; days: number; label: st
   return { weeks, days, label: `${weeks}s ${days}d` };
 }
 
+/**
+ * Idade gestacional a partir do CCN (comprimento cabeça-nádega, em mm) —
+ * polinômio de Hadlock et al. 1992:
+ *   ln(IG_semanas) = 1.684969 + 0.315646·c − 0.049306·c² + 0.004057·c³
+ *                    − 0.000120456·c⁴   (c = CCN em cm)
+ */
+export function crlToGestationalAge(
+  crlMm: number
+): { totalDays: number; weeks: number; days: number; label: string } | null {
+  if (!(crlMm > 0)) return null;
+  const c = crlMm / 10;
+  const lnMA =
+    1.684969 +
+    0.315646 * c -
+    0.049306 * Math.pow(c, 2) +
+    0.004057 * Math.pow(c, 3) -
+    0.000120456 * Math.pow(c, 4);
+  const totalDays = Math.round(Math.exp(lnMA) * 7);
+  const weeks = Math.floor(totalDays / 7);
+  const days = totalDays % 7;
+  return { totalDays, weeks, days, label: `${weeks}s ${days}d` };
+}
+
 /** Volume de derrame pleural pela fórmula de Balik: V(ml) = 20 × espessura(mm). */
 export function balikPleuralVolume(depthMm: number): number | null {
   return depthMm > 0 ? 20 * depthMm : null;

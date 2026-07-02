@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tiradsCategory, classifyBirads, BiradsInput } from '../modules/calculators/classifiers';
+import { tiradsCategory, classifyBirads, BiradsInput, classifyOrads } from '../modules/calculators/classifiers';
 
 describe('TI-RADS (ACR 2017) — categoria por pontuação', () => {
   it('mapeia total → TR e conduta', () => {
@@ -55,5 +55,31 @@ describe('BI-RADS (ACR 2013) — classificação de lesão mamária', () => {
       posteriorFeatures: 'Sombra Acústica',
     });
     expect(r.cat).toBe('5');
+  });
+});
+
+describe('O-RADS (ACR) — massa anexial', () => {
+  const base = { type: null as string | null, colorScore: 1, innerWall: null as string | null, ascites: false, maxDim: 40 };
+
+  it('ascite → O-RADS 5 (alto risco)', () => {
+    expect(classifyOrads({ ...base, ascites: true }).cat).toBe('5');
+  });
+  it('lesão sólida com color score 4 ou parede irregular → 5', () => {
+    expect(classifyOrads({ ...base, type: 'Lesão Sólida', colorScore: 4 }).cat).toBe('5');
+    expect(classifyOrads({ ...base, type: 'Lesão Sólida', innerWall: 'Irregular' }).cat).toBe('5');
+  });
+  it('lesão sólida sem suspeição → 4', () => {
+    expect(classifyOrads({ ...base, type: 'Lesão Sólida' }).cat).toBe('4');
+  });
+  it('cisto unilocular simples: <10cm → 2, ≥10cm → 3', () => {
+    expect(classifyOrads({ ...base, type: 'Cisto Unilocular Simples', maxDim: 50 }).cat).toBe('2');
+    expect(classifyOrads({ ...base, type: 'Cisto Unilocular Simples', maxDim: 100 }).cat).toBe('3');
+  });
+  it('cisto multilocular grande ou vascularizado → 4, senão → 3', () => {
+    expect(classifyOrads({ ...base, type: 'Cisto Multilocular', maxDim: 120 }).cat).toBe('4');
+    expect(classifyOrads({ ...base, type: 'Cisto Multilocular', maxDim: 50 }).cat).toBe('3');
+  });
+  it('sem tipo definido → 0 (incompleto)', () => {
+    expect(classifyOrads(base).cat).toBe('0');
   });
 });

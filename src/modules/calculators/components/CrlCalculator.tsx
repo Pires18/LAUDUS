@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Activity, Info } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { crlToGestationalAge } from '../formulas';
 
 export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) {
   const [crl, setCrl] = useState(value?.crl || '');
@@ -10,24 +11,10 @@ export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) 
     let ga = null;
     let edd = null;
 
-    if (crl) {
-      const c_mm = Number(crl);
-      const c_cm = c_mm / 10;
-
-      // Hadlock et al. 1992 — polinômio de 4º grau (padrão Fetalmed/Radiology)
-      // ln(IG) = 1.684969 + 0.315646(CCN) - 0.049306(CCN²) + 0.004057(CCN³) - 0.000120456(CCN⁴)
-      const lnMA = 1.684969
-                 + (0.315646 * c_cm)
-                 - (0.049306 * Math.pow(c_cm, 2))
-                 + (0.004057 * Math.pow(c_cm, 3))
-                 - (0.000120456 * Math.pow(c_cm, 4));
-
-      const weeksFloat = Math.exp(lnMA);
-      const totalDays = Math.round(weeksFloat * 7);
-
-      const weeks = Math.floor(totalDays / 7);
-      const days = totalDays % 7;
-      ga = `${weeks}s ${days}d`;
+    const crlGa = crl ? crlToGestationalAge(Number(crl)) : null;
+    if (crlGa) {
+      const totalDays = crlGa.totalDays;
+      ga = crlGa.label;
 
       // Cálculo da DDP: usa examDateMs se disponível, senão a data atual
       const today = examDateMs ? new Date(examDateMs) : new Date();

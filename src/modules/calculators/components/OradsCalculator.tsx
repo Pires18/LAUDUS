@@ -4,6 +4,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Activity } from 'lucide-r
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
+import { classifyOrads } from '../classifiers';
 
 interface Lesion {
   id: string;
@@ -40,42 +41,14 @@ export function OradsCalculator({ value, onChange }: CalculatorProps) {
 
   useEffect(() => {
     const updatedLesions = lesions.map(l => {
-      let cat = '0';
-      let rec = 'Avaliação Incompleta';
       const maxDim = Math.max(Number(l.d1 || 0), Number(l.d2 || 0), Number(l.d3 || 0));
-
-      if (l.ascites) {
-        cat = '5';
-        rec = 'Alto risco (≥50%). Presença de ascite ou nódulos peritoneais.';
-      } else if (l.type === 'Lesão Sólida') {
-        if (l.colorScore === 4 || l.innerWall === 'Irregular') {
-          cat = '5';
-          rec = 'Alto risco (≥50%). Lesão sólida suspeita.';
-        } else {
-          cat = '4';
-          rec = 'Risco intermediário (10-50%).';
-        }
-      } else if (l.type === 'Cisto com Componente Sólido') {
-        cat = '4';
-        rec = 'Risco intermediário (10-50%).';
-      } else if (l.type === 'Cisto Multilocular') {
-        if (maxDim >= 100 || l.colorScore === 4) {
-          cat = '4';
-          rec = 'Risco intermediário (10-50%). Cisto multilocular grande ou vascularizado.';
-        } else {
-          cat = '3';
-          rec = 'Baixo risco (1-10%).';
-        }
-      } else if (l.type === 'Cisto Unilocular Simples') {
-        if (maxDim >= 100) {
-          cat = '3';
-          rec = 'Baixo risco (1-10%). Cisto unilocular ≥ 10cm.';
-        } else {
-          cat = '2';
-          rec = 'Quase certamente benigno (<1%). Cisto unilocular < 10cm.';
-        }
-      }
-
+      const { cat, rec } = classifyOrads({
+        type: l.type,
+        colorScore: l.colorScore,
+        innerWall: l.innerWall,
+        ascites: l.ascites,
+        maxDim,
+      });
       return { ...l, classification: cat !== '0' ? `O-RADS ${cat}` : null, recommendation: cat !== '0' ? rec : null };
     });
 

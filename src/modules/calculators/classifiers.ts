@@ -112,3 +112,41 @@ export function classifyBirads(l: BiradsInput): { cat: string; rec: string } {
     rec: 'Provavelmente benigno (< 2% risco). Controle por imagem em 6-12 meses.',
   };
 }
+
+export interface OradsInput {
+  type: string | null;
+  colorScore: number;
+  innerWall: string | null;
+  ascites: boolean;
+  /** Maior dimensão da lesão em mm. */
+  maxDim: number;
+}
+
+/** ACR O-RADS US (massa anexial): categoria de risco e conduta. */
+export function classifyOrads(l: OradsInput): { cat: string; rec: string } {
+  if (l.ascites) {
+    return { cat: '5', rec: 'Alto risco (≥50%). Presença de ascite ou nódulos peritoneais.' };
+  }
+  if (l.type === 'Lesão Sólida') {
+    if (l.colorScore === 4 || l.innerWall === 'Irregular') {
+      return { cat: '5', rec: 'Alto risco (≥50%). Lesão sólida suspeita.' };
+    }
+    return { cat: '4', rec: 'Risco intermediário (10-50%).' };
+  }
+  if (l.type === 'Cisto com Componente Sólido') {
+    return { cat: '4', rec: 'Risco intermediário (10-50%).' };
+  }
+  if (l.type === 'Cisto Multilocular') {
+    if (l.maxDim >= 100 || l.colorScore === 4) {
+      return { cat: '4', rec: 'Risco intermediário (10-50%). Cisto multilocular grande ou vascularizado.' };
+    }
+    return { cat: '3', rec: 'Baixo risco (1-10%).' };
+  }
+  if (l.type === 'Cisto Unilocular Simples') {
+    if (l.maxDim >= 100) {
+      return { cat: '3', rec: 'Baixo risco (1-10%). Cisto unilocular ≥ 10cm.' };
+    }
+    return { cat: '2', rec: 'Quase certamente benigno (<1%). Cisto unilocular < 10cm.' };
+  }
+  return { cat: '0', rec: 'Avaliação Incompleta' };
+}

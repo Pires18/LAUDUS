@@ -5,6 +5,7 @@ import {
   meanSacDiameter,
   gaFromMsd,
   balikPleuralVolume,
+  crlToGestationalAge,
   amnioticMBV,
   amnioticILA,
   imtClassification,
@@ -55,6 +56,22 @@ describe('DMSG / idade gestacional', () => {
     expect(gaFromMsd(12)).toEqual({ weeks: 6, days: 0, label: '6s 0d' });
     // 15 + 30 = 45 dias = 6s 3d
     expect(gaFromMsd(15)).toEqual({ weeks: 6, days: 3, label: '6s 3d' });
+  });
+});
+
+describe('CRL → idade gestacional (Hadlock 1992)', () => {
+  it('CCN 30mm ≈ 9s6d–10s (faixa fisiológica)', () => {
+    const r = crlToGestationalAge(30)!;
+    // Referência clínica: CCN 30mm ~ 9-10 semanas
+    expect(r.weeks).toBeGreaterThanOrEqual(9);
+    expect(r.weeks).toBeLessThanOrEqual(10);
+    expect(r.label).toMatch(/^\d+s \d+d$/);
+  });
+  it('monotônico: CCN maior → IG maior', () => {
+    expect(crlToGestationalAge(60)!.totalDays).toBeGreaterThan(crlToGestationalAge(30)!.totalDays);
+  });
+  it('null para CCN não positivo', () => {
+    expect(crlToGestationalAge(0)).toBeNull();
   });
 });
 
