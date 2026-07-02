@@ -27,7 +27,35 @@ def main():
     try:
         # Ler dados do JSON fornecido via stdin
         data = json.load(sys.stdin)
-        
+
+        # ── Health-check (ping) ──────────────────────────────────────────────
+        # Quando chamado com {"ping": true}, verifica a cadeia completa SEM gerar
+        # nenhum arquivo .wl: pydicom disponível (já importado no topo), pasta
+        # de destino existente e gravável. Usado pelo Diagnóstico de Rede na UI.
+        if data.get('ping'):
+            output_dir = data.get('outputDir', '')
+            if not output_dir:
+                import platform
+                output_dir = ('C:/OrthancServer/db/WorklistsDatabase/'
+                              if platform.system() == 'Windows'
+                              else '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/')
+            writable = False
+            dir_error = ''
+            try:
+                os.makedirs(output_dir, exist_ok=True)
+                writable = os.access(output_dir, os.W_OK)
+            except Exception as e:
+                dir_error = str(e)
+            print(json.dumps({
+                "success": bool(writable),
+                "ping": True,
+                "pydicom": getattr(pydicom, "__version__", "ok"),
+                "dir": output_dir,
+                "writable": writable,
+                "error": '' if writable else (dir_error or f'Sem permissão de escrita em {output_dir}')
+            }))
+            return
+
         exam_id = data.get('examId')
         patient_name = data.get('patientName', 'PACIENTE^TESTE')
         patient_id = data.get('patientId', '000000')

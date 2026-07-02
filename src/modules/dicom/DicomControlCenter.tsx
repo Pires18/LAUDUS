@@ -6,10 +6,10 @@ import {
   Save, RotateCcw, Loader2, Database, Server, Wifi,
   HardDrive, Shield, Cloud, Info, Network, BookOpen,
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
-  Copy, Check
+  Copy, Check, ArrowRight, Monitor, Radio
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
-import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams } from '../../store/db';
+import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
 
 const JSON_TEMPLATE = `{
   "Name" : "PACS LAUDUS Principal",
@@ -44,6 +44,16 @@ const JSON_TEMPLATE = `{
 type ControlTab = 'config' | 'guides';
 type GuideMethod = 'local' | 'tailscale';
 
+/** Resultado de um teste de capacidade (imagens ou worklist) de um servidor. */
+type CapResult = { ok: boolean; msg: string; skipped?: boolean };
+/** Matriz de diagnóstico: imagens e worklist, para principal e backup. */
+type DiagResults = {
+  primaryImages: CapResult;
+  primaryWorklist: CapResult;
+  backupImages: CapResult;
+  backupWorklist: CapResult;
+};
+
 export function DicomControlCenter() {
   const { settings, updateSettings, showToast } = useApp();
   const { user } = useAuth();
@@ -56,12 +66,8 @@ export function DicomControlCenter() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [pacsTestResults, setPacsTestResults] = useState<{
-    primaryOk: boolean;
-    backupOk: boolean;
-    primaryMsg?: string;
-    backupMsg?: string;
-  } | null>(null);
+  const [diag, setDiag] = useState<DiagResults | null>(null);
+  const [diagStep, setDiagStep] = useState<string>('');
 
   useEffect(() => {
     setDraft(settings);
@@ -88,78 +94,134 @@ export function DicomControlCenter() {
     }
   }
 
+  // Testa a VISUALIZAÇÃO DE IMAGENS (REST do Orthanc via /system) de um servidor.
+  async function testImages(isBackup: boolean): Promise<CapResult> {
+    const baseUrl = getActivePacsUrl(draft, isBackup);
+    if (!baseUrl || baseUrl === 'http://localhost:8042') {
+      return { ok: false, msg: 'URL do servidor não configurada' };
+    }
+    const auth = getDicomAuthParams(draft, isBackup);
+    const proxyPath = getProxyEndpoint(draft, isBackup);
+    const pingUrl = `${baseUrl.replace(/\/$/, '')}/system`;
+    try {
+      const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${auth}`);
+      if (res.ok) {
+        const data = await res.json();
+        return { ok: true, msg: `Orthanc v${data.Version || 'OK'}${data.Name ? ` · ${data.Name}` : ''}` };
+      }
+      if (res.status === 401 || res.status === 403) return { ok: false, msg: `HTTP ${res.status} — usuário/senha do Orthanc incorretos` };
+      return { ok: false, msg: `HTTP ${res.status} — ${res.statusText || 'falha de proxy/servidor'}` };
+    } catch (e: any) {
+      return { ok: false, msg: e.message || 'Servidor inacessível (offline ou fora do Funnel)' };
+    }
+  }
+
+  // Testa a WORKLIST de ponta a ponta (agente/Vite → Python → pydicom → pasta)
+  // via ping, sem gerar arquivo .wl.
+  async function testWorklist(isBackup: boolean): Promise<CapResult> {
+    const agent = isBackup ? draft.dicomBackupLocalAgentUrl : draft.dicomLocalAgentUrl;
+    const dir = isBackup ? draft.dicomBackupWorklistFolder : draft.dicomWorklistFolder;
+    const isVercel = typeof window !== 'undefined' &&
+      (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+    if (isVercel && !agent) {
+      return { ok: false, msg: 'URL do Agente Local não configurada (obrigatória na nuvem)' };
+    }
+    try {
+      const res = await fetch(getWorklistEndpoint(draft, isBackup), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ping: true, localAgentUrl: agent, outputDir: dir })
+      });
+      const data = await res.json().catch(() => ({ success: false, error: 'Resposta inválida do agente' }));
+      if (data.success) {
+        return { ok: true, msg: `Pasta gravável · pydicom ${data.pydicom || 'ok'}` };
+      }
+      return { ok: false, msg: data.error || 'Falha no agente de worklist' };
+    } catch (e: any) {
+      return { ok: false, msg: e.message || 'Agente inacessível' };
+    }
+  }
+
   async function handleTestPacsConnection() {
     setPacsTestState('testing');
-    setPacsTestResults(null);
+    setDiag(null);
+    const backupOn = !!draft.dicomBackupSyncEnabled && !!(draft.dicomBackupViewerUrl || draft.dicomBackupTailscalePublicUrl);
+    const skipped: CapResult = { ok: false, msg: 'Backup desabilitado', skipped: true };
     try {
-      const primaryUrl = getActivePacsUrl(draft, false);
-      const primaryAuth = getDicomAuthParams(draft, false);
+      setDiagStep('Testando servidor principal…');
+      const [primaryImages, primaryWorklist] = await Promise.all([testImages(false), testWorklist(false)]);
+      setDiagStep(backupOn ? 'Testando servidor de backup…' : '');
+      const [backupImages, backupWorklist] = backupOn
+        ? await Promise.all([testImages(true), testWorklist(true)])
+        : [skipped, skipped];
 
-      const backupUrl = draft.dicomBackupViewerUrl ? getActivePacsUrl(draft, true) : null;
-      const backupAuth = backupUrl ? getDicomAuthParams(draft, true) : '';
+      const results: DiagResults = { primaryImages, primaryWorklist, backupImages, backupWorklist };
+      setDiag(results);
 
-      // Test Primary
-      const testPrimary = async () => {
-        const pingUrl = `${primaryUrl.replace(/\/$/, '')}/system`;
-        const proxyPath = getProxyEndpoint(draft, false);
-        try {
-          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${primaryAuth}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
-          }
-          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
-        } catch (e: any) {
-          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
-        }
-      };
+      const primaryOk = primaryImages.ok && primaryWorklist.ok;
+      const backupOk = !backupOn || (backupImages.ok && backupWorklist.ok);
+      setPacsTestState(primaryOk && backupOk ? 'success' : 'error');
 
-      // Test Backup
-      const testBackup = async () => {
-        if (!backupUrl) return { ok: false, msg: 'Servidor backup não configurado' };
-        const pingUrl = `${backupUrl.replace(/\/$/, '')}/system`;
-        const proxyPath = getProxyEndpoint(draft, true);
-        try {
-          const res = await fetch(`${proxyPath}?url=${encodeURIComponent(pingUrl)}${backupAuth}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { ok: true, msg: `Conectado! Versão Orthanc: ${data.Version || 'OK'}` };
-          }
-          return { ok: false, msg: `Erro HTTP ${res.status}: ${res.statusText || 'Falha de Autenticação/Proxy'}` };
-        } catch (e: any) {
-          return { ok: false, msg: e.message || 'Erro de rede ou conexão recusada' };
-        }
-      };
-
-      const [primaryRes, backupRes] = await Promise.all([
-        testPrimary(),
-        backupUrl ? testBackup() : Promise.resolve({ ok: false, msg: 'Nenhum backup configurado' })
-      ]);
-
-      setPacsTestResults({
-        primaryOk: primaryRes.ok,
-        backupOk: backupRes.ok,
-        primaryMsg: primaryRes.msg,
-        backupMsg: backupUrl ? backupRes.msg : undefined
-      });
-      
-      const success = primaryRes.ok && (!backupUrl || backupRes.ok);
-      setPacsTestState(success ? 'success' : 'error');
-      
-      if (primaryRes.ok) {
-        showToast('PACS Principal conectado com sucesso!', 'success');
+      if (primaryOk && backupOk) {
+        showToast('Diagnóstico completo: tudo operacional!', 'success');
+      } else if (primaryOk) {
+        showToast('Principal OK, mas há falhas no backup.', 'error');
       } else {
-        showToast('Erro de conexão com o PACS Principal.', 'error');
+        showToast('Falhas detectadas no servidor principal.', 'error');
       }
     } catch (err: any) {
       setPacsTestState('error');
-      setPacsTestResults({
-        primaryOk: false,
-        backupOk: false,
-        primaryMsg: err.message || 'Falha crítica ao testar conexão.'
-      });
-      showToast('Erro crítico ao testar conexões.', 'error');
+      showToast(err.message || 'Erro crítico ao executar o diagnóstico.', 'error');
+    } finally {
+      setDiagStep('');
     }
+  }
+
+  // Renderiza um "chip" de status para uma capacidade (imagens ou worklist).
+  function renderCap(label: string, Icon: typeof Server, r: CapResult) {
+    const StatusIcon = r.skipped ? Info : r.ok ? CheckCircle2 : AlertTriangle;
+    return (
+      <div className={classNames(
+        'flex items-start gap-2 p-2.5 rounded-lg border text-[10px] leading-snug',
+        r.skipped ? 'bg-ink-50 border-ink-100 text-ink-400'
+          : r.ok ? 'bg-emerald-50/60 border-emerald-100 text-emerald-800'
+            : 'bg-rose-50/60 border-rose-100 text-rose-800'
+      )}>
+        <StatusIcon size={13} className={classNames('mt-0.5 shrink-0', r.skipped ? 'text-ink-300' : r.ok ? 'text-emerald-500' : 'text-rose-500')} />
+        <div className="min-w-0">
+          <div className="font-bold flex items-center gap-1"><Icon size={10} />{label}</div>
+          <div className="opacity-90 mt-0.5 break-words">{r.msg}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Renderiza um fluxo horizontal de nós (diagrama de arquitetura).
+  function renderFlow(
+    title: string,
+    titleClass: string,
+    nodes: { icon: typeof Server; label: string; sub: string }[]
+  ) {
+    return (
+      <div className="space-y-2">
+        <div className={classNames('text-[10px] font-black uppercase tracking-wider', titleClass)}>{title}</div>
+        <div className="flex items-center gap-1 overflow-x-auto pb-1.5">
+          {nodes.map((n, i) => {
+            const NodeIcon = n.icon;
+            return (
+              <div key={i} className="flex items-center gap-1 shrink-0">
+                <div className="flex flex-col items-center justify-center gap-1 w-[88px] h-[68px] rounded-xl border border-ink-150 bg-white dark:bg-ink-800 px-1.5 text-center shadow-sm">
+                  <NodeIcon size={16} className="text-ink-500 shrink-0" />
+                  <div className="text-[10px] font-bold text-ink-800 leading-tight">{n.label}</div>
+                  <div className="text-[8px] text-ink-400 leading-none font-mono">{n.sub}</div>
+                </div>
+                {i < nodes.length - 1 && <ArrowRight size={14} className="text-ink-300 shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   }
 
   function handleCopy(text: string, fieldId: string) {
@@ -543,8 +605,8 @@ export function DicomControlCenter() {
                     <Wifi size={16} className="text-emerald-500 animate-pulse" />
                     <h3 className="text-xs font-black text-ink-900 uppercase tracking-wider">Diagnóstico de Rede</h3>
                   </div>
-                  <p className="text-[10px] text-ink-500 leading-normal">Verifique instantaneamente se a conexão com os servidores Orthanc principal e backup está respondendo.</p>
-                  
+                  <p className="text-[10px] text-ink-500 leading-normal">Testa <strong>Imagens</strong> (REST do Orthanc) e <strong>Worklist</strong> (agente → Python → pasta) separadamente, no principal e no backup.</p>
+
                   <button
                     type="button"
                     onClick={handleTestPacsConnection}
@@ -552,36 +614,43 @@ export function DicomControlCenter() {
                     className="w-full h-11 rounded-xl bg-ink-900 hover:bg-ink-800 disabled:opacity-50 text-white font-black text-xs tracking-wider transition-all flex items-center justify-center gap-2"
                   >
                     {pacsTestState === 'testing' ? <Loader2 size={13} className="animate-spin" /> : <Network size={13} />}
-                    {pacsTestState === 'testing' ? 'TESTANDO...' : 'TESTAR PACS'}
+                    {pacsTestState === 'testing' ? (diagStep || 'TESTANDO…') : 'EXECUTAR DIAGNÓSTICO'}
                   </button>
 
-                  {pacsTestResults && (
-                    <div className="space-y-2.5 pt-2">
-                      <div className={classNames(
-                        "p-3 rounded-xl border text-xs leading-normal",
-                        pacsTestResults.primaryOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-rose-50/50 border-rose-100 text-rose-800"
-                      )}>
-                        <div className="flex items-center gap-1.5 font-bold">
-                          <div className={classNames("w-2 h-2 rounded-full", pacsTestResults.primaryOk ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
-                          PACS Principal
-                        </div>
-                        <p className="mt-1 text-[10px] text-ink-650 opacity-90">{pacsTestResults.primaryMsg}</p>
+                  {diag && (() => {
+                    const backupConfigured = !!draft.dicomBackupSyncEnabled && !!(draft.dicomBackupViewerUrl || draft.dicomBackupTailscalePublicUrl);
+                    const groups = [
+                      { title: 'Servidor Principal', dot: 'bg-emerald-500', images: diag.primaryImages, worklist: diag.primaryWorklist, show: true },
+                      { title: 'Servidor Backup', dot: 'bg-indigo-500', images: diag.backupImages, worklist: diag.backupWorklist, show: backupConfigured },
+                    ];
+                    return (
+                      <div className="space-y-3 pt-1 animate-fade-in">
+                        {groups.filter(g => g.show).map(g => {
+                          const groupOk = g.images.ok && g.worklist.ok;
+                          return (
+                            <div key={g.title} className="rounded-xl border border-ink-100 overflow-hidden">
+                              <div className="flex items-center justify-between px-3 py-2 bg-ink-50/70 border-b border-ink-100">
+                                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-ink-700">
+                                  <span className={classNames('w-2 h-2 rounded-full', groupOk ? g.dot : 'bg-rose-500', groupOk && 'animate-pulse')} />
+                                  {g.title}
+                                </div>
+                                <span className={classNames('text-[9px] font-black px-2 py-0.5 rounded-md', groupOk ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700')}>
+                                  {groupOk ? 'OPERACIONAL' : 'COM FALHA'}
+                                </span>
+                              </div>
+                              <div className="p-2 space-y-1.5">
+                                {renderCap('Imagens (PACS)', Server, g.images)}
+                                {renderCap('Worklist (.wl)', FileText, g.worklist)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <p className="text-[9px] text-ink-400 leading-normal px-0.5">
+                          A Worklist é testada por <em>ping</em> (verifica agente, Python/pydicom e permissão de escrita na pasta) — nenhum arquivo é criado.
+                        </p>
                       </div>
-
-                      {draft.dicomBackupSyncEnabled && draft.dicomBackupViewerUrl && (
-                        <div className={classNames(
-                          "p-3 rounded-xl border text-xs leading-normal",
-                          pacsTestResults.backupOk ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-rose-50/50 border-rose-100 text-rose-800"
-                        )}>
-                          <div className="flex items-center gap-1.5 font-bold">
-                            <div className={classNames("w-2 h-2 rounded-full", pacsTestResults.backupOk ? "bg-emerald-500 animate-pulse" : "bg-rose-500")} />
-                            PACS Backup
-                          </div>
-                          <p className="mt-1 text-[10px] text-ink-650 opacity-90">{pacsTestResults.backupMsg}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* Parâmetros Rápidos para Ultrassom */}
@@ -691,6 +760,33 @@ export function DicomControlCenter() {
                       <div className="pb-3 border-b border-ink-100">
                         <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">📐 Fluxo de Trabalho & Arquitetura</h3>
                         <p className="text-[11px] text-ink-500 font-medium">Entenda como os dados trafegam entre o ultrassom, o servidor PACS local e a nuvem.</p>
+                      </div>
+
+                      {/* Diagrama visual do fluxo de dados */}
+                      <div className="rounded-2xl border border-ink-150 bg-ink-50/30 p-4 sm:p-5 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Network size={14} className="text-emerald-500" />
+                          <span className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Diagrama do Fluxo (modo nuvem via Tailscale)</span>
+                        </div>
+                        {renderFlow('① Imagens — visualização no editor', 'text-emerald-600', [
+                          { icon: Monitor, label: 'Navegador', sub: 'LAUD.US' },
+                          { icon: Cloud, label: 'Vercel', sub: 'proxy' },
+                          { icon: Database, label: 'Orthanc', sub: ':8443' },
+                        ])}
+                        {renderFlow('② Worklist — envio de exames (.wl)', 'text-blue-600', [
+                          { icon: Monitor, label: 'Navegador', sub: 'LAUD.US' },
+                          { icon: Cloud, label: 'Vercel', sub: 'serverless' },
+                          { icon: Cpu, label: 'Agente/Vite', sub: ':443' },
+                          { icon: FileText, label: 'Pasta .wl', sub: 'grava' },
+                          { icon: Database, label: 'Orthanc', sub: 'lê fila' },
+                        ])}
+                        {renderFlow('③ Ultrassom — captura de imagens', 'text-violet-600', [
+                          { icon: Radio, label: 'Ultrassom', sub: 'modalidade' },
+                          { icon: Database, label: 'Orthanc', sub: 'C-STORE :4242' },
+                        ])}
+                        <p className="text-[9px] text-ink-400 leading-normal pt-1 border-t border-ink-100">
+                          No modo <strong>local/on-premise</strong>, o navegador e o Vite ficam na própria máquina do PACS — os passos "Vercel" são omitidos e o acesso ao Orthanc é direto por HTTP na porta 8042.
+                        </p>
                       </div>
 
                       <div className="grid grid-cols-1 gap-6">
