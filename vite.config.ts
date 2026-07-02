@@ -5,6 +5,19 @@ import path from 'path'
 import { spawn } from 'child_process'
 import fs from 'fs'
 
+// O Vite não injeta variáveis sem prefixo VITE_ em process.env. Como o proxy
+// dev usa process.env.GOOGLE_API_KEY / ANTHROPIC_API_KEY (server-side), lemos
+// essas chaves do .env aqui — assim o dev funciona sem a chave nas Settings.
+try {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*(GOOGLE_API_KEY|ANTHROPIC_API_KEY)\s*=\s*(.+?)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  }
+} catch { /* opcional em dev */ }
+
 // Resolve o diretório da Worklist de forma IDÊNTICA para POST e DELETE.
 // Antes, o POST delegava o fallback ao generate_wl.py (que tem um default por SO)
 // enquanto o DELETE usava um default vazio no Mac — então o arquivo era gravado
