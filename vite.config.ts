@@ -504,6 +504,10 @@ export default defineConfig({
         secure: true,
         configure: (proxy: any) => {
           proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            // O cliente envia Authorization: Bearer <token Firebase> para o
+            // proxy autenticado de produção. No dev o Vite encaminha direto à
+            // API real, que rejeitaria esse bearer (401) — então removemos.
+            proxyReq.removeHeader('authorization');
             const key = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY || '';
             if (key) proxyReq.setHeader('x-api-key', key);
           });
@@ -519,10 +523,17 @@ export default defineConfig({
         },
         configure: (proxy: any, _options: any) => {
           proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            // Remove o Authorization Bearer (token Firebase) destinado apenas
+            // ao proxy de produção; a API do Gemini usa a chave na query string.
+            proxyReq.removeHeader('authorization');
             const key = req.headers['x-api-key'] || process.env.GOOGLE_API_KEY || '';
             const model = req.headers['x-gemini-model'] || 'gemini-3.5-flash';
+            const task = req.headers['x-gemini-task'] || 'generate';
             const isStream = req.headers['x-gemini-stream'] === 'true';
-            const action = isStream ? 'streamGenerateContent' : 'generateContent';
+            let action: string;
+            if (task === 'embed') action = 'embedContent';
+            else if (task === 'embed-batch') action = 'batchEmbedContents';
+            else action = isStream ? 'streamGenerateContent' : 'generateContent';
             const url = `/v1beta/models/${model}:${action}?key=${key}${isStream ? '&alt=sse' : ''}`;
             proxyReq.path = url;
           });

@@ -104,7 +104,18 @@ service cloud.firestore {
       // Dono lê a própria assinatura; admin lê/gerencia todas.
       allow read: if isAdmin()
         || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow write: if isAdmin();
+      // Criação/exclusão só por admin (ou Admin SDK nos webhooks).
+      allow create, delete: if isAdmin();
+      // Atualização: admin faz tudo; o dono só pode incrementar o contador de
+      // uso mensal (espelho do doc do usuário) — corrige a transação de quota
+      // que antes falhava por completo (bug D2). Nenhum outro campo é editável.
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && resource.data.userId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['reportsUsedThisMonth', 'updatedAt'])
+            && request.resource.data.get('reportsUsedThisMonth', 0)
+                 >= resource.data.get('reportsUsedThisMonth', 0));
     }
 
     // ---- Catálogo de planos SaaS ------------------------------------------
