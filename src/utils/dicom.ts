@@ -34,18 +34,24 @@ export async function syncExamToOrthancWorklist(
       ? settings.dicomDevices?.find((d: any) => d.id === deviceId) || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' }
       : settings.dicomDevices?.[0] || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
 
-    // Principal Sync
+    // Envia ao primário e ao backup EM PARALELO — assim um servidor lento ou caído
+    // (ex.: agente do Mac fora do ar) não atrasa o envio ao outro.
     let primarySuccess = false;
     let primaryAttempted = false;
     let primaryError = '';
+    let backupSuccess = true;
+    let backupAttempted = false;
 
-    if (settings.dicomSyncEnabled !== false && patient.id !== 'ANONIMO') {
+    const sendPrimary = async () => {
+      if (settings.dicomSyncEnabled === false || patient.id === 'ANONIMO') {
+        primarySuccess = true; // Skip gracefully if anon or disabled
+        return;
+      }
       primaryAttempted = true;
       // Same-origin '/api/worklist': no local o Vite grava o .wl nesta máquina;
       // no Vercel a função serverless encaminha server-side ao agente público
       // (localAgentUrl do corpo) — mesmo canal confiável usado pelas imagens.
       const url = getWorklistEndpoint(settings, false);
-
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -72,18 +78,13 @@ export async function syncExamToOrthancWorklist(
         logger.warn('[Orthanc Sync] Falha ao enviar para o worklist local:', err);
         primaryError = err.message || 'Erro de conexão';
       }
-    } else {
-      primarySuccess = true; // Skip gracefully if anon or disabled
-    }
+    };
 
-    // Backup Sync
-    let backupSuccess = true;
-    let backupAttempted = false;
-    if (settings.dicomBackupSyncEnabled && patient.id !== 'ANONIMO') {
+    const sendBackup = async () => {
+      if (!settings.dicomBackupSyncEnabled || patient.id === 'ANONIMO') return;
       backupAttempted = true;
       try {
         const urlBackup = getWorklistEndpoint(settings, true);
-
         const backupRes = await fetch(urlBackup, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -108,7 +109,9 @@ export async function syncExamToOrthancWorklist(
         logger.warn('[Orthanc Backup Sync] Falha ao enviar:', err);
         backupSuccess = false;
       }
-    }
+    };
+
+    await Promise.all([sendPrimary(), sendBackup()]);
 
     // Sucesso geral: basta UM destino habilitado ter gravado. Assim, se o primário
     // (ex.: agente do Mac) estiver fora do ar mas o backup gravar, a worklist ainda
