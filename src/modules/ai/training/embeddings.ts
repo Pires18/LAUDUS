@@ -47,7 +47,6 @@ export async function probeEmbedding(
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'x-gemini-model': model,
         'x-gemini-task': 'embed',
-        'x-api-key': settings.geminiApiKey || '',
       },
       body: JSON.stringify({
         model: `models/${model}`,
@@ -118,7 +117,6 @@ export async function embedText(
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'x-gemini-model': model,
         'x-gemini-task': 'embed',
-        'x-api-key': settings.geminiApiKey || '',
       },
       body: JSON.stringify({
         model: `models/${model}`,
@@ -167,7 +165,6 @@ export async function embedTextBatch(
           'x-uid': auth.currentUser?.uid || 'anonymous',
           'x-gemini-model': model,
           'x-gemini-task': 'embed-batch',
-          'x-api-key': settings.geminiApiKey || '',
         },
         body: JSON.stringify({
           requests: cleaned.map((text) => ({

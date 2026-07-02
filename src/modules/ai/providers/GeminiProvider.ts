@@ -57,7 +57,6 @@ async function proxyHeaders(model: string, stream: boolean, settings: AppSetting
     'x-uid': auth.currentUser?.uid || 'anonymous',
     'x-gemini-model': model,
     'x-gemini-stream': stream ? 'true' : 'false',
-    'x-api-key': settings.geminiApiKey || '',
   };
 }
 

@@ -63,7 +63,6 @@ export function useCopilotSuggestions(settings: AppSettings) {
             'x-uid': auth.currentUser?.uid || 'anonymous',
             'x-gemini-model': resolveGeminiModelId(settings.geminiModel || ''),
             'x-gemini-stream': 'false',
-            'x-api-key': settings.geminiApiKey || ''
           },
           body: JSON.stringify({
             system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },

@@ -80,7 +80,6 @@ async function judgeFetch(
           'x-uid': auth.currentUser?.uid || 'anonymous',
           'x-gemini-model': model,
           'x-gemini-stream': 'false',
-          'x-api-key': apiKey || '',
         },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemContext }] },
