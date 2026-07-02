@@ -435,8 +435,12 @@ export function ClinicForm({ clinicId }: Props) {
                     <input
                       className="input h-10 font-mono text-xs bg-ink-50/50 flex-1"
                       value={draft.googleDocsTemplateId}
-                      readOnly
-                      placeholder="Nenhum template selecionado"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const match = val.match(/[-\w]{25,}/);
+                        u('googleDocsTemplateId', match ? match[0] : val);
+                      }}
+                      placeholder="Selecione ou cole o ID do documento"
                     />
                     <button
                       type="button"
@@ -458,8 +462,12 @@ export function ClinicForm({ clinicId }: Props) {
                     <input
                       className="input h-10 font-mono text-xs bg-ink-50/50 flex-1"
                       value={draft.googleDriveFolderId}
-                      readOnly
-                      placeholder="Nenhuma pasta selecionada"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const match = val.match(/[-\w]{25,}/);
+                        u('googleDriveFolderId', match ? match[0] : val);
+                      }}
+                      placeholder="Selecione ou cole o ID da pasta"
                     />
                     <button
                       type="button"
