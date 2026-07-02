@@ -3,15 +3,16 @@ import { useApp } from '../../store/app';
 import { useDocument } from '../../hooks/useFirestore';
 import { addItemWithId, updateItem, generateStandardId } from '../../store/db';
 import { Clinic } from '../../types';
-import { 
-  ArrowLeft, Save, Upload, Building2, MapPin, 
-  Globe, FileText, Layout, 
-  RotateCcw, Info, CheckCircle2
+import {
+  ArrowLeft, Save, Upload, Building2, MapPin,
+  Globe, FileText, Layout,
+  RotateCcw, Info, CheckCircle2, MousePointerClick
 } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { logger } from '../../utils/logger';
 import { storage, auth } from '../../lib/firebase';
 import { classNames } from '../../utils/format';
+import { pickGoogleDoc, pickGoogleFolder } from '../../lib/googlePicker';
 
 interface Props {
   clinicId?: string;
@@ -79,6 +80,40 @@ export function ClinicForm({ clinicId }: Props) {
 
   function ua<K extends keyof NonNullable<typeof draft.address>>(key: K, value: string) {
     setDraft((d) => ({ ...d, address: { ...d.address, [key]: value } }));
+  }
+
+  const [picking, setPicking] = useState<null | 'doc' | 'folder'>(null);
+
+  async function handlePickTemplate() {
+    setPicking('doc');
+    try {
+      const picked = await pickGoogleDoc();
+      if (picked) {
+        u('googleDocsTemplateId', picked.id);
+        showToast(`Template selecionado: ${picked.name}`, 'success');
+      }
+    } catch (err: any) {
+      logger.error('[ClinicForm] Erro no Picker (template):', err);
+      showToast(err?.message || 'Não foi possível abrir o seletor do Google.', 'error');
+    } finally {
+      setPicking(null);
+    }
+  }
+
+  async function handlePickFolder() {
+    setPicking('folder');
+    try {
+      const picked = await pickGoogleFolder();
+      if (picked) {
+        u('googleDriveFolderId', picked.id);
+        showToast(`Pasta selecionada: ${picked.name}`, 'success');
+      }
+    } catch (err: any) {
+      logger.error('[ClinicForm] Erro no Picker (pasta):', err);
+      showToast(err?.message || 'Não foi possível abrir o seletor do Google.', 'error');
+    } finally {
+      setPicking(null);
+    }
   }
 
   function compressLogoFile(file: File): Promise<Blob> {
@@ -387,41 +422,55 @@ export function ClinicForm({ clinicId }: Props) {
                 <h3 className="text-[10px] font-black text-brand-650 uppercase tracking-widest">Integração Google Cloud</h3>
               </div>
               <p className="text-xs text-ink-500 max-w-lg leading-relaxed">
-                Vincule um template do Google Docs e uma pasta no Drive para que os laudos desta unidade sejam gerados e salvos automaticamente.
+                Selecione um template do Google Docs e uma pasta no Drive para que os laudos desta unidade sejam gerados e salvos automaticamente. Use o botão <strong>Selecionar</strong> — ao escolher pelo Google, o app recebe acesso somente àquele arquivo/pasta (permissão mínima).
               </p>
 
               <div className="space-y-4">
                 <div>
                   <label className="label flex items-center justify-between">
-                    ID do Template Google Docs
+                    Template do Google Docs
                     <Info size={11} className="text-ink-400" />
                   </label>
-                  <input
-                    className="input h-10 font-mono text-xs bg-ink-50/50"
-                    value={draft.googleDocsTemplateId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const match = val.match(/[-\w]{25,}/);
-                      u('googleDocsTemplateId', match ? match[0] : val);
-                    }}
-                    placeholder="Cole o ID ou URL do documento"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      className="input h-10 font-mono text-xs bg-ink-50/50 flex-1"
+                      value={draft.googleDocsTemplateId}
+                      readOnly
+                      placeholder="Nenhum template selecionado"
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePickTemplate}
+                      disabled={picking !== null}
+                      className="btn-secondary h-10 px-3 shrink-0 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <MousePointerClick size={13} />
+                      {picking === 'doc' ? 'Abrindo…' : 'Selecionar'}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="label flex items-center justify-between">
-                    ID da Pasta no Google Drive
+                    Pasta no Google Drive
                     <Info size={11} className="text-ink-400" />
                   </label>
-                  <input
-                    className="input h-10 font-mono text-xs bg-ink-50/50"
-                    value={draft.googleDriveFolderId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const match = val.match(/[-\w]{25,}/);
-                      u('googleDriveFolderId', match ? match[0] : val);
-                    }}
-                    placeholder="Cole o ID ou URL da pasta"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      className="input h-10 font-mono text-xs bg-ink-50/50 flex-1"
+                      value={draft.googleDriveFolderId}
+                      readOnly
+                      placeholder="Nenhuma pasta selecionada"
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePickFolder}
+                      disabled={picking !== null}
+                      className="btn-secondary h-10 px-3 shrink-0 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <MousePointerClick size={13} />
+                      {picking === 'folder' ? 'Abrindo…' : 'Selecionar'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
