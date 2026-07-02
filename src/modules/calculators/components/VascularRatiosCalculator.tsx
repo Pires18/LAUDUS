@@ -3,6 +3,7 @@ import { CalculatorProps } from '../registry';
 import { Activity, Info } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { CalculatorInput } from './CalculatorUI';
+import { dopplerIndices } from '../formulas';
 
 export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
   const [psv, setPsv] = useState(value?.psv || '');
@@ -14,21 +15,7 @@ export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
   const [sd, setSd] = useState<number | null>(null);
 
   useEffect(() => {
-    const s = Number(psv);
-    const d = Number(edv);
-    const m = Number(tamv);
-
-    let calculatedRi: number | null = null;
-    let calculatedPi: number | null = null;
-    let calculatedSd: number | null = null;
-
-    if (s && d) {
-      calculatedRi = (s - d) / s;
-      calculatedSd = s / d;
-    }
-    if (s && d && m) {
-      calculatedPi = (s - d) / m;
-    }
+    const { ri: calculatedRi, pi: calculatedPi, sd: calculatedSd } = dopplerIndices(Number(psv), Number(edv), Number(tamv));
 
     setRi(calculatedRi);
     setPi(calculatedPi);

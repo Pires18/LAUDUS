@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Droplets, Info, AlertCircle } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { balikPleuralVolume } from '../formulas';
 
 export function PleuralEffusionCalculator({ value, onChange }: CalculatorProps) {
   const [depth, setDepth] = useState(value?.depth || ''); // mm
@@ -9,12 +10,7 @@ export function PleuralEffusionCalculator({ value, onChange }: CalculatorProps) 
   const [volume, setVolume] = useState<number | null>(null);
 
   useEffect(() => {
-    const d = Number(depth);
-    let vol: number | null = null;
-
-    if (d > 0) {
-      vol = 20 * d;
-    }
+    const vol = balikPleuralVolume(Number(depth));
 
     setVolume(vol);
 

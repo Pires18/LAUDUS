@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Ruler, Info } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { meanSacDiameter, gaFromMsd } from '../formulas';
 
 export function MsdCalculator({ value, onChange }: CalculatorProps) {
   const [d1, setD1] = useState(value?.d1 || '');
@@ -13,12 +14,8 @@ export function MsdCalculator({ value, onChange }: CalculatorProps) {
     let ga = null;
 
     if (d1 && d2 && d3) {
-      msd = (Number(d1) + Number(d2) + Number(d3)) / 3;
-      // Fórmula: IG (dias) = DMSG (mm) + 30
-      const totalDays = Math.round(msd + 30);
-      const weeks = Math.floor(totalDays / 7);
-      const days = totalDays % 7;
-      ga = `${weeks}s ${days}d`;
+      msd = meanSacDiameter(Number(d1), Number(d2), Number(d3));
+      if (msd !== null) ga = gaFromMsd(msd).label;
     }
 
     const summary = msd

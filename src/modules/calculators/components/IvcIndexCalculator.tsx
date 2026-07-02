@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Droplets } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { ivcCollapsibilityIndex } from '../formulas';
 
 export function IvcIndexCalculator({ value, onChange }: CalculatorProps) {
   const [maxDia, setMaxDia] = useState(value?.maxDia || ''); // Diâmetro expiratório (máximo)
@@ -10,13 +11,7 @@ export function IvcIndexCalculator({ value, onChange }: CalculatorProps) {
   const [index, setIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    const max = Number(maxDia);
-    const min = Number(minDia);
-
-    let idx: number | null = null;
-    if (max && min && max > 0) {
-      idx = ((max - min) / max) * 100;
-    }
+    const idx = ivcCollapsibilityIndex(Number(maxDia), Number(minDia));
 
     setIndex(idx);
 

@@ -3,6 +3,7 @@ import { CalculatorProps } from '../registry';
 import { Droplets, Info, Plus, Trash2 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { genId } from '../../../store/db';
+import { amnioticMBV, amnioticILA } from '../formulas';
 
 interface Pocket {
   id: string;
@@ -27,23 +28,14 @@ export function AmnioticFluidCalculator({ value, onChange }: CalculatorProps) {
 
     if (method === 'mbv') {
       // MBV = Maior Bolsão Vertical (Single Deepest Pocket)
-      const depths = pockets.map(p => Number(p.depth)).filter(d => d > 0);
-      if (depths.length > 0) {
-        result = Math.max(...depths);
-        if (result < 20) classification = 'Oligoâmnio (MBV < 20mm)';
-        else if (result <= 80) classification = 'Volume normal (20-80mm)';
-        else classification = 'Polidrâmnio (MBV > 80mm)';
-      }
+      const r = amnioticMBV(pockets.map(p => Number(p.depth)));
+      if (r) { result = r.result; classification = r.classification; }
     } else {
       // ILA = Índice de Líquido Amniótico (4 quadrants)
-      if (q1 && q2 && q3 && q4) {
-        result = Number(q1) + Number(q2) + Number(q3) + Number(q4);
-        if (result < 50) classification = 'Oligoâmnio (ILA < 50mm)';
-        else if (result <= 80) classification = 'Líquido reduzido (50-80mm)';
-        else if (result <= 180) classification = 'Volume normal (80-180mm)';
-        else if (result <= 240) classification = 'Líquido aumentado (180-240mm)';
-        else classification = 'Polidrâmnio (ILA > 240mm)';
-      }
+      const r = (q1 && q2 && q3 && q4)
+        ? amnioticILA(Number(q1), Number(q2), Number(q3), Number(q4))
+        : null;
+      if (r) { result = r.result; classification = r.classification; }
     }
 
     const summary = result !== null

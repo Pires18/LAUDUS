@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Ruler } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { prostateVolumeWeight } from '../formulas';
 
 export function ProstateWeightCalculator({ value, onChange }: CalculatorProps) {
   const [d1, setD1] = useState(value?.d1 || ''); // Transverso
@@ -13,17 +14,11 @@ export function ProstateWeightCalculator({ value, onChange }: CalculatorProps) {
     let weight: number | null = null;
     let classification = '';
 
-    if (d1 && d2 && d3) {
-      // Volume do elipsoide = 0.523 × D1 × D2 × D3 (mm³ → cm³)
-      volume = 0.523 * Number(d1) * Number(d2) * Number(d3) / 1000;
-      // Peso ≈ Volume × 1.05 (densidade do tecido prostático g/cm³)
-      weight = volume * 1.05;
-
-      if (volume <= 20) classification = 'Normal (até 20cc)';
-      else if (volume <= 30) classification = 'Aumento leve (20-30cc)';
-      else if (volume <= 50) classification = 'Aumento moderado (30-50cc)';
-      else if (volume <= 80) classification = 'Aumento acentuado (50-80cc)';
-      else classification = 'Aumento muito acentuado (> 80cc)';
+    const r = (d1 && d2 && d3) ? prostateVolumeWeight(Number(d1), Number(d2), Number(d3)) : null;
+    if (r) {
+      volume = r.volume;
+      weight = r.weight;
+      classification = r.classification;
     }
 
     const summary = volume

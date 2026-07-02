@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Ruler, Maximize2 } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { ellipsoidVolume } from '../formulas';
 
 export function VolumeCalculator({ value, onChange }: CalculatorProps) {
   const [structureName, setStructureName] = useState<string>(value?.structureName ?? '');
@@ -12,10 +13,8 @@ export function VolumeCalculator({ value, onChange }: CalculatorProps) {
 
   useEffect(() => {
     let volumeCm3 = 0;
-    if (typeof d1 === 'number' && typeof d2 === 'number' && typeof d3 === 'number' && d1 > 0 && d2 > 0 && d3 > 0) {
-      const rawVolume = d1 * d2 * d3 * 0.523;
-      // Se unidade for mm, converter mm³ → cm³ (÷ 1000). Se cm, já está em cm³.
-      volumeCm3 = unit === 'mm' ? rawVolume / 1000 : rawVolume;
+    if (typeof d1 === 'number' && typeof d2 === 'number' && typeof d3 === 'number') {
+      volumeCm3 = ellipsoidVolume(d1, d2, d3, unit === 'mm' ? 'mm' : 'cm') ?? 0;
     }
 
     const name = structureName.trim() || 'Estrutura';

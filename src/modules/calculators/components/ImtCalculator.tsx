@@ -3,30 +3,7 @@ import { CalculatorProps } from '../registry';
 import { Activity } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
-
-// Referência IMT ELSA-Brasil (Freire et al. 2015, Lotufo et al. 2016)
-// Limiares: p75 e p90 por faixa etária e sexo.
-const IMT_REF: Record<string, Record<string, { p75: number; p90: number }>> = {
-  male: {
-    '35-44': { p75: 0.72, p90: 0.82 },
-    '45-54': { p75: 0.80, p90: 0.93 },
-    '55-64': { p75: 0.90, p90: 1.03 },
-    '65+':   { p75: 0.98, p90: 1.12 },
-  },
-  female: {
-    '35-44': { p75: 0.65, p90: 0.74 },
-    '45-54': { p75: 0.73, p90: 0.84 },
-    '55-64': { p75: 0.82, p90: 0.95 },
-    '65+':   { p75: 0.90, p90: 1.04 },
-  }
-};
-
-function getAgeGroup(age: number): string {
-  if (age < 45) return '35-44';
-  if (age < 55) return '45-54';
-  if (age < 65) return '55-64';
-  return '65+';
-}
+import { IMT_REF, imtAgeGroup, imtClassification } from '../formulas';
 
 export function ImtCalculator({ value, onChange }: CalculatorProps) {
   const [age, setAge] = useState(value?.age || '');
@@ -44,14 +21,8 @@ export function ImtCalculator({ value, onChange }: CalculatorProps) {
       const l = Number(imtLeft) || 0;
       maxImt = Math.max(r, l);
 
-      const ageGroup = getAgeGroup(Number(age));
-      ref = IMT_REF[sex]?.[ageGroup] || null;
-
-      if (ref) {
-        if (maxImt <= ref.p75) classification = 'Normal (≤ p75)';
-        else if (maxImt <= ref.p90) classification = 'Espessamento moderado (p75-p90)';
-        else classification = 'Espessamento acentuado (> p90) — Risco cardiovascular elevado';
-      }
+      ref = IMT_REF[sex]?.[imtAgeGroup(Number(age))] || null;
+      classification = imtClassification(Number(age), sex, maxImt) || '';
     }
 
     const summary = maxImt
@@ -118,7 +89,7 @@ export function ImtCalculator({ value, onChange }: CalculatorProps) {
           />
           {ref && (
             <p className="text-[10px] text-ink-400 text-center font-medium">
-              Referência ELSA-Brasil ({sex === 'male' ? 'Masc' : 'Fem'}, {getAgeGroup(Number(age))} anos): p75 = {ref.p75}mm | p90 = {ref.p90}mm
+              Referência ELSA-Brasil ({sex === 'male' ? 'Masc' : 'Fem'}, {imtAgeGroup(Number(age))} anos): p75 = {ref.p75}mm | p90 = {ref.p90}mm
             </p>
           )}
         </div>
