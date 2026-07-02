@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useDocument } from '../../hooks/useFirestore';
-import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
@@ -97,6 +97,13 @@ export function ExamEditor({ examId }: Props) {
     : dbPatient;
   const [template, setTemplate] = useState<ReportTemplate | null>(null);
   const [clinic, setClinic] = useState<Clinic | null>(null);
+
+  // Trilha de acesso LGPD: registra a abertura do laudo (exceto avulso/anônimo).
+  useEffect(() => {
+    if (exam?.id && exam.patientId !== 'ANONIMO') {
+      logPatientAccess('exam', exam.id, `${exam.examType || 'Laudo'}${patient?.name ? ' — ' + patient.name : ''}`);
+    }
+  }, [exam?.id]);
 
   // Load related data
   useEffect(() => {

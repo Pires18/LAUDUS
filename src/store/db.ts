@@ -889,6 +889,10 @@ export async function addAuditLog(log: {
   module: string;
   userId?: string;
   userName?: string;
+  /** Alvo do acesso (ex: id do paciente/exame) — para a trilha de acesso LGPD. */
+  targetId?: string;
+  /** Tipo do alvo (ex: 'patient', 'exam'). */
+  targetType?: string;
 }): Promise<void> {
   try {
     const currentUser = auth.currentUser;
@@ -903,6 +907,37 @@ export async function addAuditLog(log: {
   } catch (err) {
     logger.error('[DB] Erro ao gravar log de auditoria', err);
   }
+}
+
+// Trilha de acesso a dados de paciente (LGPD). Janela de dedup para evitar
+// registros duplicados por remontagem/StrictMode; reacessos reais (após a
+// janela) são registrados normalmente.
+const _recentAccessLog = new Map<string, number>();
+
+/**
+ * Registra o ACESSO/visualização de dados identificáveis de paciente
+ * (prontuário ou laudo) na trilha de auditoria — exigível para dados de saúde.
+ * Não registra CPF/RG; apenas o id do alvo e um rótulo legível ao admin.
+ */
+export async function logPatientAccess(
+  targetType: 'patient' | 'exam',
+  targetId: string,
+  label?: string
+): Promise<void> {
+  if (!targetId) return;
+  const key = `${targetType}:${targetId}`;
+  const now = Date.now();
+  if (now - (_recentAccessLog.get(key) || 0) < 10_000) return;
+  _recentAccessLog.set(key, now);
+  await addAuditLog({
+    action: targetType === 'patient' ? 'view_patient' : 'view_report',
+    details: label
+      ? `Acesso a dados de paciente: ${label}`
+      : `Acesso a ${targetType} (${targetId})`,
+    module: targetType === 'patient' ? 'patients' : 'editor',
+    targetId,
+    targetType,
+  });
 }
 
 /**
