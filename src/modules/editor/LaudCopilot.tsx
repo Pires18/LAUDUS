@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator,
   Lightbulb, Zap, ClipboardList, RotateCcw, CheckCircle2,
-  Trash2, StopCircle, Brain, Pencil, FileText, Lock
+  Trash2, StopCircle, Brain, Pencil, FileText, Lock, ShieldCheck, ShieldAlert,
 } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
@@ -10,6 +10,7 @@ import { updateItem, saveVersionSnapshot, getRecentFinalizedReports } from '../.
 import { logger } from '../../utils/logger';
 import { ExamRequest, Patient, ReportTemplate } from '../../types';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
+import { routeMotor } from '../ai/router';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -275,6 +276,16 @@ export function LaudCopilot({
     const area = exam.area || template?.area || '';
     return AREA_SUGGESTIONS[area] || AREA_SUGGESTIONS['default'];
   }, [exam.area, template?.area]);
+
+  // Consciência do roteador: detecta red flags na instrução atual + clínica
+  // para sinalizar quando o Motor Pro será acionado por segurança.
+  const routerDecision = useMemo(() => routeMotor({
+    area: exam.area || template?.area || '',
+    examType: exam.examType,
+    clinicalIndication: exam.clinicalIndication,
+    anamnesis: [exam.anamnesis, prompt].filter(Boolean).join(' '),
+    userMotor: selectedMotor,
+  }), [exam.area, template?.area, exam.examType, exam.clinicalIndication, exam.anamnesis, prompt, selectedMotor]);
 
   const handleFormTextChange = (val: string) => {
     setFormText(val);
@@ -678,6 +689,22 @@ export function LaudCopilot({
     const historyWithAssistant = [...newHistory, { role: 'assistant' as const, content: '__thinking__' }];
     onChatUpdate(historyWithAssistant);
 
+    // Roteador de segurança: red flag na instrução força o Motor Pro
+    // (se disponível), ignorando a escolha do usuário.
+    const decision = routeMotor({
+      area: exam.area || template?.area || '',
+      examType: exam.examType,
+      clinicalIndication: exam.clinicalIndication,
+      anamnesis: [exam.anamnesis, messageToSend].filter(Boolean).join(' '),
+      userMotor: selectedMotor,
+    });
+    const effectiveSettings = (decision.forcedPro && motorProEnabled && settings.selectedMotor !== 'pro')
+      ? { ...settings, selectedMotor: 'pro' as const }
+      : settings;
+    if (decision.forcedPro && motorProEnabled && settings.selectedMotor !== 'pro') {
+      showToast('Motor Pro ativado: sinal clínico de alerta detectado.', 'info');
+    }
+
     try {
       const previousExams = settings.aiTrainingEnabled
         ? await getRecentFinalizedReports(template?.id || '', settings.aiTrainingContextSize || 3)
@@ -700,7 +727,7 @@ export function LaudCopilot({
           createdAt: exam.examDate || exam.createdAt
         },
         template,
-        settings,
+        settings: effectiveSettings,
         previousExams,
         signal: controller.signal
       }, (chunk, rawText) => {
@@ -750,7 +777,7 @@ export function LaudCopilot({
               currentReport: cleanProposal,
               template,
               patient,
-              settings,
+              settings: effectiveSettings,
               clinicalIndication: exam.clinicalIndication,
               requestingPhysician: exam.requestingPhysician,
               anamnesis: exam.anamnesis,
@@ -924,6 +951,47 @@ export function LaudCopilot({
 
       {activeTab === 'chat' && (
         <>
+          {/* ── Status header inteligente ── */}
+          <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-ink-100 bg-gradient-to-r from-brand-50/50 via-white to-white shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="relative shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                  <Bot size={15} className="text-white" />
+                </div>
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white">
+                  <span className="absolute inset-0.5 rounded-full bg-emerald-300 animate-pulse" />
+                </span>
+              </div>
+              <div className="min-w-0 leading-tight">
+                <div className="text-[11px] font-black text-ink-800 tracking-tight">Copiloto LAUD.IA</div>
+                <div className="flex items-center gap-1 text-[9px] text-ink-400 font-bold">
+                  <ShieldCheck size={9} className="text-emerald-500" />
+                  Verificação ativa
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {routerDecision.forcedPro && selectedMotor !== 'pro' && (
+                <span
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-[9px] font-black uppercase tracking-widest"
+                  title={routerDecision.reason}
+                >
+                  <ShieldAlert size={9} /> Pro auto
+                </span>
+              )}
+              <span className={classNames(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border',
+                (routerDecision.forcedPro || selectedMotor === 'pro')
+                  ? 'bg-violet-600 text-white border-violet-600'
+                  : 'bg-indigo-600 text-white border-indigo-600'
+              )}>
+                {(routerDecision.forcedPro || selectedMotor === 'pro') ? <Sparkles size={9} /> : <Zap size={9} />}
+                {(routerDecision.forcedPro || selectedMotor === 'pro') ? 'Pro' : 'Lite'}
+              </span>
+            </div>
+          </div>
+
           {/* Refine phase banner */}
           <AnimatePresence>
             {refinePhase !== 'idle' && (
