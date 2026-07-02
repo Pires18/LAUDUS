@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { anonymizeReport, detectResidualPII } from '../modules/ai/training/anonymize';
+import { anonymizeReport, detectResidualPII, scrubForGeneration } from '../modules/ai/training/anonymize';
 import { GOLDEN_DATASET, goldenCasesByArea } from '../modules/ai/training/goldenDataset';
 import { DIMENSION_WEIGHTS, HardAssertion } from '../modules/ai/training/types';
 import { checkAssertions } from '../modules/ai/training/harness';
@@ -19,6 +19,36 @@ const mockPatient: Patient = {
   createdAt: Date.now(),
   updatedAt: Date.now(),
 };
+
+describe('scrubForGeneration (pseudonimização na geração de laudo)', () => {
+  it('remove nome, CPF, telefone e e-mail do paciente', () => {
+    const txt = 'João Carlos da Silva, CPF 123.456.789-00, tel (11) 98765-4321, joao.silva@email.com';
+    const out = scrubForGeneration(txt, mockPatient);
+    expect(out).not.toContain('João');
+    expect(out).not.toContain('Silva');
+    expect(out).not.toContain('123.456.789-00');
+    expect(out).not.toContain('joao.silva@email.com');
+  });
+
+  it('PRESERVA datas e medidas (essenciais para evolução/idade gestacional)', () => {
+    const txt = 'US de 25/06/2026: nódulo de 1,8 cm (antes 1,2 cm em 10/01/2026).';
+    const out = scrubForGeneration(txt, mockPatient);
+    expect(out).toContain('25/06/2026');
+    expect(out).toContain('10/01/2026');
+    expect(out).toContain('1,8 cm');
+    expect(out).toContain('1,2 cm');
+  });
+
+  it('remove PII estrutural mesmo sem objeto Patient', () => {
+    const out = scrubForGeneration('Contato: outro.paciente@x.com, CPF 987.654.321-00');
+    expect(out).toContain('[EMAIL]');
+    expect(out).toContain('[CPF]');
+  });
+
+  it('texto vazio retorna vazio', () => {
+    expect(scrubForGeneration('')).toBe('');
+  });
+});
 
 describe('anonymizeReport', () => {
   it('substitui o nome completo do paciente', () => {

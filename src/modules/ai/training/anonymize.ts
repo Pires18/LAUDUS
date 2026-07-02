@@ -101,6 +101,54 @@ export function anonymizeReport(html: string, patient?: Patient | null): Anonymi
   return { text, redactions };
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PSEUDONIMIZAÇÃO PARA GERAÇÃO DE LAUDO (LGPD) — preserva valor clínico
+// ═══════════════════════════════════════════════════════════════
+// Diferente da de-identificação do corpus: aqui NÃO removemos datas nem
+// medidas, pois são essenciais para o raciocínio clínico (evolução, idade
+// gestacional, comparação com exames anteriores). Removemos apenas
+// identificadores diretos: nome do paciente, CPF, RG, CNS, telefone, e-mail.
+
+const GENERATION_SCRUB_PATTERNS = PII_PATTERNS.filter((p) => p.name !== 'data');
+
+/**
+ * Remove identificadores diretos de um texto que será enviado à IA na
+ * geração/edição de laudo, preservando datas e medidas. Quando o objeto
+ * Patient é fornecido, remove também o nome nominal conhecido.
+ */
+export function scrubForGeneration(text: string, patient?: Patient | null): string {
+  if (!text) return '';
+  let out = text;
+
+  if (patient) {
+    const known: Array<{ raw?: string; token: string }> = [
+      { raw: patient.name, token: '[PACIENTE]' },
+      { raw: (patient as any).cpf, token: '[CPF]' },
+      { raw: (patient as any).rg, token: '[RG]' },
+      { raw: (patient as any).email, token: '[EMAIL]' },
+      { raw: (patient as any).phone, token: '[TELEFONE]' },
+    ];
+    for (const { raw, token } of known) {
+      if (!raw || String(raw).trim().length < 2) continue;
+      const value = String(raw).trim();
+      out = out.replace(new RegExp(escapeRegExp(value), 'gi'), token);
+      if (token === '[PACIENTE]') {
+        const parts = stripDiacritics(value)
+          .split(/\s+/)
+          .filter((p) => p.replace(/[^A-Za-z]/g, '').length >= 3);
+        for (const part of parts) {
+          out = out.replace(new RegExp(`\\b${escapeRegExp(part)}\\b`, 'gi'), token);
+        }
+      }
+    }
+  }
+
+  for (const { pattern, replacement } of GENERATION_SCRUB_PATTERNS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
 /**
  * Verifica se um texto ainda contém PII residual aparente. Usado como
  * gate de segurança antes de persistir no corpus — se retornar problemas,

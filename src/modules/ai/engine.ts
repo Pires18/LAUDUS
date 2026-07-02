@@ -7,6 +7,7 @@ import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
 import { getMotorProfile } from './motorProfiles';
 import { retrieveFewShotBlock } from './training/augment';
+import { scrubForGeneration } from './training/anonymize';
 
 // ─── Interfaces públicas ─────────────────────────────────────────────────────
 
@@ -389,26 +390,32 @@ function buildContextMessage({
     `MODO: ${mode}`,
     `EXAME: ${examType}`,
     `DATA DO EXAME: ${examDate} (ATENÇÃO: Use ESTA data como o "Hoje" para qualquer cálculo de datas no laudo, como DDP ou Idade Gestacional. PROIBIDO usar a data atual real do sistema.)`,
-    `PACIENTE: ${patient?.name || 'Não informado'}, ${patientAge}, ${patientGender}`,
+    // LGPD: o nome do paciente NÃO é enviado à IA (não é usado no corpo do
+    // laudo — entra só no cabeçalho, via template, na exportação).
+    `PACIENTE: ${patientAge}, ${patientGender}`,
   ];
   if (patient?.insurance) lines.push(`CONVÊNIO: ${patient.insurance}`);
-  if (patient?.history) lines.push(`HISTÓRICO CLÍNICO: ${patient.history}`);
+  if (patient?.history) lines.push(`HISTÓRICO CLÍNICO: ${scrubForGeneration(patient.history, patient)}`);
   lines.push(`INDICAÇÃO: ${clinicalIndication || 'Não informada'}`);
   if (requestingPhysician) lines.push(`MÉDICO SOLICITANTE: ${requestingPhysician}`);
 
   if (anamnesis && anamnesis.trim()) {
-    lines.push(`\nANAMNESE DO PACIENTE (dados da consulta — usar como contexto clínico prioritário para calibrar descrição, conclusão e recomendações):\n${anamnesis.trim()}`);
+    lines.push(`\nANAMNESE DO PACIENTE (dados da consulta — usar como contexto clínico prioritário para calibrar descrição, conclusão e recomendações):\n${scrubForGeneration(anamnesis.trim(), patient)}`);
   }
 
   const notesLabel = mode === 'GERAÇÃO INICIAL' ? 'NOTAS DO MÉDICO' : 'INSTRUÇÃO DE ALTERAÇÃO';
   lines.push(`${notesLabel}: ${notes || 'Nenhuma nota adicional.'}`);
 
+  // Referências de estilo (laudos de outros exames) — limpeza estrutural de
+  // identificadores diretos (CPF/telefone/e-mail); datas/medidas preservadas.
   const prevContext = previousExams.length > 0
-    ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${previousExams.join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
+    ? `\n\nREFERÊNCIA DE ESTILO (laudos anteriores — mimetize APENAS o estilo de escrita, NUNCA copie dados clínicos):\n[INÍCIO DOS EXEMPLOS]\n${previousExams.map((e) => scrubForGeneration(e)).join('\n\n---\n\n')}\n[FIM DOS EXEMPLOS]`
     : '';
 
+  // Histórico do MESMO paciente — remove o nome nominal conhecido, preserva
+  // datas e medidas (essenciais para a análise de evolução).
   const patientHistoryBlock = patientPreviousExams && patientPreviousExams.length > 0
-    ? `\n\n═══════════════════════════════════════════\nHISTÓRICO CLÍNICO ANTERIOR DO PACIENTE:\n═══════════════════════════════════════════\nVocê tem acesso aos exames passados deste paciente na mesma especialidade. Seu dever máximo é atuar como médico analista: cruze as medidas e informações do INPUT ATUAL com o HISTÓRICO abaixo e descreva ativamente a evolução clínica (ex: informe se um nódulo aumentou de volume, se um cisto regrediu, ou se a biometria evoluiu normalmente comparado ao exame anterior). NÃO copie o laudo antigo, apenas use-o para inferir a EVOLUÇÃO cronológica da doença ou gestação.\n\n[INÍCIO DO HISTÓRICO DO PACIENTE]\n${patientPreviousExams.join('\n\n---\n\n')}\n[FIM DO HISTÓRICO DO PACIENTE]`
+    ? `\n\n═══════════════════════════════════════════\nHISTÓRICO CLÍNICO ANTERIOR DO PACIENTE:\n═══════════════════════════════════════════\nVocê tem acesso aos exames passados deste paciente na mesma especialidade. Seu dever máximo é atuar como médico analista: cruze as medidas e informações do INPUT ATUAL com o HISTÓRICO abaixo e descreva ativamente a evolução clínica (ex: informe se um nódulo aumentou de volume, se um cisto regrediu, ou se a biometria evoluiu normalmente comparado ao exame anterior). NÃO copie o laudo antigo, apenas use-o para inferir a EVOLUÇÃO cronológica da doença ou gestação.\n\n[INÍCIO DO HISTÓRICO DO PACIENTE]\n${patientPreviousExams.map((e) => scrubForGeneration(e, patient)).join('\n\n---\n\n')}\n[FIM DO HISTÓRICO DO PACIENTE]`
     : '';
 
   const maskLabel = mode === 'GERAÇÃO INICIAL'
