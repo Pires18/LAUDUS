@@ -4,6 +4,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity, Spark
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
+import { classifyBirads } from '../classifiers';
 
 interface Lesion {
   id: string;
@@ -63,109 +64,6 @@ const CALCIFICATIONS = [
   { label: 'Periféricas (distrofia)', value: 'Periféricas', description: 'Calcificações na parede da lesão' },
 ];
 
-/**
- * Classificação BI-RADS US 2013 por contagem de features suspeitas.
- * Referência: ACR BI-RADS® Atlas 5th Edition (2013).
- */
-function classifyBirads(l: Lesion): { cat: string; rec: string } {
-  if (!l.shape || !l.margin || !l.orientation || !l.echoPattern) {
-    return { cat: '0', rec: 'Avaliação Incompleta — preencha todos os campos.' };
-  }
-
-  // Cisto simples = BI-RADS 2 (benigno definitivo)
-  if (
-    l.echoPattern === 'Anecóico' &&
-    l.margin === 'Circunscrita' &&
-    (l.shape === 'Oval' || l.shape === 'Redondo') &&
-    l.orientation === 'Paralelo'
-  ) {
-    return { cat: '2', rec: 'Benigno. Cisto simples clássico. Nenhum acompanhamento necessário.' };
-  }
-
-  // Contagem de features suspeitas per ACR BI-RADS 2013
-  let suspiciousCount = 0;
-  const suspiciousFeatures: string[] = [];
-
-  if (l.shape === 'Irregular') {
-    suspiciousCount++;
-    suspiciousFeatures.push('forma irregular');
-  }
-  if (l.orientation === 'Não-paralelo') {
-    suspiciousCount++;
-    suspiciousFeatures.push('orientação não-paralela');
-  }
-  if (l.margin && ['Indistinta', 'Angular', 'Microlobulada', 'Espiculada'].includes(l.margin)) {
-    suspiciousCount++;
-    suspiciousFeatures.push(`margem ${l.margin.toLowerCase()}`);
-  }
-  if (l.echoPattern === 'Hipoecóico') {
-    suspiciousCount++;
-    suspiciousFeatures.push('padrão hipoecóico');
-  }
-  if (l.posteriorFeatures === 'Sombra Acústica') {
-    suspiciousCount++;
-    suspiciousFeatures.push('sombra acústica posterior');
-  }
-  if (l.calcifications === 'Microcalcificações') {
-    suspiciousCount++;
-    suspiciousFeatures.push('microcalcificações');
-  }
-
-  // BI-RADS 5: ≥ 4 features suspeitas OU combinação clássica de malignidade
-  const isClassicMalignant =
-    l.shape === 'Irregular' &&
-    l.margin === 'Espiculada' &&
-    l.orientation === 'Não-paralelo';
-
-  if (isClassicMalignant || suspiciousCount >= 4) {
-    return {
-      cat: '5',
-      rec: `Altamente suspeito (> 95% risco). Biópsia obrigatória independente do tamanho. Features: ${suspiciousFeatures.join(', ')}.`,
-    };
-  }
-
-  // BI-RADS 4C: 3 features suspeitas (50-95%)
-  if (suspiciousCount === 3) {
-    return {
-      cat: '4C',
-      rec: `Suspeita alta (50-95% risco). Biópsia obrigatória. Features: ${suspiciousFeatures.join(', ')}.`,
-    };
-  }
-
-  // BI-RADS 4B: 2 features suspeitas (10-50%)
-  if (suspiciousCount === 2) {
-    return {
-      cat: '4B',
-      rec: `Suspeita moderada (10-50% risco). Biópsia recomendada. Features: ${suspiciousFeatures.join(', ')}.`,
-    };
-  }
-
-  // BI-RADS 4A: 1 feature suspeita (2-10%)
-  if (suspiciousCount === 1) {
-    return {
-      cat: '4A',
-      rec: `Suspeita baixa (2-10% risco). Biópsia recomendada. Feature: ${suspiciousFeatures.join(', ')}.`,
-    };
-  }
-
-  // BI-RADS 3: provavelmente benigno — oval + paralelo + circunscrita (< 2%)
-  if (
-    (l.shape === 'Oval' || l.shape === 'Redondo') &&
-    l.orientation === 'Paralelo' &&
-    l.margin === 'Circunscrita'
-  ) {
-    return {
-      cat: '3',
-      rec: 'Provavelmente benigno (< 2% risco). Provável fibroadenoma. Controle por imagem em 6, 12 e 24 meses.',
-    };
-  }
-
-  // Default: BI-RADS 3
-  return {
-    cat: '3',
-    rec: 'Provavelmente benigno (< 2% risco). Controle por imagem em 6-12 meses.',
-  };
-}
 
 export function BiradsCalculator({ value, onChange }: CalculatorProps) {
   const [lesions, setLesions] = useState<Lesion[]>(() => {

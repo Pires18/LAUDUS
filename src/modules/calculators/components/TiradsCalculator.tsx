@@ -4,6 +4,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Maximize, Activity, Spark
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
+import { tiradsCategory } from '../classifiers';
 
 interface Lesion {
   id: string;
@@ -93,11 +94,9 @@ export function TiradsCalculator({ value, onChange }: CalculatorProps) {
       let tr = '';
       let rec = '';
       if (complete) {
-        if (total === 0)              { tr = 'TR1'; rec = 'Benigno. PAAF não recomendada.'; }
-        else if (total <= 2)          { tr = 'TR2'; rec = 'Não suspeito. PAAF não recomendada.'; }
-        else if (total === 3)         { tr = 'TR3'; rec = 'Levemente suspeito. PAAF se ≥ 2,5 cm. Seguimento se ≥ 1,5 cm.'; }
-        else if (total >= 4 && total <= 6) { tr = 'TR4'; rec = 'Moderadamente suspeito. PAAF se ≥ 1,5 cm. Seguimento se ≥ 1,0 cm.'; }
-        else if (total >= 7)          { tr = 'TR5'; rec = 'Altamente suspeito. PAAF se ≥ 1,0 cm. Seguimento se ≥ 0,5 cm.'; }
+        const c = tiradsCategory(total);
+        tr = c.tr;
+        rec = c.rec;
       }
 
       return {
