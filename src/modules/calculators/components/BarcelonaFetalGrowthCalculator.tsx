@@ -2,94 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { CalculatorProps } from '../registry';
 import { Activity, AlertTriangle, ShieldCheck, ChevronRight, ChevronLeft, BarChart3, Baby } from 'lucide-react';
 import { classNames } from '../../../utils/format';
-import { WHO_COEFFICIENTS } from '../constants/whoCoefficients';
+import {
+  UA_REF, MCA_REF, UTA_REF, DV_REF, DOPPLER_GA_MIN, DOPPLER_GA_MAX,
+  getRef, getCprRef, getWhoPercentile, zToPercentile, calcHadlockEfw,
+  type WHODimension,
+} from '../constants/fetalReferences';
 
 type Step = 'ga' | 'biometry' | 'doppler' | 'result';
 type Sex = 'male' | 'female' | 'unknown';
-type WHODimension = keyof typeof WHO_COEFFICIENTS;
-
-// --- DOPPLER REFERENCES ---
-// UA PI reference (Arduini & Rizzo 1990)
-const UA_REF: Record<number,[number,number]> = {
-  20:[1.54,0.37],21:[1.47,0.34],22:[1.41,0.32],23:[1.35,0.30],24:[1.30,0.28],25:[1.25,0.27],
-  26:[1.20,0.25],27:[1.16,0.24],28:[1.12,0.23],29:[1.08,0.22],30:[1.05,0.21],31:[1.02,0.20],
-  32:[0.99,0.19],33:[0.96,0.19],34:[0.94,0.18],35:[0.92,0.18],36:[0.90,0.17],37:[0.89,0.17],
-  38:[0.87,0.17],39:[0.86,0.16],40:[0.85,0.16]
-};
-// MCA PI reference (Mari & Deter 1992)
-const MCA_REF: Record<number,[number,number]> = {
-  20:[1.60,0.30],21:[1.62,0.31],22:[1.65,0.32],23:[1.68,0.33],24:[1.71,0.33],25:[1.74,0.34],
-  26:[1.77,0.34],27:[1.80,0.35],28:[1.82,0.35],29:[1.83,0.36],30:[1.84,0.36],31:[1.84,0.36],
-  32:[1.83,0.36],33:[1.82,0.36],34:[1.79,0.35],35:[1.76,0.35],36:[1.71,0.34],37:[1.66,0.33],
-  38:[1.60,0.32],39:[1.53,0.31],40:[1.45,0.29]
-};
-// UtA PI reference (Gomez 2008)
-const UTA_REF: Record<number,[number,number]> = {
-  20:[1.20,0.32],21:[1.16,0.31],22:[1.12,0.30],23:[1.08,0.29],24:[1.04,0.28],25:[1.01,0.27],
-  26:[0.98,0.26],27:[0.95,0.25],28:[0.92,0.25],29:[0.90,0.24],30:[0.87,0.24],31:[0.85,0.23],
-  32:[0.83,0.23],33:[0.81,0.22],34:[0.79,0.22],35:[0.77,0.21],36:[0.76,0.21],37:[0.74,0.21],
-  38:[0.73,0.20],39:[0.72,0.20],40:[0.71,0.20]
-};
-// DV PIV reference (Hecher 1994)
-const DV_REF: Record<number,[number,number]> = {
-  20:[0.65,0.18],22:[0.60,0.17],24:[0.56,0.16],26:[0.53,0.15],28:[0.50,0.14],30:[0.48,0.14],
-  32:[0.45,0.13],34:[0.43,0.13],36:[0.41,0.12],38:[0.39,0.12],40:[0.38,0.11]
-};
-
-// --- DOPPLER LOGIC ---
-function erf(x: number) {
-  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
-  const s=x<0?-1:1; x=Math.abs(x);
-  const t=1/(1+p*x);
-  return s*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
-}
-function zToPercentile(z: number) { return Math.max(1, Math.min(99, Math.round(50*(1+erf(z/Math.sqrt(2)))))); }
-
-function getRef(table: Record<number,[number,number]>, ga: number): [number,number] {
-  if (table[ga]) return table[ga];
-  const keys = Object.keys(table).map(Number).sort((a,b)=>a-b);
-  if (ga <= keys[0]) return table[keys[0]];
-  if (ga >= keys[keys.length-1]) return table[keys[keys.length-1]];
-  const lo = keys.filter(k=>k<=ga).pop()!;
-  const hi = keys.filter(k=>k>ga).shift()!;
-  const frac = (ga-lo)/(hi-lo);
-  return [table[lo][0]+(table[hi][0]-table[lo][0])*frac, table[lo][1]+(table[hi][1]-table[lo][1])*frac];
-}
-function getCprRef(ga: number): [number, number] {
-  const [mcaM] = getRef(MCA_REF, ga);
-  const [uaM] = getRef(UA_REF, ga);
-  const mean = mcaM / uaM;
-  const sd = mean * 0.18; // ~18% CV approximation based on literature
-  return [mean, sd];
-}
-
-// --- WHO BIOMETRY LOGIC ---
-function getWhoPercentile(dimension: WHODimension, gaWeeks: number, value: number): number | null {
-  if (gaWeeks < 14 || gaWeeks > 40 || value <= 0) return null;
-  const coeffs = WHO_COEFFICIENTS[dimension];
-  if (!coeffs) return null;
-
-  const evaluated = coeffs.map(c => {
-    const poly = c.b0 + c.b1*gaWeeks + c.b2*Math.pow(gaWeeks, 2) + c.b3*Math.pow(gaWeeks, 3) + c.b4*Math.pow(gaWeeks, 4);
-    return { q: c.q, val: Math.exp(poly) };
-  });
-
-  if (value <= evaluated[0].val) return 1;
-  if (value >= evaluated[evaluated.length - 1].val) return 99;
-
-  for (let i = 0; i < evaluated.length - 1; i++) {
-    const q1 = evaluated[i];
-    const q2 = evaluated[i+1];
-    if (value >= q1.val && value <= q2.val) {
-      if (value === q1.val) return Math.round(q1.q * 100);
-      if (value === q2.val) return Math.round(q2.q * 100);
-      const frac = (Math.log(value) - Math.log(q1.val)) / (Math.log(q2.val) - Math.log(q1.val));
-      const p = (q1.q + frac * (q2.q - q1.q)) * 100;
-      return Math.max(1, Math.min(99, Math.round(p)));
-    }
-  }
-  return null;
-}
 
 export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorProps) {
   const [step, setStep] = useState<Step>('ga');
@@ -138,8 +58,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
 
     // Hadlock IV EFW
     if (bpd && hc && ac && fl) {
-      const b=Number(bpd)/10, h=Number(hc)/10, a=Number(ac)/10, f=Number(fl)/10;
-      efw = Math.round(Math.pow(10, 1.3596+0.0064*h+0.0424*a+0.174*f+0.00061*b*a-0.00386*a*f));
+      efw = Math.round(calcHadlockEfw(Number(bpd), Number(hc), Number(ac), Number(fl)));
     }
     // WHO EFW Percentile
     if (efw && gaDecimal > 0) {
@@ -150,23 +69,23 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     }
 
     // Doppler percentiles
-    if (auPi && gaDecimal >= 20 && gaDecimal <= 40) {
+    if (auPi && gaDecimal >= DOPPLER_GA_MIN && gaDecimal <= DOPPLER_GA_MAX) {
       const [m,s] = getRef(UA_REF, gaDecimal);
       auP = zToPercentile((Number(auPi)-m)/s);
     }
-    if (acmPi && gaDecimal >= 20 && gaDecimal <= 40) {
+    if (acmPi && gaDecimal >= DOPPLER_GA_MIN && gaDecimal <= DOPPLER_GA_MAX) {
       const [m,s] = getRef(MCA_REF, gaDecimal);
       acmP = zToPercentile((Number(acmPi)-m)/s);
     }
-    if (utaPi && gaDecimal >= 20 && gaDecimal <= 40) {
+    if (utaPi && gaDecimal >= DOPPLER_GA_MIN && gaDecimal <= DOPPLER_GA_MAX) {
       const [m,s] = getRef(UTA_REF, gaDecimal);
       utaP = zToPercentile((Number(utaPi)-m)/s);
     }
-    if (dvPi && gaDecimal >= 20 && gaDecimal <= 40) {
+    if (dvPi && gaDecimal >= DOPPLER_GA_MIN && gaDecimal <= DOPPLER_GA_MAX) {
       const [m,s] = getRef(DV_REF, gaDecimal);
       dvP = zToPercentile((Number(dvPi)-m)/s);
     }
-    if (auPi && acmPi && gaDecimal >= 20 && gaDecimal <= 40) {
+    if (auPi && acmPi && gaDecimal >= DOPPLER_GA_MIN && gaDecimal <= DOPPLER_GA_MAX) {
       rcp = Number(acmPi)/Number(auPi);
       const [m,s] = getCprRef(gaDecimal);
       rcpP = zToPercentile((rcp-m)/s);
@@ -213,7 +132,14 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gaWeeks,gaDays,sex,bpd,hc,ac,fl,hl,auPi,acmPi,utaPi,dvPi,auFlow,dvWave,calc]);
 
-  const stageColors = ['emerald','blue','amber','orange','red'];
+  // Classes estáticas (Tailwind não gera classes montadas por interpolação).
+  const stageCardClasses = [
+    'bg-emerald-50 border-emerald-200',
+    'bg-blue-50 border-blue-200',
+    'bg-amber-50 border-amber-200',
+    'bg-orange-50 border-orange-200',
+    'bg-red-50 border-red-200',
+  ];
   const stageNames = ['Crescimento Normal','Estágio I','Estágio II','Estágio III','Estágio IV'];
   const stageDescs = [
     'Biometria e Doppler dentro dos padrões de normalidade. Seguimento habitual.',
@@ -222,26 +148,26 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
     'Risco de acidose fetal. AU com diástole reversa (REDF) ou DV PI > p95. Internação. Parto em 48h se > 26s.',
     'Morte fetal iminente. DV onda "a" reversa. Parto IMEDIATO se viabilidade fetal.'
   ];
-  const sc = stageColors[calc.stage];
 
   return (
-    <div className="bg-white border border-ink-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="bg-ink-50 p-3 border-b border-ink-100">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Activity size={16} className="text-blue-600" />
-            <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-widest">Crescimento Fetal</h3>
-          </div>
-          <span className="text-[8px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">OMS + BARCELONA</span>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
+          <Activity size={24} />
         </div>
-        <div className="flex items-center gap-1">
-          {(['ga','biometry','doppler','result'] as Step[]).map((s, i) => (
-            <StepDot key={s} active={step===s} num={i+1} label={['Datação','Biometria','Doppler','Laudo'][i]} onClick={() => setStep(s)} />
-          ))}
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Crescimento Fetal</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Biometria OMS + Doppler Barcelona</p>
         </div>
       </div>
 
-      <div className="p-3">
+      <div className="flex items-center gap-1 bg-ink-50 p-1.5 rounded-2xl border border-ink-100">
+        {(['ga','biometry','doppler','result'] as Step[]).map((s, i) => (
+          <StepDot key={s} active={step===s} num={i+1} label={['Datação','Biometria','Doppler','Laudo'][i]} onClick={() => setStep(s)} />
+        ))}
+      </div>
+
+      <div>
         {step === 'ga' && (
           <div className="space-y-4">
             <div>
@@ -368,7 +294,7 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
 
         {step === 'result' && (
           <div className="space-y-3">
-            <div className={classNames("rounded-xl p-4 border shadow-sm", `bg-${sc}-50 border-${sc}-200`)}>
+            <div className={classNames("rounded-xl p-4 border shadow-sm", stageCardClasses[calc.stage])}>
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <span className="text-[8px] font-bold uppercase tracking-widest block opacity-60">Estadiamento de Crescimento</span>

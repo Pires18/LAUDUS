@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Activity, Plus, Trash2, Printer } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { genId } from '../../../store/db';
 
 interface Ceap {
   c: string; e: string; a: string; p: string;
@@ -164,7 +165,7 @@ export function VenousCartographyCalculator({ value, onChange }: CalculatorProps
   const addPerforator = (leg: 'MID' | 'MIE') => {
     updateLeg(leg, prev => ({
       ...prev,
-      perforators: [...prev.perforators, { id: Math.random().toString(), name: 'other', location: '', caliber: '' }]
+      perforators: [...prev.perforators, { id: genId(), name: 'other', location: '', caliber: '' }]
     }));
   };
 
@@ -359,38 +360,43 @@ export function VenousCartographyCalculator({ value, onChange }: CalculatorProps
   };
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Activity size={14} className="text-blue-600" />
-          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Cartografia Venosa (PRO)</h3>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
+            <Activity size={24} />
+          </div>
+          <div>
+            <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Cartografia Venosa</h3>
+            <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Mapeamento Venoso de Membros Inferiores</p>
+          </div>
         </div>
-        <button 
+        <button
           onClick={() => setShowPrintModal(true)}
-          className="text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded border border-transparent hover:border-blue-200 flex items-center gap-1 transition-colors"
+          className="shrink-0 px-4 py-2.5 rounded-2xl bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all"
           title="Ver Resumo Estruturado"
         >
-          <Printer size={12} />
+          <Printer size={13} />
           <span>Resumo</span>
         </button>
       </div>
 
-      <div className="border-b border-ink-100 flex">
-        <button 
+      <div className="flex gap-2 bg-ink-50 p-1 rounded-2xl border border-ink-100">
+        <button
           onClick={() => setActiveTab('MID')}
-          className={classNames("flex-1 py-2 text-[10px] font-bold uppercase transition-colors", activeTab === 'MID' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-ink-50 text-ink-400 hover:bg-ink-100')}
+          className={classNames("flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all", activeTab === 'MID' ? 'bg-blue-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-700')}
         >
           Membro Direito (MID)
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('MIE')}
-          className={classNames("flex-1 py-2 text-[10px] font-bold uppercase transition-colors", activeTab === 'MIE' ? 'bg-white text-blue-600 border-b-2 border-blue-600' : 'bg-ink-50 text-ink-400 hover:bg-ink-100')}
+          className={classNames("flex-1 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all", activeTab === 'MIE' ? 'bg-blue-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-700')}
         >
           Membro Esquerdo (MIE)
         </button>
       </div>
 
-      <div className="p-3">
+      <div>
         {renderLegForm(activeTab)}
       </div>
 

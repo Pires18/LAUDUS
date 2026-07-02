@@ -53,13 +53,30 @@ export function AdminMasks() {
       const existingIds = new Set(allTemplates.map(t => t.id));
       let updated = 0;
       let created = 0;
+      // Campos ajustáveis por importação. A atualização é PARCIAL: apenas os
+      // campos efetivamente presentes em cada objeto do JSON são alterados;
+      // os demais campos da máscara permanecem intactos (retrocompatível com
+      // arquivos que trazem apenas { id, aiInstructions }).
+      const UPDATABLE_FIELDS = [
+        'area', 'name', 'description', 'title', 'technique',
+        'analysisTemplate', 'conclusionTemplate', 'classificationTemplate',
+        'recommendationsTemplate', 'observationsTemplate', 'aiInstructions',
+        'customForm', 'anamnesisTemplate', 'consentTemplate', 'clinicId',
+      ] as const;
       for (const tmpl of imported) {
-        if (!tmpl.id || tmpl.aiInstructions === undefined) continue;
+        if (!tmpl.id) continue;
         if (existingIds.has(tmpl.id)) {
-          await updateItem('templates', tmpl.id, { aiInstructions: tmpl.aiInstructions });
+          const patch: Record<string, unknown> = {};
+          for (const f of UPDATABLE_FIELDS) {
+            if (tmpl[f] !== undefined) patch[f] = tmpl[f];
+          }
+          if (Object.keys(patch).length === 0) continue; // nada a ajustar
+          patch.updatedAt = Date.now();
+          await updateItem('templates', tmpl.id, patch);
           updated++;
         } else {
-          // Template novo: exige campos obrigatórios
+          // Template novo: exige aiInstructions + campos obrigatórios da máscara
+          if (tmpl.aiInstructions === undefined) continue;
           const { id, ...rest } = tmpl;
           await addItemWithId('templates', id, rest as Record<string, unknown>);
           created++;
@@ -102,12 +119,12 @@ export function AdminMasks() {
           />
           <button
             className="btn-secondary shrink-0 self-start md:self-auto"
-            title="Importar aiInstructions de arquivo JSON"
+            title="Importar/ajustar máscaras via JSON (aiInstructions e campos estruturados: análise, técnica, conclusão, etc.)"
             disabled={importing}
             onClick={() => importRef.current?.click()}
           >
             <Upload size={16} />
-            {importing ? 'Importando...' : 'Importar AI'}
+            {importing ? 'Importando...' : 'Importar / Ajustar'}
           </button>
           <button
             className="btn-secondary shrink-0 self-start md:self-auto"

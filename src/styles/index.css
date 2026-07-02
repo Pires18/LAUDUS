@@ -291,6 +291,112 @@ html.dark .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgb(var
 html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--ink-400)); }
 html.dark .custom-scrollbar { scrollbar-color: rgb(var(--ink-300)) transparent; }
 
+/* ════════════════════════════════════════════
+   MODO ESCURO — POLIMENTOS ADICIONAIS
+   Bordas, rings, sombras, gradientes e componentes
+   que usam referências a "white" ou valores fixos.
+   ════════════════════════════════════════════ */
+
+/* ── Avatares/badges: ring-white e border-white → cinza escuro ── */
+html.dark .ring-white { --tw-ring-color: rgb(var(--ink-200)) !important; }
+html.dark .border-white:not(.text-white) { border-color: rgb(var(--ink-200)) !important; }
+/* Preserva border-white em contextos com fundo colorido (ex.: FAB do BottomNav) */
+html.dark .border-4.border-white { border-color: rgb(var(--ink-100)) !important; }
+html.dark .border-2.border-white { border-color: rgb(var(--ink-200)) !important; }
+
+/* ── Sombras intensificadas para o dark ── */
+html.dark .shadow-soft {
+  box-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.25), 0 1px 3px -1px rgb(0 0 0 / 0.2) !important;
+}
+html.dark .shadow-medium {
+  box-shadow: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25) !important;
+}
+html.dark .shadow-premium {
+  box-shadow: 0 10px 25px -3px rgb(0 0 0 / 0.3), 0 4px 10px -4px rgb(0 0 0 / 0.2) !important;
+}
+html.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.25) !important;
+}
+html.dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2) !important;
+}
+html.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25) !important;
+}
+html.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3) !important;
+}
+html.dark .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.6) !important;
+}
+
+/* ── Gradientes com referência a "white" ── */
+html.dark .from-white {
+  --tw-gradient-from: rgb(var(--surface)) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(var(--surface) / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .to-brand-50\/10 {
+  --tw-gradient-to: rgb(17 134 231 / 0.06) var(--tw-gradient-to-position) !important;
+}
+
+/* ── .tab-item-active: borda e fundo adaptados ── */
+html.dark .tab-item-active {
+  background-color: rgb(var(--surface)) !important;
+  border-color: rgb(var(--ink-200)) !important;
+}
+
+/* ── .section-card-header: fundo mais perceptível ── */
+html.dark .section-card-header {
+  background-color: rgb(var(--ink-100) / 0.3) !important;
+}
+
+/* ── .sidebar-nav: fundo adaptado ── */
+html.dark .sidebar-nav {
+  background-color: rgb(var(--surface)) !important;
+  border-color: rgb(var(--ink-200)) !important;
+}
+
+/* ── Inputs: fundo e bordas mais integrados ── */
+html.dark .input {
+  background-color: rgb(var(--ink-100)) !important;
+  border-color: rgb(var(--ink-200)) !important;
+  color: rgb(var(--ink-900)) !important;
+}
+html.dark .input:focus {
+  border-color: rgb(58 161 246) !important;
+  --tw-ring-color: rgb(17 134 231 / 0.2) !important;
+}
+html.dark .input::placeholder {
+  color: rgb(var(--ink-400)) !important;
+}
+
+/* ── LoginScreen: padrão de pontos do grid ── */
+html.dark [style*="radial-gradient(#e2e8f0"] {
+  background-image: radial-gradient(rgb(var(--ink-300)) 1px, transparent 1px) !important;
+}
+
+/* ── BottomNav mobile: fundo translúcido escuro ── */
+@media (max-width: 767px) {
+  html.dark nav.fixed.bottom-0 {
+    background-color: rgb(var(--surface) / 0.92) !important;
+    border-color: rgb(var(--ink-200)) !important;
+  }
+}
+
+/* ── divide-ink: divisores mais visíveis no dark ── */
+html.dark .divide-ink-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(var(--ink-200)) !important;
+}
+
+/* ── Scrollbar global no dark ── */
+html.dark ::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--ink-300)) !important;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--ink-400)) !important;
+}
+
 html, body, #root {
   /* 100dvh: dynamic viewport height — handles Safari mobile URL bar correctly */
   height: 100dvh;
@@ -869,11 +975,11 @@ aside {
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #1a1b1e;
+  color: rgb(var(--ink-950));
   text-align: center;
   font-size: 1.5rem;
   margin-bottom: 2rem;
-  border-bottom: 2px solid #f1f3f5;
+  border-bottom: 2px solid rgb(var(--ink-100));
   padding-bottom: 1rem;
 }
 

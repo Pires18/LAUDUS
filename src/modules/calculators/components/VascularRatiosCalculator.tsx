@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
 import { Activity, Info } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { CalculatorInput } from './CalculatorUI';
 
 export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
   const [psv, setPsv] = useState(value?.psv || '');
@@ -50,78 +51,59 @@ export function VascularRatiosCalculator({ value, onChange }: CalculatorProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [psv, edv, tamv]);
 
+  const hasResult = ri !== null || pi !== null || sd !== null;
+
   return (
-    <div className="bg-white border border-ink-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="bg-ink-50 p-3 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity size={16} className="text-emerald-600" />
-          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-widest">Índices Hemodinâmicos</h3>
+    <div className="space-y-8">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+          <Activity size={24} />
         </div>
-        <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 uppercase">Doppler Geral</span>
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Índices Hemodinâmicos</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">IR · IP · Relação S/D (Doppler Universal)</p>
+        </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Pico Sistólico (Vp)</label>
-            <input 
-              type="number" 
-              className="input text-center text-sm font-black h-10" 
-              placeholder="cm/s"
-              value={psv} 
-              onChange={e => setPsv(e.target.value)} 
-            />
-          </div>
-          <div>
-            <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Diastólico Final (Vd)</label>
-            <input 
-              type="number" 
-              className="input text-center text-sm font-black h-10" 
-              placeholder="cm/s"
-              value={edv} 
-              onChange={e => setEdv(e.target.value)} 
-            />
-          </div>
-          <div>
-            <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Velocidade Média (Vm)</label>
-            <input 
-              type="number" 
-              className="input text-center text-sm font-black h-10" 
-              placeholder="cm/s"
-              value={tamv} 
-              onChange={e => setTamv(e.target.value)} 
-            />
-          </div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <CalculatorInput type="number" label="Pico Sistólico (Vp)" placeholder="0.0" value={psv} onChange={setPsv} suffix="cm/s" />
+        <CalculatorInput type="number" label="Diastólico Final (Vd)" placeholder="0.0" value={edv} onChange={setEdv} suffix="cm/s" />
+        <CalculatorInput type="number" label="Velocidade Média (Vm)" placeholder="0.0" value={tamv} onChange={setTamv} suffix="cm/s" />
+      </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <ResultCard label="IR (S-D)/S" value={ri?.toFixed(2)} sub="Índice de Resistência" color="emerald" />
-          <ResultCard label="IP (S-D)/Vm" value={pi?.toFixed(2)} sub="Índice de Pulsatilidade" color="blue" />
-          <ResultCard label="S/D" value={sd?.toFixed(2)} sub="Relação Sist/Diast" color="amber" />
+      {hasResult ? (
+        <div className="grid grid-cols-3 gap-4">
+          <MetricBox label="IR" sub="(S-D)/S" value={ri} variant="emerald" />
+          <MetricBox label="IP" sub="(S-D)/Vm" value={pi} variant="blue" />
+          <MetricBox label="S/D" sub="Sist/Diast" value={sd} variant="amber" />
         </div>
+      ) : (
+        <div className="py-10 border-2 border-dashed border-ink-100 rounded-2xl text-center">
+          <p className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Insira as velocidades para calcular</p>
+        </div>
+      )}
 
-        <div className="p-3 bg-ink-50 rounded-lg flex gap-3 items-start border border-ink-100">
-          <Info size={16} className="text-ink-400 shrink-0 mt-0.5" />
-          <div className="text-[10px] text-ink-600 leading-relaxed">
-            O <strong>Índice de Resistência (Pourcelot)</strong> e o <strong>Índice de Pulsatilidade (Gosling)</strong> são parâmetros universais para avaliação da resistência vascular distal.
-          </div>
+      <div className="p-3 bg-ink-50 rounded-xl flex gap-3 items-start border border-ink-100">
+        <Info size={16} className="text-ink-400 shrink-0 mt-0.5" />
+        <div className="text-[10px] text-ink-600 leading-relaxed font-medium">
+          O <strong>Índice de Resistência (Pourcelot)</strong> e o <strong>Índice de Pulsatilidade (Gosling)</strong> são parâmetros universais para avaliação da resistência vascular distal.
         </div>
       </div>
     </div>
   );
 }
 
-function ResultCard({ label, value, sub, color }: any) {
-  const colors: any = {
-    emerald: 'bg-emerald-50 border-emerald-100 text-emerald-900',
-    blue: 'bg-blue-50 border-blue-100 text-blue-900',
-    amber: 'bg-amber-50 border-amber-100 text-amber-900',
-  };
+function MetricBox({ label, sub, value, variant }: { label: string; sub: string; value: number | null; variant: 'emerald' | 'blue' | 'amber' }) {
+  const styles = {
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    blue: 'bg-blue-50 border-blue-200 text-blue-900',
+    amber: 'bg-amber-50 border-amber-200 text-amber-900',
+  }[variant];
   return (
-    <div className={classNames("p-3 rounded-xl border text-center", colors[color] || 'bg-ink-50 border-ink-100 text-ink-900')}>
-      <span className="text-[8px] font-black uppercase opacity-60 block tracking-wider">{label}</span>
-      <span className="text-xl font-black block my-0.5">{value || '--'}</span>
-      <span className="text-[8px] font-bold opacity-50 block uppercase">{sub}</span>
+    <div className={classNames('rounded-2xl border-2 p-5 text-center shadow-sm', styles)}>
+      <span className="text-[10px] font-black uppercase tracking-widest opacity-60 block">{label}</span>
+      <span className="text-2xl font-black block my-1">{value !== null ? value.toFixed(2) : '--'}</span>
+      <span className="text-[9px] font-bold uppercase opacity-50 block">{sub}</span>
     </div>
   );
 }

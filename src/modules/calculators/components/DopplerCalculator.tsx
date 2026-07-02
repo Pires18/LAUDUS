@@ -2,53 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { CalculatorProps } from '../registry';
 import { Activity, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { classNames } from '../../../utils/format';
-
-// Arduini & Rizzo 1990 — AU PI
-const UA_REF: Record<number,[number,number]> = {
-  20:[1.54,0.37],22:[1.41,0.32],24:[1.30,0.28],26:[1.20,0.25],28:[1.12,0.23],30:[1.05,0.21],
-  32:[0.99,0.19],34:[0.94,0.18],36:[0.90,0.17],38:[0.87,0.17],40:[0.85,0.16]
-};
-// Mari & Deter 1992 — ACM PI
-const MCA_REF: Record<number,[number,number]> = {
-  20:[1.60,0.30],22:[1.65,0.32],24:[1.71,0.33],26:[1.77,0.34],28:[1.82,0.35],30:[1.84,0.36],
-  32:[1.83,0.36],34:[1.79,0.35],36:[1.71,0.34],38:[1.60,0.32],40:[1.45,0.29]
-};
-// Gomez 2008 — Uterinas PI
-const UTA_REF: Record<number,[number,number]> = {
-  20:[1.20,0.32],22:[1.12,0.30],24:[1.04,0.28],26:[0.98,0.26],28:[0.92,0.25],30:[0.87,0.24],
-  32:[0.83,0.23],34:[0.79,0.22],36:[0.76,0.21],38:[0.73,0.20],40:[0.71,0.20]
-};
-// DV PIV reference (Hecher 1994)
-const DV_REF: Record<number,[number,number]> = {
-  20:[0.65,0.18],22:[0.60,0.17],24:[0.56,0.16],26:[0.53,0.15],28:[0.50,0.14],30:[0.48,0.14],
-  32:[0.45,0.13],34:[0.43,0.13],36:[0.41,0.12],38:[0.39,0.12],40:[0.38,0.11]
-};
-
-function erf(x: number) {
-  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
-  const s=x<0?-1:1; x=Math.abs(x);
-  const t=1/(1+p*x);
-  return s*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
-}
-function zToP(z: number) { return Math.max(1,Math.min(99,Math.round(50*(1+erf(z/Math.sqrt(2)))))); }
-function getRef(table: Record<number,[number,number]>, ga: number): [number,number] {
-  if (table[ga]) return table[ga];
-  const keys = Object.keys(table).map(Number).sort((a,b)=>a-b);
-  if (ga<=keys[0]) return table[keys[0]];
-  if (ga>=keys[keys.length-1]) return table[keys[keys.length-1]];
-  const lo=keys.filter(k=>k<=ga).pop()!;
-  const hi=keys.filter(k=>k>ga).shift()!;
-  const f=(ga-lo)/(hi-lo);
-  return [table[lo][0]+(table[hi][0]-table[lo][0])*f, table[lo][1]+(table[hi][1]-table[lo][1])*f];
-}
-
-function getCprRef(ga: number): [number, number] {
-  const [mcaM] = getRef(MCA_REF, ga);
-  const [uaM] = getRef(UA_REF, ga);
-  const mean = mcaM / uaM;
-  const sd = mean * 0.18; // ~18% CV approximation based on literature
-  return [mean, sd];
-}
+import {
+  UA_REF, MCA_REF, UTA_REF, DV_REF, DOPPLER_GA_MIN, DOPPLER_GA_MAX,
+  getRef, getCprRef, zToPercentile as zToP,
+} from '../constants/fetalReferences';
 
 export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   const [gaWeeks, setGaWeeks] = useState(value?.gaWeeks || '');
@@ -68,12 +25,12 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
     let rcpP: number|null = null;
     let auP: number|null = null, acmP: number|null = null, utaP: number|null = null, dvP: number|null = null;
 
-    if (auPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(UA_REF,gaDecimal); auP=zToP((Number(auPi)-m)/s); }
-    if (acmPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(MCA_REF,gaDecimal); acmP=zToP((Number(acmPi)-m)/s); }
-    if (utaPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(UTA_REF,gaDecimal); utaP=zToP((Number(utaPi)-m)/s); }
-    if (dvPi && gaDecimal>=20 && gaDecimal<=40) { const [m,s]=getRef(DV_REF,gaDecimal); dvP=zToP((Number(dvPi)-m)/s); }
+    if (auPi && gaDecimal>=DOPPLER_GA_MIN && gaDecimal<=DOPPLER_GA_MAX) { const [m,s]=getRef(UA_REF,gaDecimal); auP=zToP((Number(auPi)-m)/s); }
+    if (acmPi && gaDecimal>=DOPPLER_GA_MIN && gaDecimal<=DOPPLER_GA_MAX) { const [m,s]=getRef(MCA_REF,gaDecimal); acmP=zToP((Number(acmPi)-m)/s); }
+    if (utaPi && gaDecimal>=DOPPLER_GA_MIN && gaDecimal<=DOPPLER_GA_MAX) { const [m,s]=getRef(UTA_REF,gaDecimal); utaP=zToP((Number(utaPi)-m)/s); }
+    if (dvPi && gaDecimal>=DOPPLER_GA_MIN && gaDecimal<=DOPPLER_GA_MAX) { const [m,s]=getRef(DV_REF,gaDecimal); dvP=zToP((Number(dvPi)-m)/s); }
     
-    if (auPi && acmPi && gaDecimal>=20 && gaDecimal<=40) { 
+    if (auPi && acmPi && gaDecimal>=DOPPLER_GA_MIN && gaDecimal<=DOPPLER_GA_MAX) { 
       rcp = Number(acmPi)/Number(auPi);
       const [m,s] = getCprRef(gaDecimal);
       rcpP = zToP((rcp-m)/s);
@@ -128,16 +85,18 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
   }, [gaWeeks,gaDays,auPi,acmPi,utaPi,dvPi,auFlow,dvWave,efwPercentile,calc]);
 
   return (
-    <div className="bg-white border border-ink-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Activity size={14} className="text-blue-600"/>
-          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">Doppler Barcelona (Gratacós)</h3>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
+          <Activity size={24} />
         </div>
-        <div className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 uppercase">FGR Staging</div>
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Doppler Fetal (Percentis)</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Estadiamento FGR — Barcelona (Gratacós)</p>
+        </div>
       </div>
 
-      <div className="p-3 space-y-3">
+      <div className="space-y-4">
         <div className="grid grid-cols-3 gap-2">
           <div>
             <label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">IG (Sem)</label>

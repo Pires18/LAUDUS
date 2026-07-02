@@ -8,6 +8,7 @@ import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
 import { AreaIcon } from '../../components/AreaIcon';
 import { CalculatorReference } from './components/CalculatorUI';
+import { FIELD_LABELS, isDisplayableMetric } from './constants/fieldLabels';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useApp } from '../../store/app';
@@ -253,7 +254,7 @@ export function Calculators() {
                 />
               )}
               
-              {calcResult && (calcResult._summary || Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0) && (
+              {calcResult && (calcResult._summary || Object.entries(calcResult).some(([k, v]) => isDisplayableMetric(k, v))) && (
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -272,13 +273,13 @@ export function Calculators() {
                      </div>
                   )}
 
-                  {Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0 && (
+                  {Object.entries(calcResult).some(([k, v]) => isDisplayableMetric(k, v)) && (
                      <div className="space-y-3">
                         <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest pl-2">Métricas Detalhadas</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                           {Object.entries(calcResult).filter(([k]) => !k.startsWith('_')).map(([k, v]) => (
+                           {Object.entries(calcResult).filter(([k, v]) => isDisplayableMetric(k, v)).map(([k, v]) => (
                              <div key={k} className="flex flex-col gap-1 px-5 py-4 bg-white rounded-2xl border border-ink-100 shadow-sm hover:shadow-md transition-shadow">
-                                <span className="text-[10px] font-black text-ink-400 uppercase tracking-widest">{k}</span>
+                                <span className="text-[10px] font-black text-ink-400 uppercase tracking-widest">{FIELD_LABELS[k] || k}</span>
                                 <span className="text-sm font-bold text-ink-800">{String(v)}</span>
                              </div>
                            ))}
@@ -296,7 +297,7 @@ export function Calculators() {
               >
                 Fechar
               </button>
-              {calcResult && (calcResult._summary || Object.keys(calcResult).filter(k => !k.startsWith('_')).length > 0) && (
+              {calcResult && (calcResult._summary || Object.entries(calcResult).some(([k, v]) => isDisplayableMetric(k, v))) && (
                 <button 
                   className={classNames(
                     "px-8 py-3.5 rounded-2xl text-[11px] font-black transition-all uppercase tracking-widest flex items-center gap-2.5 active:scale-95 shadow-xl",
@@ -306,14 +307,14 @@ export function Calculators() {
                   )}
                   disabled={copied}
                   onClick={() => {
-                    const cleanData = { ...calcResult };
-                    Object.keys(cleanData).forEach(key => {
-                      if (key.startsWith('_')) delete cleanData[key];
-                    });
+                    const metricsText = Object.entries(calcResult)
+                      .filter(([k, v]) => isDisplayableMetric(k, v))
+                      .map(([k, v]) => `- ${FIELD_LABELS[k] || k}: ${v}`)
+                      .join('\n');
 
                     const finalMessage = `[RESULTADO TÉCNICO: ${activeCalc?.name}]\n\n` +
                       (calcResult?._summary ? `CONCLUSÃO: ${calcResult._summary}\n\n` : '') +
-                      `MÉTRICAS COLETADAS:\n${Object.entries(cleanData).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`;
+                      `MÉTRICAS COLETADAS:\n${metricsText}`;
 
                     navigator.clipboard.writeText(finalMessage);
                     setCopied(true);

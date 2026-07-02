@@ -52,7 +52,7 @@ const ECHO_PATTERN = [
 const POSTERIOR = [
   { label: 'Sem alteração posterior', value: 'Sem alteração' },
   { label: 'Reforço acústico posterior', value: 'Reforço', description: 'Típico de cistos' },
-  { label: 'Sombra acústica posterior', value: 'Sombra Acústica', description: 'Suspei to — cicatriz, calcificação' },
+  { label: 'Sombra acústica posterior', value: 'Sombra Acústica', description: 'Suspeito — cicatriz, calcificação' },
   { label: 'Padrão combinado', value: 'Combinado' },
 ];
 

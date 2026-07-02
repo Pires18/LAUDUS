@@ -1488,8 +1488,8 @@ export function LaudCopilot({
                   onBlur={(e) => handleBlurAnamnesisText(e.target.value)}
                   onChange={(e) => handleAnamnesisTextChange(e.target.value)}
                   placeholder="Histórico clínico, queixas ou sintomas do paciente..."
-                  className="w-full text-xs font-medium text-ink-700 bg-white border border-indigo-100 focus:ring-2 focus:ring-indigo-300/50 focus:border-indigo-300 rounded-xl p-3 resize-none outline-none transition-all leading-relaxed"
-                  rows={3}
+                  className="w-full text-xs font-medium text-ink-700 bg-white border border-indigo-100 focus:ring-2 focus:ring-indigo-300/50 focus:border-indigo-300 rounded-xl p-3 resize-y outline-none transition-colors leading-relaxed"
+                  style={{ minHeight: '60px', height: '90px' }}
                 />
               </div>
             </div>
@@ -1529,8 +1529,8 @@ export function LaudCopilot({
                   onBlur={(e) => handleBlurFormText(e.target.value)}
                   onChange={(e) => handleFormTextChange(e.target.value)}
                   placeholder="Digite de forma livre ou cole os achados para que a IA integre ao laudo..."
-                  className="w-full p-3 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-all text-xs font-mono text-ink-700 resize-none leading-relaxed"
-                  style={{ minHeight: '160px' }}
+                  className="w-full p-3 bg-ink-50 border border-ink-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/10 focus:bg-white rounded-xl outline-none transition-colors text-xs font-mono text-ink-700 resize-y leading-relaxed"
+                  style={{ minHeight: '80px', height: '160px' }}
                 />
               </div>
             </div>

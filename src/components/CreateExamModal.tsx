@@ -41,7 +41,6 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
   const [hoveredTemplate, setHoveredTemplate] = useState<ReportTemplate | null>(null);
   const [anamnesis, setAnamnesis] = useState('');
-  const [anamnesisFromTemplate, setAnamnesisFromTemplate] = useState(false);
   const [examDateStr, setExamDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(settings.dicomDevices?.[0]?.id || '');
 
@@ -53,15 +52,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
     }
   }, [clinics, selectedClinicId, selectedClinic]);
 
-  // Pré-preenche anamnese com o template selecionado
-  useEffect(() => {
-    if (selectedTemplate?.anamnesisTemplate) {
-      setAnamnesis(selectedTemplate.anamnesisTemplate);
-      setAnamnesisFromTemplate(true);
-    } else {
-      setAnamnesisFromTemplate(false);
-    }
-  }, [selectedTemplate]);
+  // A anamnese SEMPRE inicia em branco — nunca é pré-preenchida pela máscara.
 
   // Define paciente padrão vindo do contexto
   useEffect(() => {
@@ -722,24 +713,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                    {/* Anamnese / Indicação Clínica */}
                    <div className="flex items-center justify-between ml-1">
                      <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest block">Anamnese / Indicação Clínica</label>
-                     {anamnesisFromTemplate && (
-                       <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg uppercase tracking-wider">
-                         Pré-preenchido pelo template
-                       </span>
-                     )}
-                     {!anamnesisFromTemplate && selectedTemplate?.anamnesisTemplate && (
-                       <button
-                         type="button"
-                         onClick={() => { setAnamnesis(selectedTemplate.anamnesisTemplate!); setAnamnesisFromTemplate(true); }}
-                         className="text-[9px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-wider transition-colors"
-                       >
-                         Restaurar do template
-                       </button>
-                     )}
                    </div>
                    <textarea
                      value={anamnesis}
-                     onChange={(e) => { setAnamnesis(e.target.value); setAnamnesisFromTemplate(false); }}
+                     onChange={(e) => { setAnamnesis(e.target.value); }}
                      placeholder="Ex: Dor abdominal a esclarecer. Suspeita de litíase vesicular."
                      className="w-full h-36 p-4 bg-white border-2 border-ink-200 rounded-[1rem] focus:ring-2 focus:ring-ink-900/10 focus:border-ink-400 outline-none transition-all font-medium text-sm text-ink-900 resize-none custom-scrollbar shadow-sm"
                    />
