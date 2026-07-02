@@ -401,7 +401,7 @@ export function VenousCartographyCalculator({ value, onChange }: CalculatorProps
       </div>
 
       {showPrintModal && (
-        <div className="fixed inset-0 z-50 bg-ink-900/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[500] bg-ink-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
               <h2 className="font-bold text-lg flex items-center gap-2"><Printer size={18}/> Resumo de Cartografia Venosa</h2>
