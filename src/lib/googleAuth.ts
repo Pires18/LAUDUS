@@ -5,11 +5,8 @@ import { logger } from '../utils/logger';
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// Escopos mínimos (princípio do menor privilégio, S10):
-//  • drive.file — acesso APENAS a arquivos criados pelo app ou explicitamente
-//    selecionados pelo usuário via Google Picker (não mais a todo o Drive).
-//  • documents — edição do conteúdo dos Google Docs gerados.
-provider.addScope('https://www.googleapis.com/auth/drive.file');
+// Adiciona os escopos necessários para a integração
+provider.addScope('https://www.googleapis.com/auth/drive');
 provider.addScope('https://www.googleapis.com/auth/documents');
 
 // Inicializa a partir do localStorage para persistir entre recarregamentos de página/abas
