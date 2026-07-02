@@ -1,11 +1,11 @@
 import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
-import { updateItem } from '../../store/db';
+import { updateItem, logPatientAccess } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
 import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings, ClipboardPen, Check, X as XIcon } from 'lucide-react';
 import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
 import { where } from 'firebase/firestore';
@@ -30,6 +30,11 @@ export function PatientDetail({ patientId }: Props) {
     constraints: [where('patientId', '==', patientId)],
   });
   const { data: clinics } = useCollection<Clinic>('clinics');
+
+  // Trilha de acesso LGPD: registra a abertura do prontuário.
+  useEffect(() => {
+    if (patient?.id) logPatientAccess('patient', patient.id, patient.name);
+  }, [patient?.id]);
 
   const clinicMap = useMemo(() => new Map(clinics.map((c) => [c.id, c])), [clinics]);
 

@@ -3,6 +3,7 @@ import { AiProvider, BuiltPrompt } from '../types';
 import { robustJsonParse } from '../json';
 import { logger } from '../../../utils/logger';
 import { auth } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
 
 /**
  * Resolves the canonical Gemini model ID from any alias or raw setting.
@@ -47,14 +48,15 @@ function buildBody(
   });
 }
 
-/** Headers common to all proxy calls. */
-function proxyHeaders(model: string, stream: boolean, settings: AppSettings): Record<string, string> {
+/** Headers common to all proxy calls (inclui o token Firebase exigido pelo proxy). */
+async function proxyHeaders(model: string, stream: boolean, settings: AppSettings): Promise<Record<string, string>> {
+  const idToken = await getIdToken();
   return {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${idToken}`,
     'x-uid': auth.currentUser?.uid || 'anonymous',
     'x-gemini-model': model,
     'x-gemini-stream': stream ? 'true' : 'false',
-    'x-api-key': settings.geminiApiKey || '',
   };
 }
 
@@ -75,9 +77,10 @@ export class GeminiProvider implements AiProvider {
     const model = this.resolveModelName(settings, mode, area);
     const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
 
+    const headers = await proxyHeaders(model, false, settings);
     const response = await helpers.withRetry(() => fetch('/api/gemini', {
       method: 'POST',
-      headers: proxyHeaders(model, false, settings),
+      headers,
       body: buildBody(
         systemInstruction,
         built.userMessage,
@@ -111,9 +114,10 @@ export class GeminiProvider implements AiProvider {
     const model = this.resolveModelName(settings, mode, area);
     const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
 
+    const headers = await proxyHeaders(model, true, settings);
     const response = await helpers.withRetry(() => fetch('/api/gemini', {
       method: 'POST',
-      headers: proxyHeaders(model, true, settings),
+      headers,
       body: buildBody(
         systemInstruction,
         built.userMessage,
@@ -195,9 +199,10 @@ export class GeminiProvider implements AiProvider {
         prompt += `\n\nATENÇÃO: A sua resposta anterior falhou ao ser processada como JSON. Erro: ${errorContext}. Por favor, retorne APENAS um JSON válido, sem texto adicional ou markdown.`;
       }
 
+      const headers = await proxyHeaders(model, false, settings);
       const response = await helpers.withRetry(() => fetch('/api/gemini', {
         method: 'POST',
-        headers: proxyHeaders(model, false, settings),
+        headers,
         body: buildBody(
           built.universalContext,
           prompt,

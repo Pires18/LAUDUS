@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Activity, Zap } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Activity } from 'lucide-react';
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
+import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
 
 interface Myoma {
   id: string;
@@ -11,7 +12,7 @@ interface Myoma {
   d2: number | '';
   d3: number | '';
   type1: string | null;
-  type2: string | null; // For hybrids like 2-5
+  type2: string | null; // Para híbridos (ex: 2-5)
   vascularity: number; // 1-4
   echogenicity: string | null;
   classification: string | null;
@@ -31,26 +32,26 @@ const FIGO_TYPES = [
 ];
 
 const LOCATIONS = [
-  { label: 'Parede Anterior' },
-  { label: 'Parede Posterior' },
-  { label: 'Fundo Uterino' },
-  { label: 'Lateral Direita' },
-  { label: 'Lateral Esquerda' },
-  { label: 'Cervical' },
+  { label: 'Parede Anterior', value: 'Parede Anterior' },
+  { label: 'Parede Posterior', value: 'Parede Posterior' },
+  { label: 'Fundo Uterino', value: 'Fundo Uterino' },
+  { label: 'Lateral Direita', value: 'Lateral Direita' },
+  { label: 'Lateral Esquerda', value: 'Lateral Esquerda' },
+  { label: 'Cervical', value: 'Cervical' },
 ];
 
 const ECHOGENICITY = [
-  { label: 'Hipoecogênico' },
-  { label: 'Isoecogênico' },
-  { label: 'Hiperecogênico' },
-  { label: 'Heterogêneo' },
+  { label: 'Hipoecogênico', value: 'Hipoecogênico' },
+  { label: 'Isoecogênico', value: 'Isoecogênico' },
+  { label: 'Hiperecogênico', value: 'Hiperecogênico' },
+  { label: 'Heterogêneo', value: 'Heterogêneo' },
 ];
 
 export function FigoCalculator({ value, onChange }: CalculatorProps) {
   const [myomas, setMyomas] = useState<Myoma[]>(() => {
     return Array.isArray(value?.myomas) ? value.myomas : [];
   });
-  
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,153 +100,168 @@ export function FigoCalculator({ value, onChange }: CalculatorProps) {
     setMyomas(myomas.map(m => m.id === id ? { ...m, ...patch } : m));
   }
 
+  function toggleFigoType(myoma: Myoma, typeId: string) {
+    if (myoma.type1 === typeId) updateMyoma(myoma.id, { type1: myoma.type2, type2: null });
+    else if (myoma.type2 === typeId) updateMyoma(myoma.id, { type2: null });
+    else if (!myoma.type1) updateMyoma(myoma.id, { type1: typeId });
+    else if (!myoma.type2) updateMyoma(myoma.id, { type2: typeId });
+    else updateMyoma(myoma.id, { type1: typeId, type2: null });
+  }
+
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Activity size={14} className="text-emerald-600" />
-          <h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">FIGO (Miomas)</h3>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+            <Activity size={20} />
+          </div>
+          <div>
+            <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Classificação FIGO</h3>
+            <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Leiomiomas Uterinos (PALM-COEIN 0–8)</p>
+          </div>
         </div>
-        <button onClick={addMyoma} className="btn-primary text-[10px] py-1 px-2 flex items-center gap-1">
-          <Plus size={12} /> Mioma
+        <button
+          onClick={addMyoma}
+          className="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 flex items-center gap-2"
+        >
+          <Plus size={14} /> Novo Mioma
         </button>
       </div>
 
-      <div className="divide-y divide-ink-100">
-        {myomas.length === 0 && <div className="p-4 text-center text-ink-400 text-[10px]">Nenhum mioma adicionado.</div>}
-        {myomas.map(myoma => (
-          <div key={myoma.id}>
-            <div 
-              className={classNames("flex items-center justify-between p-2 cursor-pointer hover:bg-ink-50", expandedId === myoma.id ? "bg-emerald-50/20" : "")}
+      <div className="space-y-4">
+        {myomas.length === 0 && (
+          <div className="py-12 border-2 border-dashed border-ink-100 rounded-2xl text-center space-y-3">
+            <div className="w-16 h-16 bg-ink-50 rounded-full flex items-center justify-center mx-auto text-ink-200">
+              <MapPin size={32} />
+            </div>
+            <p className="text-xs font-bold text-ink-400 uppercase tracking-widest">Nenhum mioma registrado</p>
+          </div>
+        )}
+
+        {myomas.map((myoma) => (
+          <div key={myoma.id} className="bg-white rounded-2xl border-2 border-ink-100 overflow-hidden shadow-sm transition-all hover:border-emerald-200">
+            <div
+              className={classNames(
+                "flex items-center justify-between p-6 cursor-pointer transition-all",
+                expandedId === myoma.id ? "bg-emerald-50/20" : "hover:bg-ink-50/50"
+              )}
               onClick={() => setExpandedId(expandedId === myoma.id ? null : myoma.id)}
             >
-              <div className="flex items-center gap-2">
-                <MapPin size={12} className="text-emerald-500" />
+              <div className="flex items-center gap-4 flex-1">
+                <div className={classNames(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-all",
+                  myoma.classification ? "bg-emerald-500 text-white" : "bg-ink-100 text-ink-400"
+                )}>
+                  {myoma.type1
+                    ? <span className="font-black text-xs">{myoma.type1}{myoma.type2 ? `-${myoma.type2}` : ''}</span>
+                    : <Activity size={20} />}
+                </div>
                 <div>
-                  <div className="text-[11px] font-bold text-ink-900">{myoma.location}</div>
-                  <div className="text-[9px] text-ink-500">
+                  <div className="text-sm font-black text-ink-900 uppercase tracking-tight">{myoma.location}</div>
+                  <div className="text-[10px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">
                     {myoma.classification || 'Pendente'}
                     {myoma.vascularity > 1 && ` • Vasc ${myoma.vascularity}`}
                   </div>
                 </div>
               </div>
-              {expandedId === myoma.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMyomas(myomas.filter(m => m.id !== myoma.id)); }}
+                  className="w-10 h-10 rounded-xl bg-ink-50 text-ink-400 hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center"
+                >
+                  <Trash2 size={18} />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-white border border-ink-100 flex items-center justify-center text-ink-400">
+                  {expandedId === myoma.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </div>
+              </div>
             </div>
 
             {expandedId === myoma.id && (
-              <div className="p-3 bg-ink-50/20 space-y-4 border-t border-ink-100">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">Localização</label>
-                    <select className="input text-[11px] h-8 py-0" value={myoma.location} onChange={e => updateMyoma(myoma.id, { location: e.target.value })}>
-                      {LOCATIONS.map(l => <option key={l.label} value={l.label}>{l.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[8px] font-bold text-ink-500 uppercase block mb-1">Medidas (mm)</label>
-                    <div className="flex gap-1">
-                      <input type="number" className="input text-[10px] text-center p-1 h-8" placeholder="C" value={myoma.d1} onChange={e => updateMyoma(myoma.id, { d1: e.target.value ? Number(e.target.value) : '' })} />
-                      <input type="number" className="input text-[10px] text-center p-1 h-8" placeholder="L" value={myoma.d2} onChange={e => updateMyoma(myoma.id, { d2: e.target.value ? Number(e.target.value) : '' })} />
-                      <input type="number" className="input text-[10px] text-center p-1 h-8" placeholder="A" value={myoma.d3} onChange={e => updateMyoma(myoma.id, { d3: e.target.value ? Number(e.target.value) : '' })} />
-                    </div>
+              <div className="p-8 pt-0 border-t border-ink-50 space-y-8 animate-in slide-in-from-top-2 duration-300">
+                <div className="space-y-1.5 pt-6">
+                  <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Medidas (mm)</label>
+                  <div className="flex items-center gap-3">
+                    <CalculatorInput type="number" placeholder="C" value={myoma.d1} onChange={(v: any) => updateMyoma(myoma.id, { d1: v ? Number(v) : '' })} suffix="mm" />
+                    <CalculatorInput type="number" placeholder="L" value={myoma.d2} onChange={(v: any) => updateMyoma(myoma.id, { d2: v ? Number(v) : '' })} suffix="mm" />
+                    <CalculatorInput type="number" placeholder="A" value={myoma.d3} onChange={(v: any) => updateMyoma(myoma.id, { d3: v ? Number(v) : '' })} suffix="mm" />
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Selector label="Ecogenicidade" options={ECHOGENICITY} current={myoma.echogenicity} onSelect={(v: string) => updateMyoma(myoma.id, { echogenicity: v })} />
-                  
-                  <div>
-                    <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Tipo FIGO (Selecione 1 ou 2 para Híbridos)</label>
-                    <div className="grid grid-cols-5 gap-1">
-                      {FIGO_TYPES.map(type => {
-                        const isSelected = myoma.type1 === type.id || myoma.type2 === type.id;
-                        return (
-                          <button
-                            key={type.id}
-                            onClick={() => {
-                              if (myoma.type1 === type.id) updateMyoma(myoma.id, { type1: myoma.type2, type2: null });
-                              else if (myoma.type2 === type.id) updateMyoma(myoma.id, { type2: null });
-                              else if (!myoma.type1) updateMyoma(myoma.id, { type1: type.id });
-                              else updateMyoma(myoma.id, { type2: type.id });
-                            }}
-                            className={classNames(
-                              "py-1.5 text-[10px] rounded border transition-all font-bold",
-                              isSelected ? "bg-emerald-600 text-white border-emerald-700 shadow-sm" : "bg-white text-ink-600 border-ink-200 hover:bg-ink-50"
-                            )}
-                          >
-                            {type.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* LEGENDA DE AUXÍLIO */}
-                    <div className="mt-2 p-2 bg-ink-50 rounded-md border border-ink-100">
-                      <div className="text-[8px] font-bold text-ink-400 uppercase tracking-widest mb-1.5">Legenda Auxiliar</div>
-                      <div className="grid grid-cols-1 gap-1 max-h-[100px] overflow-y-auto pr-1">
-                        {FIGO_TYPES.map(t => (
-                          <div key={t.id} className="flex gap-1.5 text-[9px] leading-tight text-ink-600">
-                            <span className="font-bold text-emerald-600 w-4 shrink-0">{t.label}:</span>
-                            <span>{t.desc}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                <CategorySelector label="Localização" options={LOCATIONS} current={myoma.location} onSelect={(v: string) => updateMyoma(myoma.id, { location: v })} />
+                <CategorySelector label="Ecogenicidade" options={ECHOGENICITY} current={myoma.echogenicity} onSelect={(v: string) => updateMyoma(myoma.id, { echogenicity: v })} />
 
-                  <div>
-                    <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">Vascularização (Doppler)</label>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4].map(v => (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-1 h-3 bg-brand-500 rounded-full" />
+                    <label className="text-[10px] font-black text-ink-900 uppercase tracking-widest">Tipo FIGO</label>
+                  </div>
+                  <p className="text-[9px] text-ink-400 font-semibold ml-3 -mt-1">Selecione 1 tipo — ou 2 para miomas híbridos (ex: 2-5).</p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {FIGO_TYPES.map(type => {
+                      const isSelected = myoma.type1 === type.id || myoma.type2 === type.id;
+                      return (
                         <button
-                          key={v}
-                          onClick={() => updateMyoma(myoma.id, { vascularity: v })}
+                          key={type.id}
+                          type="button"
+                          onClick={() => toggleFigoType(myoma, type.id)}
+                          title={type.desc}
                           className={classNames(
-                            "flex-1 py-1 text-[10px] rounded border font-bold transition-all",
-                            myoma.vascularity === v ? "bg-emerald-600 text-white border-emerald-700" : "bg-white text-ink-600 border-ink-200"
+                            "h-11 rounded-xl text-xs font-black border-2 transition-all",
+                            isSelected ? "bg-emerald-600 text-white border-emerald-500 shadow-sm" : "bg-white text-ink-500 border-ink-100 hover:border-ink-200"
                           )}
                         >
-                          {v}
+                          {type.label}
                         </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 p-3 bg-ink-50 rounded-xl border border-ink-100">
+                    <div className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-2">Legenda Auxiliar</div>
+                    <div className="grid grid-cols-1 gap-1 max-h-[120px] overflow-y-auto pr-1 custom-scrollbar">
+                      {FIGO_TYPES.map(t => (
+                        <div key={t.id} className="flex gap-2 text-[10px] leading-tight text-ink-600">
+                          <span className="font-black text-emerald-600 w-6 shrink-0">{t.label}:</span>
+                          <span>{t.desc}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                {myoma.classification && (
-                  <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 mb-0.5">
-                      <Zap size={12} /> {myoma.classification}
-                    </div>
-                    <div className="text-[9px] text-emerald-600 leading-tight">{myoma.description}</div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-1 h-3 bg-brand-500 rounded-full" />
+                    <label className="text-[10px] font-black text-ink-900 uppercase tracking-widest">Vascularização (Doppler)</label>
                   </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1, 2, 3, 4].map(v => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => updateMyoma(myoma.id, { vascularity: v })}
+                        className={classNames(
+                          "h-12 rounded-2xl text-sm font-black border-2 transition-all",
+                          myoma.vascularity === v ? "bg-emerald-600 text-white border-emerald-500 shadow-sm" : "bg-white text-ink-500 border-ink-100 hover:border-ink-200"
+                        )}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {myoma.classification && (
+                  <ResultCard
+                    label="Classificação FIGO"
+                    value={myoma.classification}
+                    recommendation={myoma.description || ''}
+                    variant="emerald"
+                  />
                 )}
-                
-                <button onClick={() => setMyomas(myomas.filter(m => m.id !== myoma.id))} className="text-[9px] text-red-500 flex items-center gap-1 hover:underline">
-                  <Trash2 size={12} /> Remover Mioma
-                </button>
               </div>
             )}
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Selector({ label, options, current, onSelect }: { label: string, options: any[], current: string | null, onSelect: (v: string) => void }) {
-  return (
-    <div>
-      <label className="text-[9px] font-bold text-ink-500 uppercase block mb-1">{label}</label>
-      <div className="flex flex-wrap gap-1">
-        {options.map((o: any) => (
-          <button
-            key={o.label}
-            onClick={() => onSelect(o.label)}
-            className={classNames("px-2 py-1 text-[9px] rounded border transition-all", current === o.label ? "bg-emerald-500 text-white border-emerald-600 shadow-sm" : "bg-white text-ink-600 border-ink-200 hover:border-ink-300")}
-          >
-            {o.label}
-          </button>
         ))}
       </div>
     </div>

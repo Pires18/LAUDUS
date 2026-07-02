@@ -1,46 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Calculator, Filter, ArrowLeft, Activity, Zap, Sparkles, Copy, CheckCircle2, Send, Search } from 'lucide-react';
-import { logger } from '../../utils/logger';
 import { CALCULATORS } from './registry';
-
-const FIELD_LABELS: Record<string, string> = {
-  // Volume
-  structureName: 'Estrutura', volume: 'Volume (cm³)', unit: 'Unidade',
-  d1: 'D1', d2: 'D2', d3: 'D3',
-  // IG
-  method: 'Método', referenceDate: 'Data do exame',
-  dumDate: 'DUM', prevUsgDate: 'Data USG anterior',
-  prevUsgWeeks: 'IG USG (sem)', prevUsgDays: 'IG USG (dias)',
-  currentGa: 'IG Atual', edd: 'DDP',
-  // Biometria fetal
-  gaWeeks: 'IG (semanas)', gaDays: 'IG (dias)', sex: 'Sexo',
-  bpd: 'DBP (mm)', hc: 'CC (mm)', ac: 'CA (mm)', fl: 'CF (mm)', hl: 'Úmero (mm)',
-  efw: 'PFE (g)', percentile: 'Percentil OMS (%)', pDescription: 'Classificação',
-  bpdPercentile: 'DBP p%', hcPercentile: 'CC p%', acPercentile: 'CA p%',
-  flPercentile: 'CF p%', hlPercentile: 'Úmero p%',
-  // Doppler
-  auPi: 'IP Art. Umbilical', acmPi: 'IP ACM', utaPi: 'IP Uterinas (média)', dvPi: 'PIV Ducto Venoso',
-  auFlow: 'Fluxo diastólico (AU)', dvWave: 'Onda A (Ducto Venoso)', efwPercentile: 'PFE Percentil',
-  rcp: 'RCP (ACM/AU)', rcpP: 'RCP p%',
-  stage: 'Estadio Barcelona', stageDesc: 'Estadiamento', rec: 'Conduta sugerida',
-  auP: 'AU p%', acmP: 'ACM p%', utaP: 'UtA p%', dvP: 'DV p%',
-  // Vascular
-  psv: 'Vel. Sistólica (cm/s)', edv: 'Vel. Diastólica (cm/s)', tamv: 'TAMV (cm/s)',
-  ri: 'IR (Resistência)', pi: 'IP (Pulsatilidade)', sd: 'Rel. S/D',
-  // IMT
-  age: 'Idade (anos)', imtRight: 'EIM Direita (mm)', imtLeft: 'EIM Esquerda (mm)',
-  maxImt: 'EIM Máxima (mm)', classification: 'Classificação',
-  // Próstata
-  weight: 'Peso Estimado (g)',
-  // Líquido amniótico
-  result: 'Resultado (mm)', q1: 'Q1 (mm)', q2: 'Q2 (mm)', q3: 'Q3 (mm)', q4: 'Q4 (mm)',
-  // IVC
-  ivcimax: 'VCI Inspir. (mm)', ivcmax: 'VCI Expir. (mm)', ivci: 'Índice Colapsabilidade (%)',
-  // Pleural
-  thickness: 'Espessura lâmina (mm)',
-  // CRL / MSD
-  crl: 'CCN (mm)', msd: 'DMSG (mm)',
-};
+import { FIELD_LABELS, isDisplayableMetric } from './constants/fieldLabels';
 
 import { ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
@@ -120,13 +81,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
   const buildTechnicalMessage = () => {
     if (!calcResult || !selectedCalc) return '';
     const metricsText = Object.entries(calcResult)
-      .filter(([k, v]) =>
-        !k.startsWith('_') &&
-        typeof v !== 'object' &&
-        v !== '' &&
-        v !== null &&
-        v !== undefined
-      )
+      .filter(([k, v]) => isDisplayableMetric(k, v))
       .map(([k, v]) => `- ${FIELD_LABELS[k] || k}: ${v}`)
       .join('\n');
     return `[RESULTADO TÉCNICO: ${selectedCalc.name} | ID: ${selectedCalcId}]\n\nCONCLUSÃO:\n${calcResult._summary || ''}\n\nMÉTRICAS COLETADAS:\n${metricsText}`;
@@ -395,12 +350,12 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
                           )}
 
                           {/* Metrics Grid */}
-                          {Object.keys(calcResult).filter(k => !k.startsWith('_') && typeof calcResult[k] !== 'object' && calcResult[k] !== '').length > 0 && (
+                          {Object.entries(calcResult).some(([k, v]) => isDisplayableMetric(k, v)) && (
                             <div className="space-y-2 bg-white rounded-2xl p-4 border border-ink-100 shadow-sm">
                               <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Métricas Detalhadas</p>
                               <div className="grid grid-cols-1 gap-1.5">
                                 {Object.entries(calcResult)
-                                  .filter(([k, v]) => !k.startsWith('_') && typeof v !== 'object' && v !== '' && v !== null && v !== undefined)
+                                  .filter(([k, v]) => isDisplayableMetric(k, v))
                                   .map(([k, v]) => (
                                     <div key={k} className="flex items-center justify-between py-1.5 border-b border-ink-50 last:border-0">
                                       <span className="text-[10px] font-bold text-ink-400">{FIELD_LABELS[k] || k}</span>

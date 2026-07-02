@@ -5,7 +5,7 @@ import {
   Loader2, Camera, Printer, CheckSquare, Square,
   AlertTriangle, RefreshCw, Check
 } from 'lucide-react';
-import { getProxyEndpoint, getActivePacsUrl } from '../../../store/db';
+import { getProxyEndpoint, getActivePacsUrl, getDicomAuthParams } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { DicomThumbnail } from './DicomThumbnail';
 
@@ -124,11 +124,9 @@ export function DicomImagesModal({
     if (!activeInstance) return null;
     const isBackup = activeInstance.serverSource === 'backup';
     const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-    const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-    const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
     const proxyPath = getProxyEndpoint(settings, isBackup);
-    
-    return `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+
+    return `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
   }, [activeInstance, settings]);
 
 
@@ -231,10 +229,8 @@ export function DicomImagesModal({
                     const isActive = activeInstanceId === instance.ID;
                     const isBackup = instance.serverSource === 'backup';
                     const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-                    const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-                    const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
                     const proxyPath = getProxyEndpoint(settings, isBackup);
-                    const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+                    const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
                     const instNum = instance.MainDicomTags?.InstanceNumber || (idx + 1);
 
                     return (

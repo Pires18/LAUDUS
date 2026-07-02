@@ -28,6 +28,7 @@ import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_P
 import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
 import { encryptPassword, decryptPassword } from '../utils/crypto';
+import { getCachedIdToken } from '../lib/authToken';
 
 async function decryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
   settings: T
@@ -888,6 +889,10 @@ export async function addAuditLog(log: {
   module: string;
   userId?: string;
   userName?: string;
+  /** Alvo do acesso (ex: id do paciente/exame) — para a trilha de acesso LGPD. */
+  targetId?: string;
+  /** Tipo do alvo (ex: 'patient', 'exam'). */
+  targetType?: string;
 }): Promise<void> {
   try {
     const currentUser = auth.currentUser;
@@ -902,6 +907,37 @@ export async function addAuditLog(log: {
   } catch (err) {
     logger.error('[DB] Erro ao gravar log de auditoria', err);
   }
+}
+
+// Trilha de acesso a dados de paciente (LGPD). Janela de dedup para evitar
+// registros duplicados por remontagem/StrictMode; reacessos reais (após a
+// janela) são registrados normalmente.
+const _recentAccessLog = new Map<string, number>();
+
+/**
+ * Registra o ACESSO/visualização de dados identificáveis de paciente
+ * (prontuário ou laudo) na trilha de auditoria — exigível para dados de saúde.
+ * Não registra CPF/RG; apenas o id do alvo e um rótulo legível ao admin.
+ */
+export async function logPatientAccess(
+  targetType: 'patient' | 'exam',
+  targetId: string,
+  label?: string
+): Promise<void> {
+  if (!targetId) return;
+  const key = `${targetType}:${targetId}`;
+  const now = Date.now();
+  if (now - (_recentAccessLog.get(key) || 0) < 10_000) return;
+  _recentAccessLog.set(key, now);
+  await addAuditLog({
+    action: targetType === 'patient' ? 'view_patient' : 'view_report',
+    details: label
+      ? `Acesso a dados de paciente: ${label}`
+      : `Acesso a ${targetType} (${targetId})`,
+    module: targetType === 'patient' ? 'patients' : 'editor',
+    targetId,
+    targetType,
+  });
 }
 
 /**
@@ -1025,6 +1061,22 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
 }
 
 /**
+ * Monta os parâmetros de autenticação para URLs do proxy Orthanc:
+ * credenciais Basic do Orthanc + token Firebase exigido pelo proxy na nuvem
+ * (via query porque `<img src>` não suporta headers).
+ */
+export function getDicomAuthParams(
+  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword'>,
+  isBackup = false
+): string {
+  const username = isBackup ? settings.dicomBackupUsername : settings.dicomUsername;
+  const password = isBackup ? settings.dicomBackupPassword : settings.dicomPassword;
+  const token = getCachedIdToken();
+  return `&username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
+    + (token ? `&token=${encodeURIComponent(token)}` : '');
+}
+
+/**
  * Retorna o endpoint de Worklist (.wl) a ser utilizado.
  *
  * Usa SEMPRE `'/api/worklist'` same-origin — exatamente o mesmo padrão confiável
@@ -1069,7 +1121,10 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
 
   const primaryPromise = fetch(primaryAgentUrl, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getCachedIdToken()}`
+    },
     body: JSON.stringify({
       examId,
       outputDir: settings.dicomWorklistFolder,
@@ -1086,7 +1141,10 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
 
     backupPromise = fetch(backupAgentUrl, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getCachedIdToken()}`
+      },
       body: JSON.stringify({
         examId,
         outputDir: settings.dicomBackupWorklistFolder,

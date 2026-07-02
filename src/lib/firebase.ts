@@ -26,9 +26,10 @@ export const firestore = initializeFirestore(app, {
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
-// Google Auth provider com escopos para Drive e Docs
+// Google Auth provider — escopos mínimos (S10): drive.file (só arquivos
+// criados/abertos pelo app via Picker) + documents (edição dos laudos gerados).
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/drive');
+googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
 googleProvider.addScope('https://www.googleapis.com/auth/documents');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 

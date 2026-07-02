@@ -1,5 +1,6 @@
 import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
 import { logger } from '../../../utils/logger';
 
 // ═══════════════════════════════════════════════════════════════
@@ -12,16 +13,18 @@ import { logger } from '../../../utils/logger';
 // A matemática de similaridade é PURA e testável; a vetorização é a
 // única parte que toca a rede.
 
-export const EMBEDDING_MODEL = 'text-embedding-004';
+export const EMBEDDING_MODEL = 'gemini-embedding-001';
 
 /**
  * Modelos de embedding candidatos, em ordem de preferência. Chaves
  * diferentes do Gemini têm acesso a modelos diferentes — testamos em
  * cascata e usamos o primeiro que responder com vetor.
+ * gemini-embedding-001 vem primeiro por ser o compatível com as chaves
+ * atuais (text-embedding-004 retorna 404 nelas).
  */
 export const EMBEDDING_MODEL_CANDIDATES = [
-  'text-embedding-004',
   'gemini-embedding-001',
+  'text-embedding-004',
   'embedding-001',
 ];
 
@@ -40,10 +43,10 @@ export async function probeEmbedding(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getIdToken()}`,
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'x-gemini-model': model,
         'x-gemini-task': 'embed',
-        'x-api-key': settings.geminiApiKey || '',
       },
       body: JSON.stringify({
         model: `models/${model}`,
@@ -110,10 +113,10 @@ export async function embedText(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getIdToken()}`,
         'x-uid': auth.currentUser?.uid || 'anonymous',
         'x-gemini-model': model,
         'x-gemini-task': 'embed',
-        'x-api-key': settings.geminiApiKey || '',
       },
       body: JSON.stringify({
         model: `models/${model}`,
@@ -158,10 +161,10 @@ export async function embedTextBatch(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getIdToken()}`,
           'x-uid': auth.currentUser?.uid || 'anonymous',
           'x-gemini-model': model,
           'x-gemini-task': 'embed-batch',
-          'x-api-key': settings.geminiApiKey || '',
         },
         body: JSON.stringify({
           requests: cleaned.map((text) => ({

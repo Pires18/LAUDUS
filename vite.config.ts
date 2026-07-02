@@ -5,6 +5,36 @@ import path from 'path'
 import { spawn } from 'child_process'
 import fs from 'fs'
 
+// O Vite não injeta variáveis sem prefixo VITE_ em process.env. Como o proxy
+// dev usa process.env.GOOGLE_API_KEY / ANTHROPIC_API_KEY (server-side), lemos
+// essas chaves do .env aqui — assim o dev funciona sem a chave nas Settings.
+try {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*(GOOGLE_API_KEY|ANTHROPIC_API_KEY)\s*=\s*(.+?)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  }
+} catch { /* opcional em dev */ }
+
+// Resolve o diretório da Worklist de forma IDÊNTICA para POST e DELETE.
+// Antes, o POST delegava o fallback ao generate_wl.py (que tem um default por SO)
+// enquanto o DELETE usava um default vazio no Mac — então o arquivo era gravado
+// num lugar e procurado em outro, deixando .wl órfãos. Centralizar aqui garante
+// que ambos resolvam exatamente o mesmo caminho.
+// Precedência: Docker > env var > outputDir do payload (settings) > fallback por SO.
+function resolveWorklistDir(payloadDir?: string): string {
+  if (process.env.RUNNING_IN_DOCKER === 'true') return '/app/pacs-worklist/';
+  return (
+    process.env.VITE_ORTHANC_WORKLIST_DIR ||
+    payloadDir ||
+    (process.platform === 'win32'
+      ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
+      : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/')
+  );
+}
+
 // Custom Plugin to handle local Orthanc Worklist files during development
 function localOrthancWorklistPlugin() {
   return {
@@ -125,18 +155,9 @@ function localOrthancWorklistPlugin() {
             req.on('end', () => {
               try {
                 const payload = JSON.parse(body);
-                // Se rodando no Docker, força o diretório da worklist para a montagem de volume
-                // Determine output directory based on environment variables or OS fallback
-                const defaultOutputDir = process.platform === 'win32'
-                  ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '';
+                // Diretório resolvido de forma centralizada (idêntico ao DELETE).
+                payload.outputDir = resolveWorklistDir(payload.outputDir);
 
-                payload.outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
-                
-                if (process.env.RUNNING_IN_DOCKER === 'true') {
-                  payload.outputDir = '/app/pacs-worklist/';
-                }
-                
                 // Resolve python executable — try env var first, then a fallback chain
                 const pythonScriptPath = path.resolve(__dirname, 'scripts', 'generate_wl.py');
 
@@ -213,13 +234,8 @@ function localOrthancWorklistPlugin() {
                   res.end(JSON.stringify({ success: false, error: "O campo 'examId' e obrigatorio." }));
                   return;
                 }
-                const defaultOutputDir = process.platform === 'win32'
-                  ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-                  : '';
-                let outputDir = process.env.VITE_ORTHANC_WORKLIST_DIR || payload.outputDir || defaultOutputDir;
-                if (process.env.RUNNING_IN_DOCKER === 'true') {
-                  outputDir = '/app/pacs-worklist/';
-                }
+                // Diretório resolvido de forma centralizada (idêntico ao POST).
+                const outputDir = resolveWorklistDir(payload.outputDir);
                 const filePath = path.join(outputDir, `agendamento_${examId}.wl`);
                 if (fs.existsSync(filePath)) {
                   fs.unlinkSync(filePath);
@@ -501,6 +517,10 @@ export default defineConfig({
         secure: true,
         configure: (proxy: any) => {
           proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            // O cliente envia Authorization: Bearer <token Firebase> para o
+            // proxy autenticado de produção. No dev o Vite encaminha direto à
+            // API real, que rejeitaria esse bearer (401) — então removemos.
+            proxyReq.removeHeader('authorization');
             const key = req.headers['x-api-key'] || process.env.ANTHROPIC_API_KEY || '';
             if (key) proxyReq.setHeader('x-api-key', key);
           });
@@ -516,10 +536,17 @@ export default defineConfig({
         },
         configure: (proxy: any, _options: any) => {
           proxy.on('proxyReq', (proxyReq: any, req: any) => {
+            // Remove o Authorization Bearer (token Firebase) destinado apenas
+            // ao proxy de produção; a API do Gemini usa a chave na query string.
+            proxyReq.removeHeader('authorization');
             const key = req.headers['x-api-key'] || process.env.GOOGLE_API_KEY || '';
             const model = req.headers['x-gemini-model'] || 'gemini-3.5-flash';
+            const task = req.headers['x-gemini-task'] || 'generate';
             const isStream = req.headers['x-gemini-stream'] === 'true';
-            const action = isStream ? 'streamGenerateContent' : 'generateContent';
+            let action: string;
+            if (task === 'embed') action = 'embedContent';
+            else if (task === 'embed-batch') action = 'batchEmbedContents';
+            else action = isStream ? 'streamGenerateContent' : 'generateContent';
             const url = `/v1beta/models/${model}:${action}?key=${key}${isStream ? '&alt=sse' : ''}`;
             proxyReq.path = url;
           });

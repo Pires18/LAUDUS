@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { CalculatorProps } from '../registry';
-import { Activity, Info } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { classNames } from '../../../utils/format';
+import { CalculatorInput, ResultCard } from './CalculatorUI';
 
-// ELSA-Brasil IMT Reference (Freire et al. 2015, Lotufo et al. 2016)
-// Thresholds: p75 and p90 by age and sex
+// Referência IMT ELSA-Brasil (Freire et al. 2015, Lotufo et al. 2016)
+// Limiares: p75 e p90 por faixa etária e sexo.
 const IMT_REF: Record<string, Record<string, { p75: number; p90: number }>> = {
   male: {
     '35-44': { p75: 0.72, p90: 0.82 },
@@ -62,55 +63,70 @@ export function ImtCalculator({ value, onChange }: CalculatorProps) {
   }, [age, sex, imtRight, imtLeft]);
 
   const ref = value?.ref;
+  const variant = !value?.maxImt ? 'brand'
+    : value.maxImt <= (ref?.p75 ?? 0.7) ? 'emerald'
+    : value.maxImt <= (ref?.p90 ?? 0.9) ? 'amber'
+    : 'red';
 
   return (
-    <div className="bg-white border border-ink-200 rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-ink-50 px-3 py-2 border-b border-ink-100 flex items-center justify-between">
-        <div className="flex items-center gap-1.5"><Activity size={14} className="text-violet-600" /><h3 className="font-bold text-ink-900 text-[11px] uppercase tracking-wider">IMT Carótidas (ELSA-Brasil)</h3></div>
-        <span className="text-[8px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-100">ELSA-BR</span>
+    <div className="space-y-8">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center shadow-sm">
+          <Activity size={24} />
+        </div>
+        <div>
+          <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">IMT Carótidas</h3>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Espessura Médio-Intimal — ELSA-Brasil</p>
+        </div>
       </div>
-      <div className="p-3 space-y-3">
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">Idade (anos)</label>
-            <input type="number" className="input text-center text-xs h-8" value={age} onChange={e => setAge(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">Sexo</label>
-            <div className="flex gap-1">
-              <button onClick={() => setSex('male')} className={classNames("flex-1 py-1 text-[10px] font-bold rounded border transition-all", sex === 'male' ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-ink-500 border-ink-200')}>Masc</button>
-              <button onClick={() => setSex('female')} className={classNames("flex-1 py-1 text-[10px] font-bold rounded border transition-all", sex === 'female' ? 'bg-pink-500 text-white border-pink-600' : 'bg-white text-ink-500 border-ink-200')}>Fem</button>
-            </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <CalculatorInput type="number" label="Idade" placeholder="0" value={age} onChange={setAge} suffix="anos" />
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Sexo</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setSex('male')}
+              className={classNames('flex-1 h-12 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all', sex === 'male' ? 'bg-blue-600 text-white border-blue-500 shadow-sm' : 'bg-white text-ink-400 border-ink-100 hover:bg-ink-50')}
+            >
+              Masc
+            </button>
+            <button
+              type="button"
+              onClick={() => setSex('female')}
+              className={classNames('flex-1 h-12 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all', sex === 'female' ? 'bg-pink-500 text-white border-pink-400 shadow-sm' : 'bg-white text-ink-400 border-ink-100 hover:bg-ink-50')}
+            >
+              Fem
+            </button>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div><label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">IMT Direita (mm)</label><input type="number" step="0.01" className="input text-center text-xs h-8" value={imtRight} onChange={e => setImtRight(e.target.value)} /></div>
-          <div><label className="text-[9px] font-bold text-ink-400 uppercase block mb-0.5">IMT Esquerda (mm)</label><input type="number" step="0.01" className="input text-center text-xs h-8" value={imtLeft} onChange={e => setImtLeft(e.target.value)} /></div>
-        </div>
-
-        {value?.maxImt ? (
-          <div className="space-y-2">
-            <div className={classNames("rounded-lg p-2 border flex items-center justify-between",
-              value.maxImt <= (ref?.p75 || 0.7) ? "bg-emerald-50 border-emerald-200" :
-              value.maxImt <= (ref?.p90 || 0.9) ? "bg-amber-50 border-amber-200" :
-              "bg-red-50 border-red-200"
-            )}>
-              <div><span className="text-[8px] font-bold uppercase block mb-0.5 opacity-60">IMT Máximo</span><span className="text-lg font-black leading-none">{value.maxImt.toFixed(2)} mm</span></div>
-              <div className="text-right"><span className="text-[8px] font-bold uppercase block mb-0.5 opacity-60">Classificação</span><span className="text-[10px] font-bold">{value.classification}</span></div>
-            </div>
-            {ref && (
-              <div className="text-[8px] text-ink-400 text-center italic">
-                Referência ELSA-Brasil ({sex === 'male' ? 'Masc' : 'Fem'}, {getAgeGroup(Number(age))} anos): p75 = {ref.p75}mm | p90 = {ref.p90}mm
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-ink-50 rounded-md p-2 flex items-center gap-2 border border-dashed border-ink-200">
-            <Info size={12} className="text-ink-400" /><span className="text-[10px] text-ink-400">Insira idade, sexo e medidas de IMT.</span>
-          </div>
-        )}
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <CalculatorInput type="number" label="EIM Direita" placeholder="0.00" value={imtRight} onChange={setImtRight} suffix="mm" />
+        <CalculatorInput type="number" label="EIM Esquerda" placeholder="0.00" value={imtLeft} onChange={setImtLeft} suffix="mm" />
+      </div>
+
+      {value?.maxImt ? (
+        <div className="flex flex-col gap-3">
+          <ResultCard
+            label="EIM Máxima"
+            value={`${value.maxImt.toFixed(2)} mm`}
+            recommendation={value.classification}
+            variant={variant}
+          />
+          {ref && (
+            <p className="text-[10px] text-ink-400 text-center font-medium">
+              Referência ELSA-Brasil ({sex === 'male' ? 'Masc' : 'Fem'}, {getAgeGroup(Number(age))} anos): p75 = {ref.p75}mm | p90 = {ref.p90}mm
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="py-10 border-2 border-dashed border-ink-100 rounded-2xl text-center">
+          <p className="text-[10px] font-black text-ink-300 uppercase tracking-[0.2em]">Insira idade, sexo e medidas de EIM</p>
+        </div>
+      )}
     </div>
   );
 }

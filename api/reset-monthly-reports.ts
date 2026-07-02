@@ -1,4 +1,5 @@
 import { getDb, getAdminAuth } from './_firebase.js';
+import { safeEqual } from './_secure.js';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;
@@ -12,8 +13,8 @@ const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;
 async function runCronBatch(req: any, res: any) {
   const secret = (process.env.CRON_SECRET || '').trim();
   const authHeader = req.headers.authorization || '';
-  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : (req.query?.secret || '');
-  if (!secret || provided !== secret) {
+  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : String(req.query?.secret || '');
+  if (!secret || !safeEqual(provided, secret)) {
     return res.status(401).json({ error: 'Cron não autorizado.' });
   }
 

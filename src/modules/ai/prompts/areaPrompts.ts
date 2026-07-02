@@ -946,13 +946,15 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
      Acima de 50 anos: NÃO classificar nenhum cisto como funcional. Aplicar
      O-RADS rigoroso mesmo para cistos aparentemente simples.
 
-   SOMP — Síndrome Ovariana Metabólica Poliendócrina — Critério ultrassonográfico (Rotterdam 2003, atualizado 2018):
-     ≥20 folículos de 2–9 mm por ovário OU volume ovariano >10 cm³.
-     Relatar: "Morfologia compatível com ovários policísticos, sugestiva de SOMP
-     (Síndrome Ovariana Metabólica Poliendócrina). Correlação clínica e laboratorial
-     (critérios de Rotterdam) para diagnóstico definitivo."
-     ATENÇÃO: SOMP ao US isolado NÃO é diagnóstico — requer hiperandrogenismo
-     clínico/bioquímico ou oligoanovulação para diagnóstico de Rotterdam.
+   SOMP — Síndrome Ovariana Metabólica Poliendócrina (antiga SOP/PCOS) — Critério de morfologia
+   [Diretriz Internacional SOP 2023 — Monash/ESHRE/ASRM]:
+     ≥20 folículos de 2–9 mm por ovário (transdutor ≥8 MHz) OU volume ovariano ≥10 mL.
+     AMH sérica pode SUBSTITUIR o US na definição de morfologia (adultas).
+     NÃO usar US para morfologia em adolescentes <8 anos pós-menarca (alta prevalência fisiológica).
+     Relatar: "Morfologia compatível com ovários policísticos, sugestiva de SOMP (antiga SOP).
+     Achado isolado; correlação clínico-laboratorial para os critérios de SOMP."
+     ATENÇÃO: morfologia isolada NÃO é diagnóstico — requer 2 de 3 (oligo/anovulação,
+     hiperandrogenismo clínico/laboratorial, morfologia ovariana).
 
 7. TROMPAS UTERINAS — Achados e conduta
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1861,7 +1863,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    */
   'mastologia': `DIRETRIZES CLÍNICAS — MASTOLOGIA (V2.0 — LAUD.IA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REFERÊNCIAS: ACR BI-RADS 2013 · SBM · FEBRASGO · NCCN · ASCO
+REFERÊNCIAS: ACR BI-RADS v2025 (extensão da 5ª ed.) · SBM · FEBRASGO · NCCN · ASCO
              EUSOMA · ACR · CBR · SBUS · EUSOMA Linfonodos 2024
 
 MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
@@ -1872,7 +1874,8 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
   └────────────────────────────────────────────────────────────────────┘
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. CLASSIFICAÇÃO BI-RADS (ACR 2013) — OBRIGATÓRIA para toda formação mamária
+1. CLASSIFICAÇÃO BI-RADS (ACR v2025) — OBRIGATÓRIA para toda formação mamária
+   [v2025: "microlobulada" fundida em "indistinta"; categoria 6 = seguimento com cirurgião/oncologista + terapia local definitiva; novos descritores de elastografia US]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ┌──────────┬─────────────────────────────────────────────────────────────────┐
    │ CATEGORIA│ INTERPRETAÇÃO / CONDUTA                                         │

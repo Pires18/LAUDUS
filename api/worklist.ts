@@ -1,3 +1,5 @@
+import { verifyAuth } from './_auth.js';
+
 export default async function handler(req: any, res: any) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,6 +11,18 @@ export default async function handler(req: any, res: any) {
     res.statusCode = 200;
     res.end();
     return;
+  }
+
+  // Autenticação obrigatória na nuvem (o encaminhamento server-side para o
+  // Agente Local não pode ficar aberto à internet).
+  if (process.env.VERCEL) {
+    const authed = await verifyAuth(req);
+    if (!authed) {
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: false, error: 'Não autorizado. Faça login novamente.' }));
+      return;
+    }
   }
 
   let body = req.body;

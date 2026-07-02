@@ -217,7 +217,7 @@ Filtros obrigatórios de compatibilidade biológica:
   — Útero, ovários, endométrio: EXCLUSIVO do sexo feminino;
   — Ateromatose degenerativa, artrose avançada: incompatíveis com pacientes <30 anos;
   — Biometria fetal: somente em contexto obstétrico confirmado;
-  — Pós-menopausa (sem TH): endométrio normal ≤4 mm; >5 mm = investigar;
+  — Pós-menopausa COM sangramento: ≤4 mm tranquilizador; >4 mm = investigar (histeroscopia/biópsia). ASSINTOMÁTICA: investigar se ≥11 mm (ACOG 2018);
   — Pós-menopausa (com TH / HRT): endométrio até 8 mm pode ser normal; informar contexto;
   — Tamoxifeno: endométrio heterogêneo e espessado é efeito esperado — mencionar;
   — Pediatria (<2 anos): fígado proeminente, rins com relação córtex/médula maior, timo visível são normais;
@@ -309,6 +309,8 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 4.4 RCP — RELAÇÃO CÉREBRO-PLACENTÁRIA:
     RCP = IP_ACM / IP_artéria_umbilical
     Normal: >1,00 | Centralização suspeita: 0,75–1,00 | Centralização confirmada: ≤0,75
+    Para estadiamento de RCIU, o critério PREFERIDO é RCP <P5 para a IG (percentil). O corte
+    absoluto <1,00 marca redistribuição fisiológica (brain-sparing); usar percentil quando disponível.
 
 4.5 DATAÇÃO GESTACIONAL POR DUM:
     — IG (Idade Gestacional) = DATA DO EXAME − DUM (resultado em semanas + dias);
@@ -323,8 +325,10 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 
 4.7 ÍNDICE DE LÍQUIDO AMNIÓTICO (ILA / AFI):
     AFI = soma dos maiores bolsões nos 4 quadrantes abdominais maternos (cm).
-    Valores de referência: Normal: 8,0–24,0 cm | Limítrofe (oligoâmnio marginal): 5,1–7,9 cm | Oligoâmnio: ≤5,0 cm | Polihidrâmnio: ≥25,0 cm.
-    Maior bolsão vertical (MBV): normal 2,0–8,0 cm | Reduzido: 1,0–1,9 cm | Oligoâmnio grave: <1,0 cm.
+    Valores de referência (SMFM 2021 — MBV é o critério preferido para oligoâmnio):
+      Normal: ILA 8,0–24,0 cm / MBV 2,0–8,0 cm | Líquido no limite inferior (vigilância, NÃO é
+      oligoâmnio franco): ILA 5,0–8,0 cm | Oligoâmnio: ILA <5,0 cm OU MBV <2,0 cm | Polidrâmnio: ILA ≥25,0 cm / MBV >8,0 cm.
+    Maior bolsão vertical (MBV): <2,0 cm = oligoâmnio; <1,0 cm = oligoâmnio grave (IG prematura → investigar RPMO/insuficiência placentária).
     Quando fornecido via MBV único: reporte como "maior bolsão vertical de X,X cm".
     Reporte: "ILA estimado em XX,X cm — [limítrofe / normal / polihidrâmnio]" ou "Maior bolsão vertical de XX,X cm — [oligoâmnio / reduzido / normal]".
 
@@ -367,7 +371,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
     Medição: plano sagital médio do útero, máxima espessura da dupla camada endometrial (incluindo ambas as camadas funcionais).
     Valores de referência:
       — Menacme (fase proliferativa): 4–10 mm normal; até 14 mm na fase secretora;
-      — Pós-menopausa (sem TH): ≤4 mm normal; 5–7 mm — controle; ≥8 mm → investigar (DD: pólipo, hiperplasia endometrial, carcinoma de endométrio → histeroscopia indicada);
+      — Pós-menopausa COM sangramento: ≤4 mm tranquilizador; >4 mm → investigar (DD: pólipo, hiperplasia, carcinoma de endométrio → histeroscopia); ASSINTOMÁTICA: investigar se ≥11 mm (ACOG 2018);
       — Pós-menopausa (com TH): até 8 mm pode ser normal → mencionar uso de TH explicitamente;
       — Tamoxifeno: espessamento heterogêneo e pólipos são frequentes (efeito esperado) → mencionar medicação.
     Reporte: "Espessura endometrial de X,X mm ao plano médio-sagital — [dentro do esperado / espessada para o contexto hormonal]."
@@ -519,7 +523,7 @@ Execute a verificação final explícita no scratchpad, respondendo SIM ou NÃO 
      → NÃO: prosseguir.
 
   ③ O laudo segue rigorosamente a hierarquia de seções do Skeleton (Bloco 3)?
-     (<h1> → TÉCNICA → ANÁLISE → CONCLUSÃO → RECOMENDAÇÕES → OBSERVAÇÕES METODOLÓGICAS)
+     (<h1> → TÉCNICA → ANÁLISE → [CLASSIFICAÇÃO opcional] → CONCLUSÃO → RECOMENDAÇÕES → OBSERVAÇÕES METODOLÓGICAS)
      → NÃO: corrigir antes de prosseguir;
      → SIM: prosseguir.
 
@@ -663,7 +667,7 @@ REGRAS DE FORMATAÇÃO DA ANÁLISE:
 
 REGRAS PARA SEÇÃO CLASSIFICAÇÃO — REGRA UNIFICADA:
   INCLUIR OBRIGATORIAMENTE quando houver QUALQUER achado focal que receba classificação sistematizada oficial:
-    • Nódulo mamário → BI-RADS (ACR 2013);
+    • Nódulo mamário → BI-RADS® v2025 (ACR, extensão da 5ª ed.);
     • Nódulo tireoidiano → TI-RADS (ACR 2017);
     • Formação ovariana → O-RADS (ACR 2022);
     • Lesão hepática suspeita em cirrótico/HBV → LI-RADS (ACR v2024);
@@ -674,7 +678,7 @@ REGRAS PARA SEÇÃO CLASSIFICAÇÃO — REGRA UNIFICADA:
     • Exames 100% normais sem achado focal classificável;
     • Laudos vasculares puros (TVP, Doppler arterial, carótidas) — Não existe sistema classificatório obrigatório; grau de estenose é citado na ANÁLISE, não em seção separada;
     • Laudos obstétricos — a biometria vai em tabela na ANÁLISE, não em seção CLASSIFICAÇÃO.
-  SEMPRE citar versão e entidade: "(BI-RADS ACR 2013)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
+  SEMPRE citar versão e entidade: "(BI-RADS® v2025 ACR)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
 
 CABEÇALHO DE LAUDO OBSTÉTRICO — adicionar ANTES de <h2>TÉCNICA</h2>:
   <p><strong>DATA DE REFERÊNCIA:</strong> [data do exame]</p>
@@ -814,7 +818,7 @@ R5 — CLASSIFICAÇÕES SISTEMATIZADAS OFICIAIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Nunca atribuir categorias (BI-RADS, TI-RADS, O-RADS, LI-RADS, BOSNIAK, FIGO, PIRADS) sem dados morfológicos descritivos suficientes para justificar a categoria.
 Se dados insuficientes: declare — "Dados descritivos insuficientes para classificação sistematizada com segurança."
-Sempre cite a versão/sistema usado: "(BI-RADS ACR 2013)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
+Sempre cite a versão/sistema usado: "(BI-RADS® v2025 ACR)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
 Nunca misturar versões ou sistemas diferentes no mesmo laudo.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -877,7 +881,7 @@ Em pacientes com idade registrada como < 18 anos:
 R10 — SEGURANÇA EM VERSÕES DE CLASSIFICAÇÕES (V2.0)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Versões oficiais vigentes a utilizar EXCLUSIVAMENTE (não misturar):
-  BI-RADS: ACR 2013 (5ª edição) — único válido para mama;
+  BI-RADS: v2025 (ACR — extensão da 5ª ed.; novos descritores de elastografia US e composição mamária; categorias 0–6 mantidas) — mama;
   TI-RADS: ACR 2017 — único válido para tireoide;
   O-RADS: ACR 2022 — único válido para ovário/pelve;
   LI-RADS: ACR v2024 — para fígado em risco de CHC (versão vigente; substitui v2018; citar "(LI-RADS ACR v2024)");

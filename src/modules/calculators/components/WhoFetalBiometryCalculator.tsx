@@ -3,44 +3,9 @@ import { CalculatorProps } from '../registry';
 import { Ruler, BarChart3, Sparkles } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
-import { WHO_COEFFICIENTS } from '../constants/whoCoefficients';
+import { getWhoPercentile, calcHadlockEfw, type WHODimension } from '../constants/fetalReferences';
 
-type WHODimension = keyof typeof WHO_COEFFICIENTS;
 type Sex = 'male' | 'female' | 'unknown';
-
-function getWhoPercentile(dimension: WHODimension, gaWeeks: number, value: number): number | null {
-  if (gaWeeks < 14 || gaWeeks > 40 || value <= 0) return null;
-  
-  const coeffs = WHO_COEFFICIENTS[dimension];
-  if (!coeffs) return null;
-
-  // Evaluate polynomials for all quantiles
-  const evaluated = coeffs.map(c => {
-    const poly = c.b0 + c.b1*gaWeeks + c.b2*Math.pow(gaWeeks, 2) + c.b3*Math.pow(gaWeeks, 3) + c.b4*Math.pow(gaWeeks, 4);
-    return { q: c.q, val: Math.exp(poly) };
-  });
-
-  // Find exact match or interpolate on log scale
-  if (value <= evaluated[0].val) return 1; // < p1
-  if (value >= evaluated[evaluated.length - 1].val) return 99; // > p99
-
-  for (let i = 0; i < evaluated.length - 1; i++) {
-    const q1 = evaluated[i];
-    const q2 = evaluated[i+1];
-    
-    if (value >= q1.val && value <= q2.val) {
-      if (value === q1.val) return Math.round(q1.q * 100);
-      if (value === q2.val) return Math.round(q2.q * 100);
-      
-      // Logarithmic interpolation
-      const frac = (Math.log(value) - Math.log(q1.val)) / (Math.log(q2.val) - Math.log(q1.val));
-      const p = (q1.q + frac * (q2.q - q1.q)) * 100;
-      return Math.max(1, Math.min(99, Math.round(p)));
-    }
-  }
-  
-  return null;
-}
 
 export function WhoFetalBiometryCalculator({ value, onChange }: CalculatorProps) {
   const [gaWeeks, setGaWeeks] = useState(value?.gaWeeks || '');
@@ -64,20 +29,8 @@ export function WhoFetalBiometryCalculator({ value, onChange }: CalculatorProps)
     let pDescription = '';
 
     if (bpd && hc && ac && fl) {
-      const b = Number(bpd) / 10;
-      const h = Number(hc) / 10;
-      const a = Number(ac) / 10;
-      const f = Number(fl) / 10;
-
       // Hadlock IV para o PESO (em gramas)
-      const logEFW = 1.3596 
-                   + (0.0064 * h) 
-                   + (0.0424 * a) 
-                   + (0.174 * f) 
-                   + (0.00061 * b * a) 
-                   - (0.00386 * a * f);
-      
-      efw = Math.pow(10, logEFW);
+      efw = calcHadlockEfw(Number(bpd), Number(hc), Number(ac), Number(fl));
     }
 
     let bpdP = null;
@@ -143,6 +96,7 @@ export function WhoFetalBiometryCalculator({ value, onChange }: CalculatorProps)
       hlPercentile: hlP,
       _summary: summary
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gaWeeks, gaDays, sex, bpd, hc, ac, fl, hl]);
 
   return (
