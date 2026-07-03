@@ -1016,6 +1016,51 @@ export function DicomControlCenter() {
                         </p>
                       </div>
 
+                      {/* A REDE — quem fala com quem / quem precisa de Tailscale */}
+                      <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4 sm:p-5 space-y-4">
+                        <h4 className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5"><Network size={14} /> A Rede — Quem fala com quem (leia isto)</h4>
+
+                        <p className="text-[11px] text-ink-700 leading-relaxed">
+                          Existem <strong>duas conversas separadas</strong> e independentes. Entender isso resolve 90% da confusão:
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-3">
+                          <div className="p-3.5 rounded-xl bg-white border border-ink-150 space-y-1.5">
+                            <div className="font-black text-[11px] text-violet-700 uppercase flex items-center gap-1.5"><Radio size={13} /> Conversa 1 — Aparelho ↔ Orthanc (SEMPRE local)</div>
+                            <p className="text-[11px] text-ink-600 leading-relaxed">
+                              O ultrassom conversa com o Orthanc <strong>pela rede local (Wi-Fi/cabo)</strong>, usando o <strong>IP local</strong> do servidor e a <strong>porta 4242</strong> (protocolo DICOM). Isso <strong>nunca</strong> passa pela internet nem pelo Tailscale. Os dois só precisam estar na <strong>mesma rede</strong> (mesma sub-rede, ex: ambos <code>192.168.1.x</code>).
+                            </p>
+                          </div>
+                          <div className="p-3.5 rounded-xl bg-white border border-ink-150 space-y-1.5">
+                            <div className="font-black text-[11px] text-emerald-700 uppercase flex items-center gap-1.5"><Cloud size={13} /> Conversa 2 — Nuvem ↔ Agente (só no cenário nuvem)</div>
+                            <p className="text-[11px] text-ink-600 leading-relaxed">
+                              Quando você abre o LAUD.US pela internet (site laud.us), o navegador precisa alcançar a clínica. O <strong>Tailscale Funnel</strong> dá um endereço HTTPS público ao <strong>Agente</strong>. Este é o <strong>único</strong> ponto que sai para a internet. No cenário 100% local, essa conversa não existe.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto border border-amber-200 rounded-xl bg-white">
+                          <table className="w-full text-[11px] text-left">
+                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
+                              <tr><th className="px-3 py-2">Componente</th><th className="px-3 py-2">Precisa de Tailscale?</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-ink-100 text-ink-700">
+                              <tr><td className="px-3 py-2 font-bold">Servidor (Orthanc + Agente)</td><td className="px-3 py-2"><strong className="text-emerald-700">Sim — só no cenário nuvem.</strong> A máquina do servidor entra na tailnet e roda o Funnel.</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Aparelho de ultrassom</td><td className="px-3 py-2"><strong className="text-rose-700">❌ NÃO, nunca.</strong> Só precisa estar na mesma rede local do servidor. Aparelhos de US nem instalam Tailscale.</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Navegador do médico</td><td className="px-3 py-2"><strong className="text-rose-700">❌ Não.</strong> Acessa o site normalmente; o app alcança a clínica sozinho via Funnel.</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
+                          <strong className="text-amber-400">Resposta direta:</strong> o <strong>aparelho de ultrassom NÃO precisa de Tailscale</strong> e não fica "conectado à rede Tailscale". Ele só precisa estar na <strong>mesma rede local</strong> do servidor Orthanc, apontando para o IP local dele na porta 4242. O Tailscale existe apenas para a <strong>nuvem alcançar a clínica</strong> — só a máquina servidora entra na tailnet.
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 text-[11px] text-ink-700 leading-relaxed">
+                          <strong className="text-blue-800">Rede local feita do jeito certo:</strong> deixe o servidor com <strong>IP fixo</strong> (reserve o IP no roteador por DHCP, ou configure IP estático) — se o IP mudar, o aparelho perde o servidor. Garanta que aparelho e servidor estão na <strong>mesma sub-rede</strong> e libere a <strong>porta 4242</strong> (entrada) no firewall da máquina servidora.
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 gap-6">
                         {/* Método 1 */}
                         <div className="p-5 rounded-2xl border border-ink-150 bg-ink-50/20 space-y-4">
@@ -1048,17 +1093,17 @@ export function DicomControlCenter() {
                         <div className="p-5 rounded-2xl border border-ink-150 bg-ink-50/20 space-y-4">
                           <div className="flex items-center gap-2 pb-2 border-b border-ink-100">
                             <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black">2</span>
-                            <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Método 2: Tailscale VPN (Recomendado para Nuvem/Vercel)</h4>
+                            <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Método 2: Tailscale Funnel (Recomendado para Nuvem/Vercel)</h4>
                           </div>
                           <p className="text-xs text-ink-600 leading-relaxed">
-                            Obrigatório para acesso seguro fora da clínica ou a partir de plataformas seguras HTTPS (como Vercel) para contornar o bloqueio de conteúdo misto (Mixed Content) e dispensar redirecionamento de portas.
+                            Necessário quando você acessa o LAUD.US pela internet (HTTPS, como o site laud.us). O Funnel dá um endereço HTTPS público ao Agente — sem abrir portas no roteador e sem gerar certificados manualmente.
                           </p>
                           <div className="flex flex-col gap-2.5">
                             {[
-                              { step: "Navegador Seguro (HTTPS Vercel)", desc: "Comunica-se via túnel criptografado seguro com a URL pública ts.net do servidor na porta 8443." },
-                              { step: "Laudus Local Agent (HTTPS)", desc: "Funciona como a ponte segura local, gravando arquivos de worklist no servidor." },
-                              { step: "Orthanc Local", desc: "Fica isolado e recebe exames localmente via C-STORE (porta 4242) vindos do ultrassom." },
-                              { step: "Segurança de Certificado", desc: "A criptografia ponta a ponta SSL é gerada de forma automatizada com certificados Let's Encrypt do próprio Tailscale." }
+                              { step: "Navegador Seguro (HTTPS Vercel)", desc: "Acessa o site laud.us normalmente e chama o Agente pela URL pública do Funnel (https://...ts.net)." },
+                              { step: "Laudus Local Agent (via Funnel)", desc: "Exposto na porta 3000 pelo Tailscale Funnel. Grava a worklist e faz proxy das imagens do Orthanc em localhost." },
+                              { step: "Orthanc Local", desc: "Continua isolado em localhost:8042 — só o Agente o acessa. Recebe exames via C-STORE (4242) do ultrassom, na rede local." },
+                              { step: "HTTPS automático", desc: "O certificado é gerenciado pelo próprio Tailscale — você só roda 'tailscale funnel --bg 3000'. Sem .pem manual, sem SSL no Orthanc." }
                             ].map((item, idx) => (
                               <div key={idx} className="flex gap-3 text-xs">
                                 <span className="font-mono text-ink-400 font-bold">{idx + 1}.</span>
@@ -1144,6 +1189,22 @@ export function DicomControlCenter() {
                         <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
                         <div className="text-[11px] text-ink-700 leading-relaxed">
                           <strong className="text-blue-800">Em palavras simples:</strong> o Orthanc lê todas as suas configurações de um único arquivo de texto, o <code>orthanc.json</code> — é o "painel de controle" dele. O modelo abaixo é o <strong>prático (sem senha)</strong>: define as <strong>portas</strong> e a <strong>pasta da worklist</strong>. Copie, ajuste o caminho da worklist e reinicie o Orthanc. <em>(Para exigir senha, troque <code>"AuthenticationEnabled": true</code> e adicione <code>"RegisteredUsers"</code> — veja a seção Segurança.)</em>
+                        </div>
+                      </div>
+
+                      {/* Como o Orthanc funciona */}
+                      <div className="rounded-2xl border border-ink-150 bg-ink-50/30 p-4 space-y-2.5">
+                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Como o Orthanc funciona</h4>
+                        <p className="text-[11px] text-ink-600 leading-relaxed">
+                          O Orthanc é um servidor PACS que faz três coisas ao mesmo tempo, cada uma numa "porta":
+                        </p>
+                        <ul className="text-[11px] text-ink-600 leading-relaxed space-y-1.5">
+                          <li><strong className="font-mono">:4242 (DICOM)</strong> — a porta que o <strong>aparelho de ultrassom</strong> usa. Por ela o Orthanc recebe imagens (<strong>C-STORE</strong>) e responde à busca de worklist (<strong>C-FIND</strong>). É sempre acesso na rede local.</li>
+                          <li><strong className="font-mono">:8042 (HTTP/API)</strong> — a porta que o <strong>LAUD.US/Agente</strong> usa para ler imagens e informações. É também a interface web do Orthanc (abra <code>http://localhost:8042</code>).</li>
+                          <li><strong>Plugin de Worklist</strong> — o Orthanc lê os arquivos <code>.wl</code> de uma pasta (a que você define em <code>Worklists.Database</code>) e os oferece ao aparelho. O <strong>Agente LAUD.US</strong> é quem grava esses <code>.wl</code> ali.</li>
+                        </ul>
+                        <div className="p-2.5 rounded-lg bg-white border border-ink-150 text-[11px] text-ink-700 leading-relaxed">
+                          Fluxo completo: LAUD.US → Agente grava <code>.wl</code> → Orthanc oferece na worklist (4242) → aparelho lê e faz o exame → aparelho envia imagens (4242, C-STORE) → Orthanc guarda → LAUD.US busca as imagens (8042) e mostra no laudo.
                         </div>
                       </div>
 
@@ -1310,6 +1371,19 @@ export function DicomControlCenter() {
                         <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
                         <div className="text-[11px] text-ink-700 leading-relaxed">
                           <strong className="text-blue-800">Em palavras simples:</strong> quando o LAUD.US roda na nuvem (site <strong>laud.us</strong>), o navegador está "na internet" e o Orthanc está "trancado dentro da clínica". O <strong>Tailscale</strong> cria um túnel seguro com cadeado (HTTPS) entre os dois — <strong>sem precisar mexer no roteador</strong> nem abrir portas perigosas. Só é necessário se você usa a versão na nuvem.
+                        </div>
+                      </div>
+
+                      {/* Como funciona o Tailscale */}
+                      <div className="rounded-2xl border border-ink-150 bg-ink-50/30 p-4 space-y-2.5">
+                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Como o Tailscale funciona (3 ideias)</h4>
+                        <ul className="text-[11px] text-ink-600 leading-relaxed space-y-1.5">
+                          <li><strong>1. VPN mesh:</strong> cada computador em que você instala o Tailscale e faz login com a mesma conta ganha um IP privado <code>100.x.y.z</code> e passa a "se enxergar" com os outros, de forma criptografada, <strong>sem abrir portas no roteador</strong>.</li>
+                          <li><strong>2. MagicDNS:</strong> em vez de decorar IPs, cada máquina ganha um nome <code>nome.tailXXXX.ts.net</code>.</li>
+                          <li><strong>3. Funnel:</strong> por padrão o Tailscale é <strong>privado</strong> (só entre as suas máquinas). O <strong>Funnel</strong> é o que <strong>publica um serviço na internet pública</strong> com HTTPS — é isso que a Vercel (que não está na sua tailnet) usa para alcançar o Agente.</li>
+                        </ul>
+                        <div className="p-2.5 rounded-lg bg-white border border-ink-150 text-[11px] text-ink-700 leading-relaxed">
+                          <strong>O que entra na tailnet:</strong> apenas a <strong>máquina servidora</strong> da clínica (a do Orthanc + Agente). <strong>NÃO</strong> o aparelho de ultrassom, <strong>NÃO</strong> o computador/celular do médico — o navegador acessa o site normalmente e o app faz a ponte via Funnel.
                         </div>
                       </div>
 
