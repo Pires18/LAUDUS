@@ -734,36 +734,48 @@ export function DicomControlCenter() {
               <div className="grid grid-cols-1 md:grid-cols-4 min-h-[500px]">
                 {/* Menu Lateral de Seções */}
                 <div className="col-span-1 border-r border-ink-100 bg-ink-50/50 p-4 space-y-1">
-                  <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest px-3 block mb-3">Tópicos do Manual</span>
                   {[
-                    { id: 'walkthrough', label: '★ Passo a Passo do Zero', icon: CheckCircle2 },
-                    { id: 'concepts', label: '0. Conceitos Básicos', icon: BookOpen },
-                    { id: 'architecture', label: '1. Fluxo & Arquitetura', icon: Network },
-                    { id: 'prereq', label: '2. Preparação do Servidor', icon: Cpu },
-                    { id: 'orthanc_json', label: '3. Configuração do Orthanc', icon: FileText },
-                    { id: 'agent', label: '4. Agente Local (Laudus Agent)', icon: Server },
-                    { id: 'tailscale', label: '5. Tailscale Funnel (Nuvem)', icon: Cloud },
-                    { id: 'ultrasound', label: '6. Configuração no Aparelho', icon: Database },
-                    { id: 'troubleshoot', label: '7. Resolução de Problemas', icon: HelpCircle }
-                  ].map(sec => {
-                    const isSelected = selectedSection === sec.id;
-                    const Icon = sec.icon;
-                    return (
-                      <button
-                        key={sec.id}
-                        onClick={() => setSelectedSection(sec.id as any)}
-                        className={classNames(
-                          'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-left',
-                          isSelected
-                            ? 'bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-100/50'
-                            : 'text-ink-600 hover:bg-ink-100/50 hover:text-ink-900'
-                        )}
-                      >
-                        <Icon size={14} className={isSelected ? 'text-emerald-600' : 'text-ink-400'} />
-                        {sec.label}
-                      </button>
-                    );
-                  })}
+                    { group: '▶ Comece aqui', items: [
+                      { id: 'walkthrough', label: 'Passo a passo (do zero)', icon: CheckCircle2 },
+                    ]},
+                    { group: 'Entender', items: [
+                      { id: 'concepts', label: 'O que é PACS / DICOM', icon: BookOpen },
+                      { id: 'architecture', label: 'Como funciona a rede', icon: Network },
+                    ]},
+                    { group: 'Configurar (detalhado)', items: [
+                      { id: 'prereq', label: '1 · Instalar os programas', icon: Cpu },
+                      { id: 'orthanc_json', label: '2 · Configurar o Orthanc', icon: FileText },
+                      { id: 'agent', label: '3 · Ligar o Agente', icon: Server },
+                      { id: 'tailscale', label: '4 · Tailscale (só nuvem)', icon: Cloud },
+                      { id: 'ultrasound', label: '5 · Conectar o aparelho', icon: Database },
+                    ]},
+                    { group: 'Ajuda', items: [
+                      { id: 'troubleshoot', label: 'Resolver problemas', icon: HelpCircle },
+                    ]},
+                  ].map(grp => (
+                    <div key={grp.group} className="mb-3.5 space-y-1">
+                      <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest px-3 block mb-1.5">{grp.group}</span>
+                      {grp.items.map(sec => {
+                        const isSelected = selectedSection === sec.id;
+                        const Icon = sec.icon;
+                        return (
+                          <button
+                            key={sec.id}
+                            onClick={() => setSelectedSection(sec.id as any)}
+                            className={classNames(
+                              'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-left',
+                              isSelected
+                                ? 'bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-100/50'
+                                : 'text-ink-600 hover:bg-ink-100/50 hover:text-ink-900'
+                            )}
+                          >
+                            <Icon size={14} className={classNames('shrink-0', isSelected ? 'text-emerald-600' : 'text-ink-400')} />
+                            {sec.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Conteúdo da Seção Selecionada */}
@@ -985,8 +997,8 @@ export function DicomControlCenter() {
                   {selectedSection === 'architecture' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">📐 Fluxo de Trabalho & Arquitetura</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Entenda como os dados trafegam entre o ultrassom, o servidor PACS local e a nuvem.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🌐 Como Funciona a Rede</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Quem fala com quem — e quem precisa (ou não) do Tailscale.</p>
                       </div>
 
                       {/* Diagrama visual do fluxo de dados */}
@@ -1061,61 +1073,6 @@ export function DicomControlCenter() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-6">
-                        {/* Método 1 */}
-                        <div className="p-5 rounded-2xl border border-ink-150 bg-ink-50/20 space-y-4">
-                          <div className="flex items-center gap-2 pb-2 border-b border-ink-100">
-                            <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px] font-black">1</span>
-                            <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Método 1: Rede Local (Intranet Física)</h4>
-                          </div>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Adequado quando o computador médico e o ultrassom estão conectados na mesma rede local física do PACS.
-                          </p>
-                          <div className="flex flex-col gap-2.5">
-                            {[
-                              { step: "Aparelho de Ultrassom", desc: "Envia requisições C-FIND e envia exames C-STORE na porta 4242 para o Orthanc." },
-                              { step: "Navegador do Médico", desc: "Acessa o sistema LAUD.US localmente e interage com o Orthanc via HTTP (porta 8042)." },
-                              { step: "Laudus Local Agent", desc: "Escuta na porta 3000 e grava fisicamente os arquivos de worklist (.wl) na pasta configurada." },
-                              { step: "Servidor Orthanc", desc: "Lê os arquivos .wl da pasta e disponibiliza a fila de trabalho atualizada para o ultrassom." }
-                            ].map((item, idx) => (
-                              <div key={idx} className="flex gap-3 text-xs">
-                                <span className="font-mono text-ink-400 font-bold">{idx + 1}.</span>
-                                <div className="space-y-0.5">
-                                  <strong className="text-ink-800 font-bold">{item.step}</strong>
-                                  <p className="text-ink-500 text-[11px] font-medium leading-normal">{item.desc}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Método 2 */}
-                        <div className="p-5 rounded-2xl border border-ink-150 bg-ink-50/20 space-y-4">
-                          <div className="flex items-center gap-2 pb-2 border-b border-ink-100">
-                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black">2</span>
-                            <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Método 2: Tailscale Funnel (Recomendado para Nuvem/Vercel)</h4>
-                          </div>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Necessário quando você acessa o LAUD.US pela internet (HTTPS, como o site laud.us). O Funnel dá um endereço HTTPS público ao Agente — sem abrir portas no roteador e sem gerar certificados manualmente.
-                          </p>
-                          <div className="flex flex-col gap-2.5">
-                            {[
-                              { step: "Navegador Seguro (HTTPS Vercel)", desc: "Acessa o site laud.us normalmente e chama o Agente pela URL pública do Funnel (https://...ts.net)." },
-                              { step: "Laudus Local Agent (via Funnel)", desc: "Exposto na porta 3000 pelo Tailscale Funnel. Grava a worklist e faz proxy das imagens do Orthanc em localhost." },
-                              { step: "Orthanc Local", desc: "Continua isolado em localhost:8042 — só o Agente o acessa. Recebe exames via C-STORE (4242) do ultrassom, na rede local." },
-                              { step: "HTTPS automático", desc: "O certificado é gerenciado pelo próprio Tailscale — você só roda 'tailscale funnel --bg 3000'. Sem .pem manual, sem SSL no Orthanc." }
-                            ].map((item, idx) => (
-                              <div key={idx} className="flex gap-3 text-xs">
-                                <span className="font-mono text-ink-400 font-bold">{idx + 1}.</span>
-                                <div className="space-y-0.5">
-                                  <strong className="text-ink-800 font-bold">{item.step}</strong>
-                                  <p className="text-ink-500 text-[11px] font-medium leading-normal">{item.desc}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   )}
 
