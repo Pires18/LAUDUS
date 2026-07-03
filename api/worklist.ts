@@ -53,11 +53,15 @@ export default async function handler(req: any, res: any) {
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
+      // Segredo compartilhado (server-side, nunca exposto ao navegador): se o
+      // agente exigir LAUDUS_AGENT_SECRET, o Vercel o repassa via header.
+      const fwdHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (process.env.LAUDUS_AGENT_SECRET) {
+        fwdHeaders['x-agent-secret'] = process.env.LAUDUS_AGENT_SECRET;
+      }
       const response = await fetch(targetUrl, {
         method: req.method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: fwdHeaders,
         body: JSON.stringify(body),
         signal: controller.signal
       });

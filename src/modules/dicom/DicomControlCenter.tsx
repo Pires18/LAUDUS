@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
+import { getCachedIdToken } from '../../lib/authToken';
 
 const JSON_TEMPLATE = `{
   "Name" : "PACS LAUDUS Principal",
@@ -62,7 +63,7 @@ export function DicomControlCenter() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
-  const [selectedSection, setSelectedSection] = useState<'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('architecture');
+  const [selectedSection, setSelectedSection] = useState<'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('concepts');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -129,7 +130,10 @@ export function DicomControlCenter() {
     try {
       const res = await fetch(getWorklistEndpoint(draft, isBackup), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getCachedIdToken()}`
+        },
         body: JSON.stringify({ ping: true, localAgentUrl: agent, outputDir: dir })
       });
       const data = await res.json().catch(() => ({ success: false, error: 'Resposta inválida do agente' }));
@@ -725,6 +729,7 @@ export function DicomControlCenter() {
                 <div className="col-span-1 border-r border-ink-100 bg-ink-50/50 p-4 space-y-1">
                   <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest px-3 block mb-3">Tópicos do Manual</span>
                   {[
+                    { id: 'concepts', label: '0. Conceitos Básicos (Comece Aqui)', icon: BookOpen },
                     { id: 'architecture', label: '1. Fluxo & Arquitetura', icon: Network },
                     { id: 'prereq', label: '2. Preparação do Servidor', icon: Cpu },
                     { id: 'orthanc_json', label: '3. Configuração do Orthanc', icon: FileText },
@@ -755,6 +760,87 @@ export function DicomControlCenter() {
 
                 {/* Conteúdo da Seção Selecionada */}
                 <div className="col-span-3 p-6 overflow-y-auto max-h-[600px] custom-scrollbar">
+                  {selectedSection === 'concepts' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🎓 Conceitos Básicos — Comece Por Aqui</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Nunca mexeu com PACS/DICOM? Sem problema. Esta página explica tudo em linguagem simples, sem termos técnicos.</p>
+                      </div>
+
+                      {/* O que é, em uma frase */}
+                      <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-2">
+                        <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Em uma frase</h4>
+                        <p className="text-xs text-ink-700 leading-relaxed">
+                          Este módulo conecta o <strong>LAUD.US</strong> ao seu <strong>aparelho de ultrassom</strong>: ele <strong>envia os dados do paciente</strong> para a tela do aparelho (para você não redigitar nome/data) e <strong>traz as imagens capturadas</strong> de volta para dentro do laudo. É a ponte entre o computador e o ultrassom.
+                        </p>
+                      </div>
+
+                      {/* Analogia */}
+                      <div className="p-4 rounded-2xl border border-ink-150 bg-ink-50/30 space-y-2.5">
+                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5">🍽️ Uma analogia simples (restaurante)</h4>
+                        <ul className="text-xs text-ink-600 leading-relaxed space-y-1.5">
+                          <li><strong>A Worklist</strong> é como a <strong>comanda de pedidos</strong> que vai para a cozinha: você anota o pedido (o exame do paciente) e ele aparece na tela do ultrassom, prontinho, sem o operador digitar nada.</li>
+                          <li><strong>O PACS (Orthanc)</strong> é como o <strong>álbum de fotos</strong> do restaurante: guarda todas as imagens que o ultrassom "fotografou" e as organiza por paciente.</li>
+                          <li><strong>O Ultrassom</strong> é a <strong>câmera</strong>: lê a comanda, tira as fotos e as devolve para o álbum.</li>
+                          <li><strong>O LAUD.US</strong> é o <strong>garçom</strong>: anota o pedido, entrega na cozinha e traz as fotos até a sua mesa (o laudo).</li>
+                        </ul>
+                      </div>
+
+                      {/* As duas funções */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-blue-700 font-black text-xs uppercase tracking-wider"><FileText size={13} /> 1. Worklist (ida)</div>
+                          <p className="text-[11px] text-ink-600 leading-relaxed">O LAUD.US cria um "cartão de identificação" digital do paciente (arquivo <code>.wl</code>) e o entrega ao aparelho. No ultrassom, o operador só seleciona o nome — sem digitar.</p>
+                        </div>
+                        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/30 space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-emerald-700 font-black text-xs uppercase tracking-wider"><Database size={13} /> 2. Imagens (volta)</div>
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Depois do exame, as imagens ficam guardadas no PACS. O LAUD.US as busca automaticamente e mostra dentro do editor de laudos, prontas para anexar.</p>
+                        </div>
+                      </div>
+
+                      {/* Glossário */}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5"><BookOpen size={13} /> Glossário — o que cada palavra significa</h4>
+                        <div className="overflow-x-auto border border-ink-150 rounded-xl">
+                          <table className="w-full text-xs text-left">
+                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
+                              <tr><th className="px-3 py-2.5">Termo</th><th className="px-3 py-2.5">O que é (em português claro)</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-ink-100 bg-white">
+                              {[
+                                ['DICOM', 'O "idioma" universal que aparelhos médicos usam para trocar imagens e dados. Como o PDF é para documentos, o DICOM é para exames.'],
+                                ['PACS', 'O arquivo/servidor que guarda e organiza todas as imagens dos exames. É o "álbum de fotos" central.'],
+                                ['Orthanc', 'O programa gratuito que usamos como PACS. Roda no computador da clínica guardando as imagens.'],
+                                ['Worklist (MWL)', 'A "lista/fila de trabalho" que aparece no ultrassom com os pacientes agendados. Evita digitar dados no aparelho.'],
+                                ['Arquivo .wl', 'O cartão de identificação de um paciente dentro da worklist. Cada exame vira um arquivo .wl.'],
+                                ['AE Title', 'O "apelido" (nome de rede) de cada equipamento DICOM para que eles se reconheçam. Ex: ORTHANC, MINDRAYMX7.'],
+                                ['Porta (ex: 4242, 8042)', 'Um "número de porta de entrada" no computador. Cada serviço usa a sua: imagens numa, site do Orthanc noutra.'],
+                                ['C-STORE / C-FIND', 'Comandos DICOM: C-STORE = "guarde esta imagem"; C-FIND = "procure este paciente na lista".'],
+                                ['Agente Local', 'Pequeno programa do LAUD.US que roda na clínica e cria os arquivos .wl na pasta certa do Orthanc.'],
+                                ['Tailscale', 'Uma "rede privada segura" (VPN) que liga a clínica à internet com segurança, sem abrir portas no roteador.'],
+                                ['Funnel', 'Recurso do Tailscale que publica um endereço https seguro para a nuvem (Vercel) conseguir falar com a clínica.'],
+                                ['Proxy', 'Um "intermediário" que repassa pedidos. O LAUD.US usa um proxy para falar com o Orthanc com segurança.'],
+                              ].map(([term, desc]) => (
+                                <tr key={term}>
+                                  <td className="px-3 py-2.5 font-bold text-ink-800 font-mono text-[11px] whitespace-nowrap align-top">{term}</td>
+                                  <td className="px-3 py-2.5 text-ink-600 leading-relaxed">{desc}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Ordem recomendada */}
+                      <div className="p-4 rounded-2xl bg-ink-900 text-white space-y-2">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={13} /> Ordem recomendada de leitura</h4>
+                        <p className="text-[11px] text-ink-300 leading-relaxed">
+                          Siga os tópicos do menu na ordem: <strong className="text-white">1</strong> entenda o fluxo → <strong className="text-white">2</strong> prepare o servidor → <strong className="text-white">3</strong> configure o Orthanc → <strong className="text-white">4</strong> ligue o Agente → <strong className="text-white">5</strong> (nuvem) configure o Tailscale → <strong className="text-white">6</strong> ajuste o aparelho → <strong className="text-white">7</strong> resolva problemas. Ao final, use o botão <strong className="text-white">"Executar Diagnóstico"</strong> na aba de Servidores para conferir se está tudo verde.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {selectedSection === 'architecture' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
@@ -854,6 +940,13 @@ export function DicomControlCenter() {
                         <p className="text-[11px] text-ink-500 font-medium">Instalação das dependências fundamentais e pacotes básicos no servidor local.</p>
                       </div>
 
+                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
+                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-ink-700 leading-relaxed">
+                          <strong className="text-blue-800">Em palavras simples:</strong> antes de conectar, o computador da clínica precisa de 3 programas — <strong>Python</strong> (o motor que cria os cartões de paciente <code>.wl</code>), a biblioteca <strong>pydicom</strong> (ensina o Python a "falar DICOM") e o <strong>Orthanc</strong> (o PACS que guarda as imagens). Instale-os uma única vez.
+                        </div>
+                      </div>
+
                       <div className="space-y-4">
                         <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
                           <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">1. Instalar Python 3</h4>
@@ -906,6 +999,13 @@ export function DicomControlCenter() {
                         <p className="text-[11px] text-ink-500 font-medium font-mono">C:\Program Files\Orthanc Server\Configuration\orthanc.json</p>
                       </div>
 
+                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
+                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-ink-700 leading-relaxed">
+                          <strong className="text-blue-800">Em palavras simples:</strong> o Orthanc lê todas as suas configurações de um único arquivo de texto, o <code>orthanc.json</code> — é o "painel de controle" dele. Ali você define a <strong>senha</strong>, as <strong>portas</strong> e <strong>onde ficam</strong> as imagens e a worklist. Copie o modelo abaixo, ajuste a senha e reinicie o Orthanc.
+                        </div>
+                      </div>
+
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-medium text-ink-500">Modelo recomendado pré-configurado:</span>
@@ -932,10 +1032,37 @@ export function DicomControlCenter() {
                         <p className="text-[11px] text-ink-500 font-medium">Executando o script agent.js como serviço persistente em segundo plano.</p>
                       </div>
 
+                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
+                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-ink-700 leading-relaxed">
+                          <strong className="text-blue-800">Em palavras simples:</strong> um site, por segurança, não pode gravar arquivos direto no seu computador. O <strong>Agente</strong> é um programinha do LAUD.US que fica rodando na clínica e faz esse trabalho por ele — recebe o pedido e grava o arquivo <code>.wl</code> na pasta que o Orthanc vigia. Ele precisa estar <strong>sempre ligado</strong>.
+                        </div>
+                      </div>
+
                       <div className="space-y-4">
                         <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-100 text-emerald-900 text-xs leading-relaxed space-y-1">
                           <strong className="block font-bold">Gateway único (worklist + imagens)</strong>
                           O agente agora também faz proxy do Orthanc em <code>/api/orthanc-proxy</code>. Basta expor o agente via <strong>Tailscale Funnel (HTTPS)</strong> e preencher a "URL do Agente Local" — uma única exposição atende tanto a gravação de worklist (.wl) quanto a visualização de imagens na nuvem. Sem o agente exposto em HTTPS, a Worklist funciona no localhost mas falha no Vercel.
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-100 space-y-2">
+                          <h4 className="text-xs font-black text-rose-800 uppercase tracking-wider flex items-center gap-1.5"><Shield size={13} /> Segurança: proteja o agente antes de expor</h4>
+                          <p className="text-xs text-ink-700 leading-relaxed">
+                            Exponha via Funnel o <strong>Agente</strong> — <strong>nunca</strong> o servidor de desenvolvimento (<code>npm run dev</code>), que não tem autenticação. Antes de publicar o agente, defina um segredo compartilhado (o Vercel envia esse mesmo segredo automaticamente):
+                          </p>
+                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
+                            <span>export LAUDUS_AGENT_SECRET="uma-senha-longa-aleatoria"</span>
+                            <button
+                              onClick={() => handleCopy('export LAUDUS_AGENT_SECRET="uma-senha-longa-aleatoria"', 'agent_secret')}
+                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
+                              title="Copiar Comando"
+                            >
+                              {copiedField === 'agent_secret' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-ink-500 leading-relaxed">
+                            Defina a MESMA variável <code>LAUDUS_AGENT_SECRET</code> nas <strong>Environment Variables do Vercel</strong>. Sem o segredo, o agente aceita qualquer requisição (ok só em rede local isolada).
+                          </p>
                         </div>
 
                         <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
@@ -1030,6 +1157,13 @@ export function DicomControlCenter() {
                         <p className="text-[11px] text-ink-500 font-medium">Bypass completo de Mixed Content no navegador e HTTPS obrigatório.</p>
                       </div>
 
+                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
+                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-ink-700 leading-relaxed">
+                          <strong className="text-blue-800">Em palavras simples:</strong> quando o LAUD.US roda na nuvem (site <strong>laud.us</strong>), o navegador está "na internet" e o Orthanc está "trancado dentro da clínica". O <strong>Tailscale</strong> cria um túnel seguro com cadeado (HTTPS) entre os dois — <strong>sem precisar mexer no roteador</strong> nem abrir portas perigosas. Só é necessário se você usa a versão na nuvem.
+                        </div>
+                      </div>
+
                       <div className="space-y-4">
                         <div className="p-4 rounded-xl bg-violet-50/30 border border-violet-100 text-violet-850 text-xs leading-relaxed space-y-1">
                           <strong className="block font-bold">Por que o Tailscale VPN é obrigatório na nuvem?</strong>
@@ -1102,6 +1236,13 @@ export function DicomControlCenter() {
                       <div className="pb-3 border-b border-ink-100">
                         <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🖥️ Parametrização no Ultrassom (Modalidade)</h3>
                         <p className="text-[11px] text-ink-500 font-medium">Configuração no teclado e console físico do aparelho de imagem.</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
+                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-ink-700 leading-relaxed">
+                          <strong className="text-blue-800">Em palavras simples:</strong> por último, o <strong>aparelho de ultrassom</strong> precisa saber "com quem falar". No painel do próprio aparelho você cadastra o <strong>endereço (IP) do PACS</strong>, a <strong>porta</strong> e o <strong>apelido (AE Title)</strong>. Assim ele consegue baixar a lista de pacientes e devolver as imagens. Faça isso uma vez por aparelho.
+                        </div>
                       </div>
 
                       <div className="space-y-4">

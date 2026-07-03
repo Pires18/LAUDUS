@@ -5,10 +5,28 @@ const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 
+// Segredo compartilhado (opt-in). Quando definido em LAUDUS_AGENT_SECRET, TODA
+// requisição de escrita/proxy precisa trazer o header 'x-agent-secret' igual.
+// Isso permite expor o AGENTE com segurança via Tailscale Funnel (em vez do
+// servidor de desenvolvimento Vite, que não tem autenticação). Se não definido,
+// o agente roda aberto (retrocompatível) e avisa no console.
+const AGENT_SECRET = process.env.LAUDUS_AGENT_SECRET || '';
+
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-agent-secret');
+}
+
+// Retorna true se autorizado; caso contrário responde 401 e retorna false.
+function requireSecret(req, res) {
+  if (!AGENT_SECRET) return true; // sem segredo configurado → aberto (aviso no boot)
+  const provided = req.headers['x-agent-secret'];
+  if (provided && provided === AGENT_SECRET) return true;
+  res.statusCode = 401;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ success: false, error: 'Não autorizado: x-agent-secret ausente ou inválido.' }));
+  return false;
 }
 
 const server = http.createServer((req, res) => {
@@ -20,7 +38,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // GET /
+  // GET / (health-check — sempre público, não expõe dados)
   if (req.method === 'GET' && req.url === '/') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
@@ -38,6 +56,7 @@ const server = http.createServer((req, res) => {
   // mesma máquina (localhost:8042). Assim a nuvem não precisa expor o Orthanc
   // separadamente, e o getProxyEndpoint do app pode apontar para este agente.
   if (req.url && req.url.startsWith('/api/orthanc-proxy')) {
+    if (!requireSecret(req, res)) return;
     (async () => {
       try {
         const parsedUrl = new URL(req.url, 'http://localhost');
@@ -52,15 +71,15 @@ const server = http.createServer((req, res) => {
         const targetUrlObj = new URL(targetUrl);
         const headers = {};
 
-        // Credenciais: query params primeiro, depois embutidas na URL, senão padrão
+        // Credenciais do Orthanc: query params ou embutidas na URL. Sem
+        // credenciais, segue anônima — NUNCA usar senha default (evita que uma
+        // senha embutida no código funcione como backdoor).
         const queryUsername = parsedUrl.searchParams.get('username');
         const queryPassword = parsedUrl.searchParams.get('password');
         if (queryUsername && queryPassword) {
           headers['Authorization'] = `Basic ${Buffer.from(`${queryUsername}:${queryPassword}`).toString('base64')}`;
         } else if (targetUrlObj.username && targetUrlObj.password) {
           headers['Authorization'] = `Basic ${Buffer.from(`${targetUrlObj.username}:${targetUrlObj.password}`).toString('base64')}`;
-        } else {
-          headers['Authorization'] = `Basic ${Buffer.from('admin:123456789').toString('base64')}`;
         }
         if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
 
@@ -104,6 +123,7 @@ const server = http.createServer((req, res) => {
 
   // POST /api/worklist -> Criação de Worklist
   if (req.method === 'POST' && req.url === '/api/worklist') {
+    if (!requireSecret(req, res)) return;
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
@@ -184,6 +204,7 @@ const server = http.createServer((req, res) => {
 
   // DELETE /api/worklist -> Remoção de Worklist
   if (req.method === 'DELETE' && req.url === '/api/worklist') {
+    if (!requireSecret(req, res)) return;
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
@@ -243,5 +264,11 @@ server.listen(PORT, () => {
   console.log(`==================================================`);
   console.log(`  LAUD.US Local Agent rodando na porta ${PORT}      `);
   console.log(`  Pronto para intermediar conexões DICOM / .wl   `);
+  if (AGENT_SECRET) {
+    console.log(`  🔒 Autenticação ATIVA (x-agent-secret exigido)  `);
+  } else {
+    console.log(`  ⚠️  SEM autenticação. Se for expor via Funnel,   `);
+    console.log(`     defina LAUDUS_AGENT_SECRET antes de publicar. `);
+  }
   console.log(`==================================================`);
 });
