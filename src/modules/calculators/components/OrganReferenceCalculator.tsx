@@ -3,6 +3,7 @@ import { CalculatorProps } from '../registry';
 import { BookOpen, Info } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { classifyOrganMeasurement } from '../classifiers';
 
 type Organ = 'liver' | 'spleen' | 'kidney' | 'gallbladder' | 'prostate';
 
@@ -41,14 +42,9 @@ export function OrganReferenceCalculator({ value, onChange }: CalculatorProps) {
   const ref = REFS[selected];
   const val = Number(measure);
 
-  let status: 'normal' | 'alert' | 'none' = 'none';
-  if (measure) {
-    if (selected === 'liver') status = val > 15.5 ? 'alert' : 'normal';
-    if (selected === 'spleen') status = val > 13.0 ? 'alert' : 'normal';
-    if (selected === 'kidney') status = (val < 8 || val > 13) ? 'alert' : 'normal';
-    if (selected === 'gallbladder') status = val > 3.0 ? 'alert' : 'normal';
-    if (selected === 'prostate') status = val > 30 ? 'alert' : 'normal';
-  }
+  const status: 'normal' | 'alert' | 'none' = measure
+    ? classifyOrganMeasurement(selected, val)
+    : 'none';
 
   useEffect(() => {
     const statusLabel = status === 'alert' ? 'AUMENTADO/ALTERADO' : status === 'normal' ? 'Normal' : null;

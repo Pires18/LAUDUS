@@ -150,3 +150,28 @@ export function classifyOrads(l: OradsInput): { cat: string; rec: string } {
   }
   return { cat: '0', rec: 'Avaliação Incompleta' };
 }
+
+export type OrganKey = 'liver' | 'spleen' | 'kidney' | 'gallbladder' | 'prostate';
+
+/**
+ * Classifica uma medida de órgão como 'normal' ou 'alert' (aumentado/alterado)
+ * pelos limiares de referência ultrassonográficos. 'none' se sem medida válida.
+ */
+export function classifyOrganMeasurement(organ: OrganKey, value: number): 'normal' | 'alert' | 'none' {
+  if (!Number.isFinite(value) || value <= 0) return 'none';
+  switch (organ) {
+    case 'liver': return value > 15.5 ? 'alert' : 'normal';
+    case 'spleen': return value > 13.0 ? 'alert' : 'normal';
+    case 'kidney': return value < 8 || value > 13 ? 'alert' : 'normal';
+    case 'gallbladder': return value > 3.0 ? 'alert' : 'normal';
+    case 'prostate': return value > 30 ? 'alert' : 'normal';
+    default: return 'none';
+  }
+}
+
+/** Rótulo FIGO de leiomioma (simples ou híbrido) a partir dos tipos. */
+export function figoLabel(type1: string | null, type2: string | null): string {
+  if (type1 && type2 && type1 !== type2) return `FIGO ${type1}-${type2} (Híbrido)`;
+  if (type1) return `FIGO ${type1}`;
+  return '';
+}

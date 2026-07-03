@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tiradsCategory, classifyBirads, BiradsInput, classifyOrads } from '../modules/calculators/classifiers';
+import { tiradsCategory, classifyBirads, BiradsInput, classifyOrads, classifyOrganMeasurement, figoLabel } from '../modules/calculators/classifiers';
 
 describe('TI-RADS (ACR 2017) — categoria por pontuação', () => {
   it('mapeia total → TR e conduta', () => {
@@ -81,5 +81,40 @@ describe('O-RADS (ACR) — massa anexial', () => {
   });
   it('sem tipo definido → 0 (incompleto)', () => {
     expect(classifyOrads(base).cat).toBe('0');
+  });
+});
+
+describe('classifyOrganMeasurement — limiares de referência', () => {
+  it('fígado > 15,5 cm → alterado', () => {
+    expect(classifyOrganMeasurement('liver', 14)).toBe('normal');
+    expect(classifyOrganMeasurement('liver', 16)).toBe('alert');
+  });
+  it('rim: atrofia (<8) ou aumento (>13) → alterado', () => {
+    expect(classifyOrganMeasurement('kidney', 7)).toBe('alert');
+    expect(classifyOrganMeasurement('kidney', 10)).toBe('normal');
+    expect(classifyOrganMeasurement('kidney', 14)).toBe('alert');
+  });
+  it('próstata > 30 cm³ → alterado', () => {
+    expect(classifyOrganMeasurement('prostate', 25)).toBe('normal');
+    expect(classifyOrganMeasurement('prostate', 45)).toBe('alert');
+  });
+  it('valor inválido → none', () => {
+    expect(classifyOrganMeasurement('liver', 0)).toBe('none');
+    expect(classifyOrganMeasurement('liver', NaN)).toBe('none');
+  });
+});
+
+describe('figoLabel — leiomioma', () => {
+  it('tipo único → "FIGO X"', () => {
+    expect(figoLabel('4', null)).toBe('FIGO 4');
+  });
+  it('dois tipos distintos → híbrido', () => {
+    expect(figoLabel('2', '5')).toBe('FIGO 2-5 (Híbrido)');
+  });
+  it('tipos iguais → simples', () => {
+    expect(figoLabel('3', '3')).toBe('FIGO 3');
+  });
+  it('sem tipo → vazio', () => {
+    expect(figoLabel(null, null)).toBe('');
   });
 });

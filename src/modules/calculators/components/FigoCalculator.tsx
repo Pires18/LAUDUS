@@ -4,6 +4,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, MapPin, Activity } from 'lucide-r
 import { genId } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import { CategorySelector, ResultCard, CalculatorInput } from './CalculatorUI';
+import { figoLabel } from '../classifiers';
 
 interface Myoma {
   id: string;
@@ -56,16 +57,14 @@ export function FigoCalculator({ value, onChange }: CalculatorProps) {
 
   useEffect(() => {
     const updatedMyomas = myomas.map(m => {
-      let cls = '';
+      const cls = figoLabel(m.type1, m.type2);
       let dsc = '';
 
       if (m.type1 && m.type2 && m.type1 !== m.type2) {
-        cls = `FIGO ${m.type1}-${m.type2} (Híbrido)`;
         const d1 = FIGO_TYPES.find(t => t.id === m.type1)?.desc;
         const d2 = FIGO_TYPES.find(t => t.id === m.type2)?.desc;
         dsc = `Componente ${d1} e ${d2}`;
       } else if (m.type1) {
-        cls = `FIGO ${m.type1}`;
         dsc = FIGO_TYPES.find(t => t.id === m.type1)?.desc || '';
       }
 
