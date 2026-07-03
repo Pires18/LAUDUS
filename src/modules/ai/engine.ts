@@ -1173,6 +1173,59 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     }
   }
 
+  // ── Separador decimal com ponto em medidas (deve ser vírgula) — exclui milhar (3 díg.) e peso em g ──
+  const dotDecimal = html.match(/\b\d+\.\d{1,2}\s*(cm|mm|mL|cm³)/gi);
+  if (dotDecimal) {
+    issues.push({ type: 'decimal', severity: 'warning', message: `Separador decimal com ponto em ${dotDecimal.length} medida(s) — usar vírgula (BLOCO 1).` });
+    score -= Math.min(10, dotDecimal.length * 2);
+  }
+
+  // ── Placeholders de máscara não preenchidos no output ([__], [inserir], [listar]) — proibido em não-fetal/vascular ──
+  if (!isFetalOrVascular) {
+    const maskPlaceholders = html.match(/\[_{2,}\]|\[inserir\]|\[listar[^\]]*\]/gi);
+    if (maskPlaceholders) {
+      issues.push({ type: 'placeholder', severity: 'error', message: `Placeholder de máscara não preenchido no output (${maskPlaceholders.length}x).` });
+      score -= Math.min(20, maskPlaceholders.length * 5);
+    }
+  }
+
+  // ── R5: lesão focal descrita exige classificação sistematizada oficial (por área) ──
+  const classMap: Record<string, RegExp> = { mastologia: /BI-?RADS/i };
+  if (area && classMap[area]) {
+    const analiseMatch = html.match(/<h2[^>]*>AN[ÁA]LISE<\/h2>([\s\S]*?)(?=<h2|$)/i);
+    const analise = analiseMatch ? analiseMatch[1] : '';
+    if (/n[óo]dulo|massa|les[ãa]o focal/i.test(analise) && !classMap[area].test(html)) {
+      issues.push({ type: 'classification', severity: 'warning', message: 'Lesão focal descrita sem classificação sistematizada oficial (R5).' });
+      score -= 8;
+    }
+  }
+
+  // ── R6: achado potencialmente urgente (N4) exige ALERTA correspondente (todas as áreas) ──
+  const urgencyFindings = /tor[çc][ãa]o testicular|trombose venosa profunda|\bTVP\b|absc[ée]sso|ruptura (completa|transfixante|total)|aneurisma roto|artrite s[ée]ptica|isquemia cr[íi]tica|gesta[çc][ãa]o ect[óo]pica|pseudoaneurisma/i;
+  if (urgencyFindings.test(html) && !/ALERTA/i.test(html)) {
+    issues.push({ type: 'missing_alert', severity: 'warning', message: 'Achado potencialmente urgente sem ALERTA correspondente (R6).' });
+    score -= 10;
+  }
+
+  // ── R7: OBSERVAÇÕES METODOLÓGICAS não podem estar vazias/triviais ──
+  const obsText = obsContent.replace(/<[^>]+>/g, '').replace(/\(…\)|\(\.\.\.\)/g, '').trim();
+  if (html.toUpperCase().includes('OBSERVAÇÕES METODOLÓGICAS') && obsText.length < 20) {
+    issues.push({ type: 'empty_obs', severity: 'warning', message: 'Seção OBSERVAÇÕES METODOLÓGICAS vazia ou trivial (R7).' });
+    score -= 5;
+  }
+
+  // ── Cascata tripartite: achado patológico na CONCLUSÃO exige RECOMENDAÇÃO correspondente ──
+  if (conclusionMatch && recMatch) {
+    const conclText = conclusionMatch[1].replace(/<[^>]+>/g, ' ');
+    const hasPathology = /(n[óo]dulo|cisto|massa|espessamento|derrame|esteatose|lit[íi]ase|c[áa]lculo|estenose|trombo|les[ãa]o|fratura|rotura|ruptura|sinovite|tendinopat)/i.test(conclText)
+      && !/dentro dos limites da normalidade|sem altera[çc][õo]es/i.test(conclText.slice(0, 140));
+    const recText = recMatch[1].replace(/<[^>]+>/g, ' ').replace(/•/g, '').trim();
+    if (hasPathology && recText.length < 15) {
+      issues.push({ type: 'cascade', severity: 'warning', message: 'Achado patológico na CONCLUSÃO sem RECOMENDAÇÃO correspondente (cascata tripartite).' });
+      score -= 8;
+    }
+  }
+
   return {
     score: Math.max(0, Math.min(100, score)),
     issues,

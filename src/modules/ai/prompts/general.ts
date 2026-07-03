@@ -543,10 +543,14 @@ Execute a verificação final explícita no scratchpad, respondendo SIM ou NÃO 
      → NÃO: redigir a nota técnica apropriada;
      → SIM: prosseguir.
 
-  ⑧ Há classificação sistematizada (BI-RADS, TI-RADS, O-RADS, LI-RADS, BOSNIAK) atribuída sem
-     critérios descritivos suficientes para justificá-la na ANÁLISE?
-     → SIM: acrescentar os critérios descritivos ou remover a classificação prematura;
-     → NÃO: prosseguir.
+  ⑧ Coerência de classificação sistematizada (BI-RADS, TI-RADS, O-RADS, LI-RADS, BOSNIAK), nos DOIS sentidos:
+     (a) Há classificação atribuída SEM critérios descritivos suficientes na ANÁLISE?
+        → SIM: acrescentar os critérios descritivos ou remover a classificação prematura;
+     (b) Há lesão focal (nódulo/cisto/massa) em área com sistema oficial obrigatório (mama→BI-RADS,
+        tireoide→TI-RADS, massa anexial→O-RADS, nódulo hepático em hepatopata→LI-RADS, cisto renal→Bosniak)
+        SEM a classificação correspondente atribuída (R5)?
+        → SIM: atribuir a classificação com base nos critérios descritos;
+     → Ambos NÃO: prosseguir.
 
   ⑨ A linguagem das RECOMENDAÇÕES está proporcional ao nível de urgência (N0→N4)?
      → NÃO (linguagem de urgência para achado benigno, ou linguagem passiva para urgência real): corrigir;
