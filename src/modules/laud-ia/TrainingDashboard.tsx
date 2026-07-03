@@ -10,7 +10,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import {
   listQualityRecords,
   listCorrectionSignals,
-  listExcellenceCorpus,
+  countExcellenceCorpus,
   aggregateQualityMetrics,
   aggregatePatterns,
   buildCalibrationBlock,
@@ -72,15 +72,17 @@ export function TrainingDashboard({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [records, signals, corpus, pending] = await Promise.all([
+      const [records, signals, total, pending] = await Promise.all([
         listQualityRecords(1000),
         listCorrectionSignals(500),
-        listExcellenceCorpus(undefined, 500),
+        countExcellenceCorpus(),
         countPendingVectorization(),
       ]);
       setMetrics(aggregateQualityMetrics(records));
       setCalibration(buildCalibrationBlock(aggregatePatterns(signals, 5)));
-      setCorpusCount(corpus.length);
+      // Contagem real do servidor (sem cap). Fallback para o total do
+      // contador de pendências caso a agregação falhe.
+      setCorpusCount(total || pending.total);
       setPendingVec(pending.pending);
     } finally {
       setLoading(false);

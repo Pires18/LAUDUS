@@ -26,7 +26,7 @@ import { ExcellenceEntry } from './excellenceCorpus';
 export interface BackfillOptions {
   /** Score mínimo de auditoria para um laudo entrar (0-100). */
   minAuditScore?: number;
-  /** Máximo de laudos por tipo de exame (evita um exame dominar o corpus). */
+  /** Máximo de laudos por tipo de exame. Default: ilimitado (todos). */
   maxPerExamType?: number;
   /** Progresso (processados, total). */
   onProgress?: (done: number, total: number) => void;
@@ -62,7 +62,8 @@ export async function backfillCorpusFromFinalized(
   options: BackfillOptions = {}
 ): Promise<BackfillResult> {
   const minAuditScore = options.minAuditScore ?? 60;
-  const maxPerExamType = options.maxPerExamType ?? 40;
+  // Sem limite por tipo de exame por padrão: usa TODOS os laudos do médico.
+  const maxPerExamType = options.maxPerExamType ?? Number.POSITIVE_INFINITY;
 
   // 1. Carrega pacientes num mapa (para anonimizar nomes).
   const patientMap = new Map<string, Patient>();

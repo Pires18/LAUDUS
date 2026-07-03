@@ -3,6 +3,7 @@ import {
   doc,
   setDoc,
   getDocs,
+  getCountFromServer,
   deleteDoc,
   query,
   where,
@@ -110,8 +111,13 @@ export async function addToExcellenceCorpus(params: {
   return entry;
 }
 
-/** Lista entradas do corpus por área (com candidatos para retrieval). */
-export async function listExcellenceCorpus(area?: ExamArea, max = 200): Promise<ExcellenceEntry[]> {
+/**
+ * Lista entradas do corpus por área (candidatos para retrieval).
+ * Limite generoso: usa TODOS os laudos da área do médico como candidatos
+ * (o ranqueamento por similaridade escolhe os melhores). Filtrar por área
+ * mantém o payload proporcional, não o corpus inteiro.
+ */
+export async function listExcellenceCorpus(area?: ExamArea, max = 2000): Promise<ExcellenceEntry[]> {
   const uid = auth.currentUser?.uid;
   if (!uid) return [];
 
@@ -125,6 +131,23 @@ export async function listExcellenceCorpus(area?: ExamArea, max = 200): Promise<
   } catch (err) {
     logger.warn('[Corpus] Falha ao listar corpus:', err);
     return [];
+  }
+}
+
+/**
+ * Conta o total de laudos no corpus SEM limite, via agregação do servidor
+ * (getCountFromServer) — barato e sem baixar documentos. Fonte da verdade
+ * para o número exibido (não capado em 500).
+ */
+export async function countExcellenceCorpus(): Promise<number> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return 0;
+  try {
+    const snap = await getCountFromServer(corpusRef(uid));
+    return snap.data().count;
+  } catch (err) {
+    logger.warn('[Corpus] Falha ao contar corpus:', err);
+    return 0;
   }
 }
 
