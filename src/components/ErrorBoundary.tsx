@@ -1,6 +1,7 @@
 import { Component, ReactNode } from 'react';
 import { AlertTriangle, RotateCcw, Cloud } from 'lucide-react';
 import { logger } from '../utils/logger';
+import { Sentry } from '../lib/sentry';
 
 interface Props {
   children: ReactNode;
@@ -25,6 +26,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     logger.error('ErrorBoundary caught:', error);
+    // Envia ao Sentry (no-op se não inicializado). scope com o local do boundary.
+    Sentry.withScope((scope) => {
+      scope.setTag('boundary', this.props.label || (this.props.inline ? 'inline' : 'root'));
+      if (info?.componentStack) scope.setExtra('componentStack', info.componentStack);
+      Sentry.captureException(error);
+    });
   }
 
   handleReload = () => {
