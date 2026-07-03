@@ -862,10 +862,9 @@ export function Settings() {
                     clinic={null}
                     settings={draft}
                     examType="Ultrassonografia de Abdome Superior"
-                    reportContent={PDF_PREVIEW_CONTENT}
+                    reportContent={PDF_PREVIEW_CONTENT + (draft.laudIaMethodologicalObsEnabled !== false ? `<h2>OBSERVAÇÕES METODOLÓGICAS</h2>${PDF_PREVIEW_OBS}` : '')}
                     physicianName="Dr. Médico Solicitante"
                     examDate={PDF_PREVIEW_DATE}
-                    observationsNote={draft.laudIaMethodologicalObsEnabled !== false ? PDF_PREVIEW_OBS : ''}
                   />
                 </div>
                 <p className="text-[10px] text-ink-400 text-center">
