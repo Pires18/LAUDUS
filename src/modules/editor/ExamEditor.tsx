@@ -125,12 +125,6 @@ export function ExamEditor({ examId }: Props) {
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Nota de Observações Metodológicas (rodapé reduzido do laudo), vinda da
-  // máscara. Gated pela aba LAUD.IA. Renderizada no editor e no PDF/preview.
-  const obsMethodEnabled = settings.laudIaMethodologicalObsEnabled !== false;
-  const observationsNote = obsMethodEnabled ? (template?.observationsTemplate || '') : '';
-  const hasObsNote = observationsNote.replace(/<[^>]*>/g, '').trim() !== '';
-
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showVersionsModal, setShowVersionsModal] = useState(false);
@@ -973,17 +967,6 @@ export function ExamEditor({ examId }: Props) {
                     />
                   </div>
 
-                  {/* Nota de Observações Metodológicas — rodapé reduzido do laudo
-                      (documentação/respaldo). Só leitura; vem da máscara. */}
-                  {hasObsNote && (
-                    <div className="mt-3 bg-white rounded-2xl border border-ink-100 shadow-sm px-6 py-4">
-                      <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-1.5">Nota ao final do laudo</p>
-                      <div className="text-[12px] italic text-slate-500 leading-relaxed border-l-2 border-slate-300 pl-3">
-                        <span className="not-italic font-bold uppercase tracking-wide text-slate-600 mr-1 text-[11px]">Observações metodológicas:</span>
-                        <span dangerouslySetInnerHTML={{ __html: observationsNote }} />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1297,7 +1280,6 @@ export function ExamEditor({ examId }: Props) {
         reportContent={reportContentRef.current}
         physicianName={exam.requestingPhysician}
         examDate={exam.createdAt}
-        observationsNote={observationsNote}
       />
 
       {/* Modal de Pré-visualização — prévia fiel do PDF (ReportDocument) */}
@@ -1339,7 +1321,6 @@ export function ExamEditor({ examId }: Props) {
                 reportContent={reportContent}
                 physicianName={exam.requestingPhysician}
                 examDate={exam.createdAt}
-                observationsNote={observationsNote}
               />
             </div>
           </div>

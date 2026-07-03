@@ -249,15 +249,9 @@ export function ReportDocumentBody({
       </div>
 
       {/* Content */}
+      {/* As Observações Metodológicas agora são uma SEÇÃO do corpo do laudo
+          (reportContent) — não há mais nota reduzida separada ao final. */}
       <div className="prose prose-sm max-w-none print-prose" dangerouslySetInnerHTML={{ __html: reportContent }} />
-
-      {/* Nota de Observações Metodológicas (reduzida, documentação/respaldo) */}
-      {observationsNote && observationsNote.replace(/<[^>]*>/g, '').trim() !== '' && (
-        <div className="report-obs">
-          <span className="report-obs-label">Observações metodológicas:</span>
-          <span dangerouslySetInnerHTML={{ __html: observationsNote }} />
-        </div>
-      )}
 
       {/* Signature Block */}
       <div className="mt-16 pt-8 flex flex-col items-center text-center page-break-inside-avoid">

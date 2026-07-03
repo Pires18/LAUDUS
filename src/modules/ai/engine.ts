@@ -341,6 +341,7 @@ function buildSpecificContext(
 function buildMaskHtml(template: ReportTemplate, settings?: AppSettings): string {
   const withClassification = settings?.laudIaClassificationEnabled !== false;
   const withRecommendations = settings?.laudIaRecommendationsEnabled !== false;
+  const withObservations = settings?.laudIaMethodologicalObsEnabled !== false;
 
   const parts = [
     `TÍTULO:\n${template.title}`,
@@ -354,17 +355,21 @@ function buildMaskHtml(template: ReportTemplate, settings?: AppSettings): string
   if (withRecommendations) {
     parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
   }
+  if (withObservations && template.observationsTemplate) {
+    parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate}`);
+  }
 
-  // As Observações Metodológicas SEMPRE saem do corpo gerado pela IA: elas são
-  // anexadas automaticamente como nota reduzida ao final (ReportDocument), a
-  // partir da máscara. Incluí-las aqui duplicaria a nota.
-  const omit: string[] = ['OBSERVAÇÕES METODOLÓGICAS'];
+  // Seções desligadas pelo usuário são omitidas do corpo gerado pela IA.
+  const omit: string[] = [];
   if (!withClassification) omit.push('CLASSIFICAÇÃO');
   if (!withRecommendations) omit.push('RECOMENDAÇÕES');
-  parts.push(
-    `INSTRUÇÃO DE SEÇÕES (usuário): NÃO inclua no laudo a(s) seção(ões): ${omit.join(', ')}. ` +
-      `Omita completamente esse(s) título(s) e seu conteúdo.`
-  );
+  if (!withObservations) omit.push('OBSERVAÇÕES METODOLÓGICAS');
+  if (omit.length > 0) {
+    parts.push(
+      `INSTRUÇÃO DE SEÇÕES (usuário): NÃO inclua no laudo a(s) seção(ões): ${omit.join(', ')}. ` +
+        `Omita completamente esse(s) título(s) e seu conteúdo.`
+    );
+  }
   return parts.join('\n\n');
 }
 
@@ -1252,16 +1257,18 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
 export function generateMockReport(params: GenerateReportParams): string {
   const { template, settings } = params;
   const withRecommendations = settings?.laudIaRecommendationsEnabled !== false;
+  const withObservations = settings?.laudIaMethodologicalObsEnabled !== false;
 
-  // Observações Metodológicas não entram no corpo: viram nota reduzida ao final
-  // (ReportDocument), a partir da máscara.
   const recs = withRecommendations
     ? `\n<h2>RECOMENDAÇÕES</h2>\n${template.recommendationsTemplate}`
+    : '';
+  const obs = withObservations && template.observationsTemplate
+    ? `\n<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n${template.observationsTemplate}`
     : '';
 
   return `<h1>${template.title}</h1>
 <h2>ANÁLISE</h2>
 ${template.analysisTemplate}
 <h2>CONCLUSÃO</h2>
-${template.conclusionTemplate}${recs}`;
+${template.conclusionTemplate}${recs}${obs}`;
 }
