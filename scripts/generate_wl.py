@@ -38,7 +38,7 @@ def main():
                 import platform
                 output_dir = ('C:/OrthancServer/db/WorklistsDatabase/'
                               if platform.system() == 'Windows'
-                              else '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/')
+                              else os.path.expanduser('~/OrthancServer/db/WorklistsDatabase/'))
             writable = False
             dir_error = ''
             try:
@@ -79,7 +79,7 @@ def main():
             if platform.system() == 'Windows':
                 output_dir = 'C:/OrthancServer/db/WorklistsDatabase/'
             else:
-                output_dir = '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/'
+                output_dir = os.path.expanduser('~/OrthancServer/db/WorklistsDatabase/')
             
         os.makedirs(output_dir, exist_ok=True)
         

@@ -1,251 +1,260 @@
-# Manual de Integração e Implantação PACS / DICOM (Orthanc) — LAUD.US
-**Versão:** 2.1 · **Status:** Completo e Aprimorado · **Autor:** Time Laud.us
+# 🖥️ PACS / DICOM no LAUD.US — Manual Prático de Configuração
 
-Este manual fornece todas as diretrizes técnicas necessárias para configurar, depurar e manter a sincronização de exames, imagens e worklist no sistema **LAUD.US** utilizando o servidor PACS open-source **Orthanc**.
+**Versão 3.0 · Foco: fácil e rápido.** Este guia monta um PACS (servidor de imagens) do zero e o integra ao LAUD.US — **localmente** ou **pela nuvem (Vercel) via Tailscale** — com o mínimo de burocracia.
 
-Abaixo são apresentados em detalhes os dois métodos de implantação de rede suportados:
-*   **Método 1: Rede Local (Intranet) + Orthanc**
-*   **Método 2: Tailscale VPN (Mesh P2P) + Orthanc** (Recomendado para uso na Nuvem/Vercel)
+> **Filosofia deste manual:** priorizamos praticidade. A segurança é **opcional** e fica concentrada na seção 9. No caminho rápido, o Orthanc roda sem senha e o Agente roda aberto — suficiente para a maioria das clínicas em rede fechada.
 
 ---
 
-## 1. Diagramas de Arquitetura e Fluxo de Dados
+## 🧭 Como funciona (visão em 30 segundos)
 
-### 1.1 Método 1: Rede Local (Intranet Física)
-Este método é adequado quando tanto o navegador do médico quanto o aparelho de ultrassom estão conectados fisicamente à mesma rede do servidor PACS.
-
-```mermaid
-graph TD
-    US[Aparelho de Ultrassom] -- 1. C-FIND (Porta 4242) --> Orthanc[Servidor PACS Orthanc]
-    US -- 2. C-STORE (Porta 4242) --> Orthanc
-    Browser[Navegador do Médico] -- 3. API HTTP (Porta 8042) --> Orthanc
-    Browser -- 4. Gera .wl no diretório --> Agent[Laudus Local Agent - Porta 3000]
-    Agent -- 5. Grava arquivo .wl físico --> WLDir[Pasta WorklistsDatabase]
-    Orthanc -- 6. Lê arquivos .wl --> WLDir
+```
+Aparelho de US ──DICOM(4242)──► Orthanc (porta 8042)  ◄── lê arquivos .wl
+                                     ▲
+                                     │ localhost
+                        Agente LAUD.US (porta 3000)  ── grava .wl / faz proxy das imagens
+                                     ▲
+     navegador (local ou Vercel) ────┘  (direto na rede local, OU via Tailscale Funnel)
 ```
 
-### 1.2 Método 2: Tailscale VPN (Híbrido Nuvem-Local)
-Este método é obrigatório quando o sistema é acessado de fora da clínica (ou via Vercel HTTPS) para contornar restrições de Mixed Content no navegador e dispensar redirecionamento de portas (Port Forwarding).
+- **Orthanc** = o servidor PACS (guarda as imagens, lê a worklist).
+- **Agente LAUD.US** (`scripts/agent.js`) = a ponte. Grava a worklist (`.wl`) e faz proxy das imagens do Orthanc para o navegador. **É o único componente que você expõe.**
+- **Tailscale Funnel** = dá um endereço HTTPS público ao Agente, sem abrir portas no roteador e sem certificados manuais.
 
-```mermaid
-graph TD
-    subgraph Nuvem (Vercel)
-        LaudusApp[Navegador HTTPS]
-    end
-
-    subgraph Rede Privada VPN (Tailscale)
-        LaudusApp -- API Proxy HTTPS --> TailscaleDNS[servidor-pacs.ts.net:8443]
-    end
-
-    subgraph Servidor Físico (Clínica)
-        TailscaleDNS --> LocalAgent[Laudus Local Agent - HTTPS]
-        LocalAgent -- API REST local --> LocalOrthanc[Orthanc Local - Porta 8042]
-        LocalAgent -- Grava arquivo .wl --> WLDir[Pasta WorklistsDatabase]
-        LocalOrthanc -- Lê arquivos .wl --> WLDir
-    end
-
-    subgraph Intranet Física (Clínica)
-        US[Aparelho de Ultrassom] -- C-FIND / C-STORE (Porta 4242) --> LocalOrthanc
-    end
-```
+Cada usuário do LAUD.US tem **o seu próprio** Orthanc + Agente e cadastra isso nas configurações individuais dele.
 
 ---
 
-## 2. Preparação do Servidor (Instalação e Dependências)
+## ⚡ Setup Rápido (checklist)
 
-### 2.1 Instalando o Python e a Biblioteca `pydicom`
-A geração de arquivos de worklist física (`.wl`) é gerenciada no servidor por um script Python compilador (`scripts/generate_wl.py`).
-1.  **Instalação do Python 3:**
-    *   **Windows:** Baixe o instalador do Python 3 no site oficial. **Importante:** Na primeira tela, marque a caixa **"Add python.exe to PATH"** antes de clicar em instalar.
-    *   **macOS:** Instale via Homebrew: `brew install python`.
-2.  **Instalação da dependência `pydicom`:**
-    Abra o terminal ou prompt de comando no servidor e execute:
-    ```bash
-    pip install pydicom
-    ```
-    *Se houver erro de permissão no Windows, execute o prompt como Administrador. No macOS, use `pip3 install pydicom`.*
+1. **Instalar** Orthanc + Node.js + Python (com `pydicom`). → seção 1
+2. **Configurar** o Orthanc (`orthanc.json` mínimo). → seção 2
+3. **Rodar** o Agente: `node scripts/agent.js`. → seção 3
+4. Escolher o método:
+   - **Rede local?** → seção 4 (nada mais a fazer).
+   - **Nuvem/Vercel?** → seção 5 (um comando de Tailscale Funnel).
+5. **Preencher** os campos DICOM no LAUD.US e clicar **Testar Conexão**. → seção 6
+6. **Apontar** o aparelho de ultrassom para o Orthanc. → seção 7
 
-### 2.2 Instalando o Orthanc
-*   **No Windows:**
-    Baixe a versão empacotada de instalador oficial (Lunatec ou Orthanc Installer). Selecione a opção **"Install Orthanc as a Windows Service"** para garantir que o servidor inicie automaticamente com o computador.
-*   **No macOS:**
-    Instale usando o Homebrew:
-    ```bash
-    brew install orthanc
-    brew services start orthanc
-    ```
+Tempo estimado: **15–20 min** na primeira vez.
 
 ---
 
-## 3. Configuração do Orthanc (`orthanc.json`)
+## 1. Instalação (uma vez por máquina)
 
-Localize o arquivo de configuração (no Windows fica em `C:\Program Files\Orthanc Server\Configuration\orthanc.json`). Abra-o como administrador em um editor de texto e certifique-se de configurar os seguintes parâmetros vitais:
+Tudo roda na **máquina servidora** da clínica (o computador que fica ligado).
 
-```json
+### 1.1 Orthanc (o PACS)
+- **Windows:** baixe o instalador oficial do Orthanc e marque **"Install as a Windows Service"** (para iniciar sozinho com o PC).
+- **macOS:** `brew install orthanc && brew services start orthanc`
+
+### 1.2 Node.js (roda o Agente)
+- Baixe o Node LTS em nodejs.org (Windows) ou `brew install node` (macOS). Confirme: `node --version`.
+
+### 1.3 Python + pydicom (gera a worklist)
+A geração dos arquivos `.wl` usa um script Python (`scripts/generate_wl.py`).
+- **Windows:** instale o Python 3 marcando **"Add python.exe to PATH"**. Depois: `pip install pydicom`
+- **macOS:** `brew install python && pip3 install pydicom`
+
+> Sem `pydicom`, o envio de worklist falha (as imagens continuam funcionando). O Agente avisa no erro.
+
+---
+
+## 2. Configurar o Orthanc (`orthanc.json`)
+
+Abra o arquivo de configuração:
+- **Windows:** `C:\Program Files\Orthanc Server\Configuration\orthanc.json`
+- **macOS (brew):** `/opt/homebrew/etc/orthanc/orthanc.json` (ou `/usr/local/etc/orthanc/`)
+
+### 2.1 Configuração mínima (caminho rápido, sem senha)
+
+```jsonc
 {
-  "Name" : "PACS LAUDUS Principal",
-  "StorageDirectory" : "C:\\OrthancServer\\db\\OrthancStorage",
-  "IndexDirectory" : "C:\\OrthancServer\\db\\OrthancStorage",
-  "StorageCompression" : true,
-  "DicomServerEnabled" : true,
-  "DicomPort" : 4242,
-  "DicomAet" : "ORTHANC",
-  "HttpPort" : 8042,
-  "HttpServerEnabled" : true,
-  
-  // Habilita a autenticação básica na API HTTP (vital para segurança)
-  "AuthenticationEnabled" : true,
-  "RegisteredUsers" : {
-    "admin" : "sua_senha_secura_aqui"
-  },
+  "Name": "PACS LAUDUS",
+  "HttpPort": 8042,
+  "HttpServerEnabled": true,
+  "DicomServerEnabled": true,
+  "DicomPort": 4242,
+  "DicomAet": "ORTHANC",
 
-  // Cadastro de aparelhos autorizados a enviar imagens (C-STORE) e requisitar worklist (C-FIND)
-  "DicomModalities" : {
-    "US_SALA_01" : [ "MINDRAYMX7", "192.168.1.150", 104 ],
-    "US_SALA_02" : [ "GE_LOGIQ", "192.168.1.151", 4100 ]
-  },
+  // Caminho rápido: SEM autenticação (rede fechada da clínica).
+  "AuthenticationEnabled": false,
+  "RemoteAccessAllowed": true,
 
-  // Ativação do plugin de Worklist embutido
-  "Worklists" : {
-    "Enable" : true,
-    "Database" : "C:\\OrthancServer\\db\\WorklistsDatabase\\"
-  },
+  // Aceita imagens e worklist de qualquer aparelho (prático):
+  "DicomAlwaysAllowEcho": true,
+  "DicomAlwaysAllowStore": true,
+  "DicomAlwaysAllowFind": true,
 
-  "Plugins" : [
-    "C:\\Program Files\\Orthanc Server\\Plugins"
-  ],
-
-  "ConcurrentJobs" : 4,
-  "DicomAlwaysAllowEcho" : true,
-  "DicomAlwaysAllowStore" : true
+  // Plugin de Worklist — pasta onde o Agente grava os .wl:
+  "Worklists": {
+    "Enable": true,
+    "Database": "PASTA_DA_WORKLIST_AQUI"
+  }
 }
 ```
-*Salve o arquivo e reinicie o serviço do Orthanc (no Windows: abra `services.msc`, localize 'Orthanc' e clique em 'Reiniciar').*
+
+Troque `PASTA_DA_WORKLIST_AQUI` por (crie a pasta se não existir):
+- **Windows:** `C:\\OrthancServer\\db\\WorklistsDatabase\\`
+- **macOS:** `/Users/SEU_USUARIO/OrthancServer/db/WorklistsDatabase/`
+
+> Esse é **o mesmo caminho** que você vai colar no campo "Pasta da Worklist" do LAUD.US (seção 6). É o único ponto que precisa bater exatamente.
+
+Salve e **reinicie o Orthanc** (Windows: `services.msc` → Orthanc → Reiniciar / macOS: `brew services restart orthanc`).
+
+### 2.2 (Opcional) Cadastrar os aparelhos por nome
+Só é necessário se você quiser restringir quem envia. No caminho rápido, `DicomAlwaysAllow*` já libera tudo. Se quiser cadastrar:
+```jsonc
+"DicomModalities": {
+  "US_SALA_01": [ "MINDRAYMX7", "192.168.1.150", 104 ]
+}
+```
 
 ---
 
-## 4. O Agente Local (Laudus Local Agent)
+## 3. O Agente LAUD.US
 
-O script `scripts/agent.js` deve rodar ininterruptamente na máquina PACS local para atuar como ponte entre a nuvem e a pasta física do Orthanc.
-
-### 4.1 Inicialização Manual
-Abra o prompt de comando ou terminal no diretório do projeto e execute:
+Na pasta do projeto, rode:
 ```bash
 node scripts/agent.js
 ```
-O console exibirá que o agente está ativo na porta `3000`.
+Deve aparecer: `LAUD.US Local Agent rodando na porta 3000`. **Deixe rodando.**
 
-### 4.2 Rodando como Serviço no Windows (via NSSM)
-Para evitar que o agente feche caso o usuário faça logout da máquina:
-1.  Baixe o **NSSM** (Non-Sucking Service Manager) em [nssm.cc](https://nssm.cc).
-2.  Extraia o arquivo executável e abra o prompt de comando como Administrador no mesmo diretório.
-3.  Execute:
-    ```cmd
-    nssm install LaudusLocalAgent
-    ```
-4.  Na janela visual que se abre:
-    *   **Path:** Selecione o caminho do executável do Node (geralmente `C:\Program Files\nodejs\node.exe`).
-    *   **Startup directory:** Selecione a pasta raiz do projeto `LAUDUS`.
-    *   **Arguments:** `scripts/agent.js`
-5.  Clique em **"Install service"**.
-6.  Abra o gerenciador de serviços do Windows (`services.msc`) e inicie o serviço `LaudusLocalAgent`. Ele agora iniciará sozinho em segundo plano.
+### 3.1 Manter rodando sempre (recomendado)
+- **Windows (NSSM):** `nssm install LaudusLocalAgent` → Path: `node.exe`, Startup dir: pasta do projeto, Arguments: `scripts/agent.js` → Install → inicie em `services.msc`.
+- **macOS (launchd):** crie `~/Library/LaunchAgents/com.laudus.agent.plist` apontando para `node` + o caminho do `agent.js` com `RunAtLoad` e `KeepAlive` = true, e `launchctl load -w` nele.
 
-### 4.3 Rodando como Serviço no macOS (via launchd)
-Crie um arquivo em `/Library/LaunchDaemons/com.laudus.agent.plist`:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.laudus.agent</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/node</string>
-        <string>/Users/usuario/Documents/LAUDUS/scripts/agent.js</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-```
-Carregue o daemon no sistema:
-```bash
-sudo launchctl load -w /Library/LaunchDaemons/com.laudus.agent.plist
-```
+### 3.2 Variáveis opcionais do Agente
+| Variável | O que faz |
+|---|---|
+| `PORT` | Porta do agente (padrão 3000). |
+| `LAUDUS_WORKLIST_DIR` | Força a pasta de gravação da worklist (ignora o que o app manda). |
+| `LAUDUS_ALLOWED_HOSTS` | Restringe o proxy a estes hosts (ex: `localhost,127.0.0.1`). |
+| `LAUDUS_AGENT_SECRET` | Exige um segredo (ver seção 9 — opcional). |
+
+Sem nenhuma delas, o agente roda no modo mais prático (aberto, pasta padrão `~/OrthancServer/db/WorklistsDatabase/`).
 
 ---
 
-## 5. Método 2 em Detalhes: Configurando HTTPS / SSL no Tailscale
+## 4. Método A — Rede Local (mesma Wi-Fi/cabo)
 
-Ao rodar a aplicação em servidores HTTPS (como Vercel), requisições HTTP locais (`http://100.x.y.z:8042`) serão sumariamente bloqueadas pelo navegador. O Tailscale oferece uma infraestrutura de SSL nativa de forma automatizada.
-
-### 5.1 Configurando o Certificado Let's Encrypt do Tailscale
-1.  Abra o painel do Tailscale e navegue em **Settings > DNS**.
-2.  Habilite o **MagicDNS** caso não esteja ativo.
-3.  Role até **HTTPS Certificates** e clique em **Enable HTTPS**.
-4.  No servidor local, gere o certificado executando o comando no terminal:
-    ```bash
-    tailscale cert nome-do-seu-servidor.tail861dda.ts.net
-    ```
-    Isso gerará os arquivos `nome-do-seu-servidor.tail861dda.ts.net.crt` e `nome-do-seu-servidor.tail861dda.ts.net.key` na pasta de execução.
-
-### 5.2 Configurando SSL Nativo diretamente no Orthanc
-Se desejar criptografar o próprio Orthanc diretamente para que a Vercel consulte a porta 8443 de forma nativa e sem intermédio de agentes, adicione as seguintes linhas no seu arquivo `orthanc.json`:
-```json
-{
-  ...
-  "HttpPort" : 8443,
-  "SslEnabled" : true,
-  "SslCertificate" : "C:\\OrthancServer\\config\\certificado_combinado.pem"
-}
-```
-*Dica: Para gerar o arquivo `.pem` combinado exigido pelo Orthanc, abra o prompt de comando do Windows e concatene a chave privada e o certificado em um único arquivo:*
-```cmd
-copy /b nome-do-seu-servidor.tail861dda.ts.net.crt + nome-do-seu-servidor.tail861dda.ts.net.key certificado_combinado.pem
-```
+Se o navegador do médico e o aparelho estão na **mesma rede** do servidor: **não precisa de mais nada.** O LAUD.US acessado por `http://localhost` (ou pelo IP local da máquina) conversa direto com o Orthanc/Agente. Pule para a seção 6 usando:
+- URL do Orthanc: `http://localhost:8042` (ou `http://IP_DA_MAQUINA:8042` se acessar de outro PC da rede).
 
 ---
 
-## 6. Configurando o Aparelho de Ultrassom
+## 5. Método B — Nuvem / Vercel (via Tailscale Funnel)
 
-Acesse o menu de configurações do equipamento de imagem (ex: Mindray, GE, Samsung) e realize as parametrizações a seguir:
+Quando você acessa o LAUD.US pela internet (`laud.us`/Vercel, HTTPS), o navegador **bloqueia** chamadas HTTP locais. A solução mais simples: dar um endereço **HTTPS público** ao Agente com **Tailscale Funnel** — sem abrir portas no roteador e sem gerar certificados à mão.
 
-### 6.1 Configurando o Worklist (Lista de Trabalho)
-1.  Navegue até **DICOM Settings > Worklist > Add**.
-2.  Preencha as informações:
-    *   **Name / Alias:** `Laudus Worklist`
-    *   **IP Address:** Digite o IP da máquina servidora (use o IP local `192.168.1.100` se o ultrassom estiver na mesma Wi-Fi local que a máquina do PACS).
-    *   **Port:** `4242`
-    *   **AE Title:** `ORTHANC`
-    *   **Modality AE Title (Local):** `MINDRAYMX7` (deve ser o mesmo nome cadastrado no `DicomModalities` no `orthanc.json`).
-3.  Clique no botão **Verify / Test**. O sistema deve acusar "Sucesso".
+### 5.1 Passos
+1. Instale o **Tailscale** na máquina servidora e faça login (mesma conta).
+2. No painel do Tailscale, habilite **MagicDNS** e **HTTPS Certificates** (Settings → DNS). *(uma vez por tailnet)*
+3. Exponha **o Agente** (porta 3000) — **não** o Orthanc, **não** o Vite:
+   ```bash
+   tailscale funnel --bg 3000
+   ```
+4. O Tailscale te dá uma URL pública, tipo:
+   `https://servidor-mac.tailXXXX.ts.net`
 
-### 6.2 Configurando o Envio de Imagens (Store)
-1.  Navegue até **DICOM Settings > Storage > Add**.
-2.  Preencha as informações idênticas:
-    *   **Name / Alias:** `Laudus Storage`
-    *   **IP Address:** IP do servidor local (`192.168.1.100`).
-    *   **Port:** `4242`
-    *   **AE Title:** `ORTHANC`
-3.  Clique no botão **Verify / Test**.
+Pronto. Essa URL é o que você cola em "URL do Agente Local" no LAUD.US. O Agente cuida do resto (proxy das imagens do Orthanc em `localhost` + gravação da worklist).
+
+> **Por que Funnel do Agente e não do Orthanc?** Assim você expõe **um só** componente (o Agente), que já fala com o Orthanc localmente. Dispensa `tailscale cert`, combinar arquivos `.pem` e habilitar SSL no Orthanc — toda a burocracia da versão antiga deste manual.
 
 ---
 
-## 7. Diagnóstico e Resolução de Problemas (Troubleshooting)
+## 6. Configurar no LAUD.US (Configurações → PACS / DICOM)
 
-### 7.1 Erro: `C-FIND SCP failed` ou `No worklists found` no Ultrassom
-*   **Verificação 1:** Abra a pasta configurada em `Worklists.Database` no Orthanc (ex: `C:\OrthancServer\db\WorklistsDatabase`) e verifique se existem arquivos com a extensão `.wl`.
-*   **Verificação 2:** Certifique-se de que o AE Title local configurado no ultrassom coincide com a entrada cadastrada no `DicomModalities` do arquivo `orthanc.json`.
-*   **Verificação 3:** O firewall do Windows no computador servidor pode estar bloqueando a porta **4242**. Desative-o temporariamente para testar ou adicione uma regra de entrada.
+Preencha e clique em **"Testar Conexão PACS"** (o botão valida tudo na hora).
 
-### 7.2 Erro de Mixed Content no console do Navegador
-*   **Sintoma:** Ao tentar abrir a aba PACS ou carregar thumbnails de imagens no editor, nada carrega e o painel de inspeção do navegador (`F12`) acusa erro de carregamento de conteúdo misto (`Mixed Content`).
-*   **Causa:** O LAUD.US em HTTPS está tentando ler uma URL HTTP não segura (`http://100.93.111.95:8042`).
-*   **Solução:** Habilite o HTTPS no Tailscale e aponte os links do seu painel do Laud.us para usar o endereço público seguro (`https://...ts.net:8443`).
+### Configuração recomendada — modelo Agente + Funnel (nuvem)
+| Campo | Valor |
+|---|---|
+| **URL do Agente Local** | `https://servidor-mac.tailXXXX.ts.net` (a URL do Funnel) |
+| **URL do Orthanc / Viewer** | `http://localhost:8042` (o Agente resolve localmente) |
+| **URL Pública Tailscale** | *(deixe vazio)* — assim as imagens passam pelo Agente |
+| **Usuário / Senha do Orthanc** | *(vazio, se sem senha)* |
+| **Pasta da Worklist** | o **mesmo** caminho do `Worklists.Database` do Orthanc (seção 2.1) |
+| **AE Title do Orthanc** | `ORTHANC` |
 
-### 7.3 Erro de Permissão na criação da Worklist
-*   **Sintoma:** O Laudus Local Agent acusa que a pasta de destino não pode ser acessada.
-*   **Solução:** Garanta que o usuário que está rodando o `node scripts/agent.js` ou o serviço de plano de fundo do Windows tenha permissões totais de leitura e escrita na pasta de destino das Worklists configurada.
+### Configuração — modelo Rede Local (on-premise)
+| Campo | Valor |
+|---|---|
+| **URL do Agente Local** | *(vazio)* — usa o agente same-origin/local |
+| **URL do Orthanc / Viewer** | `http://localhost:8042` (ou `http://IP_LOCAL:8042`) |
+| **Pasta da Worklist** | mesma pasta do `Worklists.Database` |
+
+> Ao salvar, o LAUD.US valida e mostra a versão do Orthanc se a conexão funcionar. Se der erro, veja a seção 8.
+
+---
+
+## 7. Configurar o aparelho de ultrassom
+
+No menu DICOM do aparelho (Mindray, GE, Samsung…):
+
+### 7.1 Worklist (lista de trabalho)
+- **IP:** IP local da máquina do Orthanc (ex: `192.168.1.100`)
+- **Porta:** `4242`
+- **AE Title (remoto):** `ORTHANC`
+- **AE Title (local do aparelho):** o nome do aparelho (ex: `MINDRAYMX7`)
+- Clique **Verify/Test** → deve dar sucesso.
+
+### 7.2 Envio de imagens (Storage)
+- Mesmos dados (IP, `4242`, `ORTHANC`). Verify/Test.
+
+> O aparelho fala com o **Orthanc** direto na rede local (porta 4242) — isso é sempre local, independentemente de você usar nuvem ou não.
+
+---
+
+## 8. Testar e diagnosticar
+
+1. **No app:** botão **"Testar Conexão PACS"** → mostra a versão do Orthanc = conexão OK.
+2. **Worklist:** crie um agendamento/exame → confira se surgiu um `agendamento_XXX.wl` na pasta da worklist.
+3. **No aparelho:** faça uma busca de worklist → o paciente deve aparecer.
+4. **Imagens:** finalize um exame no aparelho → as fotos aparecem no editor do LAUD.US.
+
+---
+
+## 9. Troubleshooting (problemas comuns)
+
+| Sintoma | Causa provável | Solução |
+|---|---|---|
+| "Testar" falha na nuvem | Agente não exposto / Funnel caiu | `tailscale funnel status`; rode `tailscale funnel --bg 3000` de novo |
+| Imagens não carregam (nuvem) | "URL Pública Tailscale" preenchida indevidamente | Deixe-a **vazia**; URL do Orthanc = `http://localhost:8042` |
+| Aparelho: "No worklists found" | Pasta da worklist diverge OU sem `.wl` | Confira se `Worklists.Database` (Orthanc) == "Pasta da Worklist" (app); veja se o `.wl` foi criado |
+| Worklist falha com erro de Python | `pydicom` não instalado | `pip install pydicom` (ou `pip3`) |
+| Aparelho não conecta na 4242 | Firewall | Libere a porta **4242** (entrada) no firewall da máquina |
+| Mixed Content no console | App HTTPS tentando HTTP local | Use o método Tailscale Funnel (seção 5) |
+| Agente escreve `.wl` no lugar errado | Pasta padrão diferente do Orthanc | Preencha "Pasta da Worklist" no app **ou** defina `LAUDUS_WORKLIST_DIR` no agente |
+
+---
+
+## 10. (Opcional) Segurança — fechar o Agente na internet
+
+O Funnel deixa o Agente **público**. No caminho rápido ele fica aberto (qualquer um que descubra a URL pode usá-lo como proxy). Se quiser fechar — **recomendado se você funelar em produção** — ative o segredo do Agente (por usuário):
+
+1. Inicie o Agente com um segredo:
+   ```bash
+   # macOS/Linux
+   export LAUDUS_AGENT_SECRET="$(openssl rand -hex 32)"
+   node scripts/agent.js     # deve logar "🔒 Autenticação ATIVA"
+   ```
+2. No LAUD.US → Configurações → PACS/DICOM → campo **"Segredo do Agente"** → cole **o mesmo valor** → salve.
+3. (Opcional, reforço) no Agente:
+   - `LAUDUS_ALLOWED_HOSTS="localhost,127.0.0.1"` → o proxy só alcança o seu Orthanc.
+   - `LAUDUS_WORKLIST_DIR="/caminho/WorklistsDatabase/"` → trava a pasta de gravação.
+
+Sem o segredo correto, o Agente responde **401** a qualquer requisição. Se você **não** definir segredo, tudo continua funcionando aberto (opt-in).
+
+> Você também pode ligar a senha do Orthanc (`"AuthenticationEnabled": true` + `RegisteredUsers`) e preencher usuário/senha nos campos DICOM do app.
+
+---
+
+## Anexo — Portas e componentes
+| Componente | Porta | Exposto? |
+|---|---|---|
+| Orthanc (API HTTP) | 8042 | Só localmente (o Agente acessa) |
+| Orthanc (DICOM) | 4242 | Só na rede local (aparelho de US) |
+| Agente LAUD.US | 3000 | Local (Método A) ou via Funnel (Método B) |
+
+**Regra de ouro:** exponha **só o Agente (3000)** via Funnel. Nunca funele o Vite (5173) nem o Orthanc diretamente.

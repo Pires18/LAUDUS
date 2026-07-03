@@ -265,9 +265,9 @@ const server = http.createServer((req, res) => {
         let dir = WORKLIST_DIR || outputDir;
         if (!dir) {
           const isWindows = process.platform === 'win32';
-          dir = isWindows 
+          dir = isWindows
             ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-            : '/Volumes/MATHEUS SSD/OrthancServer/db/WorklistsDatabase/';
+            : path.join(require('os').homedir(), 'OrthancServer', 'db', 'WorklistsDatabase');
         }
         
         const filePath = path.join(dir, `agendamento_${examId}.wl`);
