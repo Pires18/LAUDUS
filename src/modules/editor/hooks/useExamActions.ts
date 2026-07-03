@@ -297,7 +297,9 @@ export function useExamActions({
 
         // Loop de feedback (Fase 3/4): captura do delta geração→final + qualidade.
         // Best-effort, totalmente assíncrono — nunca bloqueia a finalização.
-        if (finalReport && template && initialGeneratedRef.current) {
+        // A NOTA de qualidade é registrada em TODA finalização (não depende de
+        // ter gerado nesta sessão) para o dashboard de aprendizado se popular.
+        if (finalReport && template) {
           captureFinalizationFeedback(finalReport);
         }
       }
@@ -306,17 +308,11 @@ export function useExamActions({
     }
   }, [examId, settings, showToast, template, anamnesis, clinicalIndication]);
 
-  /** Persiste sinal de correção + registro de qualidade ao finalizar. */
+  /** Persiste nota de qualidade (sempre) + sinal de correção (se houve geração). */
   const captureFinalizationFeedback = useCallback((finalReport: string) => {
     if (!template) return;
     try {
-      const initial = initialGeneratedRef.current || '';
       const motor = lastMotorRef.current;
-      const signal = classifyCorrection(initial, finalReport, {
-        area: template.area,
-        examType: template.name,
-        motor,
-      });
       const audit = auditReportQuality(finalReport, template.area);
       const verification = verifyReport(finalReport, {
         area: template.area,
@@ -324,14 +320,27 @@ export function useExamActions({
         clinicalIndication,
       });
 
-      void recordCorrectionSignal(signal);
+      // Sinal de correção só quando temos a geração inicial (para o diff).
+      const initial = initialGeneratedRef.current;
+      let critical = false;
+      if (initial) {
+        const signal = classifyCorrection(initial, finalReport, {
+          area: template.area,
+          examType: template.name,
+          motor,
+        });
+        critical = signal.critical;
+        void recordCorrectionSignal(signal);
+      }
+
+      // NOTA de qualidade: registrada em toda finalização.
       void recordQualityRecord({
         area: template.area,
         examType: template.name,
         motor,
         auditScore: audit.score,
         refinementCount: refinementCountRef.current,
-        safetyPassed: verification.passed && !signal.critical,
+        safetyPassed: verification.passed && !critical,
         latencyMs: 0,
         timestamp: Date.now(),
       });
