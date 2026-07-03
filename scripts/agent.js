@@ -172,59 +172,85 @@ const server = http.createServer((req, res) => {
         const commandsToTry = ['python', 'python3', 'py'];
         let commandIndex = 0;
         
+        // Envia a resposta HTTP uma ÚNICA vez (evita ERR_HTTP_HEADERS_SENT
+        // quando os eventos 'error' e 'close' de um mesmo processo disparam juntos).
+        let responded = false;
+        function respond(status, bodyStr) {
+          if (responded) return;
+          responded = true;
+          res.statusCode = status;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(bodyStr);
+        }
+
+        // Quando o comando atual não existe (ENOENT), tenta o próximo da lista;
+        // se acabou a lista, reporta a falha de inicialização.
+        function tryNextOrFail(err) {
+          if (commandIndex < commandsToTry.length - 1) {
+            commandIndex++;
+            runPython(commandsToTry[commandIndex]);
+          } else {
+            respond(500, JSON.stringify({
+              success: false,
+              error: `Erro ao iniciar script do Python (pydicom): ${err.message}`
+            }));
+          }
+        }
+
         function runPython(cmd) {
           console.log(`[Agent] Tentando gerar worklist com comando: ${cmd}`);
-          const pyProcess = spawn(cmd, [pythonScriptPath]);
+          // 'settled' garante que, para um mesmo processo, apenas o primeiro
+          // evento ('error' OU 'close') seja tratado. Um spawn que falha com
+          // ENOENT pode emitir os dois — sem esta guarda, o handler roda 2x.
+          let settled = false;
+          let pyProcess;
+          try {
+            pyProcess = spawn(cmd, [pythonScriptPath]);
+          } catch (err) {
+            tryNextOrFail(err);
+            return;
+          }
           let stdout = '';
           let stderr = '';
-          
+
           pyProcess.stdout.on('data', data => { stdout += data; });
           pyProcess.stderr.on('data', data => { stderr += data; });
-          
+
+          // 'error' = comando inexistente / falha ao iniciar → tenta o próximo.
+          pyProcess.on('error', err => {
+            if (settled) return;
+            settled = true;
+            console.error(`[Agent] Erro ao spawnar processo (${cmd}): ${err.message}`);
+            tryNextOrFail(err);
+          });
+
+          // 'close' = o comando existe e executou. code 0 → sucesso; caso
+          // contrário o SCRIPT falhou (não adianta trocar de comando) → reporta.
           pyProcess.on('close', code => {
+            if (settled) return;
+            settled = true;
             if (code === 0) {
               console.log('[Agent] Worklist gerado com sucesso via Python');
-              res.statusCode = 200;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(stdout);
+              respond(200, stdout);
             } else {
-              console.error(`[Agent] Python exit code ${code}. Stderr: ${stderr}`);
-              
-              // Se falhou por comando não encontrado, tenta o próximo
-              if ((stderr.includes('not found') || stderr.includes('não reconhecido') || stderr.includes('ENOENT') || stderr === '') && commandIndex < commandsToTry.length - 1) {
-                commandIndex++;
-                runPython(commandsToTry[commandIndex]);
-              } else {
-                res.statusCode = 500;
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ 
-                  success: false, 
-                  error: `Falha na execução do Python: ${stderr || 'Erro desconhecido.'}` 
-                }));
-              }
-            }
-          });
-          
-          pyProcess.on('error', err => {
-            console.error(`[Agent] Erro ao spawnar processo: ${err.message}`);
-            if (commandIndex < commandsToTry.length - 1) {
-              commandIndex++;
-              runPython(commandsToTry[commandIndex]);
-            } else {
-              res.statusCode = 500;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ 
-                success: false, 
-                error: `Erro ao iniciar script do Python (pydicom): ${err.message}` 
+              console.error(`[Agent] Python (${cmd}) exit code ${code}. Stderr: ${stderr}`);
+              respond(500, JSON.stringify({
+                success: false,
+                error: `Falha na execução do Python: ${stderr || 'Erro desconhecido.'}`
               }));
             }
           });
-          
-          // Envia o JSON do payload para o stdin do script python
-          pyProcess.stdin.write(JSON.stringify(payload));
-          pyProcess.stdin.end();
+
+          // Envia o JSON do payload para o stdin do script python.
+          // Protegido: se o processo não iniciou (ENOENT), o handler 'error' trata.
+          try {
+            pyProcess.stdin.write(JSON.stringify(payload));
+            pyProcess.stdin.end();
+          } catch (err) {
+            /* noop — tratado por 'error' */
+          }
         }
-        
+
         runPython(commandsToTry[commandIndex]);
         
       } catch (err) {
