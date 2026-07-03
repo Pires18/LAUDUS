@@ -13,33 +13,24 @@ import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, ge
 import { getCachedIdToken } from '../../lib/authToken';
 
 const JSON_TEMPLATE = `{
-  "Name" : "PACS LAUDUS Principal",
-  "StorageDirectory" : "C:\\\\OrthancServer\\\\db\\\\OrthancStorage",
-  "IndexDirectory" : "C:\\\\OrthancServer\\\\db\\\\OrthancStorage",
-  "StorageCompression" : true,
+  "Name" : "PACS LAUDUS",
+  "HttpPort" : 8042,
+  "HttpServerEnabled" : true,
   "DicomServerEnabled" : true,
   "DicomPort" : 4242,
   "DicomAet" : "ORTHANC",
-  "HttpPort" : 8042,
-  "HttpServerEnabled" : true,
-  "AuthenticationEnabled" : true,
-  "RegisteredUsers" : {
-    "admin" : "sua_senha_segura_aqui"
-  },
-  "DicomModalities" : {
-    "US_SALA_01" : [ "MINDRAYMX7", "192.168.1.150", 104 ],
-    "US_SALA_02" : [ "GE_LOGIQ", "192.168.1.151", 4100 ]
-  },
+
+  "AuthenticationEnabled" : false,
+  "RemoteAccessAllowed" : true,
+
+  "DicomAlwaysAllowEcho" : true,
+  "DicomAlwaysAllowStore" : true,
+  "DicomAlwaysAllowFind" : true,
+
   "Worklists" : {
     "Enable" : true,
     "Database" : "C:\\\\OrthancServer\\\\db\\\\WorklistsDatabase\\\\"
-  },
-  "Plugins" : [
-    "C:\\\\Program Files\\\\Orthanc Server\\\\Plugins"
-  ],
-  "ConcurrentJobs" : 4,
-  "DicomAlwaysAllowEcho" : true,
-  "DicomAlwaysAllowStore" : true
+  }
 }`;
 
 type ControlTab = 'config' | 'guides';
@@ -750,7 +741,7 @@ export function DicomControlCenter() {
                     { id: 'prereq', label: '2. Preparação do Servidor', icon: Cpu },
                     { id: 'orthanc_json', label: '3. Configuração do Orthanc', icon: FileText },
                     { id: 'agent', label: '4. Agente Local (Laudus Agent)', icon: Server },
-                    { id: 'tailscale', label: '5. Tailscale VPN & SSL', icon: Cloud },
+                    { id: 'tailscale', label: '5. Tailscale Funnel (Nuvem)', icon: Cloud },
                     { id: 'ultrasound', label: '6. Configuração no Aparelho', icon: Database },
                     { id: 'troubleshoot', label: '7. Resolução de Problemas', icon: HelpCircle }
                   ].map(sec => {
@@ -1018,7 +1009,7 @@ export function DicomControlCenter() {
                       <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
                         <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
                         <div className="text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Em palavras simples:</strong> o Orthanc lê todas as suas configurações de um único arquivo de texto, o <code>orthanc.json</code> — é o "painel de controle" dele. Ali você define a <strong>senha</strong>, as <strong>portas</strong> e <strong>onde ficam</strong> as imagens e a worklist. Copie o modelo abaixo, ajuste a senha e reinicie o Orthanc.
+                          <strong className="text-blue-800">Em palavras simples:</strong> o Orthanc lê todas as suas configurações de um único arquivo de texto, o <code>orthanc.json</code> — é o "painel de controle" dele. O modelo abaixo é o <strong>prático (sem senha)</strong>: define as <strong>portas</strong> e a <strong>pasta da worklist</strong>. Copie, ajuste o caminho da worklist e reinicie o Orthanc. <em>(Para exigir senha, troque <code>"AuthenticationEnabled": true</code> e adicione <code>"RegisteredUsers"</code> — veja a seção Segurança.)</em>
                         </div>
                       </div>
 
@@ -1163,14 +1154,22 @@ export function DicomControlCenter() {
                           </div>
                         </div>
                       </div>
+
+                      <div className="p-3.5 rounded-xl bg-ink-50 border border-ink-150 text-[11px] text-ink-700 leading-relaxed space-y-1.5">
+                        <strong className="block text-ink-900">Variáveis opcionais do Agente</strong>
+                        <div><code>LAUDUS_AGENT_SECRET</code> — exige um segredo (feche o Agente na internet; cole o mesmo valor no campo "Segredo do Agente").</div>
+                        <div><code>LAUDUS_WORKLIST_DIR</code> — força a pasta onde grava a worklist.</div>
+                        <div><code>LAUDUS_ALLOWED_HOSTS</code> — restringe o proxy ao seu Orthanc (ex: <code>localhost,127.0.0.1</code>).</div>
+                        <div className="text-ink-400">Sem elas, o Agente roda aberto. Pasta padrão: <code>~/OrthancServer/db/WorklistsDatabase/</code> (macOS) ou <code>C:\OrthancServer\db\WorklistsDatabase\</code> (Windows).</div>
+                      </div>
                     </div>
                   )}
 
                   {selectedSection === 'tailscale' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🛡️ Método 2: Tailscale VPN (MagicDNS & SSL)</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Bypass completo de Mixed Content no navegador e HTTPS obrigatório.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🛡️ Método 2: Tailscale Funnel (Nuvem / Vercel)</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">HTTPS público para o Agente em 1 comando — sem certificados manuais.</p>
                       </div>
 
                       <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
@@ -1181,67 +1180,46 @@ export function DicomControlCenter() {
                       </div>
 
                       <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-violet-50/30 border border-violet-100 text-violet-850 text-xs leading-relaxed space-y-1">
-                          <strong className="block font-bold">Por que o Tailscale VPN é obrigatório na nuvem?</strong>
-                          As requisições HTTPS feitas pelo aplicativo na Vercel para servidores HTTP puros na rede local (ex: port 8042) são abortadas pelo navegador. O Tailscale VPN cria um túnel e emite chaves Let's Encrypt reais para suas máquinas.
+                        <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-100 text-emerald-900 text-xs leading-relaxed space-y-1">
+                          <strong className="block font-bold">Jeito simples: exponha só o Agente (Funnel)</strong>
+                          Em vez de gerar certificados e habilitar SSL no Orthanc, dê um endereço HTTPS público ao <strong>Agente</strong> com o Tailscale Funnel. O Agente já conversa com o Orthanc em <code>localhost</code> — você expõe <strong>um só</strong> componente, sem mexer no roteador e sem arquivos <code>.pem</code>.
                         </div>
 
                         <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 1: Habilitar DNS HTTPS</h4>
+                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 1: Habilitar HTTPS na tailnet (uma vez)</h4>
                           <p className="text-xs text-ink-500 leading-relaxed">
-                            No console web do Tailscale, acesse <strong>DNS</strong> e clique em <strong>Enable HTTPS Certificates</strong>. Em seguida, no console do servidor, execute:
+                            No console web do Tailscale, em <strong>Settings → DNS</strong>, habilite <strong>MagicDNS</strong> e <strong>HTTPS Certificates</strong>.
+                          </p>
+                        </div>
+
+                        <div className="space-y-3 pt-2">
+                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 2: Expor o Agente (porta 3000) via Funnel</h4>
+                          <p className="text-xs text-ink-500 leading-relaxed">
+                            No servidor, com o Agente rodando, execute (⚠️ o Agente, <strong>não</strong> o Orthanc nem o Vite):
                           </p>
                           <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                            <span>tailscale cert nome-do-seu-servidor.tail861dda.ts.net</span>
+                            <span>tailscale funnel --bg 3000</span>
                             <button
-                              onClick={() => handleCopy('tailscale cert nome-do-seu-servidor.tail861dda.ts.net', 'ts_cert')}
+                              onClick={() => handleCopy('tailscale funnel --bg 3000', 'ts_funnel')}
                               className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
                               title="Copiar Comando"
                             >
-                              {copiedField === 'ts_cert' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                              {copiedField === 'ts_funnel' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                             </button>
                           </div>
+                          <p className="text-xs text-ink-500 leading-relaxed">
+                            O Tailscale devolve uma URL pública, tipo <code>https://servidor-mac.tailXXXX.ts.net</code>.
+                          </p>
                         </div>
 
                         <div className="space-y-3 pt-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 2: Concatenar Chaves combinadas para o Orthanc (.pem)</h4>
+                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 3: Preencher no LAUD.US</h4>
                           <p className="text-xs text-ink-500 leading-relaxed">
-                            O Orthanc necessita que o certificado Let's Encrypt e a chave privada estejam no mesmo arquivo PEM.
+                            Na aba de configuração, use: <strong>URL do Agente Local</strong> = a URL do Funnel; <strong>URL do Orthanc</strong> = <code>http://localhost:8042</code>; deixe a <strong>URL Pública Tailscale vazia</strong> (assim as imagens passam pelo Agente). Clique em <strong>Testar Conexão</strong>.
                           </p>
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-ink-500 block">No Windows:</span>
-                            <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                              <span>copy /b servidor.crt + servidor.key certificado_combinado.pem</span>
-                              <button
-                                onClick={() => handleCopy('copy /b servidor.crt + servidor.key certificado_combinado.pem', 'win_cat')}
-                                className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                                title="Copiar Comando"
-                              >
-                                {copiedField === 'win_cat' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                              </button>
-                            </div>
-                            <span className="text-[10px] text-ink-500 block">No macOS / Linux:</span>
-                            <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                              <span>cat servidor.crt servidor.key &gt; certificado_combinado.pem</span>
-                              <button
-                                onClick={() => handleCopy('cat servidor.crt servidor.key > certificado_combinado.pem', 'mac_cat')}
-                                className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                                title="Copiar Comando"
-                              >
-                                {copiedField === 'mac_cat' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                              </button>
-                            </div>
+                          <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-100 text-[11px] text-amber-800 leading-relaxed">
+                            O Funnel deixa o Agente <strong>público</strong>. Para fechá-lo, defina um <strong>Segredo do Agente</strong> (campo na configuração) e inicie o Agente com <code>LAUDUS_AGENT_SECRET=… node agent.js</code>. Opcional, mas recomendado na nuvem.
                           </div>
-                        </div>
-
-                        <div className="space-y-3 pt-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 3: Configurar SSL Nativo no orthanc.json</h4>
-                          <p className="text-xs text-ink-500 leading-relaxed">
-                            No seu arquivo <code>orthanc.json</code>, aponte a porta para <code>8443</code> e informe o caminho do PEM gerado:
-                          </p>
-                          <pre className="p-4 bg-zinc-950 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto leading-relaxed">
-                            {`"HttpPort": 8443,\n"SslEnabled": true,\n"SslCertificate": "C:\\\\OrthancServer\\\\config\\\\certificado_combinado.pem"`}
-                          </pre>
                         </div>
                       </div>
                     </div>
