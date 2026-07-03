@@ -3,6 +3,7 @@ import { CalculatorProps } from '../registry';
 import { Calendar, Clock } from 'lucide-react';
 import { CalculatorInput, ResultCard } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
+import { gaFromLMP, gaFromPriorUsg } from '../formulas';
 
 export function GestationalAgeCalculator({ value, onChange, examDateMs }: CalculatorProps) {
   const [method, setMethod] = useState<'dum' | 'usg'>(value?.method || 'dum');
@@ -33,38 +34,21 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
     if (isNaN(today.getTime())) return;
 
     if (method === 'dum' && dumDate) {
-      const d = new Date(dumDate + 'T00:00:00');
-      if (!isNaN(d.getTime())) {
-        const diffMs = today.getTime() - d.getTime();
-        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-        
-        if (diffDays >= 0) {
-          const weeks = Math.floor(diffDays / 7);
-          const days = diffDays % 7;
-          currentGa = `${weeks}s ${days}d`;
-          
-          const eddDate = new Date(d);
-          eddDate.setDate(eddDate.getDate() + 280);
-          eddStr = formatDate(eddDate);
-        }
+      const r = gaFromLMP(new Date(dumDate + 'T00:00:00'), today);
+      if (r) {
+        currentGa = r.label;
+        eddStr = formatDate(r.edd);
       }
     } else if (method === 'usg' && prevUsgDate && prevUsgWeeks !== '') {
-      const d = new Date(prevUsgDate + 'T00:00:00');
-      if (!isNaN(d.getTime())) {
-        const initialDays = (Number(prevUsgWeeks) * 7) + Number(prevUsgDays || 0);
-        const diffMs = today.getTime() - d.getTime();
-        const daysSinceUsg = Math.round(diffMs / (1000 * 60 * 60 * 24));
-        const totalDays = initialDays + daysSinceUsg;
-        
-        if (totalDays >= 0) {
-          const weeks = Math.floor(totalDays / 7);
-          const days = totalDays % 7;
-          currentGa = `${weeks}s ${days}d`;
-          
-          const eddDate = new Date(d);
-          eddDate.setDate(eddDate.getDate() - initialDays + 280);
-          eddStr = formatDate(eddDate);
-        }
+      const r = gaFromPriorUsg(
+        new Date(prevUsgDate + 'T00:00:00'),
+        Number(prevUsgWeeks),
+        Number(prevUsgDays || 0),
+        today
+      );
+      if (r) {
+        currentGa = r.label;
+        eddStr = formatDate(r.edd);
       }
     }
 

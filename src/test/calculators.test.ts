@@ -6,6 +6,8 @@ import {
   gaFromMsd,
   balikPleuralVolume,
   crlToGestationalAge,
+  gaFromLMP,
+  gaFromPriorUsg,
   amnioticMBV,
   amnioticILA,
   imtClassification,
@@ -72,6 +74,32 @@ describe('CRL → idade gestacional (Hadlock 1992)', () => {
   });
   it('null para CCN não positivo', () => {
     expect(crlToGestationalAge(0)).toBeNull();
+  });
+});
+
+describe('idade gestacional por data', () => {
+  const DAY = 86400000;
+
+  it('DUM: IG = ref − DUM; DDP = DUM + 280 dias', () => {
+    const lmp = new Date('2026-01-01T00:00:00');
+    const ref = new Date(lmp.getTime() + 70 * DAY); // 10 semanas
+    const r = gaFromLMP(lmp, ref)!;
+    expect(r.label).toBe('10s 0d');
+    expect(Math.round((r.edd.getTime() - lmp.getTime()) / DAY)).toBe(280);
+  });
+
+  it('DUM no futuro → null', () => {
+    const lmp = new Date('2026-06-01T00:00:00');
+    const ref = new Date('2026-01-01T00:00:00');
+    expect(gaFromLMP(lmp, ref)).toBeNull();
+  });
+
+  it('USG anterior: soma dias decorridos à IG conhecida', () => {
+    const usg = new Date('2026-01-01T00:00:00');
+    const ref = new Date(usg.getTime() + 7 * DAY);
+    // 8s0d no USG + 7 dias = 9s0d
+    const r = gaFromPriorUsg(usg, 8, 0, ref)!;
+    expect(r.label).toBe('9s 0d');
   });
 });
 

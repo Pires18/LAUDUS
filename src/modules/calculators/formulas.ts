@@ -75,6 +75,47 @@ export function crlToGestationalAge(
   return { totalDays, weeks, days, label: `${weeks}s ${days}d` };
 }
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+export interface GaResult {
+  totalDays: number;
+  weeks: number;
+  days: number;
+  label: string;
+  edd: Date; // Data provável do parto
+}
+
+function buildGa(totalDays: number, edd: Date): GaResult {
+  const weeks = Math.floor(totalDays / 7);
+  const days = totalDays % 7;
+  return { totalDays, weeks, days, label: `${weeks}s ${days}d`, edd };
+}
+
+/** IG pela DUM (última menstruação): IG = ref − DUM; DDP = DUM + 280 dias. */
+export function gaFromLMP(lmp: Date, ref: Date): GaResult | null {
+  if (isNaN(lmp.getTime()) || isNaN(ref.getTime())) return null;
+  const diffDays = Math.round((ref.getTime() - lmp.getTime()) / MS_PER_DAY);
+  if (diffDays < 0) return null;
+  const edd = new Date(lmp);
+  edd.setDate(edd.getDate() + 280);
+  return buildGa(diffDays, edd);
+}
+
+/**
+ * IG por USG anterior: parte da IG conhecida naquele exame e soma os dias
+ * decorridos. DDP = data do USG − diasIniciais + 280.
+ */
+export function gaFromPriorUsg(usgDate: Date, usgWeeks: number, usgDays: number, ref: Date): GaResult | null {
+  if (isNaN(usgDate.getTime()) || isNaN(ref.getTime())) return null;
+  const initialDays = usgWeeks * 7 + (usgDays || 0);
+  const daysSince = Math.round((ref.getTime() - usgDate.getTime()) / MS_PER_DAY);
+  const totalDays = initialDays + daysSince;
+  if (totalDays < 0) return null;
+  const edd = new Date(usgDate);
+  edd.setDate(edd.getDate() - initialDays + 280);
+  return buildGa(totalDays, edd);
+}
+
 /** Volume de derrame pleural pela fórmula de Balik: V(ml) = 20 × espessura(mm). */
 export function balikPleuralVolume(depthMm: number): number | null {
   return depthMm > 0 ? 20 * depthMm : null;
