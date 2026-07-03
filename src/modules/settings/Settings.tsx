@@ -3,7 +3,8 @@ import { useApp } from '../../store/app';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../hooks/useAuth';
 import { useCollection } from '../../hooks/useFirestore';
-import { Clinic } from '../../types';
+import { Clinic, Patient } from '../../types';
+import { ReportPreview } from '../export/ReportDocument';
 import {
   Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
@@ -21,6 +22,27 @@ import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
 type SettingsTab = 'perfil' | 'laudia' | 'pdf' | 'audit' | 'assinatura';
+
+// ── Dados de amostra da prévia do Centro de PDF (WYSIWYG do laudo real) ──
+const PDF_PREVIEW_DATE = Date.UTC(2025, 2, 14);
+const PDF_PREVIEW_PATIENT: Patient = {
+  id: 'preview',
+  name: 'Maria da Silva Oliveira',
+  gender: 'F',
+  birthDate: '1985-06-20',
+  insurance: 'Particular',
+  cpf: '123.456.789-00',
+  createdAt: PDF_PREVIEW_DATE,
+  updatedAt: PDF_PREVIEW_DATE,
+} as Patient;
+const PDF_PREVIEW_CONTENT = `<h1>ULTRASSONOGRAFIA DE ABDOME SUPERIOR</h1>
+<h2>TÉCNICA</h2>
+<p>Exame realizado com transdutor convexo multifrequencial, em cortes longitudinais e transversais.</p>
+<h2>ANÁLISE</h2>
+<p>Fígado com dimensões normais, contornos regulares e ecotextura do parênquima homogênea, sem evidências de lesões focais ou difusas. Vias biliares intra e extra-hepáticas de calibre normal. Vesícula biliar normodistendida, de paredes finas, sem cálculos em seu interior.</p>
+<h2>CONCLUSÃO</h2>
+<p>Exame ultrassonográfico de abdome superior sem alterações significativas.</p>`;
+const PDF_PREVIEW_OBS = `<p>Método operador-dependente, sujeito a limitações técnicas inerentes (interposição gasosa, biotipo). Correlação clínico-laboratorial recomendada.</p>`;
 
 function getFontFamilyFallback(family?: string) {
   if (!family) return 'Arial, sans-serif';
@@ -832,79 +854,19 @@ export function Settings() {
                 </div>
 
                 <div className="bg-ink-50/50 p-6 rounded-2xl border border-ink-100 flex justify-center overflow-x-auto">
-                  <div
-                    className="w-full max-w-[210mm] bg-white shadow-lg border border-ink-200 rounded-xl overflow-hidden transition-all text-slate-900 duration-200"
-                    style={{
-                      fontFamily: getFontFamilyFallback(draft.pdfFontFamily),
-                      fontSize: draft.pdfFontSize || '14px',
-                      lineHeight: draft.pdfLineHeight || '1.5',
-                      paddingTop: `${draft.pdfMarginTop ?? 15}px`,
-                      paddingBottom: `${draft.pdfMarginBottom ?? 15}px`,
-                      paddingLeft: `${draft.pdfMarginLeft ?? 15}px`,
-                      paddingRight: `${draft.pdfMarginRight ?? 15}px`,
-                    }}
-                  >
-                    {draft.pdfShowHeader !== false && (
-                      <div className="border-b border-slate-300 pb-3 mb-4 flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider block">CLÍNICA SANTA MARIA</span>
-                          <span className="text-[8px] text-slate-500 block uppercase">Av. Paulista, 1000 · São Paulo/SP · CEP: 01310-100</span>
-                        </div>
-                        <div className="w-14 h-8 bg-slate-100 border border-slate-200 flex items-center justify-center text-[7px] text-slate-400 font-black uppercase rounded-lg">LOGO</div>
-                      </div>
-                    )}
-
-                    <div className="border border-slate-200 p-2.5 rounded-lg mb-4 text-[9px] bg-slate-50/80 grid grid-cols-4 gap-2 leading-tight">
-                      <div className="col-span-2">
-                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">Paciente</span>
-                        <strong className="text-slate-800 uppercase">Maria da Silva Oliveira</strong>
-                      </div>
-                      <div>
-                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">CPF</span>
-                        <span className="font-semibold text-slate-700 block">123.456.789-00</span>
-                      </div>
-                      <div>
-                        <span className="block text-[7px] font-bold text-slate-400 uppercase tracking-widest">Exame</span>
-                        <span className="font-semibold text-slate-700 block uppercase">USG Abdome</span>
-                      </div>
-                    </div>
-
-                    <div className="text-slate-800 text-[0.95em] space-y-2 leading-relaxed" style={{ textAlign: draft.pdfTextAlign || 'justify' }}>
-                      <h4 className="font-black text-slate-900 border-l-2 border-indigo-500 pl-2 text-[1em] uppercase tracking-wider mt-2 mb-1">Fígado</h4>
-                      <p>Fígado com dimensões normais, contornos regulares e ecotextura do parênquima homogênea, sem evidências de lesões focais ou difusas. Vias biliares intra e extra-hepáticas de calibre normal.</p>
-                      <h4 className="font-black text-slate-900 border-l-2 border-indigo-500 pl-2 text-[1em] uppercase tracking-wider mt-3 mb-1">Vesícula Biliar</h4>
-                      <p>Vesícula biliar normodensificada, com paredes finas e regulares, conteúdo anecóico livre de cálculos ou ecos em suspensão.</p>
-                      <h4 className="font-black text-slate-950 text-[1.1em] text-center uppercase tracking-widest mt-6 mb-1">Conclusão</h4>
-                      <p className="font-bold text-slate-900 text-center">Exame de ultrassonografia de abdome superior sem alterações significativas.</p>
-                    </div>
-
-                    <div className="mt-8 pt-4 flex flex-col items-center text-center">
-                      {draft.signatureImageUrl ? (
-                        <div className="h-10 flex items-center justify-center mb-1">
-                          <img src={draft.signatureImageUrl} alt="Assinatura" className="max-h-full object-contain" />
-                        </div>
-                      ) : (
-                        <div className="w-36 border-t border-dashed border-slate-300 mb-1" />
-                      )}
-                      <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider leading-none">
-                        {draft.physicianName || 'Dr(a). Nome do Médico'}
-                      </span>
-                      <div className="text-[7.5px] text-slate-500 font-bold uppercase tracking-wider mt-0.5 space-x-1.5">
-                        {draft.physicianCRM && <span>CRM: {draft.physicianCRM}</span>}
-                        {draft.physicianCRM && draft.physicianRQE && <span>|</span>}
-                        {draft.physicianRQE && <span>RQE: {draft.physicianRQE}</span>}
-                      </div>
-                      {draft.defaultSignature && (
-                        <p className="text-[7px] text-slate-400 font-medium whitespace-pre-wrap mt-1 leading-normal max-w-[200px] mx-auto">{draft.defaultSignature}</p>
-                      )}
-                    </div>
-
-                    {draft.pdfShowFooter !== false && (
-                      <div className="border-t border-slate-200 mt-6 pt-2 text-[7px] text-slate-400 text-center uppercase">
-                        LAUD.US · Plataforma de Diagnóstico por Imagem Inteligente
-                      </div>
-                    )}
-                  </div>
+                  {/* Prévia real: mesma renderização do PDF final (ReportDocument).
+                      Reflete fielmente fonte, margens, cabeçalho, barra do paciente,
+                      assinatura e a nota metodológica reduzida. */}
+                  <ReportPreview
+                    patient={PDF_PREVIEW_PATIENT}
+                    clinic={null}
+                    settings={draft}
+                    examType="Ultrassonografia de Abdome Superior"
+                    reportContent={PDF_PREVIEW_CONTENT}
+                    physicianName="Dr. Médico Solicitante"
+                    examDate={PDF_PREVIEW_DATE}
+                    observationsNote={draft.laudIaMethodologicalObsEnabled !== false ? PDF_PREVIEW_OBS : ''}
+                  />
                 </div>
                 <p className="text-[10px] text-ink-400 text-center">
                   Margens do laudo: Superior {draft.pdfMarginTop ?? 15}mm · Inferior {draft.pdfMarginBottom ?? 15}mm · Esq. {draft.pdfMarginLeft ?? 15}mm · Dir. {draft.pdfMarginRight ?? 15}mm

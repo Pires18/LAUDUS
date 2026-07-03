@@ -3,10 +3,12 @@ import { ReportTemplate, AppSettings } from '../../types';
 /**
  * Seções opcionais do laudo controladas pela aba LAUD.IA do perfil.
  * Quando `false`, a seção é totalmente omitida do laudo-base. Ausência = incluída.
+ *
+ * Nota: as Observações Metodológicas NÃO entram mais no corpo do laudo — são
+ * renderizadas como nota reduzida ao final pelo ReportDocument (editor/PDF).
  */
 export interface ReportSectionToggles {
   recommendations?: boolean;
-  methodologicalObs?: boolean;
   classification?: boolean;
 }
 
@@ -14,7 +16,6 @@ export interface ReportSectionToggles {
 export function sectionTogglesFromSettings(settings?: AppSettings): ReportSectionToggles {
   return {
     recommendations: settings?.laudIaRecommendationsEnabled !== false,
-    methodologicalObs: settings?.laudIaMethodologicalObsEnabled !== false,
     classification: settings?.laudIaClassificationEnabled !== false,
   };
 }
@@ -55,15 +56,15 @@ export function getInitialReportContent(
   // Seções opcionais controladas pela aba LAUD.IA (ausência = incluída)
   const withClassification = toggles?.classification !== false;
   const withRecommendations = toggles?.recommendations !== false;
-  const withMethodologicalObs = toggles?.methodologicalObs !== false;
 
-  // Ordem Clínica Padrão
+  // Ordem Clínica Padrão.
+  // As Observações Metodológicas NÃO entram no corpo: viram nota reduzida ao
+  // final, renderizada pelo ReportDocument (ver ExamEditor/PrintLayout).
   html += addSection('TÉCNICA', template.technique);
   html += addSection('ANÁLISE', template.analysisTemplate);
   if (withClassification) html += addSection('CLASSIFICAÇÕES', template.classificationTemplate || '');
   html += addSection('CONCLUSÃO', template.conclusionTemplate);
   if (withRecommendations) html += addSection('RECOMENDAÇÕES', template.recommendationsTemplate);
-  if (withMethodologicalObs) html += addSection('OBSERVAÇÕES METODOLÓGICAS', template.observationsTemplate);
 
   return html;
 }

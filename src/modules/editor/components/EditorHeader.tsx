@@ -1,6 +1,6 @@
 import {
   ChevronLeft, CheckCircle2, Settings, Play, ScanSearch,
-  Loader2, AlertCircle, ClipboardList, Printer
+  Loader2, AlertCircle, ClipboardList, Printer, Eye
 } from 'lucide-react';
 import { Patient, ExamRequest, Clinic, ExamStatus, EXAM_AREAS } from '../../../types';
 import { calculateAge, formatDate, classNames } from '../../../utils/format';
@@ -15,6 +15,7 @@ interface EditorHeaderProps {
   onStatusChange: (status: ExamStatus) => void;
   onUnlock: () => void;
   onOpenAnamnesisConsent: () => void;
+  onPreview?: () => void;
   hasDicomImages?: boolean;
   onToggleViewer?: () => void;
   viewerOpen?: boolean;
@@ -36,6 +37,7 @@ export function EditorHeader({
   onStatusChange,
   onUnlock,
   onOpenAnamnesisConsent,
+  onPreview,
   hasDicomImages = false,
   onToggleViewer,
   viewerOpen = false,
@@ -262,6 +264,18 @@ export function EditorHeader({
           <Settings size={14} />
           <span className="hidden lg:inline">Ficha & Config</span>
         </button>
+
+        {/* Pré-visualizar (prévia realista do PDF) */}
+        {onPreview && (
+          <button
+            onClick={onPreview}
+            title="Pré-visualizar o laudo como será impresso/PDF"
+            className="h-9 px-3 rounded-xl bg-white text-ink-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 border border-ink-200 shadow-sm flex items-center gap-1.5 active:scale-95"
+          >
+            <Eye size={13} />
+            <span className="hidden lg:inline">Pré-visualizar</span>
+          </button>
+        )}
 
         {/* Divider */}
         <div className="w-px h-6 bg-ink-200 shrink-0" />

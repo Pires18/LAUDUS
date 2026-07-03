@@ -8,13 +8,14 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText, Star } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText, Star, Printer } from 'lucide-react';
 import { addToExcellenceCorpus } from '../ai/training/excellenceCorpus';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames } from '../../utils/format';
 import { logger } from '../../utils/logger';
 import { PrintLayout } from '../export/PrintLayout';
+import { ReportPreview } from '../export/ReportDocument';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
 import { PatientForm } from '../patients/PatientForm';
@@ -122,6 +123,13 @@ export function ExamEditor({ examId }: Props) {
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [unlockReason, setUnlockReason] = useState('');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Nota de Observações Metodológicas (rodapé reduzido do laudo), vinda da
+  // máscara. Gated pela aba LAUD.IA. Renderizada no editor e no PDF/preview.
+  const obsMethodEnabled = settings.laudIaMethodologicalObsEnabled !== false;
+  const observationsNote = obsMethodEnabled ? (template?.observationsTemplate || '') : '';
+  const hasObsNote = observationsNote.replace(/<[^>]*>/g, '').trim() !== '';
 
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -630,6 +638,7 @@ export function ExamEditor({ examId }: Props) {
               setShowUnlockModal(true);
             }}
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
+            onPreview={() => setShowPreview(true)}
             hasDicomImages={hasDicomImages}
             onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
             viewerOpen={showIntegratedViewer}
@@ -950,19 +959,31 @@ export function ExamEditor({ examId }: Props) {
                     <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px] pointer-events-none rounded-xl" />
                   )}
                   <div className="bg-white rounded-[2rem] shadow-premium border border-ink-100 overflow-hidden flex-1 flex flex-col min-h-0">
-                    <RichEditor 
-                      ref={editorRef} 
-                      content={reportContent} 
+                    <RichEditor
+                      ref={editorRef}
+                      content={reportContent}
                       onChange={(html) => {
                         if (initialized) {
                           setReportContent(html);
                           debouncedSave(html);
                         }
-                      }} 
+                      }}
                       editable={exam.status !== 'finalizado' && currentRole !== 'recepcao'}
                       isGenerating={isGenerating}
                     />
                   </div>
+
+                  {/* Nota de Observações Metodológicas — rodapé reduzido do laudo
+                      (documentação/respaldo). Só leitura; vem da máscara. */}
+                  {hasObsNote && (
+                    <div className="mt-3 bg-white rounded-2xl border border-ink-100 shadow-sm px-6 py-4">
+                      <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest mb-1.5">Nota ao final do laudo</p>
+                      <div className="text-[12px] italic text-slate-500 leading-relaxed border-l-2 border-slate-300 pl-3">
+                        <span className="not-italic font-bold uppercase tracking-wide text-slate-600 mr-1 text-[11px]">Observações metodológicas:</span>
+                        <span dangerouslySetInnerHTML={{ __html: observationsNote }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1276,7 +1297,54 @@ export function ExamEditor({ examId }: Props) {
         reportContent={reportContentRef.current}
         physicianName={exam.requestingPhysician}
         examDate={exam.createdAt}
+        observationsNote={observationsNote}
       />
+
+      {/* Modal de Pré-visualização — prévia fiel do PDF (ReportDocument) */}
+      {showPreview && patient && (
+        <div
+          className="fixed inset-0 z-[120] flex flex-col bg-ink-900/70 backdrop-blur-sm no-print"
+          onClick={() => setShowPreview(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowPreview(false); }}
+        >
+          <div className="shrink-0 flex items-center justify-between px-5 py-3 bg-white border-b border-ink-200 shadow-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <Eye size={16} className="text-indigo-600 shrink-0" />
+              <span className="text-sm font-black text-ink-900 truncate">Pré-visualização do Laudo</span>
+              <span className="text-[10px] font-bold text-ink-400 uppercase tracking-widest hidden sm:inline">Idêntico ao PDF</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); window.print(); }}
+                className="h-9 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center gap-1.5 active:scale-95"
+              >
+                <Printer size={13} /> Imprimir / PDF
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowPreview(false); }}
+                className="h-9 w-9 rounded-xl bg-white text-ink-500 hover:text-ink-800 hover:bg-ink-100 border border-ink-200 flex items-center justify-center transition-all"
+                title="Fechar (Esc)"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto p-6 flex justify-center">
+            <div className="my-2" onClick={(e) => e.stopPropagation()}>
+              <ReportPreview
+                patient={patient}
+                clinic={clinic}
+                settings={settings}
+                examType={exam.examType}
+                reportContent={reportContent}
+                physicianName={exam.requestingPhysician}
+                examDate={exam.createdAt}
+                observationsNote={observationsNote}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDicomImages && exam && (
         <DicomImagesModal
