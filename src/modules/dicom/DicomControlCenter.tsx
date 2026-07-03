@@ -1440,34 +1440,101 @@ export function DicomControlCenter() {
                         <p className="text-[11px] text-ink-500 font-medium">Configuração no teclado e console físico do aparelho de imagem.</p>
                       </div>
 
-                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
-                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Em palavras simples:</strong> por último, o <strong>aparelho de ultrassom</strong> precisa saber "com quem falar". No painel do próprio aparelho você cadastra o <strong>endereço (IP) do PACS</strong>, a <strong>porta</strong> e o <strong>apelido (AE Title)</strong>. Assim ele consegue baixar a lista de pacientes e devolver as imagens. Faça isso uma vez por aparelho.
+                      <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-100 text-[11px] text-ink-700 leading-relaxed">
+                        <strong className="text-amber-900">Antes de tudo:</strong> esta conexão é <strong>100% rede local</strong>. O aparelho fala com o Orthanc pelo <strong>IP local</strong> do servidor, na porta <strong>4242</strong> — <strong>sem Tailscale, sem internet</strong>. Aparelho e servidor precisam estar na <strong>mesma rede</strong> (mesmo Wi-Fi/switch).
+                      </div>
+
+                      {/* Pré-requisitos */}
+                      <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
+                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">✅ Pré-requisitos (confira antes)</h4>
+                        <ul className="text-[11px] text-ink-600 space-y-1 list-disc pl-4">
+                          <li>Orthanc <strong>rodando</strong> na máquina servidora (abra <code>http://localhost:8042</code> nela).</li>
+                          <li>Aparelho e servidor na <strong>mesma rede local</strong>.</li>
+                          <li>Servidor com <strong>IP fixo</strong> (reserve no roteador) — se mudar, o aparelho perde a conexão.</li>
+                          <li><strong>Porta 4242 liberada</strong> no firewall da máquina servidora (entrada).</li>
+                        </ul>
+                      </div>
+
+                      {/* Passo A: descobrir o IP */}
+                      <div className="p-4 rounded-xl bg-white border border-ink-150 space-y-2.5">
+                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Passo A — Descubra o IP local do servidor</h4>
+                        <p className="text-[11px] text-ink-600 leading-relaxed">Na <strong>máquina do Orthanc</strong>, rode:</p>
+                        <div className="space-y-1.5 text-[11px] text-ink-600">
+                          <div><strong>Windows:</strong></div>
+                          <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
+                            <span>ipconfig</span>
+                            <button onClick={() => handleCopy('ipconfig', 'us_ipcfg')} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">{copiedField === 'us_ipcfg' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}</button>
+                          </div>
+                          <div className="text-ink-400">→ procure "IPv4 Address" (ex: 192.168.1.100)</div>
+                          <div className="pt-1"><strong>macOS:</strong></div>
+                          <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
+                            <span>ipconfig getifaddr en0</span>
+                            <button onClick={() => handleCopy('ipconfig getifaddr en0', 'us_ipmac')} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">{copiedField === 'us_ipmac' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}</button>
+                          </div>
+                          <div className="text-ink-400">(Wi-Fi: <code>en0</code>; cabo: tente <code>en1</code>). Anote esse número — é o <strong>IP do servidor</strong>.</div>
                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">1. Cadastro da Fila de Trabalho (Worklist - C-FIND)</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            No menu de configurações DICOM do equipamento, adicione um serviço de Worklist. Preencha o IP do servidor PACS, a porta <strong>4242</strong> e o AE Title <strong>{draft.dicomOrthancAETitle || 'ORTHANC'}</strong>. O local AE Title do equipamento deve coincidir com o configurado em DicomModalities do servidor.
-                          </p>
+                      {/* Os dados exatos */}
+                      <div className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 space-y-2">
+                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Os 4 dados que o aparelho precisa</h4>
+                        <div className="overflow-x-auto border border-ink-150 rounded-xl bg-white">
+                          <table className="w-full text-[11px] text-left">
+                            <tbody className="divide-y divide-ink-100 text-ink-700">
+                              <tr><td className="px-3 py-2 font-bold w-1/2">IP do servidor (Host)</td><td className="px-3 py-2 font-mono">o IP do Passo A (ex: 192.168.1.100)</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Porta</td><td className="px-3 py-2 font-mono">4242</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">AE Title do servidor (remoto)</td><td className="px-3 py-2 font-mono">{draft.dicomOrthancAETitle || 'ORTHANC'}</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">AE Title do aparelho (local)</td><td className="px-3 py-2 font-mono">o nome do aparelho (ex: MINDRAYMX7)</td></tr>
+                            </tbody>
+                          </table>
                         </div>
+                        <p className="text-[10px] text-ink-500 leading-relaxed">
+                          <strong>AE Title?</strong> É o "apelido de rede" de cada equipamento DICOM. No modelo prático deste guia, o Orthanc está com <code>DicomAlwaysAllow*: true</code> — então ele <strong>aceita qualquer</strong> AE Title do aparelho, sem precisar cadastrar. (Se você ligou a validação por <code>DicomModalities</code>, aí o AE local do aparelho precisa estar cadastrado lá com o mesmo nome.)
+                        </p>
+                      </div>
 
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">2. Cadastro de Destino das Imagens (C-STORE)</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            No menu DICOM, configure o serviço de Storage. Utilize as mesmas credenciais: IP do servidor PACS, porta <strong>4242</strong> e o AE Title <strong>{draft.dicomOrthancAETitle || 'ORTHANC'}</strong>.
-                          </p>
+                      {/* Passos B, C, D */}
+                      <div className="space-y-3">
+                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-1.5">
+                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">Passo B — Teste a conexão primeiro (C-ECHO)</h4>
+                          <p className="text-[11px] text-ink-600 leading-relaxed">No menu DICOM do aparelho, crie um destino com os 4 dados acima e clique em <strong>Verify / Ping / Echo</strong>. <strong>Comece por aqui</strong>: se o Echo falhar, nada mais funciona (é rede/firewall). Deve retornar <strong>"Success"</strong>.</p>
                         </div>
+                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-1.5">
+                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">Passo C — Worklist / MWL (baixar a lista de pacientes)</h4>
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Em <strong>DICOM → Worklist / MWL</strong>, adicione um serviço com os mesmos 4 dados. É o que faz o paciente agendado aparecer na tela do aparelho (via <strong>C-FIND</strong>), sem digitar. Teste com <strong>Verify</strong>.</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-1.5">
+                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">Passo D — Storage (enviar as imagens)</h4>
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Em <strong>DICOM → Storage / Store SCP</strong>, adicione um destino com os mesmos 4 dados. É por onde o aparelho envia as fotos ao Orthanc (via <strong>C-STORE</strong>) ao finalizar o exame. Teste com <strong>Verify</strong>.</p>
+                        </div>
+                      </div>
 
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">3. Verificação de Conexão (C-ECHO / Ping)</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Selecione os perfis criados no console e clique em <strong>"Verify / Ping / Echo"</strong>. O status retornado pelo aparelho deve ser "Sucesso / Success".
-                          </p>
+                      {/* Onde fica no menu por marca */}
+                      <div className="p-4 rounded-xl bg-white border border-ink-150 space-y-2">
+                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Onde fica no menu (por marca — pode variar por modelo)</h4>
+                        <div className="overflow-x-auto border border-ink-150 rounded-xl">
+                          <table className="w-full text-[11px] text-left">
+                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider"><tr><th className="px-3 py-2">Marca</th><th className="px-3 py-2">Caminho aproximado</th></tr></thead>
+                            <tbody className="divide-y divide-ink-100 text-ink-700">
+                              <tr><td className="px-3 py-2 font-bold">Mindray</td><td className="px-3 py-2">Setup → DICOM/Network → Local + Worklist/Storage Server</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">GE (Logiq/Voluson)</td><td className="px-3 py-2">Utility/Config → Connectivity → Dataflow / Service (Worklist, Storage)</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Samsung</td><td className="px-3 py-2">Setup → DICOM → Servidor (Worklist / Storage)</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Philips (Affiniti/EPIQ)</td><td className="px-3 py-2">Setup → DICOM Settings → Worklist / Store destinations</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Canon/Toshiba</td><td className="px-3 py-2">Menu → DICOM → MWL + Storage SCU</td></tr>
+                            </tbody>
+                          </table>
                         </div>
+                      </div>
+
+                      {/* Troubleshooting da conexão */}
+                      <div className="p-4 rounded-xl bg-rose-50/30 border border-rose-100 space-y-2">
+                        <h4 className="text-xs font-black text-rose-900 uppercase tracking-wider">Se não conectar</h4>
+                        <ul className="text-[11px] text-ink-700 space-y-1.5">
+                          <li><strong>Echo falha:</strong> IP errado / aparelho em outra rede / porta 4242 bloqueada no firewall. Teste um <code>ping IP_DO_SERVIDOR</code> do aparelho, se ele permitir.</li>
+                          <li><strong>Echo OK, mas worklist vazia:</strong> não há <code>.wl</code> na pasta (crie um exame no LAUD.US) ou o AE Title local do aparelho não bate com o <code>DicomModalities</code> (se você ligou a validação).</li>
+                          <li><strong>Imagens não chegam:</strong> destino de <strong>Storage</strong> não configurado ou AE/porta errados. Confira que o Store aponta para o mesmo IP:4242.</li>
+                          <li><strong>Nome do paciente não casa:</strong> acentos/caracteres. O nome vai em maiúsculas sem acento; se o aparelho filtrar por nome, apague o filtro e busque "todos".</li>
+                        </ul>
                       </div>
                     </div>
                   )}

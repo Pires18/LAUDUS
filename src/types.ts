@@ -158,6 +158,13 @@ export interface ReportTemplate {
 
   createdAt: number;
   updatedAt: number;
+
+  /**
+   * Marcador em tempo de execução (NÃO persistido): indica que esta máscara veio
+   * da coleção do admin (padrão do sistema), mesclada na biblioteca do usuário.
+   * Máscaras vinculadas são somente-leitura para não-admin.
+   */
+  isSystem?: boolean;
 }
 
 /** Papéis de usuário do sistema (RBAC) */
@@ -226,6 +233,22 @@ export interface AppSettings {
   aiAutoRefineEnabled?: boolean;
   /** Se o Modo Rápido (sem scratchpad) está ativo */
   aiFastMode?: boolean;
+
+  // ── Curadoria pessoal de máscaras (LAUD.IA) ──
+  /**
+   * IDs das máscaras padrão do sistema (do admin) que o usuário ativou para uso.
+   * As ativadas ficam VINCULADAS (recebem atualizações do admin, não editáveis).
+   * `undefined` = usuário legado (mostra todas as padrão + dispara migração);
+   * `[]` = usuário em branco (só vê as próprias + as que ativar no catálogo).
+   */
+  enabledSystemMaskIds?: string[];
+  /** Se as RECOMENDAÇÕES devem ser incluídas no laudo gerado (default: sim). */
+  laudIaRecommendationsEnabled?: boolean;
+  /** Se as OBSERVAÇÕES METODOLÓGICAS devem ser incluídas no laudo (default: sim). */
+  laudIaMethodologicalObsEnabled?: boolean;
+  /** Se a seção de CLASSIFICAÇÃO (BI-RADS, TI-RADS, etc.) deve ser incluída (default: sim). */
+  laudIaClassificationEnabled?: boolean;
+
   /** Banco de frases prontas do usuário */
   snippets?: { id: string; title: string; content: string; area?: string }[];
   

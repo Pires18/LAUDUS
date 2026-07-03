@@ -194,7 +194,12 @@ export async function getSettings(): Promise<AppSettings> {
         : '',
       soundNotifications: true,
       autoSave: true,
-      signatureImageUrl: ''
+      signatureImageUrl: '',
+      // Novos usuários começam com a biblioteca de máscaras EM BRANCO: só passam
+      // a ver as máscaras padrão que ativarem no Catálogo do Sistema. Usuários
+      // legados (doc já existente, sem este campo) mantêm `undefined` e a tela de
+      // Máscaras faz a migração "pré-ativar atuais" uma única vez.
+      enabledSystemMaskIds: []
     };
     let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 

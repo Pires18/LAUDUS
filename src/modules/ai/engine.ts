@@ -1,6 +1,6 @@
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
-import { getInitialReportContent } from '../templates/utils';
+import { getInitialReportContent, sectionTogglesFromSettings } from '../templates/utils';
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
@@ -338,18 +338,38 @@ function buildSpecificContext(
   return parts.join('\n\n');
 }
 
-function buildMaskHtml(template: ReportTemplate): string {
+function buildMaskHtml(template: ReportTemplate, settings?: AppSettings): string {
+  const withClassification = settings?.laudIaClassificationEnabled !== false;
+  const withRecommendations = settings?.laudIaRecommendationsEnabled !== false;
+  const withMethodologicalObs = settings?.laudIaMethodologicalObsEnabled !== false;
+
   const parts = [
     `TÍTULO:\n${template.title}`,
     `TÉCNICA:\n${template.technique}`,
     `ANÁLISE:\n${template.analysisTemplate}`,
     `CONCLUSÃO:\n${template.conclusionTemplate}`,
   ];
-  if (template.classificationTemplate) {
+  if (withClassification && template.classificationTemplate) {
     parts.push(`CLASSIFICAÇÃO:\n${template.classificationTemplate}`);
   }
-  parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
-  parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate || '<p>(…)</p>'}`);
+  if (withRecommendations) {
+    parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
+  }
+  if (withMethodologicalObs) {
+    parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate || '<p>(…)</p>'}`);
+  }
+
+  // Instrução explícita para a IA NÃO gerar as seções desativadas pelo usuário.
+  const omit: string[] = [];
+  if (!withClassification) omit.push('CLASSIFICAÇÃO');
+  if (!withRecommendations) omit.push('RECOMENDAÇÕES');
+  if (!withMethodologicalObs) omit.push('OBSERVAÇÕES METODOLÓGICAS');
+  if (omit.length) {
+    parts.push(
+      `INSTRUÇÃO DE SEÇÕES (usuário): NÃO inclua no laudo a(s) seção(ões): ${omit.join(', ')}. ` +
+        `Omita completamente esse(s) título(s) e seu conteúdo.`
+    );
+  }
   return parts.join('\n\n');
 }
 
@@ -582,7 +602,7 @@ export function buildPrompt({
 }: GenerateReportParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template, settings);
-  const maskHtml = buildMaskHtml(template);
+  const maskHtml = buildMaskHtml(template, settings);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
@@ -645,7 +665,7 @@ function buildRefinePrompt({
     anamnesis,
     notes: refineNote,
     maskHtml: currentReport,
-    originalMaskHtml: getInitialReportContent(template),
+    originalMaskHtml: getInitialReportContent(template, sectionTogglesFromSettings(settings)),
     requestingPhysician,
     previousExams: safePreviousExams,
     patientPreviousExams: safePatientExams,
@@ -713,7 +733,7 @@ function buildCopilotPrompt({
     anamnesis: exam.anamnesis,
     notes: instruction,
     maskHtml: currentReport,
-    originalMaskHtml: template ? getInitialReportContent(template) : undefined,
+    originalMaskHtml: template ? getInitialReportContent(template, sectionTogglesFromSettings(settings)) : undefined,
     requestingPhysician: exam.requestingPhysician,
     previousExams: safePreviousExams,
     patientPreviousExams: safePatientExams,
@@ -1235,18 +1255,22 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
 // ─── Mock (modo sem API) ──────────────────────────────────────────────────────
 
 export function generateMockReport(params: GenerateReportParams): string {
-  const { template } = params;
+  const { template, settings } = params;
+  const withRecommendations = settings?.laudIaRecommendationsEnabled !== false;
+  const withMethodologicalObs = settings?.laudIaMethodologicalObsEnabled !== false;
 
-  const obs = template.observationsTemplate
-    ? `<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n${template.observationsTemplate}`
-    : `<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n<p><em>[Laudo gerado em modo de demonstração — configure a API Key do Gemini ou Anthropic em Configurações para usar IA real]</em></p>`;
+  const recs = withRecommendations
+    ? `\n<h2>RECOMENDAÇÕES</h2>\n${template.recommendationsTemplate}`
+    : '';
+  const obs = !withMethodologicalObs
+    ? ''
+    : template.observationsTemplate
+      ? `\n<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n${template.observationsTemplate}`
+      : `\n<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n<p><em>[Laudo gerado em modo de demonstração — configure a API Key do Gemini ou Anthropic em Configurações para usar IA real]</em></p>`;
 
   return `<h1>${template.title}</h1>
 <h2>ANÁLISE</h2>
 ${template.analysisTemplate}
 <h2>CONCLUSÃO</h2>
-${template.conclusionTemplate}
-<h2>RECOMENDAÇÕES</h2>
-${template.recommendationsTemplate}
-${obs}`;
+${template.conclusionTemplate}${recs}${obs}`;
 }

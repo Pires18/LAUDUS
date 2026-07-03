@@ -3,9 +3,9 @@ import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { useAdmin } from '../../hooks/useAdmin';
 import { PageHeader } from '../../components/PageHeader';
-import { updateItem } from '../../store/db';
+import { updateItem, addItemWithId, genId } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
-import { FileText, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList } from 'lucide-react';
+import { FileText, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList, Copy } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
 import { classNames } from '../../utils/format';
 import { auth } from '../../lib/firebase';
@@ -59,6 +59,26 @@ export function TemplateEditor({ templateId }: Props) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
   }
 
+  // Máscara vinculada/padrão vista por não-admin: somente leitura. Permite criar
+  // uma cópia pessoal e editável a partir dela.
+  async function handlePersonalize() {
+    if (!draft) return;
+    const id = genId();
+    const { id: _id, createdAt, updatedAt, isSystem, ...rest } = draft as ReportTemplate & { isSystem?: boolean };
+    try {
+      await addItemWithId('templates', id, {
+        ...rest,
+        name: `${draft.name} (Personalizada)`,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      showToast('Cópia criada! Agora você pode editá-la.', 'success');
+      setView({ name: 'template-editor', templateId: id });
+    } catch {
+      showToast('Erro ao criar cópia da máscara', 'error');
+    }
+  }
+
   const tabs = ([
     { id: 'info', label: 'Informações Básicas' },
     { id: 'structure', label: 'Estrutura do Laudo' },
@@ -88,8 +108,8 @@ export function TemplateEditor({ templateId }: Props) {
                 </p>
               </div>
             </div>
-            {isAdmin && (
-              <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              {isAdmin ? (
                 <button
                   onClick={handleSave}
                   className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
@@ -97,8 +117,17 @@ export function TemplateEditor({ templateId }: Props) {
                   <Save size={11} />
                   Salvar Máscara
                 </button>
-              </div>
-            )}
+              ) : (
+                <button
+                  onClick={handlePersonalize}
+                  className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                  title="Criar uma cópia pessoal e editável desta máscara"
+                >
+                  <Copy size={11} />
+                  Criar cópia para editar
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -215,6 +244,7 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Técnica"
               value={draft.technique}
               onChange={(val) => u('technique', val)}
+              editable={isAdmin}
               placeholder="Ex: Exame realizado com transdutor convexo de 3,5 MHz..."
             />
 
@@ -222,6 +252,7 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Análise"
               value={draft.analysisTemplate}
               onChange={(val) => u('analysisTemplate', val)}
+              editable={isAdmin}
               placeholder="Descreva a análise padrão para quando os achados forem normais..."
             />
 
@@ -229,6 +260,7 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Conclusão"
               value={draft.conclusionTemplate}
               onChange={(val) => u('conclusionTemplate', val)}
+              editable={isAdmin}
               placeholder="Ex: Exame ultrassonográfico sem alterações significativas."
             />
 
@@ -236,6 +268,7 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Classificação (Opcional)"
               value={draft.classificationTemplate || ''}
               onChange={(val) => u('classificationTemplate', val)}
+              editable={isAdmin}
               placeholder="Ex: BI-RADS: (...) — Categoria (...)"
             />
 
@@ -243,6 +276,7 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Observações Metodológicas (Opcional — Gerado automaticamente pela IA se em branco)"
               value={draft.observationsTemplate || ''}
               onChange={(val) => u('observationsTemplate', val)}
+              editable={isAdmin}
               placeholder="Ex: Observações metodológicas e notas adicionais de limitação clínica..."
             />
 
@@ -250,6 +284,7 @@ export function TemplateEditor({ templateId }: Props) {
               label="Texto Padrão: Recomendações / Notas (Opcional)"
               value={draft.recommendationsTemplate}
               onChange={(val) => u('recommendationsTemplate', val)}
+              editable={isAdmin}
               placeholder="Ex: Sugere-se correlação clínica..."
             />
 

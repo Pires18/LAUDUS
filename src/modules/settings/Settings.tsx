@@ -8,7 +8,7 @@ import {
   Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Info, Upload, Loader2,
-  Printer, Receipt
+  Printer, Receipt, Sparkles, ListChecks, ClipboardList, Wand2, Award
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -20,7 +20,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
 
-type SettingsTab = 'perfil' | 'pdf' | 'audit' | 'assinatura';
+type SettingsTab = 'perfil' | 'laudia' | 'pdf' | 'audit' | 'assinatura';
 
 function getFontFamilyFallback(family?: string) {
   if (!family) return 'Arial, sans-serif';
@@ -145,6 +145,7 @@ export function Settings() {
 
   const tabs = [
     { id: 'perfil',    label: 'Perfil',        icon: User       },
+    { id: 'laudia',    label: 'LAUD.IA',        icon: Sparkles   },
     { id: 'pdf',       label: 'Centro de PDF',  icon: Printer    },
     { id: 'audit',     label: 'Auditoria',      icon: ShieldCheck },
     { id: 'assinatura',label: 'Assinatura & Faturamento',     icon: Receipt },
@@ -358,6 +359,112 @@ export function Settings() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: LAUD.IA — ajustes individuais da IA e das máscaras */}
+          {activeTab === 'laudia' && (
+            <div className="max-w-3xl animate-fade-in space-y-5">
+              <div className="bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-5 flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-white/70 text-indigo-600 shrink-0">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-ink-900">Preferências da LAUD.IA</h4>
+                  <p className="text-[11px] text-ink-500 font-medium mt-1 leading-relaxed">
+                    Ajustes pessoais que controlam quais seções a IA inclui nos seus laudos e como
+                    o motor de refinamento se comporta. Valem apenas para a sua conta.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <Sliders size={15} className="text-ink-500" />
+                  <h4 className="text-xs font-black text-ink-700 uppercase tracking-widest">Seções do Laudo</h4>
+                </div>
+                <div className="space-y-3">
+                  {([
+                    {
+                      key: 'laudIaRecommendationsEnabled' as const,
+                      icon: ListChecks,
+                      color: 'text-emerald-600',
+                      title: 'Recomendações',
+                      desc: 'Incluir a seção de RECOMENDAÇÕES nos laudos gerados.',
+                    },
+                    {
+                      key: 'laudIaMethodologicalObsEnabled' as const,
+                      icon: ClipboardList,
+                      color: 'text-brand-600',
+                      title: 'Observações Metodológicas',
+                      desc: 'Incluir a seção de OBSERVAÇÕES METODOLÓGICAS nos laudos.',
+                    },
+                    {
+                      key: 'laudIaClassificationEnabled' as const,
+                      icon: Award,
+                      color: 'text-amber-600',
+                      title: 'Classificação (BI-RADS, TI-RADS…)',
+                      desc: 'Incluir a seção de CLASSIFICAÇÃO quando a máscara tiver.',
+                    },
+                  ]).map(({ key, icon: Icon, color, title, desc }) => (
+                    <div key={key} className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                      <div className="flex items-center gap-2.5">
+                        <Icon size={15} className={color} />
+                        <div>
+                          <p className="text-xs font-bold text-ink-900">{title}</p>
+                          <p className="text-[10px] text-ink-500">{desc}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => u(key, draft[key] === false)}
+                        className={classNames(
+                          "w-10 h-6 rounded-full transition-all relative shrink-0",
+                          draft[key] !== false ? "bg-emerald-500" : "bg-ink-300"
+                        )}
+                      >
+                        <div className={classNames(
+                          "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                          draft[key] !== false ? "left-5" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <Wand2 size={15} className="text-ink-500" />
+                  <h4 className="text-xs font-black text-ink-700 uppercase tracking-widest">Motor de IA</h4>
+                </div>
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-ink-50 border border-ink-100">
+                  <div className="flex items-center gap-2.5">
+                    <Wand2 size={15} className="text-violet-600" />
+                    <div>
+                      <p className="text-xs font-bold text-ink-900">Refinador Automático</p>
+                      <p className="text-[10px] text-ink-500">Executa um passe de refino estrutural após a geração inicial quando detecta falhas.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => u('aiAutoRefineEnabled', !draft.aiAutoRefineEnabled)}
+                    className={classNames(
+                      "w-10 h-6 rounded-full transition-all relative shrink-0",
+                      draft.aiAutoRefineEnabled ? "bg-emerald-500" : "bg-ink-300"
+                    )}
+                  >
+                    <div className={classNames(
+                      "w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm",
+                      draft.aiAutoRefineEnabled ? "left-5" : "left-1"
+                    )} />
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-ink-400 flex items-center gap-1.5 px-1">
+                <Info size={12} /> As alterações passam a valer nos próximos laudos gerados. Clique em Salvar para aplicar.
+              </p>
             </div>
           )}
 

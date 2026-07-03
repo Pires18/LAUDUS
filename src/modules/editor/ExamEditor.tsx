@@ -33,7 +33,7 @@ import { useAdmin } from '../../hooks/useAdmin';
 import { DicomViewerSidebar } from './components/DicomViewerSidebar';
 import { EditorHeader } from './components/EditorHeader';
 import { EditorToolbar } from './components/EditorToolbar';
-import { getInitialReportContent } from '../templates/utils';
+import { getInitialReportContent, sectionTogglesFromSettings } from '../templates/utils';
 import { useConfirm } from '../../hooks/useConfirm';
 import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
@@ -271,7 +271,7 @@ export function ExamEditor({ examId }: Props) {
       if (exam.reportContent && exam.reportContent.trim() !== '') {
         setReportContent(exam.reportContent || '');
       } else {
-        const initial = getInitialReportContent(template);
+        const initial = getInitialReportContent(template, sectionTogglesFromSettings(settings));
         setReportContent(initial);
         updateItem('exams', examId, { reportContent: initial });
       }
@@ -416,7 +416,7 @@ export function ExamEditor({ examId }: Props) {
       variant: 'warning',
     });
     if (ok) {
-      const initial = getInitialReportContent(template);
+      const initial = getInitialReportContent(template, sectionTogglesFromSettings(settings));
       setReportContent(initial);
       await updateItem('exams', examId, { reportContent: initial });
       showToast('Laudo reiniciado para o padrão da máscara', 'success');
@@ -713,7 +713,7 @@ export function ExamEditor({ examId }: Props) {
                 isTemplateMask={
                   template
                     ? (() => {
-                        const initialContent = getInitialReportContent(template);
+                        const initialContent = getInitialReportContent(template, sectionTogglesFromSettings(settings));
                         const cleanCurrent = reportContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                         const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                         return cleanCurrent === '' || cleanCurrent === cleanInitial;
@@ -755,7 +755,7 @@ export function ExamEditor({ examId }: Props) {
 
               {/* ── Avaliação de Qualidade (auditoria + anti-alucinação) ── */}
               {!isGenerating && currentRole !== 'recepcao' && (() => {
-                const initialContent = template ? getInitialReportContent(template) : '';
+                const initialContent = template ? getInitialReportContent(template, sectionTogglesFromSettings(settings)) : '';
                 const cleanCurrent = reportContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                 const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                 const isMask = cleanCurrent === '' || cleanCurrent === cleanInitial;

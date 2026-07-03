@@ -11,6 +11,8 @@ import { firestore, auth } from '../lib/firebase';
 import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
 import { resolveAdminUid } from '../store/db';
+import { useApp } from '../store/app';
+import { ReportTemplate } from '../types';
 
 // ─── Helper: user-scoped collection path ───
 function userPath(collectionName: string): string {
@@ -47,8 +49,15 @@ export function useCollection<T extends { id: string }>(
   const [error, setError] = useState<string | null>(null);
   const [adminUid, setAdminUid] = useState<string | null>(localCachedAdminUid);
 
+  // Curadoria pessoal de máscaras: quais padrão do sistema o usuário ativou.
+  // `undefined` = legado (mescla todas as do admin); array = mescla só as ativadas.
+  const enabledSystemMaskIds = useApp((s) => s.settings.enabledSystemMaskIds);
+
   // Serialize constraints for dependency array
   const constraintKey = JSON.stringify(constraints.map((c) => c.toString()));
+  // Chave estável do conjunto de máscaras ativadas (re-subscreve/mescla ao mudar).
+  const enabledMaskKey =
+    enabledSystemMaskIds === undefined ? '∅' : [...enabledSystemMaskIds].sort().join(',');
 
   useEffect(() => {
     if (!enabled || !auth.currentUser) return;
@@ -78,12 +87,18 @@ export function useCollection<T extends { id: string }>(
 
     const updateCombinedData = () => {
       if (collectionName === 'templates' && !isGlobal && auth.currentUser?.email !== ADMIN_EMAIL) {
+        // Curadoria pessoal: se o usuário tem uma lista explícita de máscaras
+        // ativadas (array), mescla APENAS essas do admin. Se `undefined` (legado),
+        // mantém o comportamento antigo (mescla todas) até a migração rodar.
+        const enabledSet =
+          enabledSystemMaskIds !== undefined ? new Set(enabledSystemMaskIds) : null;
         const combined = [...userDocs];
         adminDocs.forEach((aDoc: T) => {
+          if (enabledSet && !enabledSet.has(aDoc.id)) return;
           if (!combined.some((uDoc) => uDoc.id === aDoc.id)) {
             combined.push({
               ...aDoc,
-              isSystem: true // Marca como máscara oficial do sistema
+              isSystem: true // Marca como máscara oficial do sistema (vinculada)
             });
           }
         });
@@ -139,9 +154,57 @@ export function useCollection<T extends { id: string }>(
       unsubscribeUser();
       if (unsubscribeAdmin) unsubscribeAdmin();
     };
-  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, adminUid]);
+  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, adminUid, enabledMaskKey]);
 
   return { data, loading, error };
+}
+
+// ─── useSystemTemplates: todas as máscaras PADRÃO DO SISTEMA (do admin) ───
+// Independe da curadoria pessoal do usuário — é a fonte do "Catálogo do Sistema",
+// onde o usuário escolhe quais ativar. Para o próprio admin, retorna vazio (ele
+// gerencia as máscaras diretamente em useCollection('templates')).
+export function useSystemTemplates(): { data: ReportTemplate[]; loading: boolean } {
+  const [data, setData] = useState<ReportTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adminUid, setAdminUid] = useState<string | null>(localCachedAdminUid);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    resolveAdminUid().then((uid) => {
+      if (uid) {
+        localCachedAdminUid = uid;
+        setAdminUid(uid);
+      }
+    });
+  }, [auth.currentUser?.uid]);
+
+  useEffect(() => {
+    if (!auth.currentUser || auth.currentUser.email === ADMIN_EMAIL) {
+      setData([]);
+      setLoading(false);
+      return;
+    }
+    if (!adminUid) return;
+
+    setLoading(true);
+    const adminColRef = collection(firestore, `users/${adminUid}/templates`);
+    const unsubscribe = onSnapshot(
+      query(adminColRef),
+      (snapshot) => {
+        setData(
+          snapshot.docs.map((d) => ({ ...d.data(), id: d.id, isSystem: true } as ReportTemplate))
+        );
+        setLoading(false);
+      },
+      (err) => {
+        logger.warn('[Firestore] Erro ao carregar catálogo de máscaras do sistema:', err);
+        setLoading(false);
+      }
+    );
+    return () => unsubscribe();
+  }, [auth.currentUser?.uid, adminUid]);
+
+  return { data, loading };
 }
 
 // ─── useDocument: realtime listener for a single document ───

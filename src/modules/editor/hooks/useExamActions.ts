@@ -7,7 +7,7 @@ import { verifyReport } from '../../ai/verification';
 import { classifyCorrection } from '../../ai/training/feedback';
 import { recordCorrectionSignal, recordQualityRecord } from '../../ai/training/feedbackStore';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
-import { getInitialReportContent } from '../../templates/utils';
+import { getInitialReportContent, sectionTogglesFromSettings } from '../../templates/utils';
 import { logger } from '../../../utils/logger';
 
 interface UseExamActionsProps {
@@ -135,7 +135,7 @@ export function useExamActions({
       if (hasKey) {
         // Detecta se é a primeira geração (máscara ainda limpa/não editada)
         // Nesse caso, usa buildPrompt (GERAÇÃO INICIAL) para melhor qualidade
-        const initialContent = getInitialReportContent(template);
+        const initialContent = getInitialReportContent(template, sectionTogglesFromSettings(settings));
         const cleanCurrent = currentReport.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
         const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
         const isFirstGeneration = !customPrompt && (cleanCurrent === '' || cleanCurrent === cleanInitial);
