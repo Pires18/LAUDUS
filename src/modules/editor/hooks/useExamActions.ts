@@ -195,6 +195,51 @@ export function useExamActions({
         // Sanitização obrigatória do HTML antes de salvar (prevenção XSS)
         html = sanitizeHtml(html);
 
+        // FASE 4 — Auto-refino por score: se a 1ª geração apresenta falhas
+        // estruturais (auditReportQuality) e o auto-refino está habilitado,
+        // executa UM único passe de refinamento estrutural. Best-effort e
+        // sem loop: só substitui se o refino não piorou o score.
+        if (
+          isFirstGeneration &&
+          (settings.aiAutoRefineEnabled ?? false) &&
+          html && html.trim().length > 10
+        ) {
+          const audit = auditReportQuality(html, template.area);
+          const hasErrors = audit.issues.some((i) => i.severity === 'error');
+          if (hasErrors || audit.score < 70) {
+            try {
+              const refined = await generateReportStream({
+                examId,
+                currentReport: html,
+                template,
+                patient,
+                settings: effectiveSettings,
+                clinicalIndication,
+                requestingPhysician,
+                anamnesis,
+                previousExams,
+                patientPreviousExams,
+                examDateMs,
+              }, (chunk, rawText) => {
+                const hasClosedScratch = rawText ? rawText.includes('</scratchpad>') : true;
+                const hasOpenScratch = rawText ? rawText.includes('<scratchpad>') : false;
+                setIsReasoning(hasOpenScratch && !hasClosedScratch);
+                if (chunk.trim()) onReportChange(chunk);
+              });
+              const refinedClean = sanitizeHtml(refined);
+              if (
+                refinedClean && refinedClean.trim().length > 10 &&
+                auditReportQuality(refinedClean, template.area).score >= audit.score
+              ) {
+                html = refinedClean;
+                showToast('Auto-refino de qualidade aplicado ✓', 'info');
+              }
+            } catch (e) {
+              logger.warn('[useExamActions] Auto-refino falhou (mantendo geração original):', e);
+            }
+          }
+        }
+
         // Proteção contra laudos em branco
         if (html && html.trim().length > 10) {
           // Loop de feedback: snapshot da 1ª geração (base do diff no finalize).

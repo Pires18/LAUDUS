@@ -161,7 +161,7 @@ IDIOMA, TERMINOLOGIA E PADRÃO NUMÉRICO:
       • Peso fetal em gramas: sem casas decimais (ex: "1.888 g", "3.245 g");
       • BCF/frequência cardíaca: sem casas (ex: "145 bpm", "162 bpm");
       • Doppler (IP, IR): 2 casas (ex: "0,85", "1,20");
-      • Velocidades Doppler em cm/s: 1 casa (ex: "78,5 cm/s");
+      • Velocidades Doppler em cm/s: 1 casa por padrão; 2 casas quando a convenção da especialidade exigir (ex.: VPS/VDF vasculares — SBACV), conforme a diretriz de área;
   — PROIBIDO: unidades órfãs ("___cm", "(...) bpm"), números sem unidade contextual.`;
 
 // ═══════════════════════════════════════════════════════════════════════
