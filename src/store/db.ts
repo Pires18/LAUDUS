@@ -468,25 +468,20 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
       logger.warn('[DB] Documento global_config/admin_settings NÃO existe no Firestore.');
     }
 
-    // 2. Fallback para carregar do documento de usuário se o global ainda não existir
-    logger.info('[DB] Tentando carregar settings diretamente do documento do usuário administrador como fallback...');
+    // 2. Fallback: ler as settings direto da subárvore do admin — SÓ funciona
+    //    para o próprio admin (as regras do Firestore bloqueiam qualquer outro
+    //    usuário de ler users/{adminUid}/**). Guardamos por isso, evitando um
+    //    read fadado ao permission-denied (e o warning ruidoso) para não-admins.
     const adminUid = await resolveAdminUid();
-    if (adminUid) {
+    const currentUid = auth.currentUser?.uid;
+    if (adminUid && currentUid === adminUid) {
       const adminDocRef = doc(firestore, `users/${adminUid}/settings`, SETTINGS_DOC_ID);
       const adminSnap = await getDoc(adminDocRef);
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AppSettings;
-        logger.info('[DB] Settings carregadas do fallback (documento do admin). Chaves:', {
-          hasGeminiKey: !!adminData.geminiApiKey,
-          hasAnthropicKey: !!adminData.anthropicApiKey
-        });
         migrateLegacyAnthropicModel(adminData);
         return adminData;
-      } else {
-        logger.warn(`[DB] Documento de settings do admin (users/${adminUid}/settings/app) não existe.`);
       }
-    } else {
-      logger.warn('[DB] Não foi possível resolver o adminUid para o fallback.');
     }
   } catch (e: any) {
     logger.error('[DB] Erro crítico ao carregar settings do administrador:', e);
