@@ -6,26 +6,21 @@ import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 
 /**
- * Resolves the canonical Gemini model ID from any alias or raw setting.
- * Mapeia apelidos/valores antigos para IDs REAIS e estáveis da API do Google
- * (modelos "preview"/inexistentes como gemini-3.5-flash causavam erro 404).
+ * Resolves the canonical Gemini model ID. Modelos oficiais do usuário:
+ * Lite = gemini-3.5-flash, Pro = gemini-3.1-pro-preview.
  */
 function resolveGeminiModelId(rawModel: string): string {
   const raw = (rawModel || '').toLowerCase();
 
-  // ── Tiers Pro ──
-  if (raw.includes('1.5') && raw.includes('pro'))   return 'gemini-1.5-pro';
-  if (raw.includes('pro'))                           return 'gemini-2.5-pro';
+  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
+  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
+  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
+  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
 
-  // ── Tiers Flash ──
-  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.0-flash';
-  if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
-  if (raw.includes('flash'))                         return 'gemini-2.5-flash';
-
-  // Já é um ID Gemini válido e específico? Mantém.
-  if (/^gemini-(1\.5|2\.0|2\.5)-/.test(raw)) return rawModel;
-
-  return 'gemini-2.5-flash';
+  return 'gemini-3.5-flash';
 }
 
 /** Build the standard Gemini request body. */

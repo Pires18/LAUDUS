@@ -735,20 +735,20 @@ ${contextMessage}`;
 export function resolveGeminiModel(rawModel: string | undefined): string {
   const raw = (rawModel || '').toLowerCase();
 
-  // Mapeia para IDs REAIS e estáveis do Google (IDs "preview"/inexistentes
-  // como gemini-3.5-flash / gemini-3.1-pro-preview causavam erro 404).
-  if (raw.includes('1.5') && raw.includes('pro'))   return 'gemini-1.5-pro';
-  if (raw.includes('pro'))                           return 'gemini-2.5-pro';
-  if (raw.includes('2.0') && raw.includes('flash')) return 'gemini-2.0-flash';
-  if (raw.includes('1.5') && raw.includes('flash')) return 'gemini-1.5-flash';
-  if (raw.includes('flash'))                         return 'gemini-2.5-flash';
-  if (/^gemini-(1\.5|2\.0|2\.5)-/.test(raw))         return rawModel as string;
+  // Modelos oficiais do usuário: Lite = gemini-3.5-flash, Pro = gemini-3.1-pro-preview.
+  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
+  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
+  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
+  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
+  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
+  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
 
-  return 'gemini-2.5-flash';
+  return 'gemini-3.5-flash';
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
-  const modelToUse = settings.geminiModel || 'gemini-2.5-flash';
+  const modelToUse = settings.geminiModel || 'gemini-3.5-flash';
   return resolveGeminiModel(modelToUse);
 }
 
@@ -812,7 +812,7 @@ async function resolveMotorConfigAndCheckQuota(
   mode: string
 ): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; resolvedMotor: 'lite' | 'pro'; uid?: string }> {
   const uid = auth.currentUser?.uid;
-  let resolvedModelName = 'gemini-2.5-flash';
+  let resolvedModelName = 'gemini-3.5-flash';
   let resolvedMotor: 'lite' | 'pro' = settings.selectedMotor === 'pro' ? 'pro' : 'lite';
 
   if (!uid) {
@@ -848,8 +848,8 @@ async function resolveMotorConfigAndCheckQuota(
       const motorConfigRef = doc(firestore, 'global_config', 'motor_config');
       const motorConfigSnap = await getDoc(motorConfigRef);
       const motorConfig = {
-        lite: { model: 'gemini-2.5-flash' },
-        pro:  { model: 'gemini-2.5-pro' }
+        lite: { model: 'gemini-3.5-flash' },
+        pro:  { model: 'gemini-3.1-pro-preview' }
       };
 
       if (motorConfigSnap.exists()) {
