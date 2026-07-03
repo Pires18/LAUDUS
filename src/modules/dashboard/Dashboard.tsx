@@ -23,6 +23,7 @@ import { AreaIcon } from '../../components/AreaIcon';
 import { classNames, formatDateTime } from '../../utils/format';
 import { motion } from 'framer-motion';
 import { Skeleton } from '../../components/SkeletonLoader';
+import { SetupChecklist } from '../../components/SetupChecklist';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -150,6 +151,8 @@ export function Dashboard() {
 
   return (
     <div className="module-container">
+
+      <SetupChecklist />
 
       {/* ─── COMPACT HERO ─── */}
       <div className="bg-white border border-ink-200 rounded-2xl mb-5 shadow-sm overflow-hidden">

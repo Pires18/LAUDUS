@@ -1,4 +1,4 @@
-# LAUD.US v2.0
+# LAUD.US
 
 > **Plataforma profissional de laudos ultrassonográficos com IA integrada**
 
@@ -15,7 +15,7 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
 | Estado Global | Zustand |
 | Banco de Dados | Firebase Firestore (realtime) |
 | Autenticação | Firebase Auth (Google + Email) |
-| IA | Google Gemini API (gemini-2.0-flash, gemini-1.5-pro) / Anthropic Claude |
+| IA | Google Gemini via proxy server-side (Lite: `gemini-3.5-flash` · Pro: `gemini-3.1-pro-preview`) |
 | PACS | Orthanc (primário + backup) via Proxy HTTP local |
 | Editor | Tiptap (ProseMirror) |
 | Animações | Framer Motion |
@@ -153,8 +153,9 @@ npm run preview  # Preview do build de produção
 
 ## Variáveis de Ambiente
 
-Configure um arquivo `.env.local`:
+Copie `.env.example` para `.env` e preencha. Node **22.x** é exigido (ver `engines`).
 
+**Cliente (Vite — expostas no browser, prefixo `VITE_`):**
 ```env
 VITE_FIREBASE_API_KEY=...
 VITE_FIREBASE_AUTH_DOMAIN=...
@@ -164,7 +165,23 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-As API keys da IA (Gemini/Anthropic) são configuradas pelo usuário diretamente na interface de Configurações e salvas no Firestore.
+**Servidor (proxies `api/*` — nunca expostas ao browser):**
+```env
+# Chave de IA — server-side (o cliente NÃO envia mais a chave)
+GOOGLE_API_KEY=...
+# Admin SDK do Firebase (usado por api/_firebase, _edgeAuth, webhooks)
+FIREBASE_PROJECT_ID=...
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY=...
+# Pagamentos e cron (se usar)
+ABACATEPAY_API_KEY=...
+ABACATEPAY_WEBHOOK_SECRET=...
+CRON_SECRET=...
+# Monitoramento de erros (opcional)
+VITE_SENTRY_DSN=
+```
+
+> **Dev local:** `npm run dev` (Vite) já intermedia `/api/gemini` para a API real — coloque `GOOGLE_API_KEY` no `.env` que o proxy de dev a usa (sem precisar de chave na UI). As demais vars de servidor só são necessárias ao rodar as funções serverless (`vercel dev`) ou em produção na Vercel.
 
 ---
 
