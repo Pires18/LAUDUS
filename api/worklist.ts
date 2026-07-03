@@ -4,7 +4,7 @@ export default async function handler(req: any, res: any) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-agent-secret');
 
   // Preflight CORS request
   if (req.method === 'OPTIONS') {
@@ -53,11 +53,14 @@ export default async function handler(req: any, res: any) {
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      // Segredo compartilhado (server-side, nunca exposto ao navegador): se o
-      // agente exigir LAUDUS_AGENT_SECRET, o Vercel o repassa via header.
+      // Segredo do Agente Local (per-usuário): cada usuário tem o próprio agente
+      // e o próprio segredo. O navegador envia x-agent-secret e o Vercel apenas
+      // REPASSA (não usa segredo global). Fallback ao env global só por
+      // retrocompatibilidade de instalações single-tenant.
+      const perUserSecret = req.headers['x-agent-secret'] || body?.agentSecret || process.env.LAUDUS_AGENT_SECRET;
       const fwdHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (process.env.LAUDUS_AGENT_SECRET) {
-        fwdHeaders['x-agent-secret'] = process.env.LAUDUS_AGENT_SECRET;
+      if (perUserSecret) {
+        fwdHeaders['x-agent-secret'] = String(perUserSecret);
       }
       const response = await fetch(targetUrl, {
         method: req.method,

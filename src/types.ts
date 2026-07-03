@@ -244,7 +244,10 @@ export interface AppSettings {
   dicomUsername?: string;
   dicomPassword?: string;
   dicomLocalAgentUrl?: string;
-  
+  /** Segredo do Agente Local (per-usuário) — exigido pelo agente exposto via
+   *  Tailscale Funnel. Enviado como x-agent-secret / ?agentSecret. Criptografado. */
+  dicomAgentSecret?: string;
+
   // Configurações do PACS de Backup (Redundância)
   dicomBackupViewerUrl?: string;
   dicomBackupTailscalePublicUrl?: string;
@@ -254,6 +257,7 @@ export interface AppSettings {
   dicomBackupWorklistFolder?: string;
   dicomBackupLocalAgentUrl?: string;
   dicomBackupOrthancAETitle?: string;
+  dicomBackupAgentSecret?: string;
 
   /** Criatividade da IA por modo operacional */
   aiTemperatureByMode?: {

@@ -423,6 +423,22 @@ export function DicomControlCenter() {
                     </div>
 
                     <div className="md:col-span-2">
+                      <label className="label">Segredo do Agente (x-agent-secret) — recomendado ao expor via Tailscale</label>
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        className="input h-11 text-sm font-mono"
+                        value={draft.dicomAgentSecret || ''}
+                        onChange={(e) => u('dicomAgentSecret', e.target.value)}
+                        placeholder="Defina o mesmo valor de LAUDUS_AGENT_SECRET no agente"
+                      />
+                      <p className="text-[11px] text-ink-400 mt-1 leading-relaxed">
+                        Fecha o acesso público ao seu agente. Inicie o agente com o mesmo segredo:
+                        <code className="mx-1 px-1 bg-ink-100 rounded">LAUDUS_AGENT_SECRET=... node agent.js</code>. Vazio = agente aberto (não recomendado na nuvem).
+                      </p>
+                    </div>
+
+                    <div className="md:col-span-2">
                       <label className="label">Diretório Absoluto da Worklist (Servidor Local)</label>
                       <input
                         className="input h-11 text-sm"

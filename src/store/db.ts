@@ -30,28 +30,35 @@ import { logger } from '../utils/logger';
 import { encryptPassword, decryptPassword } from '../utils/crypto';
 import { getCachedIdToken } from '../lib/authToken';
 
-async function decryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
-  settings: T
-): Promise<T> {
+type DicomSecrets = {
+  dicomPassword?: string;
+  dicomBackupPassword?: string;
+  dicomAgentSecret?: string;
+  dicomBackupAgentSecret?: string;
+};
+
+async function decryptDicomPasswords<T extends DicomSecrets>(settings: T): Promise<T> {
   const uid = auth.currentUser?.uid;
   if (!uid) return settings;
-  const [pw, bkpw] = await Promise.all([
+  const [pw, bkpw, agent, bkAgent] = await Promise.all([
     settings.dicomPassword ? decryptPassword(settings.dicomPassword, uid) : Promise.resolve(''),
     settings.dicomBackupPassword ? decryptPassword(settings.dicomBackupPassword, uid) : Promise.resolve(''),
+    settings.dicomAgentSecret ? decryptPassword(settings.dicomAgentSecret, uid) : Promise.resolve(''),
+    settings.dicomBackupAgentSecret ? decryptPassword(settings.dicomBackupAgentSecret, uid) : Promise.resolve(''),
   ]);
-  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw };
+  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw, dicomAgentSecret: agent, dicomBackupAgentSecret: bkAgent };
 }
 
-async function encryptDicomPasswords<T extends { dicomPassword?: string; dicomBackupPassword?: string }>(
-  settings: T
-): Promise<T> {
+async function encryptDicomPasswords<T extends DicomSecrets>(settings: T): Promise<T> {
   const uid = auth.currentUser?.uid;
   if (!uid) return settings;
-  const [pw, bkpw] = await Promise.all([
+  const [pw, bkpw, agent, bkAgent] = await Promise.all([
     settings.dicomPassword ? encryptPassword(settings.dicomPassword, uid) : Promise.resolve(''),
     settings.dicomBackupPassword ? encryptPassword(settings.dicomBackupPassword, uid) : Promise.resolve(''),
+    settings.dicomAgentSecret ? encryptPassword(settings.dicomAgentSecret, uid) : Promise.resolve(''),
+    settings.dicomBackupAgentSecret ? encryptPassword(settings.dicomBackupAgentSecret, uid) : Promise.resolve(''),
   ]);
-  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw };
+  return { ...settings, dicomPassword: pw, dicomBackupPassword: bkpw, dicomAgentSecret: agent, dicomBackupAgentSecret: bkAgent };
 }
 
 // Cache global para evitar múltiplas queries do UID do administrador
@@ -1066,14 +1073,18 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
  * (via query porque `<img src>` não suporta headers).
  */
 export function getDicomAuthParams(
-  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword'>,
+  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword' | 'dicomAgentSecret' | 'dicomBackupAgentSecret'>,
   isBackup = false
 ): string {
   const username = isBackup ? settings.dicomBackupUsername : settings.dicomUsername;
   const password = isBackup ? settings.dicomBackupPassword : settings.dicomPassword;
+  // Segredo do Agente Local (per-usuário): via query porque <img> não envia
+  // headers. Vai só ao agente do próprio usuário; não é segredo global.
+  const agentSecret = isBackup ? settings.dicomBackupAgentSecret : settings.dicomAgentSecret;
   const token = getCachedIdToken();
   return `&username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
-    + (token ? `&token=${encodeURIComponent(token)}` : '');
+    + (token ? `&token=${encodeURIComponent(token)}` : '')
+    + (agentSecret ? `&agentSecret=${encodeURIComponent(agentSecret)}` : '');
 }
 
 /**
@@ -1123,7 +1134,8 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getCachedIdToken()}`
+      'Authorization': `Bearer ${getCachedIdToken()}`,
+      ...(settings.dicomAgentSecret ? { 'x-agent-secret': settings.dicomAgentSecret } : {})
     },
     body: JSON.stringify({
       examId,
@@ -1143,7 +1155,8 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getCachedIdToken()}`
+        'Authorization': `Bearer ${getCachedIdToken()}`,
+        ...(settings.dicomBackupAgentSecret ? { 'x-agent-secret': settings.dicomBackupAgentSecret } : {})
       },
       body: JSON.stringify({
         examId,

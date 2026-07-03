@@ -12,6 +12,25 @@ const PORT = process.env.PORT || 3000;
 // o agente roda aberto (retrocompatível) e avisa no console.
 const AGENT_SECRET = process.env.LAUDUS_AGENT_SECRET || '';
 
+// Endurecimento opt-in (anti-SSRF): se definido, o proxy só alcança estes hosts
+// (o Orthanc do usuário). Ex: LAUDUS_ALLOWED_HOSTS="localhost,127.0.0.1,192.168.1.50"
+const ALLOWED_HOSTS = (process.env.LAUDUS_ALLOWED_HOSTS || '')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+// Se definido, TODA gravação de worklist usa este diretório (ignora o outputDir
+// do payload) — evita escrita de arquivo em caminho arbitrário.
+const WORKLIST_DIR = process.env.LAUDUS_WORKLIST_DIR || '';
+
+// Endpoints de metadados de nuvem são SEMPRE bloqueados no proxy.
+const BLOCKED_HOSTS = new Set(['169.254.169.254', 'metadata.google.internal']);
+
+function isProxyTargetAllowed(targetUrlObj) {
+  const host = (targetUrlObj.hostname || '').toLowerCase();
+  if (BLOCKED_HOSTS.has(host)) return false;
+  if (ALLOWED_HOSTS.length > 0) return ALLOWED_HOSTS.includes(host);
+  return true; // sem allowlist → retrocompatível (metadados já bloqueados)
+}
+
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
@@ -21,11 +40,17 @@ function setCorsHeaders(res) {
 // Retorna true se autorizado; caso contrário responde 401 e retorna false.
 function requireSecret(req, res) {
   if (!AGENT_SECRET) return true; // sem segredo configurado → aberto (aviso no boot)
-  const provided = req.headers['x-agent-secret'];
-  if (provided && provided === AGENT_SECRET) return true;
+  const headerSecret = req.headers['x-agent-secret'];
+  // Query param 'agentSecret' — necessário para requisições <img> (imagens
+  // DICOM), que não conseguem enviar headers customizados.
+  let querySecret = null;
+  try { querySecret = new URL(req.url, 'http://localhost').searchParams.get('agentSecret'); } catch {}
+  if ((headerSecret && headerSecret === AGENT_SECRET) || (querySecret && querySecret === AGENT_SECRET)) {
+    return true;
+  }
   res.statusCode = 401;
   res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify({ success: false, error: 'Não autorizado: x-agent-secret ausente ou inválido.' }));
+  res.end(JSON.stringify({ success: false, error: 'Não autorizado: segredo do agente ausente ou inválido.' }));
   return false;
 }
 
@@ -69,6 +94,12 @@ const server = http.createServer((req, res) => {
         }
 
         const targetUrlObj = new URL(targetUrl);
+        if (!isProxyTargetAllowed(targetUrlObj)) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Destino não permitido pelo agente.' }));
+          return;
+        }
         const headers = {};
 
         // Credenciais do Orthanc: query params ou embutidas na URL. Sem
@@ -129,7 +160,11 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body);
-        
+
+        // Restrição opt-in: força o diretório de saída configurado no agente,
+        // ignorando o outputDir do payload (evita escrita em caminho arbitrário).
+        if (WORKLIST_DIR) payload.outputDir = WORKLIST_DIR;
+
         // Caminho para o script python
         const pythonScriptPath = path.join(__dirname, 'generate_wl.py');
         
@@ -211,16 +246,23 @@ const server = http.createServer((req, res) => {
       try {
         const payload = JSON.parse(body);
         const { examId, outputDir } = payload;
-        
+
         if (!examId) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ success: false, error: 'O campo examId é obrigatório.' }));
           return;
         }
-        
-        // Mapeia pasta final
-        let dir = outputDir;
+        // Anti path-traversal: examId compõe o nome do arquivo — só alfanumérico.
+        if (!/^[A-Za-z0-9_-]+$/.test(String(examId))) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: 'examId inválido.' }));
+          return;
+        }
+
+        // Mapeia pasta final (WORKLIST_DIR do agente tem prioridade, se definido)
+        let dir = WORKLIST_DIR || outputDir;
         if (!dir) {
           const isWindows = process.platform === 'win32';
           dir = isWindows 

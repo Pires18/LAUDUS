@@ -58,7 +58,8 @@ export async function syncExamToOrthancWorklist(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getCachedIdToken()}`
+            'Authorization': `Bearer ${getCachedIdToken()}`,
+            ...(settings.dicomAgentSecret ? { 'x-agent-secret': settings.dicomAgentSecret } : {})
           },
           body: JSON.stringify({
             examId,
@@ -93,7 +94,8 @@ export async function syncExamToOrthancWorklist(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getCachedIdToken()}`
+            'Authorization': `Bearer ${getCachedIdToken()}`,
+            ...(settings.dicomBackupAgentSecret ? { 'x-agent-secret': settings.dicomBackupAgentSecret } : {})
           },
           body: JSON.stringify({
             examId,
