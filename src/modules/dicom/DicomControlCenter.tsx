@@ -54,7 +54,7 @@ export function DicomControlCenter() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
-  const [selectedSection, setSelectedSection] = useState<'walkthrough' | 'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('walkthrough');
+  const [selectedSection, setSelectedSection] = useState<'walkthrough' | 'cloud_vm' | 'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('walkthrough');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -67,6 +67,30 @@ export function DicomControlCenter() {
 
   function u<K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
+  }
+
+  /**
+   * Aplica um preset ao Servidor Principal. Preenche apenas os campos estruturais
+   * (URL do Orthanc, AE Title, pasta da worklist, sync). NÃO sobrescreve a URL do
+   * Agente nem o Segredo — esses são específicos da instalação do usuário.
+   */
+  function applyServerPreset(kind: 'cloud' | 'local') {
+    setDraft((d) => ({
+      ...d,
+      dicomSyncEnabled: true,
+      dicomViewerUrl: 'http://localhost:8042',
+      dicomOrthancAETitle: 'ORTHANC',
+      dicomWorklistFolder:
+        kind === 'cloud'
+          ? '/opt/orthanc-data/worklists'
+          : 'C:\\OrthancServer\\db\\WorklistsDatabase\\',
+    }));
+    showToast(
+      kind === 'cloud'
+        ? 'Preset "Servidor na Nuvem (VM)" aplicado. Preencha a URL do Agente (Funnel) e o Segredo, depois Salve.'
+        : 'Preset "Servidor Local" aplicado. Ajuste a pasta da worklist se necessário e Salve.',
+      'success'
+    );
   }
 
   async function handleSave() {
@@ -333,8 +357,44 @@ export function DicomControlCenter() {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-ink-900">Servidor PACS Principal (Matriz)</h3>
-                      <p className="text-xs text-ink-500 font-medium">Parametrização do Orthanc ativo na rede ou VPN.</p>
+                      <p className="text-xs text-ink-500 font-medium">Parametrização do Orthanc ativo na nuvem (VM) ou rede local.</p>
                     </div>
+                  </div>
+
+                  {/* Presets rápidos: preenchem os campos estruturais conforme o cenário */}
+                  <div className="rounded-xl bg-ink-50 border border-ink-100 p-3">
+                    <p className="text-[10px] font-bold text-ink-500 uppercase tracking-wider mb-2">Preencher automaticamente</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => applyServerPreset('cloud')}
+                        className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all text-left"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <Cloud size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-ink-900">Servidor na Nuvem (VM)</p>
+                          <p className="text-[10px] text-ink-500 leading-tight">Orthanc localhost · worklist /opt/orthanc-data/worklists</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyServerPreset('local')}
+                        className="flex items-center gap-2 p-2.5 rounded-lg bg-white border border-ink-200 hover:border-ink-400 hover:bg-ink-50 transition-all text-left"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-ink-100 text-ink-600 flex items-center justify-center shrink-0">
+                          <HardDrive size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-ink-900">Servidor Local (Windows)</p>
+                          <p className="text-[10px] text-ink-500 leading-tight">Orthanc localhost · worklist C:\OrthancServer\…</p>
+                        </div>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-ink-400 mt-2 leading-relaxed">
+                      Os presets preenchem só os campos estruturais. A <strong>URL do Agente</strong> (Funnel) e o <strong>Segredo</strong> continuam por sua conta.
+                    </p>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-xl bg-ink-50 border border-ink-100">
@@ -736,6 +796,7 @@ export function DicomControlCenter() {
                 <div className="col-span-1 border-r border-ink-100 bg-ink-50/50 p-4 space-y-1">
                   {[
                     { group: '▶ Comece aqui', items: [
+                      { id: 'cloud_vm', label: 'Servidor na Nuvem (VM) ★', icon: Cloud },
                       { id: 'walkthrough', label: 'Passo a passo (do zero)', icon: CheckCircle2 },
                     ]},
                     { group: 'Entender', items: [
@@ -780,6 +841,106 @@ export function DicomControlCenter() {
 
                 {/* Conteúdo da Seção Selecionada */}
                 <div className="col-span-3 p-6 overflow-y-auto max-h-[600px] custom-scrollbar">
+                  {selectedSection === 'cloud_vm' && (() => {
+                    const Cmd = ({ text, id }: { text: string; id: string }) => (
+                      <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
+                        <span className="break-all whitespace-pre-wrap">{text}</span>
+                        <button onClick={() => handleCopy(text, id)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">
+                          {copiedField === id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    );
+                    const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
+                      <div className="flex gap-3.5">
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-sm">{n}</div>
+                        <div className="flex-1 space-y-2 pb-1">
+                          <h4 className="text-[13px] font-black text-ink-900 leading-tight pt-1">{title}</h4>
+                          {children}
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <div className="space-y-5 animate-fade-in">
+                        <div className="pb-3 border-b border-ink-100">
+                          <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> Servidor na Nuvem (VM) — arquitetura recomendada</h3>
+                          <p className="text-[11px] text-ink-500 font-medium">Orthanc + Agente rodam numa VM (Google Cloud). A clínica só faz um relé Tailscale. O servidor local vira backup opcional.</p>
+                        </div>
+
+                        {/* Topologia resumida */}
+                        <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-2">
+                          <h4 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Network size={13} /> Como fica</h4>
+                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                            <li><strong>VM (nuvem):</strong> Orthanc (Docker) + Agente LAUD.US + Tailscale Funnel. É o servidor <strong>principal</strong>, sempre ligado.</li>
+                            <li><strong>Clínica:</strong> um <strong>relé</strong> Tailscale (roteador GL.iNet, ou o PC do dia a dia) liga o ultrassom à VM. Sem Orthanc, sem dados locais.</li>
+                            <li><strong>LAUD.US (navegador):</strong> fala com a VM pela URL Funnel (HTTPS). <strong>Não precisa de Tailscale.</strong></li>
+                            <li><strong>Backup (opcional):</strong> um Orthanc local pode ser configurado na aba "Servidores" como redundância.</li>
+                          </ul>
+                        </div>
+
+                        <Step n={1} title="Preparar a VM (Docker + Tailscale)">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Numa VM Debian/Ubuntu no Google Cloud (região <code>southamerica-east1</code>), instale Docker e Tailscale:</p>
+                          <Cmd id="cvm-docker" text="curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER" />
+                          <Cmd id="cvm-ts" text="curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up" />
+                          <Cmd id="cvm-ip" text="tailscale ip -4   # anote o IP 100.x.y.z da VM (o ultrassom vai usar este)" />
+                        </Step>
+
+                        <Step n={2} title="Subir o Orthanc (Docker, com Worklist + DICOMweb)">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Crie <code>/opt/orthanc/docker-compose.yml</code> (HTTP só no localhost; DICOM 4242 aberto para o relé):</p>
+                          <Cmd id="cvm-compose" text={`services:\n  orthanc:\n    image: orthancteam/orthanc:latest\n    restart: unless-stopped\n    ports:\n      - "127.0.0.1:8042:8042"\n      - "0.0.0.0:4242:4242"\n    volumes:\n      - /opt/orthanc-data:/var/lib/orthanc/db\n      - /opt/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro\n      - /opt/orthanc-data/worklists:/var/lib/orthanc/worklists`} />
+                          <p className="text-[11px] text-ink-600 leading-relaxed">E o <code>/opt/orthanc/orthanc.json</code> (modo prático, sem senha — a proteção é o Tailscale):</p>
+                          <Cmd id="cvm-json" text={`{\n  "Name": "PACS LAUDUS CLOUD",\n  "HttpPort": 8042, "HttpServerEnabled": true,\n  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",\n  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,\n  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true, "DicomAlwaysAllowFind": true,\n  "Worklists": { "Enable": true, "Database": "/var/lib/orthanc/worklists" },\n  "DicomWeb": { "Enable": true }\n}`} />
+                          <Cmd id="cvm-up" text="cd /opt/orthanc && docker compose up -d" />
+                        </Step>
+
+                        <Step n={3} title="Ligar o Agente LAUD.US na VM + expor via Funnel">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Copie <code>scripts/agent.js</code> e <code>scripts/generate_wl.py</code> para a VM, instale Node + <code>pip install pydicom</code>, e rode o agente (como serviço systemd) com as variáveis:</p>
+                          <Cmd id="cvm-agent" text={`LAUDUS_AGENT_SECRET=<segredo-forte> \\\nLAUDUS_WORKLIST_DIR=/opt/orthanc-data/worklists \\\nLAUDUS_ALLOWED_HOSTS=localhost,127.0.0.1 \\\nnode agent.js`} />
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Exponha <strong>só o agente</strong> (porta 3000) na internet via Funnel — devolve a URL <code>https://&lt;vm&gt;.&lt;tailnet&gt;.ts.net</code>:</p>
+                          <Cmd id="cvm-funnel" text="tailscale funnel --bg 3000" />
+                        </Step>
+
+                        <Step n={4} title="Configurar no LAUD.US (aba Servidores)">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Clique no preset <strong>“Servidor na Nuvem (VM)”</strong> na aba Servidores e complete:</p>
+                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                            <li><strong>URL do Agente Local</strong> = a URL do Funnel da VM.</li>
+                            <li><strong>URL do Orthanc</strong> = <code>http://localhost:8042</code> (o agente resolve na própria VM).</li>
+                            <li><strong>Segredo do Agente</strong> = o mesmo <code>LAUDUS_AGENT_SECRET</code>.</li>
+                            <li><strong>Pasta da Worklist</strong> = <code>/opt/orthanc-data/worklists</code>.</li>
+                          </ul>
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Salve e use <strong>“Executar Diagnóstico”</strong> — deve ficar tudo verde.</p>
+                        </Step>
+
+                        <Step n={5} title="Relé na clínica (ligar o ultrassom à VM)">
+                          <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1.5">
+                            <div className="font-black text-[11px] text-ink-800 uppercase">Modo A1 — Roteador GL.iNet (recomendado)</div>
+                            <p className="text-[11px] text-ink-600 leading-relaxed">O GL.iNet já roda Tailscale. Aprove as rotas no admin da tailnet. No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):4242</strong>, AE <code>ORTHANC</code>. Zero software extra.</p>
+                          </div>
+                          <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1.5">
+                            <div className="font-black text-[11px] text-ink-800 uppercase">Modo A2 — PC do dia a dia (com Tailscale)</div>
+                            <p className="text-[11px] text-ink-600 leading-relaxed">No PC (que roda Tailscale), encaminhe a porta 4242 para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:4242</strong>.</p>
+                            <p className="text-[10px] text-ink-500 font-bold mt-1">Windows:</p>
+                            <Cmd id="cvm-netsh" text="netsh interface portproxy add v4tov4 listenport=4242 listenaddress=0.0.0.0 connectport=4242 connectaddress=<IP-TAILNET-DA-VM>" />
+                            <p className="text-[10px] text-ink-500 font-bold mt-1">macOS/Linux:</p>
+                            <Cmd id="cvm-socat" text="socat TCP-LISTEN:4242,fork,reuseaddr TCP:<IP-TAILNET-DA-VM>:4242" />
+                            <p className="text-[10px] text-amber-700 leading-relaxed mt-1">⚠️ Neste modo, o ultrassom só alcança a VM com o PC ligado e no Tailscale.</p>
+                          </div>
+                        </Step>
+
+                        <Step n={6} title="Validar">
+                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                            <li>C-ECHO no ultrassom → sucesso.</li>
+                            <li>Criar exame no LAUD.US → a worklist aparece no aparelho.</li>
+                            <li>Fazer o exame → as imagens sobem à VM e aparecem no laudo.</li>
+                          </ul>
+                        </Step>
+
+                        <div className="p-3 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
+                          Migração dos exames antigos (local → VM) e desativação do servidor local estão no manual completo <code className="text-emerald-300">docs/PROJETO_PACS_NUVEM.md</code> (Fases 3 e 4). Migre e confira as contagens <strong>antes</strong> de desligar o local.
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {selectedSection === 'walkthrough' && (() => {
                     const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
                       <div className="flex gap-3.5">

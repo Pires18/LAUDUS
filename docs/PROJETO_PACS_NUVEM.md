@@ -1,7 +1,8 @@
 # 🏗️ Projeto — PACS/DICOM unificado em VM na nuvem (Google Cloud + Tailscale)
 
 **Decisões aprovadas (03/07/2026):**
-- **Conectividade do US:** Opção A — **relé local Tailscale** (caixinha leve na clínica).
+- **Servidor principal:** **sempre a VM na nuvem** (Google Cloud). O servidor local passa a ser **backup opcional** (redundância), configurável na aba "Servidores" do painel DICOM.
+- **Conectividade do US:** Opção A — **relé Tailscale**, reaproveitando hardware existente: **roteador GL.iNet** (dono / recomendado) ou o **PC do dia a dia** do usuário. Sem caixinha nova.
 - **Modelo:** **1 VM por usuário** (isolado).
 
 > Objetivo: mover Orthanc + Worklist + Agente + dados para uma **VM por usuário** no Google Cloud, acessada via **Tailscale**, mantendo na clínica apenas um **relé** minúsculo (sem Orthanc, sem dados). Migrar os exames atuais e desativar os Orthanc locais.
@@ -104,22 +105,31 @@ No app (Configurações → PACS/DICOM):
 
 ---
 
-## 3. FASE 2 — Relé na clínica (US → nuvem)
+## 3. FASE 2 — Relé (US → nuvem). Reaproveita hardware existente — sem caixinha nova.
 
-Em um dispositivo sempre-ligado na clínica (Raspberry Pi ~R$300, mini-PC, ou um PC já existente):
+O "relé" é o que faz o US alcançar a VM pela tailnet. Há **dois modos**, conforme o hardware do usuário:
 
-**Opção recomendada — relé TCP com `socat`** (simples, transparente para DICOM):
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up
-sudo apt install -y socat
-# encaminha o 4242 local para o Orthanc da VM (IP tailnet da VM):
-socat TCP-LISTEN:4242,fork,reuseaddr TCP:<VM-TAILSCALE-IP>:4242
-# (rodar como serviço systemd para subir sozinho)
-```
-- No **ultrassom**: apontar Worklist e Storage para o **IP local do relé**, porta **4242**, AE **ORTHANC**.
-- Alternativa ao socat: **Tailscale subnet router** no relé (`--advertise-routes`) — mais poderoso, um pouco mais de config.
+### Modo A1 — Roteador GL.iNet com Tailscale (dono / quem tem roteador Tailscale)
+O GL.iNet já roda Tailscale e roteia a LAN para a tailnet. O US, conectado ao GL.iNet, alcança a VM direto:
+- No painel do GL.iNet, garantir Tailscale **ativo** e o roteamento da LAN → tailnet habilitado (aceitar rotas / advertise). Na tailnet (admin console), **aprovar as rotas** do GL.iNet.
+- No **ultrassom**: apontar Worklist e Storage para o **IP tailnet da VM** (`100.x.y.z`), porta **4242**, AE **ORTHANC**.
+- **Zero software extra**, sempre-ligado. É o modo mais robusto.
 
-**Validação:** C-ECHO no US → sucesso; criar exame no LAUD.US → worklist aparece no US; fazer exame → imagens sobem à VM e aparecem no laudo.
+### Modo A2 — Computador do dia a dia do usuário (com Tailscale)
+Quando não há roteador Tailscale, o PC que o usuário já usa vira a ponte. Como o PC **não é o gateway**, o US não roteia a tailnet sozinho — usamos **encaminhamento de porta** no PC:
+- **Windows (nativo, sem instalar nada):**
+  ```cmd
+  netsh interface portproxy add v4tov4 listenport=4242 listenaddress=0.0.0.0 ^
+    connectport=4242 connectaddress=<IP-TAILNET-DA-VM>
+  netsh advfirewall firewall add rule name="DICOM-relay" dir=in action=allow protocol=TCP localport=4242
+  ```
+- **macOS/Linux:** `socat TCP-LISTEN:4242,fork,reuseaddr TCP:<IP-TAILNET-DA-VM>:4242` (rodar como serviço).
+- No **ultrassom**: apontar Worklist e Storage para o **IP LAN do PC do usuário**, porta **4242**, AE **ORTHANC**.
+- ⚠️ O US só alcança a VM **com o PC ligado e no Tailscale** (ok no horário de trabalho).
+
+**Validação (ambos os modos):** C-ECHO no US → sucesso; criar exame no LAUD.US → worklist aparece no US; fazer exame → imagens sobem à VM e aparecem no laudo.
+
+> Observação: o **navegador do LAUD.US NÃO precisa de Tailscale** — ele fala com a VM pela URL Funnel (HTTPS pública). Só o **relé** (roteador GL.iNet ou PC) precisa do Tailscale, e só para o caminho do US.
 
 ---
 
@@ -149,9 +159,11 @@ Só prossiga quando os números baterem.
 
 ---
 
-## 5. FASE 4 — Desativar servidores locais
-- Confirmado worklist + imagens + histórico migrado → **desligar o Orthanc local**.
-- Manter apenas o **relé** (Opção A). Guardar backup do Orthanc local em standby por **30 dias** antes de apagar.
+## 5. FASE 4 — Rebaixar o local a backup (não é mais o principal)
+- Confirmado worklist + imagens + histórico migrado → a **VM vira o principal**.
+- O Orthanc local **deixa de ser o principal**. Duas opções:
+  - **Desligar** (manter só o relé) — mais simples/barato; guardar backup em standby por **30 dias** antes de apagar.
+  - **Manter como backup/redundância** — configurar na aba "Servidores" → "Servidor PACS de Backup", para espelhamento. Recomendado para quem quer contingência offline.
 
 ---
 
@@ -162,11 +174,12 @@ Só prossiga quando os números baterem.
 
 ---
 
-## 7. Ajustes de código no LAUD.US (pequenos)
-O app já suporta "agente via Tailscale". Necessário:
-- **Nenhuma mudança estrutural** — é configuração (URL Funnel da VM + segredo).
-- **Opcional:** um preset "Servidor na Nuvem (VM)" no painel DICOM que já preenche `URL Orthanc = localhost:8042` e explica os campos.
-- **Guia PACS:** adicionar a seção "Servidor na Nuvem (VM + Tailscale)" ao lado da atual "Local/Funnel".
+## 7. Ajustes de código no LAUD.US — ✅ IMPLEMENTADO
+O app já suportava "agente via Tailscale"; foi só configuração + conveniência:
+- ✅ **Preset "Servidor na Nuvem (VM)"** no painel DICOM (aba Servidores) — preenche `URL Orthanc = http://localhost:8042`, AE `ORTHANC`, pasta `/opt/orthanc-data/worklists` e liga o sync, num clique. Também há preset "Servidor Local (Windows)". Não sobrescreve URL do Agente nem Segredo.
+- ✅ **Guia PACS:** nova seção **"Servidor na Nuvem (VM) ★"** (topo do menu Guias) com o passo a passo completo (Docker/Orthanc/agente/Funnel/relé/validação) e comandos copiáveis.
+- O **Servidor de Backup** (redundância) já existe no painel — é onde o Orthanc local entra como backup opcional.
+- **Nenhuma mudança estrutural** de código foi necessária além disso.
 
 ---
 
