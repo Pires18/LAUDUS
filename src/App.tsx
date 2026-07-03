@@ -29,12 +29,14 @@ import { useConfirmStore } from './hooks/useConfirm';
 import { useSubscription } from './hooks/useSubscription';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
-// ── Eager loads (critical path) ──
+// ── Eager loads (critical path: Dashboard é a landing view) ──
 import { Dashboard } from './modules/dashboard/Dashboard';
 import { Worklist } from './modules/worklist/Worklist';
-import { ExamEditor } from './modules/editor/ExamEditor';
 
 // ── Lazy loads (secondary modules) ──
+// ExamEditor é lazy: arrasta o motor de IA + Tiptap + LaudCopilot, só
+// necessários ao abrir um exame (não no load inicial).
+const ExamEditor = lazy(() => import('./modules/editor/ExamEditor').then(m => ({ default: m.ExamEditor })));
 const Patients = lazy(() => import('./modules/patients/Patients').then(m => ({ default: m.Patients })));
 const PatientDetail = lazy(() => import('./modules/patients/PatientDetail').then(m => ({ default: m.PatientDetail })));
 const Appointments = lazy(() => import('./modules/appointments/Appointments').then(m => ({ default: m.Appointments })));
@@ -70,7 +72,7 @@ function ViewRenderer() {
     patients: lazy('Pacientes', <Patients />),
     appointments: lazy('Agenda', <Appointments />),
     'patient-detail': view.name === 'patient-detail' ? lazy('Paciente', <PatientDetail key={view.patientId} patientId={view.patientId} />) : null,
-    'exam-editor': view.name === 'exam-editor' ? <ErrorBoundary inline label="Editor de Laudo"><ExamEditor key={view.examId} examId={view.examId} /></ErrorBoundary> : null,
+    'exam-editor': view.name === 'exam-editor' ? lazy('Editor de Laudo', <ExamEditor key={view.examId} examId={view.examId} />) : null,
     templates: lazy('Templates', <Templates />),
     'template-editor': view.name === 'template-editor' ? lazy('Editor de Template', <TemplateEditor key={view.templateId} templateId={view.templateId} />) : null,
     settings: lazy('Configurações', <Settings />),
