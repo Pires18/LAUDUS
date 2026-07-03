@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useApp } from '../../store/app';
 import { useAuth } from '../../hooks/useAuth';
 import { useSubscription } from '../../hooks/useSubscription';
@@ -54,7 +54,7 @@ export function DicomControlCenter() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
-  const [selectedSection, setSelectedSection] = useState<'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('concepts');
+  const [selectedSection, setSelectedSection] = useState<'walkthrough' | 'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('walkthrough');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -736,7 +736,8 @@ export function DicomControlCenter() {
                 <div className="col-span-1 border-r border-ink-100 bg-ink-50/50 p-4 space-y-1">
                   <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest px-3 block mb-3">Tópicos do Manual</span>
                   {[
-                    { id: 'concepts', label: '0. Conceitos Básicos (Comece Aqui)', icon: BookOpen },
+                    { id: 'walkthrough', label: '★ Passo a Passo do Zero', icon: CheckCircle2 },
+                    { id: 'concepts', label: '0. Conceitos Básicos', icon: BookOpen },
                     { id: 'architecture', label: '1. Fluxo & Arquitetura', icon: Network },
                     { id: 'prereq', label: '2. Preparação do Servidor', icon: Cpu },
                     { id: 'orthanc_json', label: '3. Configuração do Orthanc', icon: FileText },
@@ -767,6 +768,139 @@ export function DicomControlCenter() {
 
                 {/* Conteúdo da Seção Selecionada */}
                 <div className="col-span-3 p-6 overflow-y-auto max-h-[600px] custom-scrollbar">
+                  {selectedSection === 'walkthrough' && (() => {
+                    const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
+                      <div className="flex gap-3.5">
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-sm">{n}</div>
+                        <div className="flex-1 space-y-2 pb-1">
+                          <h4 className="text-[13px] font-black text-ink-900 leading-tight pt-1">{title}</h4>
+                          {children}
+                        </div>
+                      </div>
+                    );
+                    const Cmd = ({ text, id }: { text: string; id: string }) => (
+                      <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
+                        <span className="break-all">{text}</span>
+                        <button onClick={() => handleCopy(text, id)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">
+                          {copiedField === id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    );
+                    const Check_ = ({ children }: { children: ReactNode }) => (
+                      <div className="flex items-start gap-1.5 text-[11px] text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-lg px-2.5 py-1.5">
+                        <CheckCircle2 size={13} className="shrink-0 mt-0.5" /><span className="leading-relaxed">{children}</span>
+                      </div>
+                    );
+                    return (
+                      <div className="space-y-5 animate-fade-in">
+                        <div className="pb-3 border-b border-ink-100">
+                          <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">★ Passo a Passo Completo — do Zero ao Funcionando</h3>
+                          <p className="text-[11px] text-ink-500 font-medium">Siga de cima para baixo, sem pular. Após o último passo, seu PACS estará operando.</p>
+                        </div>
+
+                        {/* Escolha do cenário */}
+                        <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-2.5">
+                          <h4 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Antes de começar: qual é o seu caso?</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="p-3 rounded-xl bg-white border border-ink-150">
+                              <div className="font-black text-[11px] text-ink-800 uppercase mb-1">🏠 Cenário LOCAL</div>
+                              <p className="text-[11px] text-ink-600 leading-relaxed">Você abre o LAUD.US <strong>no mesmo computador/rede</strong> da clínica. Não precisa de Tailscale. Faça os passos 1–4, 6, 7, 8 (pule o 5).</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-white border border-ink-150">
+                              <div className="font-black text-[11px] text-ink-800 uppercase mb-1">☁️ Cenário NUVEM</div>
+                              <p className="text-[11px] text-ink-600 leading-relaxed">Você acessa o LAUD.US pelo site (<strong>laud.us</strong>), de qualquer lugar. Precisa do Tailscale Funnel. Faça <strong>todos</strong> os passos (1 a 8).</p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-ink-400">Todos os passos abaixo são feitos na <strong>máquina servidora</strong> (o computador da clínica que fica ligado com o Orthanc).</p>
+                        </div>
+
+                        <div className="space-y-5">
+                          <Step n={1} title="Instalar os 3 programas na máquina servidora">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">Instale, na ordem: <strong>Orthanc</strong> (o PACS), <strong>Node.js</strong> (roda o Agente) e <strong>Python + pydicom</strong> (gera a worklist).</p>
+                            <div className="text-[11px] text-ink-600 space-y-1.5">
+                              <div><strong>Windows:</strong> instalador do Orthanc (marque <em>"Install as a Windows Service"</em>) · Node LTS em nodejs.org · Python 3 (marque <em>"Add python.exe to PATH"</em>).</div>
+                              <Cmd text="pip install pydicom" id="wt_pip" />
+                              <div className="pt-1"><strong>macOS:</strong></div>
+                              <Cmd text="brew install orthanc node python && brew services start orthanc && pip3 install pydicom" id="wt_brew" />
+                            </div>
+                            <Check_>No terminal, <code>node --version</code> e <code>python --version</code> (ou <code>python3</code>) respondem com um número.</Check_>
+                          </Step>
+
+                          <Step n={2} title="Criar a pasta da Worklist">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">É onde os arquivos <code>.wl</code> serão gravados. Guarde este caminho — você vai usá-lo nos passos 3 e 6.</p>
+                            <div className="text-[11px] text-ink-600 space-y-1.5">
+                              <div><strong>Windows:</strong> crie a pasta <code>C:\OrthancServer\db\WorklistsDatabase\</code></div>
+                              <div><strong>macOS:</strong></div>
+                              <Cmd text="mkdir -p ~/OrthancServer/db/WorklistsDatabase" id="wt_mkdir" />
+                            </div>
+                            <Check_>A pasta existe no explorador de arquivos.</Check_>
+                          </Step>
+
+                          <Step n={3} title="Configurar o Orthanc (orthanc.json)">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">Abra o <code>orthanc.json</code>, apague o conteúdo e cole o modelo pronto (aba <strong>"3. Configuração do Orthanc"</strong> → botão <em>Copiar</em>). Troque o valor de <code>"Database"</code> pela pasta do passo 2. Salve e <strong>reinicie o Orthanc</strong> (Windows: services.msc → Orthanc → Reiniciar · macOS: <code>brew services restart orthanc</code>).</p>
+                            <Check_>Abra <code>http://localhost:8042</code> no navegador da máquina servidora — a tela do Orthanc aparece (sem pedir senha, no modo prático).</Check_>
+                          </Step>
+
+                          <Step n={4} title="Ligar o Agente LAUD.US">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">Na pasta do projeto LAUDUS, rode e <strong>deixe a janela aberta</strong>:</p>
+                            <Cmd text="node scripts/agent.js" id="wt_agent" />
+                            <Check_>Aparece: <code>LAUD.US Local Agent rodando na porta 3000</code>. (Para não precisar deixar aberto, veja a seção 4 — rodar como serviço.)</Check_>
+                          </Step>
+
+                          <Step n={5} title="SÓ NO CENÁRIO NUVEM: expor o Agente via Tailscale Funnel">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">Instale o Tailscale e faça login. No painel web (Settings → DNS) habilite <strong>MagicDNS</strong> e <strong>HTTPS Certificates</strong> (uma vez). Depois, com o Agente rodando, exponha a <strong>porta 3000</strong>:</p>
+                            <Cmd text="tailscale funnel --bg 3000" id="wt_funnel" />
+                            <Check_>O Tailscale mostra uma URL pública tipo <code>https://servidor-mac.tailXXXX.ts.net</code>. <strong>Copie-a</strong> para o passo 6.</Check_>
+                            <div className="text-[10px] text-amber-700 bg-amber-50/60 border border-amber-100 rounded-lg px-2.5 py-1.5">⚠️ No cenário LOCAL, pule este passo inteiro.</div>
+                          </Step>
+
+                          <Step n={6} title="Preencher no LAUD.US (Configurações → PACS/DICOM → aba Servidores)">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">Preencha conforme o seu cenário e clique em <strong>"Testar Conexão PACS"</strong>:</p>
+                            <div className="overflow-x-auto border border-ink-150 rounded-xl">
+                              <table className="w-full text-[11px] text-left">
+                                <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
+                                  <tr><th className="px-3 py-2">Campo</th><th className="px-3 py-2">🏠 Local</th><th className="px-3 py-2">☁️ Nuvem</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-ink-100 bg-white text-ink-700">
+                                  <tr><td className="px-3 py-2 font-bold">URL do Agente Local</td><td className="px-3 py-2 text-ink-400">(vazio)</td><td className="px-3 py-2 font-mono">a URL do Funnel</td></tr>
+                                  <tr><td className="px-3 py-2 font-bold">URL do Orthanc</td><td className="px-3 py-2 font-mono">http://localhost:8042</td><td className="px-3 py-2 font-mono">http://localhost:8042</td></tr>
+                                  <tr><td className="px-3 py-2 font-bold">URL Pública Tailscale</td><td className="px-3 py-2 text-ink-400">(vazio)</td><td className="px-3 py-2 text-ink-400 font-bold">(vazio!)</td></tr>
+                                  <tr><td className="px-3 py-2 font-bold">Usuário / Senha</td><td className="px-3 py-2 text-ink-400">(vazio)</td><td className="px-3 py-2 text-ink-400">(vazio)</td></tr>
+                                  <tr><td className="px-3 py-2 font-bold">Pasta da Worklist</td><td className="px-3 py-2" colSpan={2}>o mesmo caminho do passo 2</td></tr>
+                                  <tr><td className="px-3 py-2 font-bold">AE Title do Orthanc</td><td className="px-3 py-2 font-mono" colSpan={2}>ORTHANC</td></tr>
+                                </tbody>
+                              </table>
+                            </div>
+                            <Check_>Ao testar, aparece a <strong>versão do Orthanc</strong> = conexão OK. Se falhar, veja a seção 7 (Problemas).</Check_>
+                          </Step>
+
+                          <Step n={7} title="Configurar o aparelho de ultrassom (uma vez)">
+                            <p className="text-[11px] text-ink-600 leading-relaxed">No menu DICOM do aparelho, cadastre <strong>Worklist</strong> e <strong>Storage</strong> com os mesmos dados (o aparelho fala direto com o Orthanc na rede local):</p>
+                            <ul className="text-[11px] text-ink-600 space-y-0.5 list-disc pl-4">
+                              <li><strong>IP:</strong> o IP local da máquina servidora (ex: 192.168.1.100)</li>
+                              <li><strong>Porta:</strong> 4242 · <strong>AE Title remoto:</strong> ORTHANC</li>
+                              <li><strong>AE Title local:</strong> o nome do aparelho (ex: MINDRAYMX7)</li>
+                            </ul>
+                            <Check_>O botão <strong>Verify/Test</strong> do aparelho acusa "Sucesso".</Check_>
+                          </Step>
+
+                          <Step n={8} title="Testar tudo de ponta a ponta">
+                            <ul className="text-[11px] text-ink-600 space-y-1 list-disc pl-4">
+                              <li>Crie um exame no LAUD.US → confira se surgiu um arquivo <code>agendamento_XXX.wl</code> na pasta da worklist.</li>
+                              <li>No aparelho, busque a worklist → o paciente deve aparecer, sem digitar.</li>
+                              <li>Faça o exame → as imagens voltam e aparecem no editor de laudos.</li>
+                            </ul>
+                            <Check_>Funcionou os três? PACS configurado com sucesso. 🎉</Check_>
+                          </Step>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
+                          <strong className="text-emerald-400">Segurança (opcional):</strong> no cenário nuvem, o Funnel deixa o Agente público. Para fechá-lo, veja a seção 4 (variável <code>LAUDUS_AGENT_SECRET</code> + campo "Segredo do Agente"). No caminho prático, pode deixar aberto.
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {selectedSection === 'concepts' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
