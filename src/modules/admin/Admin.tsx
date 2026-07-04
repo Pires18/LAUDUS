@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../store/app';
+import { useAdmin } from '../../hooks/useAdmin';
 import { useCollection } from '../../hooks/useFirestore';
 import {
   ShieldCheck, Users, History,
@@ -22,7 +23,25 @@ type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'mas
 
 export function Admin() {
   const { view } = useApp();
+  const { isAdmin } = useAdmin();
   const [activeTab, setActiveTab] = useState<AdminTab>((view.name === 'admin' && (view.activeTab as AdminTab)) || 'overview');
+
+  // Guarda de defesa-em-profundidade: mesmo que alguém navegue direto para a
+  // view 'admin', só renderiza o painel para quem é admin de verdade (o Firestore
+  // já barra os dados, mas evitamos expor a estrutura da tela a não-admins).
+  if (!isAdmin) {
+    return (
+      <div className="module-container">
+        <div className="max-w-md mx-auto w-full mt-20 text-center space-y-3 animate-fade-in">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
+            <ShieldCheck size={26} />
+          </div>
+          <h1 className="text-lg font-black text-ink-900">Acesso restrito</h1>
+          <p className="text-sm text-ink-500 leading-relaxed">Esta área é exclusiva de administradores. Se você acredita que deveria ter acesso, contate o suporte.</p>
+        </div>
+      </div>
+    );
+  }
 
   const tabs = [
     { id: 'overview',    label: 'Geral',              icon: LayoutDashboard },
