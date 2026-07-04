@@ -58,6 +58,31 @@ function verifyWebhook(req: any, rawBody: string, secret: string): { ok: boolean
   return { ok: false, reason: 'Assinatura/segredo ausente.' };
 }
 
+/**
+ * Incrementa atomicamente o agregado financeiro (global_config/finance_stats),
+ * consumido pelo painel admin para "Faturamento Acumulado" sem varrer a coleção
+ * `transactions` inteira. Best-effort: NUNCA lança — uma falha aqui não pode
+ * quebrar o processamento do pagamento. O painel também sabe recalcular do zero.
+ */
+async function bumpFinanceStats(db: any, amount: number, paymentMethod: string) {
+  try {
+    const { FieldValue } = await import('firebase-admin/firestore');
+    const methodKey =
+      paymentMethod === 'pix' ? 'pixCount'
+        : paymentMethod === 'credit_card' ? 'ccCount'
+          : paymentMethod === 'manual' ? 'manualCount'
+            : 'otherCount';
+    await db.collection('global_config').doc('finance_stats').set({
+      totalRevenue: FieldValue.increment(amount || 0),
+      paidCount: FieldValue.increment(1),
+      [methodKey]: FieldValue.increment(1),
+      updatedAt: Date.now(),
+    }, { merge: true });
+  } catch (e: any) {
+    console.warn('[WEBHOOK] Falha ao atualizar finance_stats (ignorado):', e?.message);
+  }
+}
+
 async function activateAddonInDb(db: any, userId: string, email: string, addon: string, transactionId: string, paymentMethod: string) {
   const now = Date.now();
   const userRef = db.collection('users').doc(userId);
@@ -139,6 +164,7 @@ async function activateAddonInDb(db: any, userId: string, email: string, addon: 
     paymentMethod,
     timestamp: now,
   });
+  await bumpFinanceStats(db, addonPrice, paymentMethod);
 }
 
 /** Ativa/renova uma assinatura a partir dos dados do plano (saas_plans). */
@@ -235,6 +261,7 @@ async function activateSubscription(
     paymentMethod: opts.paymentMethod,
     timestamp: now,
   });
+  await bumpFinanceStats(db, opts.gatewayPrice ?? planPrice, opts.paymentMethod);
 }
 
 export default async function handler(req: any, res: any) {

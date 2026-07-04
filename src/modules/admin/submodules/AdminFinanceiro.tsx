@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { logger } from '../../../utils/logger';
 import { FormLabel, NumInput, BoolToggle, MiniToggle, TextField, PasswordField } from './components/FinanceFormControls';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  deleteDoc, updateDoc,
+  deleteDoc, updateDoc, query, orderBy, limit, startAfter,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
@@ -1318,18 +1318,38 @@ function IACostsTab() {
   );
 }
 
+const TX_PAGE = 100;
+type FinanceStats = { totalRevenue: number; paidCount: number; pixCount: number; ccCount: number; manualCount: number };
+
 function TransactionsTab() {
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [stats, setStats] = useState<FinanceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const lastDocRef = useRef<any>(null);
   const { showToast } = useApp();
 
-  const loadTransactions = useCallback(async () => {
+  // Métricas acumuladas vêm do agregado mantido pelo webhook (global_config/
+  // finance_stats) — não varremos mais a coleção inteira só para somar receita.
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await getDoc(doc(firestore, 'global_config', 'finance_stats'));
+      setStats(s.exists() ? (s.data() as FinanceStats) : null);
+    } catch (err) {
+      logger.error('Erro ao carregar métricas financeiras:', err);
+    }
+  }, []);
+
+  // Tabela: só as transações mais recentes (paginadas), não a coleção toda.
+  const loadFirstPage = useCallback(async () => {
     setLoading(true);
     try {
-      const snap = await getDocs(collection(firestore, 'transactions'));
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
-      setTransactions(list);
+      const snap = await getDocs(query(collection(firestore, 'transactions'), orderBy('timestamp', 'desc'), limit(TX_PAGE)));
+      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
+      setHasMore(snap.docs.length === TX_PAGE);
     } catch (err) {
       logger.error('Erro ao carregar transações:', err);
       showToast('Erro ao carregar transações.', 'error');
@@ -1338,17 +1358,61 @@ function TransactionsTab() {
     }
   }, [showToast]);
 
+  const loadMore = useCallback(async () => {
+    if (!lastDocRef.current) return;
+    setLoadingMore(true);
+    try {
+      const snap = await getDocs(query(collection(firestore, 'transactions'), orderBy('timestamp', 'desc'), startAfter(lastDocRef.current), limit(TX_PAGE)));
+      setTransactions(prev => [...prev, ...snap.docs.map(d => ({ id: d.id, ...d.data() }))]);
+      lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
+      setHasMore(snap.docs.length === TX_PAGE);
+    } catch (err) {
+      logger.error('Erro ao carregar mais transações:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, []);
+
+  // Varredura completa ÚNICA para (re)semear o agregado — cobre backfill de
+  // transações antigas e corrige qualquer drift. Ação explícita do admin.
+  const recalcStats = useCallback(async () => {
+    setRecalculating(true);
+    try {
+      const snap = await getDocs(collection(firestore, 'transactions'));
+      const paid = snap.docs.map(d => d.data() as any).filter(t => t.status === 'paid');
+      const agg = {
+        totalRevenue: paid.reduce((a, t) => a + (t.amount || 0), 0),
+        paidCount: paid.length,
+        pixCount: paid.filter(t => t.paymentMethod === 'pix').length,
+        ccCount: paid.filter(t => t.paymentMethod === 'credit_card').length,
+        manualCount: paid.filter(t => t.paymentMethod === 'manual').length,
+        otherCount: paid.filter(t => !['pix', 'credit_card', 'manual'].includes(t.paymentMethod)).length,
+        updatedAt: Date.now(),
+      };
+      await setDoc(doc(firestore, 'global_config', 'finance_stats'), agg, { merge: true });
+      setStats(agg);
+      showToast('Métricas financeiras recalculadas.', 'success');
+    } catch (err) {
+      logger.error('Erro ao recalcular métricas financeiras:', err);
+      showToast('Falha ao recalcular métricas.', 'error');
+    } finally {
+      setRecalculating(false);
+    }
+  }, [showToast]);
+
   useEffect(() => {
-    loadTransactions();
-  }, [loadTransactions]);
+    loadStats();
+    loadFirstPage();
+  }, [loadStats, loadFirstPage]);
 
   if (loading) return <Spinner />;
 
-  const paidTransactions = transactions.filter(t => t.status === 'paid');
-  const totalRevenue = paidTransactions.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-  const pixCount = paidTransactions.filter(t => t.paymentMethod === 'pix').length;
-  const ccCount = paidTransactions.filter(t => t.paymentMethod === 'credit_card').length;
-  const manualCount = paidTransactions.filter(t => t.paymentMethod === 'manual').length;
+  const totalRevenue = stats?.totalRevenue ?? 0;
+  const paidCount = stats?.paidCount ?? 0;
+  const pixCount = stats?.pixCount ?? 0;
+  const ccCount = stats?.ccCount ?? 0;
+  const manualCount = stats?.manualCount ?? 0;
+  const pct = (n: number) => (paidCount ? Math.round((n / paidCount) * 100) : 0);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -1357,13 +1421,30 @@ function TransactionsTab() {
           <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest">Histórico Financeiro</h3>
           <p className="text-[11px] text-ink-500 font-medium mt-0.5">Veja todas as transações, assinaturas e compras de add-ons realizadas no sistema.</p>
         </div>
-        <button
-          onClick={loadTransactions}
-          className="flex items-center gap-1.5 h-10 px-4 bg-white border border-ink-200 text-ink-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all"
-        >
-          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={recalcStats}
+            disabled={recalculating}
+            title="Recalcula o faturamento acumulado varrendo todas as transações (use após backfill)."
+            className="flex items-center gap-1.5 h-10 px-4 bg-white border border-ink-200 text-ink-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={recalculating ? 'animate-spin' : ''} /> Recalcular métricas
+          </button>
+          <button
+            onClick={() => { loadStats(); loadFirstPage(); }}
+            className="flex items-center gap-1.5 h-10 px-4 bg-white border border-ink-200 text-ink-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all"
+          >
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Atualizar
+          </button>
+        </div>
       </div>
+
+      {!stats && (
+        <div className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2.5">
+          <FileText size={13} className="shrink-0 mt-0.5" />
+          <span>As métricas acumuladas ainda não foram semeadas. Clique em <strong>Recalcular métricas</strong> uma vez para calcular o faturamento a partir das transações existentes.</span>
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1375,12 +1456,12 @@ function TransactionsTab() {
         <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
           <div className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Vendas via PIX</div>
           <div className="text-2xl font-black text-ink-900 mt-1">{pixCount}</div>
-          <div className="text-[10px] text-ink-400 mt-0.5">{Math.round(transactions.length ? (pixCount / transactions.length) * 100 : 0)}% das transações</div>
+          <div className="text-[10px] text-ink-400 mt-0.5">{pct(pixCount)}% das vendas pagas</div>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
           <div className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Vendas via Cartão</div>
           <div className="text-2xl font-black text-ink-900 mt-1">{ccCount}</div>
-          <div className="text-[10px] text-ink-400 mt-0.5">{Math.round(transactions.length ? (ccCount / transactions.length) * 100 : 0)}% das transações</div>
+          <div className="text-[10px] text-ink-400 mt-0.5">{pct(ccCount)}% das vendas pagas</div>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
           <div className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Vendas Manuais</div>
@@ -1457,6 +1538,18 @@ function TransactionsTab() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {hasMore && (
+          <div className="border-t border-ink-100 p-4 text-center">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-1.5 h-9 px-5 bg-ink-50 hover:bg-ink-100 border border-ink-200 text-ink-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+            >
+              {loadingMore ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Carregar mais {TX_PAGE}
+            </button>
           </div>
         )}
       </div>
