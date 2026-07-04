@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { verifyAuth, verifyIdTokenString } from './_auth.js';
+import { verifyFirebaseIdToken } from './_edgeAuth.js';
 
 // Desabilita o bodyParser padrão do Vercel Serverless Functions.
 // Isso impede que a Vercel tente analisar payloads binários brutos (como arquivos DICOM)
@@ -76,9 +76,15 @@ export default async function handler(req: any, res: any) {
 
   // Autenticação obrigatória na nuvem: header Authorization (fetch) ou
   // parâmetro ?token= (URLs de <img src>, que não suportam headers).
+  // Usa validação por JWKS (mesma dos endpoints de IA/worklist, funcional no
+  // Vercel) em vez do Firebase Admin SDK, que exige conta de serviço ausente.
   if (process.env.VERCEL) {
-    const authed = (await verifyAuth(req))
-      || (query.token ? await verifyIdTokenString(String(query.token)) : null);
+    const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
+    const bearer = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.slice('Bearer '.length).trim()
+      : '';
+    const authed = (bearer ? await verifyFirebaseIdToken(bearer) : null)
+      || (query.token ? await verifyFirebaseIdToken(String(query.token)) : null);
     if (!authed) {
       res.statusCode = 401;
       res.setHeader('Content-Type', 'application/json');

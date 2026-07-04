@@ -54,7 +54,7 @@ export function DicomControlCenter() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
-  const [selectedSection, setSelectedSection] = useState<'walkthrough' | 'cloud_vm' | 'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('walkthrough');
+  const [selectedSection, setSelectedSection] = useState<'walkthrough' | 'cloud_vm' | 'backup_local' | 'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('cloud_vm');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -801,6 +801,7 @@ export function DicomControlCenter() {
                   {[
                     { group: '▶ Comece aqui', items: [
                       { id: 'cloud_vm', label: 'Servidor na Nuvem (VM) ★', icon: Cloud },
+                      { id: 'backup_local', label: 'Backup Local (auto-envio à VM)', icon: HardDrive },
                       { id: 'walkthrough', label: 'Passo a passo (do zero)', icon: CheckCircle2 },
                     ]},
                     { group: 'Entender', items: [
@@ -877,8 +878,16 @@ export function DicomControlCenter() {
                             <li><strong>VM (nuvem):</strong> Orthanc (Docker) + Agente LAUD.US + Tailscale Funnel. É o servidor <strong>principal</strong>, sempre ligado.</li>
                             <li><strong>Clínica:</strong> um <strong>relé</strong> Tailscale (roteador GL.iNet, ou o PC do dia a dia) liga o ultrassom à VM. Sem Orthanc, sem dados locais.</li>
                             <li><strong>LAUD.US (navegador):</strong> fala com a VM pela URL Funnel (HTTPS). <strong>Não precisa de Tailscale.</strong></li>
-                            <li><strong>Backup (opcional):</strong> um Orthanc local pode ser configurado na aba "Servidores" como redundância.</li>
+                            <li><strong>Backup (opcional):</strong> um Orthanc local com auto-envio à VM — veja a aba <strong>“Backup Local”</strong>.</li>
                           </ul>
+                        </div>
+
+                        {/* Atalho de 1 comando */}
+                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2">
+                          <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5"><CheckCircle2 size={13} /> Atalho: bootstrap em 1 comando</h4>
+                          <p className="text-[11px] text-ink-700 leading-relaxed">Na VM (Debian/Ubuntu), copie <code>scripts/agent.js</code>, <code>scripts/generate_wl.py</code> e <code>scripts/setup-vm.sh</code> e rode. Ele instala Docker, Orthanc, o agente (systemd), Tailscale e o Funnel, e imprime todos os valores para colar no app:</p>
+                          <Cmd id="cvm-oneshot" text="chmod +x ~/setup-vm.sh && sudo AGENT_SECRET=$(openssl rand -hex 32) ~/setup-vm.sh" />
+                          <p className="text-[10px] text-ink-500 leading-relaxed">Na 1ª vez o Tailscale pede login: rode <code>sudo tailscale up</code>, autentique no navegador e rode o script de novo (é idempotente). Os passos abaixo são o mesmo processo manual, detalhado.</p>
                         </div>
 
                         <Step n={1} title="Preparar a VM (Docker + Tailscale)">
@@ -906,12 +915,15 @@ export function DicomControlCenter() {
                         <Step n={4} title="Configurar no LAUD.US (aba Servidores)">
                           <p className="text-[11px] text-ink-600 leading-relaxed">Clique no preset <strong>“Servidor na Nuvem (VM)”</strong> na aba Servidores e complete:</p>
                           <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                            <li><strong>URL do Agente Local</strong> = a URL do Funnel da VM.</li>
-                            <li><strong>URL do Orthanc</strong> = <code>http://localhost:8042</code> (o agente resolve na própria VM).</li>
+                            <li><strong>URL do Agente Local</strong> = a URL do Funnel da VM (<code>https://…ts.net</code>).</li>
+                            <li><strong>URL do Servidor PACS</strong> = <code>http://127.0.0.1:8042</code> — o agente resolve na própria VM. <strong>Não</strong> use o IP tailnet aqui (o Orthanc só escuta no localhost da VM).</li>
                             <li><strong>Segredo do Agente</strong> = o mesmo <code>LAUDUS_AGENT_SECRET</code>.</li>
-                            <li><strong>Pasta da Worklist</strong> = <code>/opt/orthanc-data/worklists</code>.</li>
+                            <li><strong>Pasta da Worklist</strong> = <code>/opt/orthanc-data/worklists</code>. Deixe <strong>URL Pública Tailscale</strong> vazia.</li>
                           </ul>
                           <p className="text-[11px] text-ink-600 leading-relaxed">Salve e use <strong>“Executar Diagnóstico”</strong> — deve ficar tudo verde.</p>
+                          <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[10px] text-amber-800 leading-relaxed">
+                            <strong>Se aparecer loop de recarregamento</strong> após atualizar, limpe o Service Worker (PWA) do navegador: <code>F12 → Application → Service Workers → Unregister</code> e <code>Storage → Clear site data</code>. É cache antigo, não erro de config.
+                          </div>
                         </Step>
 
                         <Step n={5} title="Relé na clínica (ligar o ultrassom à VM)">
@@ -940,6 +952,83 @@ export function DicomControlCenter() {
 
                         <div className="p-3 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
                           Migração dos exames antigos (local → VM) e desativação do servidor local estão no manual completo <code className="text-emerald-300">docs/PROJETO_PACS_NUVEM.md</code> (Fases 3 e 4). Migre e confira as contagens <strong>antes</strong> de desligar o local.
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {selectedSection === 'backup_local' && (() => {
+                    const Cmd = ({ text, id }: { text: string; id: string }) => (
+                      <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
+                        <span className="break-all whitespace-pre-wrap">{text}</span>
+                        <button onClick={() => handleCopy(text, id)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">
+                          {copiedField === id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    );
+                    const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
+                      <div className="flex gap-3.5">
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm">{n}</div>
+                        <div className="flex-1 space-y-2 pb-1">
+                          <h4 className="text-[13px] font-black text-ink-900 leading-tight pt-1">{title}</h4>
+                          {children}
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <div className="space-y-5 animate-fade-in">
+                        <div className="pb-3 border-b border-ink-100">
+                          <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><HardDrive size={16} className="text-indigo-600" /> Backup Local com auto-envio à VM (store-and-forward)</h3>
+                          <p className="text-[11px] text-ink-500 font-medium">Um Orthanc na clínica que guarda os exames <strong>temporariamente</strong> e os empurra para a VM assim que ela estiver acessível, apagando a cópia local depois. Contingência para quando a internet ou a VM caírem.</p>
+                        </div>
+
+                        {/* Como funciona */}
+                        <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-2">
+                          <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> A ideia</h4>
+                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                            <li>Em operação normal, o ultrassom manda para a <strong>VM</strong>. O backup fica <strong>vazio</strong>.</li>
+                            <li>Se a VM/internet cair, o ultrassom manda para o <strong>backup local</strong> (destino secundário no aparelho).</li>
+                            <li>Cada exame que chega ao backup é <strong>reenviado à VM</strong> (DICOM 4242 na tailnet). Se a VM aceita, a cópia local é <strong>apagada</strong>.</li>
+                            <li>Enquanto a VM estiver fora, o exame <strong>fica</strong> no backup; um <em>sweep</em> periódico reenvia quando ela voltar. Assim a VM continua sendo a dona única dos exames.</li>
+                          </ul>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed">
+                          <strong>Pré-requisito:</strong> o PC do backup precisa estar na <strong>mesma tailnet</strong> da VM (Tailscale instalado nele, ou atrás do roteador GL.iNet com rotas aprovadas), para alcançar o IP <code>100.x.y.z</code> da VM na porta <code>4242</code>.
+                        </div>
+
+                        <Step n={1} title="Subir o Orthanc de backup (Docker) na clínica">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">No PC sempre-ligado da clínica, crie <code>docker-compose.yml</code>. A porta <strong>4242</strong> fica aberta na LAN (o ultrassom envia aqui no modo de contingência):</p>
+                          <Cmd id="bk-compose" text={`services:\n  orthanc-backup:\n    image: orthancteam/orthanc:latest\n    restart: unless-stopped\n    ports:\n      - "8043:8042"        # REST (evita conflito com um Orthanc na 8042)\n      - "0.0.0.0:4242:4242" # DICOM (ultrassom envia aqui na contingencia)\n    volumes:\n      - ./data:/var/lib/orthanc/db\n      - ./orthanc.json:/etc/orthanc/orthanc.json:ro\n      - ./backup-forward.lua:/etc/orthanc/backup-forward.lua:ro`} />
+                        </Step>
+
+                        <Step n={2} title="Configurar o orthanc.json (modality CLOUD + Lua)">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Troque <code>100.x.y.z</code> pelo <strong>IP tailnet da VM</strong>. A modality <code>CLOUD</code> é o destino do reenvio; o Lua faz o encaminhar-e-apagar:</p>
+                          <Cmd id="bk-json" text={`{\n  "Name": "PACS BACKUP LOCAL",\n  "HttpPort": 8042, "HttpServerEnabled": true,\n  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",\n  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,\n  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true,\n  "StableAge": 30,\n  "DicomModalities": { "CLOUD": [ "ORTHANC", "100.x.y.z", 4242 ] },\n  "LuaScripts": [ "/etc/orthanc/backup-forward.lua" ]\n}`} />
+                          <p className="text-[10px] text-ink-500 leading-relaxed">Coloque o arquivo <code>scripts/backup-forward.lua</code> (deste projeto) ao lado do compose. Ele envia cada estudo estável à modality <code>CLOUD</code> e apaga o local em caso de sucesso.</p>
+                        </Step>
+
+                        <Step n={3} title="Subir e instalar o reenvio periódico (retry)">
+                          <Cmd id="bk-up" text="docker compose up -d" />
+                          <p className="text-[11px] text-ink-600 leading-relaxed">O Lua cobre o envio <em>na hora</em>. Para os exames que chegaram com a VM offline, agende o <em>sweep</em> (reenvia o que sobrou e apaga o aceito) a cada 10 min via cron:</p>
+                          <Cmd id="bk-cron" text={`*/10 * * * * ORTHANC=http://localhost:8042 /caminho/scripts/backup-forward-sweep.sh >> /var/log/backup-forward.log 2>&1`} />
+                        </Step>
+
+                        <Step n={4} title="Apontar o ultrassom (destino secundário)">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">No aparelho, mantenha o <strong>Storage principal</strong> na VM (IP tailnet da VM:4242). Adicione um <strong>segundo destino de Storage</strong> apontando para o <strong>IP LAN do PC de backup:4242</strong>, AE <code>ORTHANC</code>. Use-o quando a VM estiver inacessível (ou configure envio duplo, se o aparelho suportar).</p>
+                        </Step>
+
+                        <Step n={5} title="(Opcional) Registrar o backup no LAUD.US">
+                          <p className="text-[11px] text-ink-600 leading-relaxed">Na aba <strong>Servidores & Conexão</strong>, ligue <strong>“Servidor PACS de Backup”</strong> e preencha a URL/pasta do backup local. Serve para o diagnóstico e para o app enxergar a redundância. O <em>encaminhamento</em> em si é feito pelo Orthanc (Lua + sweep), independente do app.</p>
+                        </Step>
+
+                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1.5">
+                          <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5"><CheckCircle2 size={13} /> Como validar</h4>
+                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                            <li>Com a VM <strong>online</strong>: envie um exame ao backup → em segundos ele some do backup e aparece na VM.</li>
+                            <li>Com a VM <strong>offline</strong> (desligue o Tailscale da VM p/ testar): o exame <strong>fica</strong> no backup. Religue a VM → o sweep reenvia e limpa o backup.</li>
+                          </ul>
+                          <p className="text-[10px] text-ink-500 leading-relaxed pt-1">Conferir contagem do backup: <code>curl -s http://localhost:8043/statistics</code> (deve tender a zero em operação normal).</p>
                         </div>
                       </div>
                     );
