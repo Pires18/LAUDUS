@@ -44,7 +44,7 @@ function buildBody(
 }
 
 /** Headers common to all proxy calls (inclui o token Firebase exigido pelo proxy). */
-async function proxyHeaders(model: string, stream: boolean, settings: AppSettings): Promise<Record<string, string>> {
+async function proxyHeaders(model: string, stream: boolean, settings: AppSettings, mode?: string): Promise<Record<string, string>> {
   const idToken = await getIdToken();
   return {
     'Content-Type': 'application/json',
@@ -52,6 +52,9 @@ async function proxyHeaders(model: string, stream: boolean, settings: AppSetting
     'x-uid': auth.currentUser?.uid || 'anonymous',
     'x-gemini-model': model,
     'x-gemini-stream': stream ? 'true' : 'false',
+    // Modo do motor: usado pelo proxy para enforçar a cota de laudos SOMENTE na
+    // geração de laudo (não em copiloto/refino/template).
+    ...(mode ? { 'x-gemini-mode': mode } : {}),
   };
 }
 
@@ -72,7 +75,7 @@ export class GeminiProvider implements AiProvider {
     const model = this.resolveModelName(settings, mode, area);
     const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
 
-    const headers = await proxyHeaders(model, false, settings);
+    const headers = await proxyHeaders(model, false, settings, mode);
     const response = await helpers.withRetry(() => fetch('/api/gemini', {
       method: 'POST',
       headers,
@@ -109,7 +112,7 @@ export class GeminiProvider implements AiProvider {
     const model = this.resolveModelName(settings, mode, area);
     const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
 
-    const headers = await proxyHeaders(model, true, settings);
+    const headers = await proxyHeaders(model, true, settings, mode);
     const response = await helpers.withRetry(() => fetch('/api/gemini', {
       method: 'POST',
       headers,

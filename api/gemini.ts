@@ -21,6 +21,61 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
+/**
+ * Enforcement de cota de laudos (server-side, FAIL-OPEN).
+ *
+ * Lê `users/{uid}` via Firestore REST usando o PRÓPRIO token do usuário (as regras
+ * permitem o dono ler seu doc — sem Admin SDK, compatível com Edge). Só bloqueia
+ * quando confirma, com o documento lido:
+ *   - nenhuma assinatura ativa (status fora de active/past_due E fora do trial de
+ *     14 dias) e o usuário não é admin, OU
+ *   - cota mensal esgotada (reportsQuota finita e usados >= cota).
+ *
+ * Qualquer incerteza (sem projectId, leitura falhou, campo ausente, erro) →
+ * `allowed:true`. Nunca derruba um pagante por falha de infraestrutura.
+ */
+async function checkReportQuota(uid: string, idToken: string): Promise<{ allowed: boolean; error?: string; status?: number }> {
+  try {
+    if (!idToken) return { allowed: true };
+    const projectId = (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '').trim();
+    if (!projectId) return { allowed: true };
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
+    if (!resp.ok) return { allowed: true }; // não conseguimos ler → fail-open
+    const doc: any = await resp.json();
+    const f = doc.fields || {};
+    const num = (k: string): number | undefined => {
+      const v = f[k];
+      if (!v) return undefined;
+      if (v.integerValue !== undefined) return parseInt(v.integerValue, 10);
+      if (v.doubleValue !== undefined) return Number(v.doubleValue);
+      return undefined;
+    };
+    const str = (k: string): string => (f[k]?.stringValue || '');
+
+    if (str('role') === 'admin') return { allowed: true };
+
+    // Assinatura ativa? (mesma regra do cliente: active/past_due, ou dentro do trial de 14d)
+    const status = str('subscriptionStatus');
+    const createdAt = num('createdAt');
+    const inTrial = createdAt !== undefined && Date.now() < createdAt + 14 * 24 * 60 * 60 * 1000;
+    const hasActiveSub = status === 'active' || status === 'past_due' || inTrial;
+    if (!hasActiveSub) {
+      return { allowed: false, status: 402, error: 'Sua assinatura não está ativa. Reative o plano para gerar novos laudos.' };
+    }
+
+    // Cota mensal esgotada? (9999 = ilimitado, ex.: admin)
+    const quota = num('reportsQuota');
+    const used = num('reportsUsedThisMonth') ?? 0;
+    if (quota !== undefined && quota > 0 && quota !== 9999 && used >= quota) {
+      return { allowed: false, status: 402, error: 'Cota mensal de laudos atingida. Faça upgrade do plano ou aguarde a renovação.' };
+    }
+    return { allowed: true };
+  } catch {
+    return { allowed: true }; // fail-open
+  }
+}
+
 // Marcador de versão do proxy — permite confirmar qual build está no ar.
 // Acesse /api/gemini?ping=1 no navegador: se aparecer "embed" e
 // "embed-batch" em features, o suporte a embeddings está publicado.
@@ -70,6 +125,20 @@ export default async function handler(req: Request) {
         JSON.stringify({ error: 'Rate limit exceeded. Tente novamente em instantes.' }),
         { status: 429, headers: { 'Retry-After': '60' } }
       );
+    }
+
+    // Enforcement de cota — SOMENTE na geração de laudo (não copiloto/refino/
+    // template/embeddings). Fail-open: só bloqueia quando confirma sem cota.
+    if (req.headers.get('x-gemini-mode') === 'generation') {
+      const authHeader = req.headers.get('authorization') || '';
+      const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const quota = await checkReportQuota(uid, idToken);
+      if (!quota.allowed) {
+        return new Response(
+          JSON.stringify({ error: quota.error }),
+          { status: quota.status || 402, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     let apiKey = (req.headers.get('x-api-key') || req.headers.get('x-gemini-key') || '').trim();
