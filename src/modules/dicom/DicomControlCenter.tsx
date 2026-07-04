@@ -7,7 +7,7 @@ import {
   HardDrive, Cloud, Info, Network, BookOpen,
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
   Copy, Check, ArrowRight, Monitor, Radio,
-  Users, Layers, Image, RefreshCw
+  Users, Layers, Image, RefreshCw, Sparkles
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
@@ -994,6 +994,21 @@ export function DicomControlCenter() {
                         <p className="text-[11px] text-ink-500 font-medium">O servidor principal é uma VM (Google Cloud). A clínica só faz um relé Tailscale. O local vira backup opcional.</p>
                       </div>
 
+                      <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2.5">
+                        <div className="flex items-center gap-1.5 text-emerald-800 font-black text-xs uppercase tracking-wider"><Sparkles size={13} /> O jeito fácil (self-service)</div>
+                        <p className="text-[11px] text-ink-700 leading-relaxed">Na aba <strong>Servidores</strong>, o cartão <strong>“Criar meu PACS”</strong> provisiona e configura tudo sozinho — você só escolhe o plano. Depois é só apontar o ultrassom (passo 3). Este guia explica os bastidores.</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="p-2.5 rounded-lg bg-white border border-ink-150">
+                            <div className="text-[10px] font-black text-blue-700 uppercase">Compartilhado (Starter/Pro)</div>
+                            <p className="text-[10px] text-ink-600 leading-relaxed">Seu cliente vira um “tenant” isolado numa VM compartilhada — barato e imediato.</p>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-white border border-ink-150">
+                            <div className="text-[10px] font-black text-emerald-700 uppercase">Dedicado</div>
+                            <p className="text-[10px] text-ink-600 leading-relaxed">Uma VM própria por cliente, criada automaticamente (~3 min) — isolamento máximo.</p>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="p-4 rounded-2xl bg-zinc-900 text-zinc-100 overflow-x-auto">
                         <pre className="text-[10px] leading-relaxed font-mono text-zinc-300 whitespace-pre">{`  CLÍNICA                          NUVEM — VM do usuário
   ┌───────────────────┐            ┌────────────────────────────┐
@@ -1047,53 +1062,29 @@ export function DicomControlCenter() {
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
                         <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> 1 · Montar a VM (Google Cloud)</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Rode estes comandos por SSH na sua VM Debian/Ubuntu. Região sugerida: southamerica-east1.</p>
+                        <p className="text-[11px] text-ink-500 font-medium">Um único comando configura tudo. Rode por SSH numa VM Debian/Ubuntu. Região sugerida: southamerica-east1.</p>
                       </div>
 
-                      <Step n={1} title="Instalar Docker e Tailscale">
-                        <P>Docker roda o Orthanc; o Tailscale liga a VM à sua rede privada.</P>
-                        <Cmd id="vm-docker" text="curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER" />
-                        <Cmd id="vm-ts" text="curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up" />
-                        <Cmd id="vm-ip" text="tailscale ip -4   # anote o IP 100.x.y.z da VM — o ultrassom vai usar este" />
+                      <Step n={1} title="Um comando faz tudo (turnkey)">
+                        <P>Como <strong>root</strong> na VM. Ele baixa os scripts, instala Docker/Node/pydicom, sobe o agente em <strong>modo multi-tenant</strong>, ativa o <strong>Funnel</strong> e aplica o <strong>hardening</strong>:</P>
+                        <Cmd id="vm-turnkey" text="curl -fsSL https://laudus.vercel.app/pacs/pacs-vm-setup.sh | sudo bash" />
+                        <Note>Com disco de dados dedicado (recomendado): <code>curl -fsSL .../pacs-vm-setup.sh | sudo DATA_DISK=/dev/sdb bash</code>. Ao final, o script imprime o que colar na Vercel e o IP para o relé.</Note>
                       </Step>
 
-                      <Step n={2} title="Subir o Orthanc (Docker + Worklist + DICOMweb)">
-                        <P>Crie <code>/opt/orthanc/docker-compose.yml</code>. HTTP fica só no localhost (o Agente acessa); o DICOM 4242 fica aberto para o relé:</P>
-                        <Cmd id="vm-compose" text={`services:
-  orthanc:
-    image: orthancteam/orthanc:latest
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8042:8042"
-      - "0.0.0.0:4242:4242"
-    volumes:
-      - /opt/orthanc-data:/var/lib/orthanc/db
-      - /opt/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
-      - /opt/orthanc-data/worklists:/var/lib/orthanc/worklists`} />
-                        <P>E o <code>/opt/orthanc/orthanc.json</code> (modo prático, sem senha — a proteção é o Tailscale):</P>
-                        <Cmd id="vm-json" text={`{
-  "Name": "PACS LAUDUS CLOUD",
-  "HttpPort": 8042, "HttpServerEnabled": true,
-  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",
-  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,
-  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true, "DicomAlwaysAllowFind": true,
-  "Worklists": { "Enable": true, "Database": "/var/lib/orthanc/worklists" },
-  "DicomWeb": { "Enable": true }
-}`} />
-                        <Cmd id="vm-up" text="cd /opt/orthanc && docker compose up -d" />
-                        <Note>Confira: <code>curl -s http://localhost:8042/system</code> na VM deve devolver a versão do Orthanc.</Note>
+                      <Step n={2} title="Colar na Vercel + Redeploy">
+                        <P>O script mostra estes dois valores. Em <strong>Vercel → Settings → Environment Variables</strong>, adicione-os e faça <strong>Redeploy</strong>:</P>
+                        <Cmd id="vm-vercel" text={`PACS_SHARED_AGENT_URL=https://orthanc-server.<tailnet>.ts.net
+PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
+                        <Note>Com isso, o botão <strong>“Criar meu PACS”</strong> (Starter/Pro) provisiona o cliente sozinho na VM.</Note>
                       </Step>
 
-                      <Step n={3} title="Ligar o Agente LAUD.US + expor via Funnel">
-                        <P>Copie <code>scripts/agent.js</code> e <code>scripts/generate_wl.py</code> para a VM. Instale Node e <code>pip install pydicom</code>. Rode o agente (idealmente como serviço systemd) com um segredo forte:</P>
-                        <Cmd id="vm-agent" text={`LAUDUS_AGENT_SECRET=<segredo-forte> \\
-LAUDUS_WORKLIST_DIR=/opt/orthanc-data/worklists \\
-LAUDUS_ALLOWED_HOSTS=localhost,127.0.0.1 \\
-node agent.js`} />
-                        <P>Exponha <strong>só o agente</strong> (porta 3000) na internet. O comando devolve a URL pública HTTPS:</P>
-                        <Cmd id="vm-funnel" text="tailscale funnel --bg 3000   # → https://<vm>.<tailnet>.ts.net" />
-                        <Note tone="amber">Guarde duas coisas para o próximo passo: a <strong>URL do Funnel</strong> e o <strong>segredo</strong> do agente.</Note>
+                      <Step n={3} title="Provisão de clientes (automática ou manual)">
+                        <P><strong>Automática:</strong> cada cliente clica em “Criar meu PACS” e o tenant nasce isolado, com o app autoconfigurado. <strong>Manual</strong> (se quiser criar você mesmo):</P>
+                        <Cmd id="vm-tenant" text="sudo /opt/pacs-tenant.sh create        # cria um tenant e mostra os dados" />
+                        <Cmd id="vm-tenant-ls" text="/opt/pacs-tenant.sh list               # lista os tenants da VM" />
                       </Step>
+
+                      <Note tone="amber">Setup manual detalhado (avançado) e o plano <strong>Dedicado</strong> (VM própria por cliente, criada automaticamente pelo app) estão documentados em <code>docs/PACS_TENANT_SETUP.md</code> e <code>docs/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md</code>.</Note>
 
                       <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
                         <ArrowRight size={14} /> VM pronta. Agora vá para <strong>2 · Configurar no LAUD.US</strong>.
