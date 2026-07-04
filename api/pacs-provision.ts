@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { verifyAuth } from './_auth.js';
+import { verifyAuth, verifyIdTokenString } from './_auth.js';
 
 /**
  * POST /api/pacs-provision — provisiona (ou simula) o PACS gerenciado do usuário.
@@ -133,12 +133,13 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') { res.statusCode = 200; res.end(); return; }
   if (req.method !== 'POST') { res.statusCode = 405; res.end(JSON.stringify({ error: 'Method Not Allowed' })); return; }
 
-  // Autenticação obrigatória.
-  const authed = await verifyAuth(req);
-  if (!authed) { res.statusCode = 401; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' })); return; }
-
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+
+  // Autenticação: header Authorization OU token no corpo (fallback robusto —
+  // mesmo caminho comprovado do proxy de imagens).
+  const authed = (await verifyAuth(req)) || (body?.token ? await verifyIdTokenString(String(body.token)) : null);
+  if (!authed) { res.statusCode = 401; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' })); return; }
   const plan = ['starter', 'pro', 'dedicado'].includes(body?.plan) ? body.plan : 'pro';
   const zone = process.env.GCP_ZONE || 'southamerica-east1-c';
   const region = zone.replace(/-[a-z]$/, '');

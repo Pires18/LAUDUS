@@ -66,10 +66,11 @@ export function MyPacsCard() {
       let result: Partial<PacsInstance> & { agentSecret?: string; tenantId?: string };
       if (useReal) {
         // Modo real — a função serverless cria a VM no GCP e devolve os dados.
+        const token = await getIdToken();
         const res = await fetch(PROVISION_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getIdToken()}` },
-          body: JSON.stringify({ plan, region })
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ plan, region, token })
         });
         const data = await res.json();
         if (!res.ok || !data.agentUrl) throw new Error(data.error || 'Falha no provisionamento.');
