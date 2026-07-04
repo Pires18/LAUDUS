@@ -1049,7 +1049,7 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
  * (via query porque `<img src>` não suporta headers).
  */
 export function getDicomAuthParams(
-  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword' | 'dicomAgentSecret' | 'dicomBackupAgentSecret'>,
+  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword' | 'dicomAgentSecret' | 'dicomBackupAgentSecret' | 'dicomTenantId'>,
   isBackup = false
 ): string {
   const username = isBackup ? settings.dicomBackupUsername : settings.dicomUsername;
@@ -1057,10 +1057,14 @@ export function getDicomAuthParams(
   // Segredo do Agente Local (per-usuário): via query porque <img> não envia
   // headers. Vai só ao agente do próprio usuário; não é segredo global.
   const agentSecret = isBackup ? settings.dicomBackupAgentSecret : settings.dicomAgentSecret;
+  // tenantId (VM compartilhada): só no primário; o backup é o Orthanc local
+  // single-tenant do próprio cliente.
+  const tenantId = isBackup ? '' : settings.dicomTenantId;
   const token = getCachedIdToken();
   return `&username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
     + (token ? `&token=${encodeURIComponent(token)}` : '')
-    + (agentSecret ? `&agentSecret=${encodeURIComponent(agentSecret)}` : '');
+    + (agentSecret ? `&agentSecret=${encodeURIComponent(agentSecret)}` : '')
+    + (tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : '');
 }
 
 /**
