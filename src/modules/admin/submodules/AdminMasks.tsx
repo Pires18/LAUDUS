@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useApp } from '../../../store/app';
 import { useCollection } from '../../../hooks/useFirestore';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { ReportTemplate, EXAM_AREAS, ExamArea, Clinic } from '../../../types';
 import { genId, addItemWithId, deleteItem, updateItem } from '../../../store/db';
 import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, Download, Upload, Sparkles } from 'lucide-react';
@@ -9,6 +10,7 @@ import { classNames } from '../../../utils/format';
 
 export function AdminMasks() {
   const { setView, showToast } = useApp();
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [typeFilter, setTypeFilter] = useState<'all' | 'system' | 'clinics'>('all');
@@ -291,10 +293,16 @@ export function AdminMasks() {
                   <button
                     title="Excluir Máscara"
                     className="p-1.5 text-ink-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      if (confirm('Tem certeza de que deseja remover esta máscara definitivamente?')) {
-                        deleteItem('templates', template.id);
+                      const ok = await confirm({
+                        title: 'Excluir máscara',
+                        message: `Remover a máscara "${template.name}" definitivamente? Esta ação é irreversível.`,
+                        variant: 'danger',
+                        confirmLabel: 'Excluir',
+                      });
+                      if (ok) {
+                        await deleteItem('templates', template.id);
                         showToast('Máscara removida com sucesso!', 'success');
                       }
                     }}

@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useCollection } from '../../../hooks/useFirestore';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
 import { addAuditLog } from '../../../store/db';
@@ -83,6 +84,7 @@ type AddonFilter  = 'all' | 'calculators' | 'pacs' | 'appointments' | 'clinics';
 export function AdminUsersSubscriptions() {
   const { user: currentUser } = useAuth();
   const { showToast }         = useApp();
+  const confirm               = useConfirm();
 
   const { data: users,         loading: loadingUsers } = useCollection<SystemUser>('users',         { isGlobal: true });
   const { data: subscriptions, loading: loadingSubs  } = useCollection<any>       ('subscriptions', { isGlobal: true });
@@ -251,7 +253,14 @@ export function AdminUsersSubscriptions() {
   }
 
   async function handleCancelSub(u: SystemUser) {
-    if (!window.confirm(`Cancelar assinatura de ${u.name}?`)) return;
+    const ok = await confirm({
+      title: 'Cancelar assinatura',
+      message: `Cancelar a assinatura de ${u.name}? O acesso pago é encerrado.`,
+      variant: 'danger',
+      confirmLabel: 'Cancelar assinatura',
+      cancelLabel: 'Voltar',
+    });
+    if (!ok) return;
     await run(u.id, async () => {
       await updateDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), { status: 'canceled', canceledAt: Date.now() });
       await updateDoc(doc(firestore, 'users', u.id), { subscriptionStatus: 'canceled' });

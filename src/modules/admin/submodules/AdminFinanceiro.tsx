@@ -8,6 +8,7 @@ import {
 import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { useApp } from '../../../store/app';
+import { useConfirm } from '../../../hooks/useConfirm';
 import { getAiUsageStats } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
@@ -136,6 +137,7 @@ export function AdminFinanceiro() {
 
 function PlansTab() {
   const { showToast } = useApp();
+  const confirm = useConfirm();
   const [plans, setPlans]         = useState<(Plan & { id: string })[]>([]);
   const [loading, setLoading]     = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -185,7 +187,13 @@ function PlansTab() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Excluir este plano permanentemente?')) return;
+    const ok = await confirm({
+      title: 'Excluir plano',
+      message: 'Excluir este plano permanentemente? Assinaturas existentes não são afetadas, mas o plano some do catálogo.',
+      variant: 'danger',
+      confirmLabel: 'Excluir',
+    });
+    if (!ok) return;
     try {
       await deleteDoc(doc(firestore, 'saas_plans', id));
       showToast('Plano removido.', 'info');
