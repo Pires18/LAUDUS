@@ -54,9 +54,9 @@ export function MyPacsCard() {
     const region = 'southamerica-east1';
     // Starter/Pro → tenant na VM COMPARTILHADA; Dedicado → VM própria.
     const shared = plan !== 'dedicado';
-    // O endpoint real (F2) só provisiona VM dedicada; o compartilhado (S2) ainda
-    // usa simulação até termos a provisão de tenant na VM.
-    const useReal = !!PROVISION_ENDPOINT && plan === 'dedicado';
+    // O endpoint serverless decide o caminho pelo plano: Starter/Pro → tenant na
+    // VM compartilhada; Dedicado → VM própria (GCP). Sem endpoint → mock local.
+    const useReal = !!PROVISION_ENDPOINT;
     const providerVal: 'mock' | 'gcp' | 'shared' = shared ? 'shared' : (useReal ? 'gcp' : 'mock');
     try {
       await updateSettings({
@@ -83,8 +83,8 @@ export function MyPacsCard() {
         await new Promise((r) => setTimeout(r, 2600));
         const id = randomHex(4);
         result = shared
-          ? { instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 }
-          : { instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 };
+          ? { provider: 'shared', instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 }
+          : { provider: 'mock', instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 };
       }
 
       // Autoconfigura as settings DICOM (o usuário não digita nada).
@@ -98,7 +98,7 @@ export function MyPacsCard() {
         ...(result.agentSecret ? { dicomAgentSecret: result.agentSecret } : {}),
         pacsInstance: {
           status: 'ready',
-          provider: providerVal,
+          provider: (result.provider as any) || providerVal,
           plan,
           region,
           instanceName: result.instanceName,

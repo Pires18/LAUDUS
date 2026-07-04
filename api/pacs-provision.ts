@@ -146,8 +146,52 @@ export default async function handler(req: any, res: any) {
 
   const gcpConfigured = !!process.env.GCP_SA_KEY && !!process.env.TAILSCALE_API_KEY && !!process.env.TAILSCALE_TS_NET;
   const mock = process.env.PACS_MOCK === '1' || !gcpConfigured;
+  const shared = plan === 'starter' || plan === 'pro';
 
-  // ── MODO MOCK ──
+  // ── SHARED (Starter/Pro): tenant na VM compartilhada ──
+  if (shared) {
+    const sharedUrl = process.env.PACS_SHARED_AGENT_URL;
+    const sharedAdmin = process.env.PACS_ADMIN_SECRET;
+    // Sem config compartilhada (ou PACS_MOCK) → simulação (provider 'shared').
+    if (mock || !sharedUrl || !sharedAdmin) {
+      const id = rand(4);
+      res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        status: 'ready', provider: 'shared', plan, region,
+        instanceName: `tenant-${id}`, tenantId: `t-${id}`,
+        agentUrl: 'https://orthanc-server.tailscale-demo.ts.net',
+        agentSecret: rand(24), orthancVersion: '1.12.4', diskGb: spec.dataDiskGb, diskUsedGb: 0,
+      }));
+      return;
+    }
+    // Real: cria o tenant via o endpoint admin do agente na VM compartilhada.
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const r = await fetch(`${sharedUrl.replace(/\/$/, '')}/api/admin/tenant`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-secret': sharedAdmin },
+        body: JSON.stringify({ plan }), signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const d: any = await r.json();
+      if (!r.ok || !d.success) throw new Error(d?.error || 'Falha ao criar tenant na VM compartilhada.');
+      res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        status: 'ready', provider: 'shared', plan, region,
+        instanceName: `tenant-${d.tenantId}`, tenantId: d.tenantId,
+        agentUrl: sharedUrl, agentSecret: d.secret, dicomPort: d.dicomPort,
+        orthancVersion: '1.12.x', diskGb: spec.dataDiskGb, diskUsedGb: 0,
+      }));
+      return;
+    } catch (err: any) {
+      res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: err.message || 'Falha no provisionamento compartilhado.' }));
+      return;
+    }
+  }
+
+  // ── DEDICADO: MODO MOCK ──
   if (mock) {
     const id = rand(4);
     res.statusCode = 200;

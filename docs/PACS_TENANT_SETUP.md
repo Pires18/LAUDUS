@@ -20,8 +20,23 @@ troque as variáveis para o modo multi-tenant:
 ```ini
 Environment=PORT=3000
 Environment=LAUDUS_TENANTS_DIR=/opt/tenants
+# Auto-provisão (S2b) — o serverless chama /api/admin/tenant com este segredo:
+Environment=LAUDUS_ADMIN_SECRET=<segredo-admin-forte>
+Environment=LAUDUS_TENANT_SCRIPT=/opt/pacs-tenant.sh
+Environment=LAUDUS_TS_NET=tail861dda.ts.net
 # (remova LAUDUS_WORKLIST_DIR e LAUDUS_AGENT_SECRET — no multi-tenant o segredo é por tenant)
 ```
+> O agente precisa rodar como **root** (para o Docker do `pacs-tenant.sh`) — é o
+> padrão do systemd sem `User=`.
+
+### Auto-provisão self-service (S2b) — env na Vercel
+Para o botão "Criar meu PACS" (Starter/Pro) provisionar o tenant sozinho, adicione
+na Vercel:
+```
+PACS_SHARED_AGENT_URL=https://orthanc-server.tail861dda.ts.net
+PACS_ADMIN_SECRET=<o MESMO LAUDUS_ADMIN_SECRET do agente>
+```
+Sem essas, os planos Starter/Pro caem em **simulação** (nada quebra).
 Recarregue e reinicie:
 ```bash
 sudo systemctl daemon-reload && sudo systemctl restart laudus-agent

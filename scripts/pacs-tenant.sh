@@ -23,8 +23,9 @@ TS_NET="${TS_NET:-tail861dda.ts.net}"
 HTTP_BASE=8100
 DICOM_BASE=4300
 
-log(){ printf '\n\033[1;36m▶ %s\033[0m\n' "$*"; }
-ok(){ printf '  \033[1;32m✓ %s\033[0m\n' "$*"; }
+# Logs vão para stderr — assim o stdout carrega só o resultado (JSON no modo admin).
+log(){ printf '\n\033[1;36m▶ %s\033[0m\n' "$*" >&2; }
+ok(){ printf '  \033[1;32m✓ %s\033[0m\n' "$*" >&2; }
 die(){ printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
 require_root(){
@@ -90,13 +91,21 @@ JSON
   chmod 600 "$dir/tenant.json"
   ok "Registry $dir/tenant.json gravado."
 
-  local ip; ip="$(tailscale ip -4 2>/dev/null | head -1 || echo '<IP-TAILNET-DA-VM>')"
+  local ip; ip="$(tailscale ip -4 2>/dev/null | head -1 || echo '')"
+
+  # Saída JSON (LAUDUS_JSON=1) — consumida pelo endpoint admin do agente.
+  if [ -n "${LAUDUS_JSON:-}" ]; then
+    printf '{"tenantId":"%s","secret":"%s","dicomPort":%s,"httpPort":%s,"tailnetIp":"%s","agentUrl":"https://orthanc-server.%s"}\n' \
+      "$tid" "$secret" "$dicom" "$http" "$ip" "$TS_NET"
+    return
+  fi
+
   echo ""
   echo "════════════ DADOS PARA O APP (settings do usuário) ════════════"
   echo "  dicomTenantId      = $tid"
   echo "  dicomAgentSecret   = $secret"
   echo "  dicomLocalAgentUrl = https://orthanc-server.$TS_NET   (Funnel do agente)"
-  echo "  Porta DICOM (relé) = $dicom   → aparelho aponta p/ $ip:$dicom"
+  echo "  Porta DICOM (relé) = $dicom   → aparelho aponta p/ ${ip:-<IP-TAILNET>}:$dicom"
   echo "  AE Title           = ORTHANC"
   echo "════════════════════════════════════════════════════════════════"
 }

@@ -19,6 +19,12 @@ const AGENT_SECRET = process.env.LAUDUS_AGENT_SECRET || '';
 // resolve pasta/porta pelo tenant e NUNCA cruza clientes (personificação).
 const TENANTS_DIR = process.env.LAUDUS_TENANTS_DIR || '';
 
+// Admin (só na VM compartilhada): provisiona tenants sob demanda. O serverless
+// do Vercel chama /api/admin/tenant com este segredo. Sem ele, o endpoint fica off.
+const ADMIN_SECRET = process.env.LAUDUS_ADMIN_SECRET || '';
+const TENANT_SCRIPT = process.env.LAUDUS_TENANT_SCRIPT || '/opt/pacs-tenant.sh';
+const AGENT_TS_NET = process.env.LAUDUS_TS_NET || 'tail861dda.ts.net';
+
 // Endurecimento opt-in (anti-SSRF) para o modo single-tenant.
 const ALLOWED_HOSTS = (process.env.LAUDUS_ALLOWED_HOSTS || '')
   .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -104,6 +110,42 @@ const server = http.createServer((req, res) => {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ status: 'online', message: 'Laudus Local Agent is running!', mode: TENANTS_DIR ? 'multi-tenant' : 'single-tenant', time: new Date().toISOString() }));
+    return;
+  }
+
+  // POST /api/admin/tenant -> provisiona um tenant na VM compartilhada (admin).
+  // Protegido por x-admin-secret. Executa pacs-tenant.sh e devolve os dados JSON.
+  if (req.method === 'POST' && pathname === '/api/admin/tenant') {
+    if (!ADMIN_SECRET || req.headers['x-admin-secret'] !== ADMIN_SECRET) {
+      res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: false, error: 'Admin não autorizado.' })); return;
+    }
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => {
+      let plan = 'pro';
+      try { plan = JSON.parse(body || '{}').plan || 'pro'; } catch {}
+      if (!['starter', 'pro', 'dedicado'].includes(plan)) plan = 'pro';
+      const env = { ...process.env, LAUDUS_JSON: '1', TENANTS_DIR: TENANTS_DIR || '/opt/tenants', TS_NET: AGENT_TS_NET };
+      let p;
+      try { p = spawn('bash', [TENANT_SCRIPT, 'create', '', plan], { env }); }
+      catch (e) { res.statusCode = 500; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ success: false, error: 'Falha ao executar script: ' + e.message })); return; }
+      let out = ''; let err = '';
+      p.stdout.on('data', d => { out += d; });
+      p.stderr.on('data', d => { err += d; });
+      p.on('error', e => { res.statusCode = 500; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ success: false, error: 'Falha ao executar script: ' + e.message })); });
+      p.on('close', code => {
+        const line = out.trim().split('\n').filter(l => l.trim().startsWith('{')).pop() || '';
+        let data = null; try { data = JSON.parse(line); } catch {}
+        if (code === 0 && data) {
+          res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: true, ...data }));
+        } else {
+          res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: (err.trim() || 'Falha ao criar tenant.').slice(-300) }));
+        }
+      });
+    });
     return;
   }
 
