@@ -101,6 +101,8 @@ export function reportDocumentStyles(settings: AppSettings): string {
       border-bottom: 1px solid #d1d5db;
       padding: 12px 0;
       margin-bottom: 22px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .report-doc .report-patient .field { min-width: 0; }
     .report-doc .report-patient .field.wide { grid-column: span 2; }
@@ -254,6 +256,24 @@ export function reportDocumentStyles(settings: AppSettings): string {
       text-align: center;
     }
     .report-doc .report-footer img { width: 100%; height: auto; object-fit: contain; max-height: 80px; margin: 0 auto; }
+
+    /* Rodapé de execução (representação na prévia — no PDF é repetido por página) */
+    .report-doc .report-preview-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 36px;
+      padding-top: 6px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 0.6em;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #9ca3af;
+    }
+    .report-doc .report-preview-footer .rf-id { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .report-doc .report-preview-footer .rf-page { white-space: nowrap; flex-shrink: 0; }
   `;
 }
 
@@ -404,7 +424,7 @@ export function ReportDocumentBody({
  * modal de pré-visualização do editor.
  */
 export function ReportPreview(props: ReportDocumentProps) {
-  const { settings } = props;
+  const { settings, patient, examDate } = props;
   return (
     <div
       className="report-doc mx-auto bg-white shadow-lg border border-slate-200"
@@ -420,6 +440,12 @@ export function ReportPreview(props: ReportDocumentProps) {
         }}
       >
         <ReportDocumentBody {...props} />
+        {/* Representação do rodapé de execução: no PDF final é repetido, com
+            numeração automática, em todas as páginas. */}
+        <div className="report-preview-footer">
+          <span className="rf-id">{patient?.name || '—'} · {formatDate(examDate)}</span>
+          <span className="rf-page">Página X de Y</span>
+        </div>
       </div>
     </div>
   );
