@@ -177,6 +177,37 @@ export interface DicomDevice {
   modality: string;
 }
 
+/** Estado do provisionamento do PACS gerenciado (VM/container por usuário). */
+export type PacsInstanceStatus =
+  | 'none'          // nunca provisionado
+  | 'provisioning'  // criando a VM/container
+  | 'ready'         // no ar e configurado
+  | 'error'         // falha no provisionamento
+  | 'suspended';    // pausado (ex: cobrança)
+
+/** Instância PACS gerenciada de um usuário (grava-se em settings.pacsInstance). */
+export interface PacsInstance {
+  status: PacsInstanceStatus;
+  /** 'mock' (simulado, sem nuvem) ou 'gcp' (VM real). */
+  provider?: 'mock' | 'gcp';
+  /** Plano contratado (define modelo/quota). */
+  plan?: 'starter' | 'pro' | 'dedicado';
+  region?: string;
+  /** Nome/host da instância (para o admin). */
+  instanceName?: string;
+  /** URL pública do Agente (Funnel) — espelhada em dicomLocalAgentUrl. */
+  agentUrl?: string;
+  orthancVersion?: string;
+  diskGb?: number;
+  diskUsedGb?: number;
+  /** epoch ms */
+  createdAt?: number;
+  updatedAt?: number;
+  lastHealthAt?: number;
+  /** Mensagem de erro amigável quando status = 'error'. */
+  error?: string;
+}
+
 /** Configurações globais do aplicativo/usuário */
 export interface AppSettings {
   /** Papel atual do usuário no sistema (para fins de simulação/teste) */
@@ -268,6 +299,8 @@ export interface AppSettings {
   /** Segredo do Agente Local (per-usuário) — exigido pelo agente exposto via
    *  Tailscale Funnel. Enviado como x-agent-secret / ?agentSecret. Criptografado. */
   dicomAgentSecret?: string;
+  /** PACS gerenciado (self-service): estado do provisionamento da VM/container. */
+  pacsInstance?: PacsInstance;
 
   // Configurações do PACS de Backup (Redundância)
   dicomBackupViewerUrl?: string;

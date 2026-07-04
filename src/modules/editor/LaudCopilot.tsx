@@ -1159,7 +1159,7 @@ export function LaudCopilot({
                               </div>
                               {calcData.conclusion && (
                                 <div className="p-3 bg-ink-50 rounded-xl border border-ink-100">
-                                  <p className="text-xs font-medium text-ink-700 leading-relaxed">{calcData.conclusion}</p>
+                                  <p className="text-xs font-medium text-ink-700 leading-relaxed whitespace-pre-wrap">{calcData.conclusion}</p>
                                 </div>
                               )}
                               {calcData.metrics.length > 0 && (

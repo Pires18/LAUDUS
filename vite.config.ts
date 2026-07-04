@@ -260,7 +260,8 @@ function localOrthancWorklistPlugin() {
             req.url.startsWith('/api/abacatepay-test') ||
             req.url.startsWith('/api/reset-monthly-reports') ||
             req.url.startsWith('/api/promote-admin') ||
-            req.url.startsWith('/api/abacatepay-cancel')
+            req.url.startsWith('/api/abacatepay-cancel') ||
+            req.url.startsWith('/api/pacs-provision')
           )
         ) {
           const parsedUrl = new URL(req.url, 'http://localhost');
@@ -325,6 +326,8 @@ function localOrthancWorklistPlugin() {
             await runServerless('./api/promote-admin.ts');
           } else if (pathName === '/api/abacatepay-cancel') {
             await runServerless('./api/abacatepay-cancel.ts');
+          } else if (pathName === '/api/pacs-provision') {
+            await runServerless('./api/pacs-provision.ts');
           } else {
             next();
           }

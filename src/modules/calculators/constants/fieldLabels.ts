@@ -47,12 +47,32 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 /**
+ * Chaves internas que NÃO devem virar "chips" de métrica: são códigos crus
+ * (enums em inglês), índices ou prosa já contida na conclusão. Exibi-las
+ * poluiria o card do Copiloto, a grade de métricas e o texto enviado à IA.
+ */
+export const HIDDEN_METRIC_KEYS = new Set<string>([
+  'method',        // mbv/ila/balik/dum/usg (código cru)
+  'auFlow',        // normal/aedf/redf (código cru; já descrito na conclusão)
+  'dvWave',        // not_evaluated/normal/rav (código cru)
+  'stage',         // índice numérico do estadiamento
+  'stageDesc',     // redundante com a conclusão
+  'rec',           // conduta em prosa longa — pertence à conclusão
+  'pDescription',  // classificação em prosa (PIG/AIG/GIG) — já na conclusão
+  'status',        // normal/alert (código cru)
+  'selected',      // rótulo do órgão — redundante com a conclusão
+  'sex',           // male/female/unknown (enum não localizado)
+  'referenceDate', // data-base interna do cálculo
+]);
+
+/**
  * Verdadeiro quando a métrica deve aparecer na grade de "Métricas Detalhadas":
- * ignora campos internos (prefixo `_`), objetos/arrays e valores vazios.
+ * ignora campos internos (prefixo `_`), chaves ocultas, objetos/arrays e vazios.
  */
 export function isDisplayableMetric(key: string, value: unknown): boolean {
   return (
     !key.startsWith('_') &&
+    !HIDDEN_METRIC_KEYS.has(key) &&
     typeof value !== 'object' &&
     value !== '' &&
     value !== null &&

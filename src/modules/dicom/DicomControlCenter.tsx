@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
+import { MyPacsCard } from './MyPacsCard';
+import { UltrasoundSetupCard } from './UltrasoundSetupCard';
 import { getIdToken } from '../../lib/authToken';
 
 const JSON_TEMPLATE = `{
@@ -451,6 +453,12 @@ export function DicomControlCenter() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in">
               {/* Form de Configuração Principal (Esquerda - 2 colunas) */}
               <div className="lg:col-span-2 space-y-5">
+                {/* PACS gerenciado (self-service) — provisiona e autoconfigura */}
+                <MyPacsCard />
+
+                {/* Conectar ultrassom — ajustes simples pessoais + aparelhos */}
+                <UltrasoundSetupCard />
+
                 {/* Servidor PACS Principal */}
                 <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-5">
                   <div className="flex items-center gap-3 pb-3 border-b border-ink-50">

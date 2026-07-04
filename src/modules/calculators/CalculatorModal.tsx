@@ -15,7 +15,6 @@ interface Props {
   area?: ExamArea;
   onClose: () => void;
   onSendToCopilot: (result: string) => void;
-  onAppendToForm?: (text: string) => void;
   onInsertToReport?: (html: string) => void;
   examDateMs?: number;
   calculatorData?: Record<string, any>;
@@ -23,7 +22,7 @@ interface Props {
   initialCalcId?: string;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
+export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
   const { setView } = useApp();
   const { hasCalculators } = useSubscription();
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
@@ -70,9 +69,10 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
     if (selectedCalcId && onSaveCalculatorData) {
       onSaveCalculatorData({ ...calculatorData, [selectedCalcId]: val });
     }
-    if (val?._summary && !calcResult?._summary) {
-      setActiveTab('result');
-    }
+    // NÃO trocar de aba automaticamente: muitas calculadoras já geram um
+    // resumo com o mínimo de campos preenchidos, e mudar para "Conclusão"
+    // interromperia o preenchimento. A aba "Conclusão" exibe um indicador
+    // pulsante quando há resultado — a troca é feita pelo médico quando quiser.
   };
 
   const hasResult = !!calcResult?._summary;
@@ -106,9 +106,19 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onAppendToForm
     setTimeout(() => onClose(), 600);
   };
 
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   const handleInsertToReport = () => {
     if (!onInsertToReport || !calcResult?._summary) return;
-    const html = `<p><strong>${selectedCalc?.name || 'Calculadora'}:</strong> ${calcResult._summary}</p>`;
+    const name = escapeHtml(selectedCalc?.name || 'Calculadora');
+    // Resumos podem ser multi-linha (ex.: Cartografia Venosa). Preserva as
+    // quebras convertendo-as em <br> e escapa o conteúdo para HTML seguro.
+    const lines = String(calcResult._summary).split('\n').map(l => l.trim()).filter(Boolean);
+    const body = lines.map(escapeHtml).join('<br>');
+    const html = lines.length > 1
+      ? `<p><strong>${name}:</strong><br>${body}</p>`
+      : `<p><strong>${name}:</strong> ${body}</p>`;
     onInsertToReport(html);
     setInsertedReport(true);
     setTimeout(() => { setInsertedReport(false); onClose(); }, 800);
