@@ -6,6 +6,10 @@ import { calculateAge, formatDate } from '../../utils/format';
  * na impressão (PrintLayout, dentro do portal #print-area) e nas prévias
  * (Centro de PDF nas Configurações e modal de pré-visualização no editor).
  * Assim, o que o médico vê na prévia é idêntico ao PDF final.
+ *
+ * Todo o visual do documento vive em `reportDocumentStyles` (folha escopada sob
+ * `.report-doc`). O JSX do corpo usa apenas classes semânticas — nada de classes
+ * utilitárias Tailwind — para que a impressão seja 100% previsível e sóbria.
  */
 
 export function getFontFamilyFallback(family?: string) {
@@ -29,16 +33,12 @@ export interface ReportDocumentProps {
   reportContent: string;
   physicianName?: string;
   examDate: number;
-  /**
-   * Nota de Observações Metodológicas (HTML) renderizada de forma reduzida ao
-   * final do laudo, para documentação/respaldo. Vazio = não exibe.
-   */
-  observationsNote?: string;
 }
 
 /**
  * CSS compartilhado do documento do laudo. Reescopado sob `.report-doc` para
  * valer tanto na impressão quanto na prévia sem vazar para o resto do app.
+ * Paleta monocromática (preto/cinzas) — documento padronizado e direto.
  */
 export function reportDocumentStyles(settings: AppSettings): string {
   return `
@@ -46,9 +46,86 @@ export function reportDocumentStyles(settings: AppSettings): string {
       font-family: ${getFontFamilyFallback(settings.pdfFontFamily)};
       font-size: ${settings.pdfFontSize || '14px'};
       line-height: ${settings.pdfLineHeight || '1.5'};
-      color: #0f172a;
+      color: #1a1a1a;
       background: #fff;
     }
+
+    /* ── Cabeçalho ── */
+    .report-doc .report-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 1.5px solid #1a1a1a;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+    }
+    .report-doc .report-header-logo {
+      height: 72px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .report-doc .report-header-text {
+      flex: 1;
+      min-width: 0;
+      text-align: right;
+    }
+    .report-doc .report-header .clinic-name {
+      font-size: 1.2em;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      margin: 0;
+    }
+    .report-doc .report-header .clinic-address {
+      font-size: 0.68em;
+      line-height: 1.5;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 4px;
+      white-space: pre-wrap;
+    }
+    .report-doc .clinic-header-image img,
+    .report-doc .clinic-header-html { margin-bottom: 20px; }
+    .report-doc .clinic-header-image img { width: 100%; height: auto; object-fit: contain; max-height: 120px; }
+
+    /* ── Barra de dados do paciente ── */
+    .report-doc .report-patient {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px 20px;
+      border-top: 1px solid #d1d5db;
+      border-bottom: 1px solid #d1d5db;
+      padding: 12px 0;
+      margin-bottom: 22px;
+    }
+    .report-doc .report-patient .field { min-width: 0; }
+    .report-doc .report-patient .field.wide { grid-column: span 2; }
+    .report-doc .report-patient .field.full { grid-column: 1 / -1; }
+    .report-doc .report-patient .field-label {
+      display: block;
+      font-size: 0.6em;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      margin-bottom: 3px;
+    }
+    .report-doc .report-patient .field-value {
+      display: block;
+      font-size: 0.82em;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #1a1a1a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── Corpo do laudo (conteúdo clínico) ── */
     .report-doc .print-prose {
       font-family: inherit;
       font-size: inherit;
@@ -59,20 +136,21 @@ export function reportDocumentStyles(settings: AppSettings): string {
       font-weight: 800;
       text-align: center;
       text-transform: uppercase;
+      letter-spacing: 0.02em;
       margin-top: 8px;
       margin-bottom: 20px;
-      color: #0f172a;
+      color: #1a1a1a;
       border: none;
       padding: 0;
     }
     .report-doc .print-prose h2 {
-      font-size: 1.05em;
+      font-size: 1.02em;
       font-weight: 800;
-      color: #1e293b;
+      color: #1a1a1a;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      border-left: 3px solid #4f46e5;
-      padding-left: 8px;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #9ca3af;
+      padding-bottom: 4px;
       margin-top: 24px;
       margin-bottom: 12px;
       page-break-after: avoid;
@@ -81,7 +159,7 @@ export function reportDocumentStyles(settings: AppSettings): string {
     .report-doc .print-prose h3 {
       font-size: 0.95em;
       font-weight: 700;
-      color: #334155;
+      color: #374151;
       margin-top: 16px;
       margin-bottom: 8px;
       page-break-after: avoid;
@@ -91,7 +169,7 @@ export function reportDocumentStyles(settings: AppSettings): string {
       margin-bottom: 8px;
       text-align: ${settings.pdfTextAlign || 'justify'};
     }
-    .report-doc .print-prose strong { color: #0f172a; font-weight: 700; }
+    .report-doc .print-prose strong { color: #1a1a1a; font-weight: 700; }
     .report-doc .print-prose table {
       width: 100%;
       border-collapse: collapse;
@@ -102,43 +180,80 @@ export function reportDocumentStyles(settings: AppSettings): string {
       break-inside: avoid;
     }
     .report-doc .print-prose th {
-      background-color: #f8fafc;
-      color: #475569;
+      background-color: #f3f4f6;
+      color: #374151;
       font-weight: 700;
       text-align: left;
       padding: 6px 10px;
-      border-bottom: 2px solid #e2e8f0;
+      border-bottom: 1.5px solid #9ca3af;
     }
     .report-doc .print-prose td {
       padding: 6px 10px;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
+      border-bottom: 1px solid #e5e7eb;
+      color: #1f2937;
     }
     .report-doc .print-prose ul { margin-left: 20px; margin-bottom: 12px; list-style-type: disc; }
     .report-doc .print-prose ol { margin-left: 20px; margin-bottom: 12px; list-style-type: decimal; }
     .report-doc .print-prose li { margin-bottom: 4px; }
-    /* Nota de Observações Metodológicas — rodapé reduzido, itálico e discreto */
-    .report-doc .report-obs {
-      margin-top: 20px;
-      padding: 8px 0 0 10px;
-      border-top: 1px solid #e2e8f0;
-      border-left: 2px solid #cbd5e1;
-      font-size: 0.78em;
-      font-style: italic;
-      line-height: 1.45;
-      color: #64748b;
+
+    /* ── Bloco de assinatura ── */
+    .report-doc .report-signature {
+      margin-top: 56px;
+      padding-top: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
       page-break-inside: avoid;
       break-inside: avoid;
     }
-    .report-doc .report-obs .report-obs-label {
-      font-style: normal;
+    .report-doc .report-signature .sig-image {
+      max-height: 64px;
+      max-width: 220px;
+      object-fit: contain;
+      margin-bottom: 6px;
+    }
+    .report-doc .report-signature .sig-line {
+      width: 260px;
+      border-top: 1px solid #6b7280;
+      margin: 16px 0 6px;
+    }
+    .report-doc .report-signature .dr-name {
+      font-size: 0.86em;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: #1a1a1a;
+    }
+    .report-doc .report-signature .dr-ids {
+      font-size: 0.72em;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #475569;
-      margin-right: 4px;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      margin-top: 2px;
     }
-    .report-doc .report-obs p { margin: 0 0 4px; text-align: left; }
+    .report-doc .report-signature .dr-ids .sep { color: #d1d5db; margin: 0 6px; }
+    .report-doc .report-signature .sig-note {
+      font-size: 0.72em;
+      color: #6b7280;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      margin-top: 6px;
+      max-width: 360px;
+    }
+
+    /* ── Rodapé da clínica ── */
+    .report-doc .report-footer {
+      margin-top: 44px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 0.7em;
+      line-height: 1.5;
+      color: #6b7280;
+      text-align: center;
+    }
+    .report-doc .report-footer img { width: 100%; height: auto; object-fit: contain; max-height: 80px; margin: 0 auto; }
   `;
 }
 
@@ -150,10 +265,17 @@ function resolveClinicAddress(clinic: Clinic | null, settings: AppSettings): str
     .join(', ');
 }
 
+function formatGender(gender?: string): string {
+  if (gender === 'M') return 'MASCULINO';
+  if (gender === 'F') return 'FEMININO';
+  return gender || '---';
+}
+
 /**
- * Corpo do laudo (cabeçalho, dados do paciente, conteúdo, nota metodológica,
- * assinatura e rodapé). Sem margens de página — quem controla margens é o
- * invólucro (PrintLayout para impressão, ReportPreview para prévia).
+ * Corpo do laudo (cabeçalho, dados do paciente, conteúdo, assinatura e rodapé).
+ * Sem margens de página — quem controla margens é o invólucro (PrintLayout para
+ * impressão, ReportPreview para prévia). Usa apenas classes semânticas
+ * estilizadas em `reportDocumentStyles`.
  */
 export function ReportDocumentBody({
   patient,
@@ -162,7 +284,6 @@ export function ReportDocumentBody({
   reportContent,
   physicianName,
   examDate,
-  observationsNote,
 }: ReportDocumentProps) {
   const drName = settings.physicianName || '';
   const drCRM = settings.physicianCRM || '';
@@ -170,127 +291,106 @@ export function ReportDocumentBody({
 
   const showHeader = settings.pdfShowHeader !== false;
   const showFooter = settings.pdfShowFooter !== false;
-  const footerText = (showFooter && clinic?.footerHtml) ? clinic.footerHtml.replace(/<[^>]*>?/gm, '').trim() : '';
+
+  const birth = patient.birthDate
+    ? `${calculateAge(patient.birthDate, examDate)} · ${formatDate(patient.birthDate)}`
+    : '---';
 
   return (
     <div className="report-doc-body">
-      {/* Header */}
+      {/* Cabeçalho */}
       {showHeader && (
         clinic?.headerHtml ? (
-          <div className="clinic-header-html mb-6" dangerouslySetInnerHTML={{ __html: clinic.headerHtml }} />
+          <div className="clinic-header-html" dangerouslySetInnerHTML={{ __html: clinic.headerHtml }} />
         ) : clinic?.headerImageUrl ? (
-          <div className="clinic-header-image mb-6 w-full">
-            <img src={clinic.headerImageUrl} alt="Cabeçalho da Clínica" className="w-full h-auto object-contain max-h-[120px]" />
+          <div className="clinic-header-image">
+            <img src={clinic.headerImageUrl} alt="Cabeçalho da Clínica" />
           </div>
         ) : (
-          <div className="flex items-center justify-between border-b border-slate-350 pb-5 mb-6">
+          <div className="report-header">
             {clinic?.logoUrl && (
-              <img src={clinic.logoUrl} alt="Logo" className="h-24 w-auto object-contain shrink-0" />
+              <img src={clinic.logoUrl} alt="Logo" className="report-header-logo" />
             )}
-            <div className="text-right flex-1 min-w-0 ml-6">
-              <h1 className="text-xl font-bold uppercase tracking-tight text-slate-800">
-                {clinic?.name || settings.clinicName || 'LAUD.US'}
-              </h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-1.5 max-w-sm ml-auto whitespace-pre-wrap leading-relaxed">
+            <div className="report-header-text">
+              <p className="clinic-name">{clinic?.name || settings.clinicName || 'LAUD.US'}</p>
+              <p className="clinic-address">
                 {resolveClinicAddress(clinic, settings)}
-                {clinic?.phone && <><br />Tel: {clinic.phone}</>}
+                {clinic?.phone ? `${resolveClinicAddress(clinic, settings) ? '\n' : ''}Tel: ${clinic.phone}` : ''}
               </p>
             </div>
           </div>
         )
       )}
 
-      {/* Patient Info Bar (grid clínico minimalista — 3 linhas) */}
-      <div className="border-y border-slate-350 py-3.5 mb-6 space-y-3.5 text-xs leading-none">
-        <div className="grid grid-cols-4 gap-4">
-          <div className="space-y-1 col-span-2">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">PACIENTE</span>
-            <span className="font-bold text-slate-800 uppercase block truncate">{patient.name}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">IDADE / NASC.</span>
-            <span className="font-semibold text-slate-700 block uppercase whitespace-nowrap">
-              {patient.birthDate ? `${calculateAge(patient.birthDate, examDate)} (${formatDate(patient.birthDate)})` : '---'}
-            </span>
-          </div>
-          <div className="space-y-1">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">GÊNERO</span>
-            <span className="font-semibold text-slate-700 block uppercase">
-              {patient.gender === 'M' ? 'MASCULINO' : patient.gender === 'F' ? 'FEMININO' : patient.gender || '---'}
-            </span>
-          </div>
+      {/* Dados do paciente */}
+      <div className="report-patient">
+        <div className="field wide">
+          <span className="field-label">Paciente</span>
+          <span className="field-value">{patient.name}</span>
         </div>
-
-        <div className="grid grid-cols-4 gap-4 pt-3.5 border-t border-slate-100">
-          <div className="space-y-1">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CONVÊNIO</span>
-            <span className="font-semibold text-slate-700 block uppercase truncate">{patient.insurance || 'PARTICULAR'}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CARTEIRINHA</span>
-            <span className="font-semibold text-slate-700 block uppercase truncate">{patient.insuranceNumber || '---'}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">CPF</span>
-            <span className="font-semibold text-slate-700 block uppercase truncate">{patient.cpf || '---'}</span>
-          </div>
-          <div className="space-y-1">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">DATA DO EXAME</span>
-            <span className="font-bold text-slate-800 block uppercase">{formatDate(examDate)}</span>
-          </div>
+        <div className="field">
+          <span className="field-label">Idade / Nasc.</span>
+          <span className="field-value">{birth}</span>
         </div>
-
-        <div className="grid grid-cols-4 gap-4 pt-3.5 border-t border-slate-100">
-          <div className="space-y-1 col-span-4">
-            <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest">MÉDICO SOLICITANTE</span>
-            <span className="font-semibold text-slate-700 block uppercase truncate">{physicianName || 'NÃO INFORMADO'}</span>
-          </div>
+        <div className="field">
+          <span className="field-label">Sexo</span>
+          <span className="field-value">{formatGender(patient.gender)}</span>
+        </div>
+        <div className="field">
+          <span className="field-label">Convênio</span>
+          <span className="field-value">{patient.insurance || 'PARTICULAR'}</span>
+        </div>
+        <div className="field">
+          <span className="field-label">Carteirinha</span>
+          <span className="field-value">{patient.insuranceNumber || '---'}</span>
+        </div>
+        <div className="field">
+          <span className="field-label">CPF</span>
+          <span className="field-value">{patient.cpf || '---'}</span>
+        </div>
+        <div className="field">
+          <span className="field-label">Data do Exame</span>
+          <span className="field-value">{formatDate(examDate)}</span>
+        </div>
+        <div className="field full">
+          <span className="field-label">Médico Solicitante</span>
+          <span className="field-value">{physicianName || 'NÃO INFORMADO'}</span>
         </div>
       </div>
 
-      {/* Content */}
-      {/* As Observações Metodológicas agora são uma SEÇÃO do corpo do laudo
-          (reportContent) — não há mais nota reduzida separada ao final. */}
+      {/* Conteúdo clínico */}
       <div className="prose prose-sm max-w-none print-prose" dangerouslySetInnerHTML={{ __html: reportContent }} />
 
-      {/* Signature Block */}
-      <div className="mt-16 pt-8 flex flex-col items-center text-center page-break-inside-avoid">
+      {/* Assinatura */}
+      <div className="report-signature">
         {settings.signatureImageUrl ? (
-          <div className="h-16 flex items-center justify-center mb-2">
-            <img src={settings.signatureImageUrl} alt="Assinatura digital" className="max-h-full object-contain" style={{ maxWidth: '220px' }} />
-          </div>
+          <img src={settings.signatureImageUrl} alt="Assinatura digital" className="sig-image" />
         ) : (
-          <div className="w-64 border-t border-dashed border-slate-350 mb-2 mt-4" />
+          <div className="sig-line" />
         )}
 
-        {drName && <p className="text-[12px] font-bold text-slate-800 uppercase tracking-wide">{drName}</p>}
+        {drName && <span className="dr-name">{drName}</span>}
 
-        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider space-y-0.5 mt-0.5">
-          {drCRM && <span>CRM: {drCRM}</span>}
-          {drCRM && drRQE && <span className="mx-1.5 text-slate-300">|</span>}
-          {drRQE && <span>RQE: {drRQE}</span>}
-        </div>
+        {(drCRM || drRQE) && (
+          <span className="dr-ids">
+            {drCRM && <span>CRM: {drCRM}</span>}
+            {drCRM && drRQE && <span className="sep">|</span>}
+            {drRQE && <span>RQE: {drRQE}</span>}
+          </span>
+        )}
 
-        {settings.defaultSignature ? (
-          <p className="text-[10px] text-slate-500 font-medium whitespace-pre-wrap mt-1 leading-normal max-w-sm mx-auto">
-            {settings.defaultSignature}
-          </p>
-        ) : (
-          footerText && !drName && (
-            <p className="text-[10px] text-slate-500 font-medium whitespace-pre-wrap mt-1 leading-normal max-w-sm mx-auto">
-              {footerText}
-            </p>
-          )
+        {settings.defaultSignature && (
+          <span className="sig-note">{settings.defaultSignature}</span>
         )}
       </div>
 
-      {/* Clinic Footer Rich HTML or Image */}
+      {/* Rodapé da clínica */}
       {showFooter && (
         clinic?.footerHtml ? (
-          <div className="mt-12 pt-4 border-t border-slate-200 text-[10px] text-slate-500 text-center clinic-footer-html leading-relaxed" dangerouslySetInnerHTML={{ __html: clinic.footerHtml }} />
+          <div className="report-footer" dangerouslySetInnerHTML={{ __html: clinic.footerHtml }} />
         ) : clinic?.footerImageUrl ? (
-          <div className="clinic-footer-image mt-12 pt-4 border-t border-slate-200 w-full text-center">
-            <img src={clinic.footerImageUrl} alt="Rodapé da Clínica" className="w-full h-auto object-contain max-h-[80px] mx-auto" />
+          <div className="report-footer">
+            <img src={clinic.footerImageUrl} alt="Rodapé da Clínica" />
           </div>
         ) : null
       )}

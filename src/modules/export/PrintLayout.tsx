@@ -10,8 +10,6 @@ interface Props {
   reportContent: string;
   physicianName?: string;
   examDate: number;
-  /** Nota de Observações Metodológicas (HTML) — rodapé reduzido ao final. */
-  observationsNote?: string;
 }
 
 export function PrintLayout(props: Props) {
