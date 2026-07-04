@@ -6,7 +6,8 @@ import {
   Save, RotateCcw, Loader2, Database, Server, Wifi,
   HardDrive, Cloud, Info, Network, BookOpen,
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
-  Copy, Check, ArrowRight, Monitor, Radio
+  Copy, Check, ArrowRight, Monitor, Radio,
+  Users, Layers, Image, RefreshCw
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
@@ -33,7 +34,23 @@ const JSON_TEMPLATE = `{
   }
 }`;
 
-type ControlTab = 'config' | 'guides';
+type ControlTab = 'config' | 'guides' | 'storage';
+
+/** Estatísticas de armazenamento/quantidades de um servidor Orthanc (VM ou backup). */
+type ServerStorage = {
+  label: string;
+  isBackup: boolean;
+  ok: boolean;
+  error?: string;
+  version?: string;
+  name?: string;
+  countPatients?: number;
+  countStudies?: number;
+  countSeries?: number;
+  countInstances?: number;
+  diskMB?: number;
+  uncompressedMB?: number;
+};
 
 /** Resultado de um teste de capacidade (imagens ou worklist) de um servidor. */
 type CapResult = { ok: boolean; msg: string; skipped?: boolean };
@@ -59,6 +76,10 @@ export function DicomControlCenter() {
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [diag, setDiag] = useState<DiagResults | null>(null);
   const [diagStep, setDiagStep] = useState<string>('');
+
+  const [storage, setStorage] = useState<ServerStorage[] | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [storageFetchedAt, setStorageFetchedAt] = useState<number | null>(null);
 
   useEffect(() => {
     setDraft(settings);
@@ -133,6 +154,69 @@ export function DicomControlCenter() {
       return { ok: false, msg: e.message || 'Servidor inacessível (offline ou fora do Funnel)' };
     }
   }
+
+  // Busca estatísticas de armazenamento/quantidades (Orthanc /statistics + /system)
+  // de um servidor via o mesmo proxy usado pelas imagens.
+  async function fetchServerStorage(isBackup: boolean): Promise<ServerStorage> {
+    const label = isBackup ? 'Servidor Backup' : 'Servidor Principal (VM)';
+    const baseUrl = getActivePacsUrl(draft, isBackup);
+    const auth = getDicomAuthParams(draft, isBackup);
+    const proxyPath = getProxyEndpoint(draft, isBackup);
+    const base = baseUrl.replace(/\/$/, '');
+    try {
+      const [statsRes, sysRes] = await Promise.all([
+        fetch(`${proxyPath}?url=${encodeURIComponent(`${base}/statistics`)}${auth}`),
+        fetch(`${proxyPath}?url=${encodeURIComponent(`${base}/system`)}${auth}`),
+      ]);
+      if (!statsRes.ok) {
+        const msg = statsRes.status === 401 || statsRes.status === 403
+          ? 'Usuário/senha do Orthanc incorretos'
+          : `HTTP ${statsRes.status} — servidor inacessível`;
+        return { label, isBackup, ok: false, error: msg };
+      }
+      const stats = await statsRes.json();
+      const sys = sysRes.ok ? await sysRes.json().catch(() => ({})) : {};
+      const num = (v: any) => (typeof v === 'number' ? v : parseInt(v, 10) || 0);
+      return {
+        label,
+        isBackup,
+        ok: true,
+        version: sys.Version,
+        name: sys.Name,
+        countPatients: num(stats.CountPatients),
+        countStudies: num(stats.CountStudies),
+        countSeries: num(stats.CountSeries),
+        countInstances: num(stats.CountInstances),
+        diskMB: num(stats.TotalDiskSizeMB),
+        uncompressedMB: num(stats.TotalUncompressedSizeMB),
+      };
+    } catch (e: any) {
+      return { label, isBackup, ok: false, error: e.message || 'Servidor inacessível (offline ou fora do Funnel)' };
+    }
+  }
+
+  async function refreshStorage() {
+    setStorageLoading(true);
+    try {
+      const backupOn = !!(draft.dicomBackupViewerUrl || draft.dicomBackupTailscalePublicUrl || draft.dicomBackupLocalAgentUrl);
+      const results = await Promise.all([
+        fetchServerStorage(false),
+        ...(backupOn ? [fetchServerStorage(true)] : []),
+      ]);
+      setStorage(results);
+      setStorageFetchedAt(Date.now());
+    } finally {
+      setStorageLoading(false);
+    }
+  }
+
+  // Carrega as estatísticas ao abrir a aba de Armazenamento (uma vez por abertura).
+  useEffect(() => {
+    if (activeTab === 'storage' && !storage && !storageLoading) {
+      refreshStorage();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Testa a WORKLIST de ponta a ponta (agente/Vite → Python → pydicom → pasta)
   // via ping, sem gerar arquivo .wl.
@@ -346,6 +430,18 @@ export function DicomControlCenter() {
           >
             <BookOpen size={13} />
             Guia de Configuração (Manual)
+          </button>
+          <button
+            onClick={() => setActiveTab('storage')}
+            className={classNames(
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 whitespace-nowrap flex-1 justify-center sm:flex-none sm:justify-start',
+              activeTab === 'storage'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                : 'text-ink-500 hover:text-ink-800 hover:bg-white/70'
+            )}
+          >
+            <Database size={13} />
+            Armazenamento & Exames
           </button>
         </div>
 
@@ -1165,6 +1261,120 @@ node agent.js`} />
               </div>
             </div>
           )}
+
+          {activeTab === 'storage' && (() => {
+            const fmtSize = (mb?: number) => {
+              if (mb === undefined || mb === null) return '—';
+              if (mb >= 1024) return `${(mb / 1024).toFixed(2)} GB`;
+              return `${mb.toLocaleString('pt-BR')} MB`;
+            };
+            const fmtNum = (n?: number) => (n === undefined || n === null ? '—' : n.toLocaleString('pt-BR'));
+            const Metric = ({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: string }) => (
+              <div className="rounded-xl border border-ink-100 bg-white p-3 flex flex-col gap-1">
+                <div className={classNames('w-8 h-8 rounded-lg flex items-center justify-center', tone)}>
+                  <Icon size={16} />
+                </div>
+                <span className="text-lg font-black text-ink-900 leading-none mt-1">{value}</span>
+                <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">{label}</span>
+              </div>
+            );
+            return (
+              <div className="animate-fade-in space-y-5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-sm font-black text-ink-900 flex items-center gap-2"><Database size={16} className="text-emerald-600" /> Armazenamento &amp; Quantidade de Exames</h3>
+                    <p className="text-[11px] text-ink-500 font-medium">Dados ao vivo do Orthanc (VM na nuvem e backup, se configurado).</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {storageFetchedAt && (
+                      <span className="text-[10px] text-ink-400 font-medium">Atualizado às {new Date(storageFetchedAt).toLocaleTimeString('pt-BR')}</span>
+                    )}
+                    <button
+                      onClick={refreshStorage}
+                      disabled={storageLoading}
+                      className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-ink-900 hover:bg-ink-800 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+                    >
+                      <RefreshCw size={12} className={storageLoading ? 'animate-spin' : ''} />
+                      Atualizar
+                    </button>
+                  </div>
+                </div>
+
+                {storageLoading && !storage && (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3 bg-white rounded-2xl border border-ink-100">
+                    <Loader2 size={28} className="animate-spin text-emerald-500" />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-ink-400">Consultando os servidores…</span>
+                  </div>
+                )}
+
+                {storage && storage.map((s) => (
+                  <div key={s.label} className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-ink-50 flex items-center gap-3">
+                      <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center', s.isBackup ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600')}>
+                        {s.isBackup ? <HardDrive size={18} /> : <Cloud size={18} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-bold text-ink-900">{s.label}</h4>
+                        <p className="text-[11px] text-ink-500 font-medium truncate">
+                          {s.ok ? `Orthanc v${s.version || '—'}${s.name ? ` · ${s.name}` : ''}` : 'Sem conexão'}
+                        </p>
+                      </div>
+                      <span className={classNames('text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wider', s.ok ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600')}>
+                        {s.ok ? 'Online' : 'Offline'}
+                      </span>
+                    </div>
+
+                    {s.ok ? (
+                      <div className="p-5 space-y-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <Metric icon={Database} label="Exames (estudos)" value={fmtNum(s.countStudies)} tone="bg-emerald-50 text-emerald-600" />
+                          <Metric icon={Users} label="Pacientes" value={fmtNum(s.countPatients)} tone="bg-blue-50 text-blue-600" />
+                          <Metric icon={Layers} label="Séries" value={fmtNum(s.countSeries)} tone="bg-amber-50 text-amber-600" />
+                          <Metric icon={Image} label="Imagens" value={fmtNum(s.countInstances)} tone="bg-fuchsia-50 text-fuchsia-600" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center shrink-0">
+                              <HardDrive size={18} />
+                            </div>
+                            <div>
+                              <span className="text-xl font-black text-ink-900 leading-none block">{fmtSize(s.diskMB)}</span>
+                              <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Espaço em disco usado</span>
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-ink-200 text-ink-600 flex items-center justify-center shrink-0">
+                              <FileText size={18} />
+                            </div>
+                            <div>
+                              <span className="text-xl font-black text-ink-900 leading-none block">{fmtSize(s.uncompressedMB)}</span>
+                              <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Tamanho descompactado</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-6 flex flex-col items-center text-center gap-3">
+                        <AlertTriangle className="text-amber-500" size={26} />
+                        <p className="text-[11px] text-ink-500 font-medium max-w-md leading-relaxed">{s.error}</p>
+                        <button
+                          onClick={refreshStorage}
+                          className="h-8 px-4 rounded-lg bg-ink-100 hover:bg-ink-200 text-ink-700 text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                        >
+                          <RefreshCw size={11} /> Tentar novamente
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <div className="flex items-start gap-1.5 text-[11px] text-ink-500 bg-blue-50/50 border border-blue-100 rounded-xl px-3 py-2.5 leading-relaxed">
+                  <Info size={13} className="shrink-0 mt-0.5 text-blue-500" />
+                  <span>Os números vêm direto do Orthanc (<code>/statistics</code>). O "espaço em disco" é o total já armazenado na VM — o Orthanc não informa o espaço livre; acompanhe a capacidade do disco no painel do Google Cloud.</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
       </div>
