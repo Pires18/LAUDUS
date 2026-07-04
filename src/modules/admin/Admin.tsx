@@ -11,7 +11,6 @@ import {
 import { classNames } from '../../utils/format';
 import { logger } from '../../utils/logger';
 import { setBroadcast } from '../../store/db';
-import { callMetricsHistory } from '../ai/engine';
 
 // Submodules
 import { AdminUsersSubscriptions } from './submodules/AdminUsersSubscriptions';
@@ -19,6 +18,7 @@ import { AdminAudit } from './submodules/AdminAudit';
 import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
 import { AdminFinanceiro } from './submodules/AdminFinanceiro';
+import { AdminAnalytics } from './submodules/AdminAnalytics';
 import { SharedLaudIA } from '../laud-ia/SharedLaudIA';
 
 type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia';
@@ -225,6 +225,9 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
         ))}
       </div>
 
+      {/* Analytics — séries reais (metrics_daily + finance_stats) */}
+      <AdminAnalytics />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Broadcast System */}
         <div className="bg-white p-5 rounded-2xl border border-ink-100 shadow-sm">
@@ -282,17 +285,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
              </div>
              <p className="text-sm text-ink-600 leading-relaxed">
-               {(() => {
-                 const successfulCalls = callMetricsHistory.filter(m => m.success);
-                 const avgLatency = successfulCalls.length > 0
-                   ? (successfulCalls.reduce((acc, curr) => acc + curr.latencyMs, 0) / successfulCalls.length / 1000).toFixed(1) + 's'
-                   : '1.2s';
-                 const totalCalls = callMetricsHistory.length;
-                 const successRate = totalCalls > 0
-                   ? Math.round((successfulCalls.length / totalCalls) * 100) + '%'
-                   : '100%';
-                 return `Motor operando normalmente. Latência média: ${avgLatency} · Taxa de sucesso: ${successRate} nas últimas requisições.`;
-               })()}
+               Motor operando normalmente. Os números reais de uso (laudos, custo, usuários ativos) estão no painel <strong>Analytics</strong> acima — dados persistidos de todo o sistema.
              </p>
              <p className="text-[10px] text-ink-400 font-semibold">Configurações avançadas disponíveis na aba LAUD.IA acima.</p>
           </div>
