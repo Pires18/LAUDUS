@@ -28,7 +28,7 @@ import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_P
 import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
 import { encryptPassword, decryptPassword } from '../utils/crypto';
-import { getCachedIdToken } from '../lib/authToken';
+import { getCachedIdToken, getIdToken } from '../lib/authToken';
 
 type DicomSecrets = {
   dicomPassword?: string;
@@ -1056,13 +1056,13 @@ export function getActivePacsUrl(settings: AppSettings, isBackup = false): strin
  * No Vercel, tenta usar o Agente Local (se for HTTPS) para contornar bloqueios de rede.
  */
 export function getProxyEndpoint(settings: AppSettings, isBackup = false): string {
-  const isVercel = typeof window !== 'undefined' && (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-  if (isVercel) {
-    const agent = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
-    // Só usa o agente local se for HTTPS para evitar Mixed Content Block no navegador
-    if (agent && agent.startsWith('https')) {
-      return `${agent.replace(/\/$/, '')}/api/orthanc-proxy`;
-    }
+  const agent = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
+  // Se há um Agente HTTPS (Tailscale Funnel) configurado, usa-o em QUALQUER
+  // ambiente — Vercel OU localhost (dev). Assim o dev local também enxerga as
+  // imagens da VM na nuvem, não só o Orthanc da própria máquina. HTTPS evita
+  // Mixed Content no navegador; sem agente HTTPS cai no same-origin (Vite/on-premise).
+  if (agent && agent.startsWith('https')) {
+    return `${agent.replace(/\/$/, '')}/api/orthanc-proxy`;
   }
   return '/api/orthanc-proxy';
 }
@@ -1104,7 +1104,19 @@ export function getDicomAuthParams(
  * O parâmetro `isBackup` é mantido por simetria com {@link getProxyEndpoint};
  * a escolha entre agente principal/backup é feita via `localAgentUrl` no corpo.
  */
-export function getWorklistEndpoint(_settings: AppSettings, _isBackup = false): string {
+export function getWorklistEndpoint(settings: AppSettings, isBackup = false): string {
+  const isVercel = typeof window !== 'undefined' &&
+    (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
+  // Na nuvem (Vercel): função serverless same-origin, que valida o login e
+  // encaminha server-side ao agente (localAgentUrl do corpo).
+  if (isVercel) return '/api/worklist';
+  // Fora do Vercel (localhost/dev): se há Agente HTTPS (Funnel) configurado,
+  // fala DIRETO com ele — assim o dev local também grava o .wl na VM da nuvem
+  // (não nesta máquina). Sem agente HTTPS, cai no middleware do Vite (grava local).
+  const agent = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
+  if (agent && /^https:\/\//i.test(agent)) {
+    return `${agent.replace(/\/$/, '')}/api/worklist`;
+  }
   return '/api/worklist';
 }
 
@@ -1125,6 +1137,10 @@ export function getWorklistEndpoint(_settings: AppSettings, _isBackup = false): 
 export async function deleteWorklistEntry(examId: string, settings: AppSettings): Promise<void> {
   if (settings.dicomSyncEnabled === false) return;
 
+  // Token FRESCO (não o cache síncrono, que pode estar vazio/expirado): a função
+  // serverless do Vercel valida esse token e recusa com 401 se estiver velho.
+  const idToken = await getIdToken();
+
   // ── Primário ──
   // Same-origin '/api/worklist' (Vite grava local OU serverless do Vercel
   // encaminha server-side ao agente via localAgentUrl do corpo).
@@ -1134,7 +1150,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getCachedIdToken()}`,
+      'Authorization': `Bearer ${idToken}`,
       ...(settings.dicomAgentSecret ? { 'x-agent-secret': settings.dicomAgentSecret } : {})
     },
     body: JSON.stringify({
@@ -1155,7 +1171,7 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getCachedIdToken()}`,
+        'Authorization': `Bearer ${idToken}`,
         ...(settings.dicomBackupAgentSecret ? { 'x-agent-secret': settings.dicomBackupAgentSecret } : {})
       },
       body: JSON.stringify({

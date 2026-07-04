@@ -1,7 +1,7 @@
 import { Patient } from '../types';
 import { logger } from './logger';
 import { getWorklistEndpoint } from '../store/db';
-import { getCachedIdToken } from '../lib/authToken';
+import { getIdToken } from '../lib/authToken';
 
 /**
  * Envia um exame para a Worklist do Orthanc (Primário e Backup)
@@ -58,7 +58,7 @@ export async function syncExamToOrthancWorklist(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getCachedIdToken()}`,
+            'Authorization': `Bearer ${await getIdToken()}`,
             ...(settings.dicomAgentSecret ? { 'x-agent-secret': settings.dicomAgentSecret } : {})
           },
           body: JSON.stringify({
@@ -94,7 +94,7 @@ export async function syncExamToOrthancWorklist(
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${getCachedIdToken()}`,
+            'Authorization': `Bearer ${await getIdToken()}`,
             ...(settings.dicomBackupAgentSecret ? { 'x-agent-secret': settings.dicomBackupAgentSecret } : {})
           },
           body: JSON.stringify({

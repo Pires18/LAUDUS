@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
-import { getCachedIdToken } from '../../lib/authToken';
+import { getIdToken } from '../../lib/authToken';
 
 const JSON_TEMPLATE = `{
   "Name" : "PACS LAUDUS",
@@ -142,14 +142,18 @@ export function DicomControlCenter() {
     if (isVercel && !agent) {
       return { ok: false, msg: 'URL do Agente Local não configurada (obrigatória na nuvem)' };
     }
+    const secret = isBackup ? draft.dicomBackupAgentSecret : draft.dicomAgentSecret;
     try {
       const res = await fetch(getWorklistEndpoint(draft, isBackup), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getCachedIdToken()}`
+          // Token FRESCO (verifyAuth do Vercel recusa o cache vazio/expirado).
+          'Authorization': `Bearer ${await getIdToken()}`,
+          // Segredo do agente: exigido pelo agente na VM (x-agent-secret).
+          ...(secret ? { 'x-agent-secret': secret } : {})
         },
-        body: JSON.stringify({ ping: true, localAgentUrl: agent, outputDir: dir })
+        body: JSON.stringify({ ping: true, localAgentUrl: agent, outputDir: dir, agentSecret: secret })
       });
       const data = await res.json().catch(() => ({ success: false, error: 'Resposta inválida do agente' }));
       if (data.success) {
