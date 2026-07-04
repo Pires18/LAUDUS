@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from 'firebase/auth';
 import { AppSettings, Patient, ExamStatus } from '../types';
-import { getSettings, saveSettings, migrateLegacyAnthropicModel } from './db';
+import { getSettings, saveSettings } from './db';
 import { logger } from '../utils/logger';
 import { setTheme } from '../utils/theme';
 
@@ -98,14 +98,11 @@ export const useApp = create<AppState>()(
   // ── Settings ──
   settings: {
     geminiModel: 'gemini-3.5-flash',
-    aiProvider: 'anthropic',
-    anthropicModel: 'claude-sonnet-4-6'
+    aiProvider: 'gemini'
   },
   loadSettings: async () => {
     try {
       const s = await getSettings();
-      // Migrate legacy Anthropic model names to current default
-      migrateLegacyAnthropicModel(s);
       set({ settings: s });
       // Aplica o tema salvo do usuário (mantém localStorage em sincronia).
       if (s.theme) setTheme(s.theme);

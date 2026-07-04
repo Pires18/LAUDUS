@@ -6,6 +6,7 @@ import {
   deleteDoc, updateDoc,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
+import { getIdToken } from '../../../lib/authToken';
 import { useApp } from '../../../store/app';
 import { getAiUsageStats } from '../../../store/db';
 import { classNames } from '../../../utils/format';
@@ -732,7 +733,10 @@ function AbacatePayTab() {
     try {
       const res = await fetch('/api/abacatepay-test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getIdToken()}`,
+        },
         body: JSON.stringify({ apiKey: config.apiKey }),
       });
       const data = await res.json();

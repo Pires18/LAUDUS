@@ -73,8 +73,7 @@ src/
     │   ├── json.ts            # robustJsonParse com auto-healing
     │   ├── generateTemplate.ts # Geração de templates via IA
     │   ├── providers/
-    │   │   ├── GeminiProvider.ts    # Google Gemini (generate + stream + extractJson)
-    │   │   └── AnthropicProvider.ts # Anthropic Claude (via proxy /api/anthropic)
+    │   │   └── GeminiProvider.ts    # Google Gemini (generate + stream + extractJson)
     │   └── prompts/
     │       ├── general.ts      # Prompts mestre, global, estrutura, regras rígidas
     │       ├── areaPrompts.ts  # Diretrizes por especialidade (~235 KB)
@@ -139,8 +138,7 @@ interface AiProvider {
 
 | Provider | Modelos Suportados | Streaming |
 |---|---|---|
-| `GeminiProvider` | gemini-2.5-pro, gemini-2.5-flash, gemini-3.5-flash | SSE via SDK |
-| `AnthropicProvider` | claude-3-5-sonnet, claude-3-7-sonnet, claude-opus-4 | SSE via /api/anthropic proxy |
+| `GeminiProvider` | gemini-3.5-flash (Lite), gemini-3.1-pro-preview (Pro) | SSE via SDK |
 
 ### Temperatura adaptativa por modo
 | Modo | Temperatura | Razão |

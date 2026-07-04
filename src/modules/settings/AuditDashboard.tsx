@@ -44,13 +44,13 @@ export function AuditDashboard() {
   useEffect(() => {
     const newResults: AuditResult[] = [];
 
-    // 1. API Key Check (Anthropic and Gemini are managed globally by the Admin or server-side)
+    // 1. API Key Check (Gemini key is managed globally by the Admin or server-side)
     newResults.push({
       id: 'api-key',
       category: 'security',
       status: 'ok',
       title: 'IA Conectada',
-      message: `Motor ${settings.aiProvider === 'anthropic' ? 'Claude' : 'Gemini'} pronto para uso (utilizando chaves globais do administrador/servidor).`,
+      message: `Motor Gemini pronto para uso (utilizando chaves globais do administrador/servidor).`,
       icon: <Key size={18} />
     });
 

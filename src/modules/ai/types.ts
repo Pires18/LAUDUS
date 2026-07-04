@@ -49,7 +49,7 @@ export interface BuiltPrompt {
 export interface CallMetrics {
   examId?: string;
   mode: 'generation' | 'refine' | 'copilot' | 'template';
-  provider: 'gemini' | 'anthropic';
+  provider: 'gemini';
   area: string;
   estimatedInputTokens: number;
   estimatedOutputTokens: number;

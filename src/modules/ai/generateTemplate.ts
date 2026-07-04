@@ -165,7 +165,7 @@ Gere o JSON da máscara do laudo agora.`;
 }
 
 /**
- * Usa a IA (Gemini ou Anthropic) para gerar um campo específico do exame
+ * Usa a IA (Gemini) para gerar um campo específico do exame
  * (formulário padrão, anamnese ou termo de consentimento).
  */
 export async function generateTemplateField(

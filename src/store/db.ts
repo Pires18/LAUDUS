@@ -138,22 +138,6 @@ export function generateStandardId(prefix: string): string {
 
 const SETTINGS_DOC_ID = 'app';
 
-/** Modelos Anthropic legados que devem ser migrados para o modelo atual. */
-const LEGACY_ANTHROPIC_MODELS = new Set([
-  'claude-3-5-sonnet-latest',
-  'claude-3-7-sonnet-latest',
-  'claude-3-5-haiku-latest',
-]);
-export const CURRENT_ANTHROPIC_MODEL = 'claude-sonnet-4-6';
-
-/** Migra (in-place) um modelo Anthropic legado para o modelo atual. Retorna o próprio objeto. */
-export function migrateLegacyAnthropicModel<T extends { anthropicModel?: string }>(s: T): T {
-  if (s.anthropicModel && LEGACY_ANTHROPIC_MODELS.has(s.anthropicModel)) {
-    s.anthropicModel = CURRENT_ANTHROPIC_MODEL;
-  }
-  return s;
-}
-
 export async function getSettings(): Promise<AppSettings> {
   try {
     const docRef = doc(firestore, getUserPath('settings'), SETTINGS_DOC_ID);
@@ -162,8 +146,7 @@ export async function getSettings(): Promise<AppSettings> {
     
     let defaultSettings: AppSettings = {
       geminiModel: 'gemini-3.5-flash',
-      aiProvider: 'anthropic',
-      anthropicModel: 'claude-sonnet-4-6',
+      aiProvider: 'gemini',
       dicomSyncEnabled: true,
       dicomWorklistFolder: isWindows
         ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
@@ -247,8 +230,10 @@ export async function getSettings(): Promise<AppSettings> {
       },
       {
         version: 5,
-        name: 'anthropic-model-upgrade-to-sonnet-4-6',
-        apply: (s) => { migrateLegacyAnthropicModel(s); }
+        name: 'anthropic-removed-noop',
+        // Migração legada do Anthropic removida (sistema é Gemini-only).
+        // Mantida como no-op para preservar a sequência de versões.
+        apply: () => { /* no-op */ }
       },
       {
         version: 6,
@@ -310,14 +295,11 @@ export async function getSettings(): Promise<AppSettings> {
           // Chaves de API, provedor, modelo e temperaturas herdados do administrador:
           aiProvider: adminSettings.aiProvider || data.aiProvider || defaultSettings.aiProvider,
           geminiModel: adminSettings.geminiModel || data.geminiModel || defaultSettings.geminiModel,
-          anthropicModel: adminSettings.anthropicModel || data.anthropicModel || defaultSettings.anthropicModel,
           geminiApiKey: adminSettings.geminiApiKey || data.geminiApiKey || '',
-          anthropicApiKey: adminSettings.anthropicApiKey || data.anthropicApiKey || '',
           aiTemperatureByMode: adminSettings.aiTemperatureByMode || data.aiTemperatureByMode || {},
           aiTemperature: adminSettings.aiTemperature ?? data.aiTemperature ?? defaultSettings.aiTemperature,
         };
 
-        migrateLegacyAnthropicModel(merged);
         return decryptDicomPasswords(merged);
       } else {
         logger.warn('[DB] getAdminSettings retornou null. O médico não pôde herdar as chaves e prompts do admin.');
@@ -328,8 +310,6 @@ export async function getSettings(): Promise<AppSettings> {
     finalData.aiGlobalInstructions = finalData.aiGlobalInstructions || DEFAULT_GLOBAL_INSTRUCTIONS;
     finalData.aiStructurePrompt = finalData.aiStructurePrompt || DEFAULT_STRUCTURE_PROMPT;
     finalData.aiRigidRules = finalData.aiRigidRules || DEFAULT_RIGID_RULES;
-
-    migrateLegacyAnthropicModel(finalData);
 
     // Se for o administrador do sistema (detectado por e-mail ou role), publica as configurações na coleção global
     if (isCurrentUserAdmin || finalData.currentRole === 'admin') {
@@ -352,8 +332,7 @@ export async function getSettings(): Promise<AppSettings> {
   const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
   return {
     geminiModel: 'gemini-3.5-flash',
-    aiProvider: 'anthropic',
-    anthropicModel: 'claude-sonnet-4-6',
+    aiProvider: 'gemini',
     dicomSyncEnabled: true,
     dicomWorklistFolder: isWindows
       ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
@@ -456,13 +435,11 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
     if (globalSnap.exists()) {
       const globalData = globalSnap.data() as AppSettings & { adminUid?: string };
       logger.info('[DB] Documento global_config/admin_settings encontrado com sucesso. Chaves configuradas:', {
-        hasGeminiKey: !!globalData.geminiApiKey,
-        hasAnthropicKey: !!globalData.anthropicApiKey
+        hasGeminiKey: !!globalData.geminiApiKey
       });
       if (globalData.adminUid) {
         cachedAdminUid = globalData.adminUid;
       }
-      migrateLegacyAnthropicModel(globalData);
       return globalData;
     } else {
       logger.warn('[DB] Documento global_config/admin_settings NÃO existe no Firestore.');
@@ -479,7 +456,6 @@ export async function getAdminSettings(): Promise<AppSettings | null> {
       const adminSnap = await getDoc(adminDocRef);
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AppSettings;
-        migrateLegacyAnthropicModel(adminData);
         return adminData;
       }
     }

@@ -192,9 +192,7 @@ export interface AppSettings {
     copilot?: string;
     template?: string;
   };
-  aiProvider?: 'gemini' | 'anthropic';
-  anthropicApiKey?: string;
-  anthropicModel?: string;
+  aiProvider?: 'gemini';
   /** Nome completo do médico (para assinatura) */
   physicianName?: string;
   physicianCRM?: string;
@@ -449,7 +447,7 @@ export interface SaasAddonsConfig {
 
 /** Configuração dos motores de IA (Lite / Pro) definida pelo admin */
 export interface MotorTierConfig {
-  provider: 'gemini' | 'anthropic';
+  provider: 'gemini';
   model: string;
   tokensPerReport: number;
   costPerThousandTokens: number;

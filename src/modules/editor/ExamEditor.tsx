@@ -674,7 +674,7 @@ export function ExamEditor({ examId }: Props) {
             </div>
           )}
 
-          {/* AVISO API KEY — apenas para Gemini (Anthropic é gerenciado server-side) */}
+          {/* AVISO API KEY — Gemini (chave gerenciada server-side pelo admin) */}
           {settings.aiProvider === 'gemini' && !settings.geminiApiKey && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-[11px] text-amber-800 flex items-center gap-2 shrink-0">
               <AlertCircle size={12} />
@@ -765,9 +765,7 @@ export function ExamEditor({ examId }: Props) {
                 snippetCount={settings.snippets?.length ?? 0}
                 saveState={saveState}
                 geminiModel={
-                  settings.aiProvider === 'anthropic'
-                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                    : (settings.geminiModel || 'gemini-3.5-flash')
+                  settings.geminiModel || 'gemini-3.5-flash'
                 }
               />
 
@@ -1165,9 +1163,7 @@ export function ExamEditor({ examId }: Props) {
               <div>
                 <h3 className="font-semibold text-ink-900 flex items-center gap-2"><Eye size={16} className="text-brand-500" /> Prompt Preview</h3>
                 <p className="text-xs text-ink-500 mt-0.5">Prompt exato enviado ao modelo {
-                  settings.aiProvider === 'anthropic'
-                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                    : (settings.geminiModel || 'gemini-3.5-flash')
+                  settings.geminiModel || 'gemini-3.5-flash'
                 }</p>
               </div>
               <button onClick={() => setShowPromptPreview(false)} className="p-1.5 rounded-lg hover:bg-ink-100 text-ink-400"><X size={18} /></button>
@@ -1191,9 +1187,7 @@ export function ExamEditor({ examId }: Props) {
             <div className="px-5 py-3 border-t border-ink-100 flex items-center justify-between bg-ink-50/50 shrink-0">
               <span className="text-[10px] text-ink-400">
                 Temperatura: {settings.aiTemperature ?? 0.3} · Modelo: {
-                  settings.aiProvider === 'anthropic'
-                    ? (settings.anthropicModel || 'claude-3-5-sonnet-latest')
-                    : (settings.geminiModel || 'gemini-3.5-flash')
+                  settings.geminiModel || 'gemini-3.5-flash'
                 }
               </span>
               <button

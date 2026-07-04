@@ -63,7 +63,7 @@ export interface BuiltPrompt {
 export interface CallMetrics {
   examId?: string;
   mode: 'generation' | 'refine' | 'copilot' | 'template';
-  provider: 'gemini' | 'anthropic';
+  provider: 'gemini';
   area: string;
   estimatedInputTokens: number;
   estimatedOutputTokens: number;
@@ -89,12 +89,6 @@ function hashPrompt(built: BuiltPrompt): string {
 export const callMetricsHistory: CallMetrics[] = [];
 
 const PRICING: Record<string, { input: number, output: number }> = {
-  // Anthropic
-  'claude-sonnet-4-6':           { input: 3.0,   output: 15.0  },
-  'claude-3-5-sonnet-latest':    { input: 3.0,   output: 15.0  },
-  'claude-3-7-sonnet-latest':    { input: 3.0,   output: 15.0  },
-  'claude-opus-4-5':             { input: 15.0,  output: 75.0  },
-  'claude-3-haiku-20240307':     { input: 0.25,  output: 1.25  },
   // Gemini
   'gemini-3.5-flash':               { input: 0.075, output: 0.30  },
   'gemini-3.1-pro-preview':         { input: 1.25,  output: 5.0   },
@@ -752,19 +746,20 @@ ${contextMessage}`;
 
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
+/**
+ * Fonte única de verdade dos modelos Gemini suportados.
+ * Só existem dois níveis oficiais — Lite (rápido/econômico) e Pro (alta qualidade).
+ * IDs antigos (gemini-2.5-*, 1.5-*) NÃO são mais válidos na API (404) e nunca
+ * devem ser emitidos; qualquer entrada legada é normalizada para um destes.
+ */
+export const GEMINI_LITE_MODEL = 'gemini-3.5-flash';
+export const GEMINI_PRO_MODEL = 'gemini-3.1-pro-preview';
+
 export function resolveGeminiModel(rawModel: string | undefined): string {
   const raw = (rawModel || '').toLowerCase();
-
-  // Modelos oficiais do usuário: Lite = gemini-3.5-flash, Pro = gemini-3.1-pro-preview.
-  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
-  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
-  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
-  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
-
-  return 'gemini-3.5-flash';
+  // Qualquer variante "pro" cai no Pro atual; todo o resto (flash/vazio/legado) no Lite.
+  // Nunca retornamos ids 2.5/1.5 (mortos na API).
+  return raw.includes('pro') ? GEMINI_PRO_MODEL : GEMINI_LITE_MODEL;
 }
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
