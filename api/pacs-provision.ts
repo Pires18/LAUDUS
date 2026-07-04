@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { verifyAuth, verifyIdTokenString } from './_auth.js';
 
 /**
  * POST /api/pacs-provision — provisiona (ou simula) o PACS gerenciado do usuário.
@@ -136,24 +135,26 @@ export default async function handler(req: any, res: any) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
 
-  // Autenticação: header Authorization OU token no corpo (fallback robusto —
-  // mesmo caminho comprovado do proxy de imagens).
-  const hasHeader = !!(req.headers?.authorization || req.headers?.Authorization);
-  const hasBodyToken = !!body?.token;
-  let verifyErr = '';
-  let authed = await verifyAuth(req);
-  if (!authed && hasBodyToken) {
-    try { authed = await verifyIdTokenString(String(body.token)); }
-    catch (e: any) { verifyErr = e?.message || 'verify_throw'; }
+  // Autenticação: verifica o token (header OU corpo) DIRETO no Admin SDK para
+  // capturar o motivo exato da falha (verifyIdToken não usa a chave privada —
+  // valida assinatura via chaves públicas do Google e confere o projeto).
+  const headerAuth = String(req.headers?.authorization || req.headers?.Authorization || '');
+  const token = (headerAuth.startsWith('Bearer ') ? headerAuth.slice(7) : '') || (body?.token ? String(body.token) : '');
+  let authed: any = null; let verifyErr = '';
+  if (token) {
+    try {
+      const { getAdminAuth } = await import('./_firebase.js');
+      const dec = await (await getAdminAuth()).verifyIdToken(token);
+      authed = { uid: dec.uid, email: (dec.email || '').toLowerCase() };
+    } catch (e: any) {
+      verifyErr = ((e?.errorInfo?.code || e?.code || 'err') + ': ' + (e?.message || '')).slice(0, 130);
+    }
   }
   if (!authed) {
-    // reason ajuda o diagnóstico sem vazar segredos:
-    //  no_token = cliente não mandou token (build antigo?) · verify_failed = token
-    //  chegou mas o servidor não validou (creds Firebase na Vercel?).
-    const reason = (hasHeader || hasBodyToken) ? 'verify_failed' : 'no_token';
-    const hasFbEnv = !!process.env.FIREBASE_CLIENT_EMAIL && !!process.env.FIREBASE_PRIVATE_KEY;
+    const reason = token ? 'verify_failed' : 'no_token';
+    const fbProj = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '(default:laudus)';
     res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.', reason, hasHeader, hasBodyToken, hasFbEnv, verifyErr }));
+    res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.', reason, fbProj, verifyErr }));
     return;
   }
   const plan = ['starter', 'pro', 'dedicado'].includes(body?.plan) ? body.plan : 'pro';

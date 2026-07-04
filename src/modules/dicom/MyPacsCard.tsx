@@ -74,7 +74,7 @@ export function MyPacsCard() {
         });
         const data = await res.json();
         if (!res.ok || !data.agentUrl) {
-          const diag = data.reason ? ` [${data.reason} · header:${data.hasHeader} · body:${data.hasBodyToken} · fbEnv:${data.hasFbEnv}${data.verifyErr ? ' · ' + data.verifyErr : ''}]` : '';
+          const diag = data.reason ? ` [${data.reason} · proj:${data.fbProj}${data.verifyErr ? ' · ' + data.verifyErr : ''}]` : '';
           throw new Error((data.error || 'Falha no provisionamento.') + diag);
         }
         result = data;
