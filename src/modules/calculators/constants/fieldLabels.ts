@@ -13,7 +13,7 @@ export const FIELD_LABELS: Record<string, string> = {
   method: 'Método', referenceDate: 'Data do exame',
   dumDate: 'DUM', prevUsgDate: 'Data USG anterior',
   prevUsgWeeks: 'IG USG (sem)', prevUsgDays: 'IG USG (dias)',
-  currentGa: 'IG Atual', edd: 'DDP', ga: 'IG Estimada',
+  currentGa: 'IG Atual', edd: 'DPP', ga: 'IG Estimada',
   // Biometria fetal
   gaWeeks: 'IG (semanas)', gaDays: 'IG (dias)', sex: 'Sexo',
   bpd: 'DBP (mm)', hc: 'CC (mm)', ac: 'CA (mm)', fl: 'CF (mm)', hl: 'Úmero (mm)',

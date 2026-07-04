@@ -161,7 +161,7 @@ export const CALCULATORS: CalculatorDef[] = [
   { 
     id: 'gestational-age', 
     name: 'Idade Gestacional (DUM/USG)', 
-    description: 'Calcula a IG atual e DDP baseada na DUM ou USG anterior.', 
+    description: 'Calcula a IG atual e DPP baseada na DUM ou USG anterior.', 
     component: GestationalAgeCalculator,
     areas: ['medicina-fetal'],
     reference: {
@@ -205,7 +205,7 @@ export const CALCULATORS: CalculatorDef[] = [
   { 
     id: 'crl-ccn', 
     name: 'Idade Gestacional (CCN)', 
-    description: 'Calcula IG e DDP pelo CCN (Hadlock 1992).', 
+    description: 'Calcula IG e DPP pelo CCN (Hadlock 1992).', 
     component: CrlCalculator,
     areas: ['medicina-fetal'],
     reference: {

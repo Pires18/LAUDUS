@@ -80,7 +80,7 @@ describe('CRL → idade gestacional (Hadlock 1992)', () => {
 describe('idade gestacional por data', () => {
   const DAY = 86400000;
 
-  it('DUM: IG = ref − DUM; DDP = DUM + 280 dias', () => {
+  it('DUM: IG = ref − DUM; DPP = DUM + 280 dias', () => {
     const lmp = new Date('2026-01-01T00:00:00');
     const ref = new Date(lmp.getTime() + 70 * DAY); // 10 semanas
     const r = gaFromLMP(lmp, ref)!;

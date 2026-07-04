@@ -16,7 +16,7 @@ export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) 
       const totalDays = crlGa.totalDays;
       ga = crlGa.label;
 
-      // Cálculo da DDP: usa examDateMs se disponível, senão a data atual
+      // Cálculo da DPP: usa examDateMs se disponível, senão a data atual
       const today = examDateMs ? new Date(examDateMs) : new Date();
       today.setHours(12, 0, 0, 0);
       const eddDate = new Date(today.getTime() + (280 - totalDays) * 24 * 60 * 60 * 1000);
@@ -28,7 +28,7 @@ export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) 
     }
 
     const summary = ga
-      ? `CCN: ${crl}mm — IG estimada (Hadlock): ${ga}. DDP: ${edd}.`
+      ? `CCN: ${crl}mm — IG estimada (Hadlock): ${ga}. DPP: ${edd}.`
       : null;
 
     onChange({
@@ -75,7 +75,7 @@ export function CrlCalculator({ value, onChange, examDateMs }: CalculatorProps) 
       {value?.ga ? (
         <div className="flex flex-col gap-4">
           <ResultCard label="Idade Gestacional" value={value.ga} variant="brand" />
-          <ResultCard label="Data Provável do Parto (DDP)" value={value.edd} variant="emerald" />
+          <ResultCard label="Data Provável do Parto (DPP)" value={value.edd} variant="emerald" />
         </div>
       ) : (
         <div className="py-10 border-2 border-dashed border-ink-100 rounded-2xl text-center">

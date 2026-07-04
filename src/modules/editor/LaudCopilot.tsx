@@ -153,6 +153,14 @@ interface LaudCopilotProps {
   onShowCalculators: (calcId?: string) => void;
   prompt: string;
   onChangePrompt: (val: string) => void;
+  /**
+   * Mensagem técnica (resultado de calculadora / formulário) injetada por um
+   * componente externo. Diferente de `prompt` (texto livre do usuário), é
+   * enviada automaticamente sem passar pela caixa de texto — evita que o
+   * marcador seja concatenado a um rascunho e nunca disparado.
+   */
+  injectedMessage?: string | null;
+  onInjectionConsumed?: () => void;
   isDocked?: boolean;
 }
 
@@ -169,6 +177,8 @@ export function LaudCopilot({
   onShowCalculators,
   prompt,
   onChangePrompt,
+  injectedMessage,
+  onInjectionConsumed,
   isDocked
 }: LaudCopilotProps) {
   const { settings, updateSettings, showToast } = useApp();
@@ -402,7 +412,7 @@ export function LaudCopilot({
   promptRef.current = prompt;
   const onChangePromptRef = useRef(onChangePrompt);
   onChangePromptRef.current = onChangePrompt;
-  const handleSendRef = useRef<(customPrompt?: string) => Promise<void>>(async () => {});
+  const handleSendRef = useRef<(customPrompt?: string, preserveDraft?: boolean) => Promise<void>>(async () => {});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -458,11 +468,24 @@ export function LaudCopilot({
     }
   };
 
+  // Envia automaticamente uma mensagem técnica injetada (resultado de
+  // calculadora ou formulário). Roda no mount do copiloto e sempre que uma
+  // nova injeção chega — independentemente do que houver na caixa de texto.
+  // O ref garante idempotência: evita envio duplicado sob StrictMode (effect
+  // executa 2× no mount) sem bloquear reenvio legítimo do mesmo resultado
+  // (o pai zera `injectedMessage` entre injeções, resetando o ref).
+  const lastInjectionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (prompt && prompt.startsWith('[RESULTADO TÉCNICO:')) {
-      handleSendRef.current(prompt);
+    if (!injectedMessage || !injectedMessage.trim()) {
+      lastInjectionRef.current = null;
+      return;
     }
-  }, [prompt]);
+    if (injectedMessage === lastInjectionRef.current) return;
+    lastInjectionRef.current = injectedMessage;
+    handleSendRef.current(injectedMessage, true);
+    onInjectionConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectedMessage]);
 
   const parseCalculatorMessage = (content: string) => {
     if (!content.startsWith('[RESULTADO TÉCNICO:')) return null;
@@ -662,12 +685,18 @@ export function LaudCopilot({
     );
   };
 
-  const handleSend = async (customPrompt?: string) => {
+  const handleSend = async (customPrompt?: string, preserveDraft = false) => {
     const messageToSend = customPrompt || prompt;
     if (!messageToSend.trim() || isGenerating) return;
 
+    // Mensagens técnicas (calculadora/formulário) são ações deliberadas do
+    // médico — não devem ser barradas pelo anti-flood nem descartadas.
+    const isTechnical =
+      messageToSend.startsWith('[RESULTADO TÉCNICO:') ||
+      messageToSend.startsWith('[DADOS DE FORMULÁRIO COMPILADOS:');
+
     const now = Date.now();
-    if (now - lastCallRef.current < 2000) {
+    if (!isTechnical && now - lastCallRef.current < 2000) {
       showToast('Aguarde um momento antes de enviar nova mensagem.', 'info');
       return;
     }
@@ -679,7 +708,8 @@ export function LaudCopilot({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    onChangePrompt('');
+    // Preserva o rascunho do usuário quando o envio veio de uma injeção técnica.
+    if (!preserveDraft) onChangePrompt('');
     const newHistory = [...chatHistory, { role: 'user' as const, content: messageToSend }];
     onChatUpdate(newHistory);
     setIsGenerating(true);

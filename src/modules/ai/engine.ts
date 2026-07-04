@@ -409,7 +409,7 @@ function buildContextMessage({
   const lines: string[] = [
     `MODO: ${mode}`,
     `EXAME: ${examType}`,
-    `DATA DO EXAME: ${examDate} (ATENÇÃO: Use ESTA data como o "Hoje" para qualquer cálculo de datas no laudo, como DDP ou Idade Gestacional. PROIBIDO usar a data atual real do sistema.)`,
+    `DATA DO EXAME: ${examDate} (ATENÇÃO: Use ESTA data como o "Hoje" para qualquer cálculo de datas no laudo, como DPP ou Idade Gestacional. PROIBIDO usar a data atual real do sistema.)`,
     // LGPD: o nome do paciente NÃO é enviado à IA (não é usado no corpo do
     // laudo — entra só no cabeçalho, via template, na exportação).
     `PACIENTE: ${patientAge}, ${patientGender}`,

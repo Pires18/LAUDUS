@@ -340,7 +340,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
    * @scope Obstétrico 1º, 2º e 3º trimestres, Morfológico, Doppler Obstétrico,
    *        Translucência Nucal, Cervicometria, etc.
    *
-   * Foco: biometria fetal (DDP, IG, peso estimado), Doppler obstétrico,
+   * Foco: biometria fetal (DPP, IG, peso estimado), Doppler obstétrico,
    * avaliação morfológica, placenta, líquido amniótico.
    *
    * ATENÇÃO: Todas as medidas biométricas fetais são em MILÍMETROS (mm).

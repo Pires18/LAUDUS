@@ -91,7 +91,7 @@ function buildGa(totalDays: number, edd: Date): GaResult {
   return { totalDays, weeks, days, label: `${weeks}s ${days}d`, edd };
 }
 
-/** IG pela DUM (última menstruação): IG = ref − DUM; DDP = DUM + 280 dias. */
+/** IG pela DUM (última menstruação): IG = ref − DUM; DPP = DUM + 280 dias. */
 export function gaFromLMP(lmp: Date, ref: Date): GaResult | null {
   if (isNaN(lmp.getTime()) || isNaN(ref.getTime())) return null;
   const diffDays = Math.round((ref.getTime() - lmp.getTime()) / MS_PER_DAY);
@@ -103,7 +103,7 @@ export function gaFromLMP(lmp: Date, ref: Date): GaResult | null {
 
 /**
  * IG por USG anterior: parte da IG conhecida naquele exame e soma os dias
- * decorridos. DDP = data do USG − diasIniciais + 280.
+ * decorridos. DPP = data do USG − diasIniciais + 280.
  */
 export function gaFromPriorUsg(usgDate: Date, usgWeeks: number, usgDays: number, ref: Date): GaResult | null {
   if (isNaN(usgDate.getTime()) || isNaN(ref.getTime())) return null;

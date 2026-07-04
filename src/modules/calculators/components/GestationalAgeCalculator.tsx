@@ -53,7 +53,7 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
     }
 
     const summary = currentGa
-      ? `Idade gestacional: ${currentGa} (calculada pela ${method === 'dum' ? 'DUM' : 'USG anterior'}). DDP: ${eddStr || '---'}.`
+      ? `Idade gestacional: ${currentGa} (calculada pela ${method === 'dum' ? 'DUM' : 'USG anterior'}). DPP: ${eddStr || '---'}.`
       : null;
 
     onChange({
@@ -73,7 +73,7 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
         </div>
         <div>
           <h3 className="font-black text-ink-900 uppercase tracking-widest text-sm">Cronometria Gestacional</h3>
-          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Cálculo de IG e Data Provável do Parto (DDP)</p>
+          <p className="text-[10px] text-ink-400 font-bold uppercase tracking-tighter">Cálculo de IG e Data Provável do Parto (DPP)</p>
         </div>
       </div>
 

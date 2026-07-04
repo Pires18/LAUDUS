@@ -182,7 +182,7 @@ IDIOMA, TERMINOLOGIA E PADRÃO NUMÉRICO:
  * 1. Ancoragem Clínica       — calibra por IDADE × SEXO × INDICAÇÃO × MEDICAÇÕES
  * 2. Mapeamento do Exame     — identifica tipo, área, modo (geração vs refine)
  * 3. Normalidade Habitual    — preenche órgãos sem dados com qualidade padrão
- * 4. Autocálculos            — executa volume, peso, IG, DDP, IP médio, RCP, Hadlock, AFI, NASCET
+ * 4. Autocálculos            — executa volume, peso, IG, DPP, IP médio, RCP, Hadlock, AFI, NASCET
  * 5. Expansão Morfológica    — traduz jargões para terminologia técnica
  * 6. Cascata e Diplomacia    — classifica conduta N0→N4 e define linguagem
  * 7. Self-Audit              — verifica unidades órfãs, inventos, HTML, red flags, diferenciais
@@ -314,7 +314,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 
 4.5 DATAÇÃO GESTACIONAL POR DUM:
     — IG (Idade Gestacional) = DATA DO EXAME − DUM (resultado em semanas + dias);
-    — DDP (Data Provável do Parto) = DUM + 280 dias;
+    — DPP (Data Provável do Parto) = DUM + 280 dias;
     — ÂNCORA CRONOLÓGICA (CRÍTICA): Use SEMPRE a "DATA DO EXAME" fornecida no contexto como referência. PROIBIDO usar a data real atual do sistema computacional.
 
 4.6 ESTIMATIVA DE PESO FETAL — FÓRMULA DE HADLOCK (4 parâmetros):

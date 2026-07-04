@@ -134,6 +134,10 @@ export function ExamEditor({ examId }: Props) {
   const [showDicomImages, setShowDicomImages] = useState(false);
   const [selectedInstancesForPrint, setSelectedInstancesForPrint] = useState<any[]>([]);
   const [copilotPrompt, setCopilotPrompt] = useState('');
+  // Canal dedicado para resultados de calculadora/formulário enviados ao
+  // copiloto. Não passa pela caixa de texto (evita concatenação com rascunho
+  // que impedia o disparo automático). Consumido e zerado após o envio.
+  const [copilotInjection, setCopilotInjection] = useState<string | null>(null);
   const [showSnippets, setShowSnippets] = useState(false);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
@@ -1038,6 +1042,8 @@ export function ExamEditor({ examId }: Props) {
                   }}
                   prompt={copilotPrompt}
                   onChangePrompt={setCopilotPrompt}
+                  injectedMessage={copilotInjection}
+                  onInjectionConsumed={() => setCopilotInjection(null)}
                   isDocked={false}
                 />
               </div>
@@ -1255,7 +1261,7 @@ export function ExamEditor({ examId }: Props) {
             examDateMs={exam.createdAt}
             onClose={() => setShowCalculators(false)}
             onSendToCopilot={(text) => {
-              setCopilotPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
+              setCopilotInjection(text);
               setShowCalculators(false);
               if (!showCopilot) setShowCopilot(true);
             }}
