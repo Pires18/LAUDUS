@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { logger } from '../../utils/logger';
 import { useSubscription } from '../../hooks/useSubscription';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useApp } from '../../store/app';
 import { createSupportTicket, getAiUsageStats } from '../../store/db';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
@@ -52,6 +53,7 @@ export function SubscriptionCenter() {
   } = useSubscription();
 
   const { user, showToast, settings } = useApp();
+  const confirm = useConfirm();
 
   const [loadingAddon,      setLoadingAddon]      = useState<string | null>(null);
   const [sendingPacsTicket, setSendingPacsTicket] = useState(false);
@@ -215,7 +217,14 @@ export function SubscriptionCenter() {
 
   const handleCancel = async () => {
     if (!subscription || !user) return;
-    if (!window.confirm('Deseja cancelar a assinatura? O acesso à LAUD.IA será bloqueado ao fim do período faturado.')) return;
+    const ok = await confirm({
+      title: 'Cancelar assinatura',
+      message: 'Deseja cancelar a assinatura? O acesso à LAUD.IA continua até o fim do período já pago e a cobrança recorrente é encerrada.',
+      variant: 'danger',
+      confirmLabel: 'Cancelar assinatura',
+      cancelLabel: 'Manter',
+    });
+    if (!ok) return;
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/abacatepay-cancel', {
@@ -432,12 +441,19 @@ export function SubscriptionCenter() {
               >
                 <CreditCard size={13} /> Gerenciar Pagamento
               </button>
-              <button
-                onClick={handleCancel}
-                className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 transition-all flex items-center gap-1.5"
-              >
-                <Ban size={13} /> Cancelar
-              </button>
+              {!isCanceled && (
+                <button
+                  onClick={handleCancel}
+                  className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 transition-all flex items-center gap-1.5"
+                >
+                  <Ban size={13} /> Cancelar
+                </button>
+              )}
+              {isCanceled && (
+                <span className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-50 border border-rose-100 text-rose-500 flex items-center gap-1.5">
+                  <Ban size={13} /> Assinatura cancelada
+                </span>
+              )}
             </div>
           </div>
         </div>
