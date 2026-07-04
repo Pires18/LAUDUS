@@ -84,6 +84,9 @@ export function DicomControlCenter() {
         kind === 'cloud'
           ? '/opt/orthanc-data/worklists'
           : 'C:\\OrthancServer\\db\\WorklistsDatabase\\',
+      // Na nuvem, todo o tráfego passa pelo Agente (Funnel). A URL pública direta
+      // do Orthanc não é usada — limpamos para o proxy mirar localhost:8042 na VM.
+      ...(kind === 'cloud' ? { dicomTailscalePublicUrl: '' } : {}),
     }));
     showToast(
       kind === 'cloud'

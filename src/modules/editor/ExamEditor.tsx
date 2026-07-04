@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useDocument } from '../../hooks/useFirestore';
-import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess, deleteWorklistEntry } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, logPatientAccess, deleteWorklistEntry } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
@@ -220,9 +220,16 @@ export function ExamEditor({ examId }: Props) {
     if (!activeStudy) return null;
 
     const isBackup = activeStudy.serverSource === 'backup';
-    const currentBaseUrl = isBackup 
+    const currentBaseUrl = isBackup
       ? getActivePacsUrl(settings, true)
       : getActivePacsUrl(settings, false);
+    // Cenário nuvem (VM): a base é localhost:8042 (alvo do proxy do Agente) e o
+    // proxy é um Agente HTTPS remoto (Funnel). Nesse caso o navegador NÃO alcança
+    // o Orthanc direto, então o visualizador externo (Stone/OHIF) é inacessível —
+    // retornamos null (o visualizador embutido, via proxy, cobre a visualização).
+    const proxyIsRemoteAgent = getProxyEndpoint(settings, isBackup).startsWith('https');
+    const baseIsLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(currentBaseUrl);
+    if (proxyIsRemoteAgent && baseIsLocalhost) return null;
     const studyUid = activeStudy.MainDicomTags?.StudyInstanceUID || getStudyInstanceUID(exam?.id || '');
 
     const viewerType = settings.dicomViewerType || 'stone';
@@ -453,10 +460,10 @@ export function ExamEditor({ examId }: Props) {
         setPrintProgress(`Otimizando imagens (${i + 1}/${instances.length})...`);
         const isBackup = instance.serverSource === 'backup';
         const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
-        const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-        const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
         const proxyPath = getProxyEndpoint(settings, isBackup);
-        const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        // Inclui token Firebase (proxy Vercel) + agentSecret (agente seguro) além
+        // de user/senha — sem eles, o fetch para o PDF falha com 401/403 na nuvem.
+        const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
 
         // Fetch the image as blob
         const res = await fetch(url);
@@ -1397,10 +1404,8 @@ export function ExamEditor({ examId }: Props) {
             const activeServerSource = activeStudy?.serverSource || 'primary';
             const isBackup = activeServerSource === 'backup';
             const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-            const username = isBackup ? (settings.dicomBackupUsername || '') : (settings.dicomUsername || '');
-            const password = isBackup ? (settings.dicomBackupPassword || '') : (settings.dicomPassword || '');
             const proxyPath = getProxyEndpoint(settings, isBackup);
-            const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
             const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
 
             return (

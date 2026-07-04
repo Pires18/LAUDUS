@@ -258,7 +258,11 @@ export function useDicomSync({
     settings.dicomUsername,
     settings.dicomBackupUsername,
     settings.dicomPassword,
-    settings.dicomBackupPassword
+    settings.dicomBackupPassword,
+    settings.dicomAgentSecret,
+    settings.dicomBackupAgentSecret,
+    settings.dicomLocalAgentUrl,
+    settings.dicomBackupLocalAgentUrl
   ]);
 
   // Troca manual de estudo: quando o usuário seleciona outro estudo do paciente,
@@ -510,6 +514,10 @@ export function useDicomSync({
     settings.dicomBackupTailscalePublicUrl,
     settings.dicomBackupUsername,
     settings.dicomBackupPassword,
+    settings.dicomAgentSecret,
+    settings.dicomBackupAgentSecret,
+    settings.dicomLocalAgentUrl,
+    settings.dicomBackupLocalAgentUrl,
     dicomRefreshKey,
     activePacsServer,
     internalChangeSelectedStudy,
