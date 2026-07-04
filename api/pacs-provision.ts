@@ -138,8 +138,24 @@ export default async function handler(req: any, res: any) {
 
   // Autenticação: header Authorization OU token no corpo (fallback robusto —
   // mesmo caminho comprovado do proxy de imagens).
-  const authed = (await verifyAuth(req)) || (body?.token ? await verifyIdTokenString(String(body.token)) : null);
-  if (!authed) { res.statusCode = 401; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' })); return; }
+  const hasHeader = !!(req.headers?.authorization || req.headers?.Authorization);
+  const hasBodyToken = !!body?.token;
+  let verifyErr = '';
+  let authed = await verifyAuth(req);
+  if (!authed && hasBodyToken) {
+    try { authed = await verifyIdTokenString(String(body.token)); }
+    catch (e: any) { verifyErr = e?.message || 'verify_throw'; }
+  }
+  if (!authed) {
+    // reason ajuda o diagnóstico sem vazar segredos:
+    //  no_token = cliente não mandou token (build antigo?) · verify_failed = token
+    //  chegou mas o servidor não validou (creds Firebase na Vercel?).
+    const reason = (hasHeader || hasBodyToken) ? 'verify_failed' : 'no_token';
+    const hasFbEnv = !!process.env.FIREBASE_CLIENT_EMAIL && !!process.env.FIREBASE_PRIVATE_KEY;
+    res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.', reason, hasHeader, hasBodyToken, hasFbEnv, verifyErr }));
+    return;
+  }
   const plan = ['starter', 'pro', 'dedicado'].includes(body?.plan) ? body.plan : 'pro';
   const zone = process.env.GCP_ZONE || 'southamerica-east1-c';
   const region = zone.replace(/-[a-z]$/, '');

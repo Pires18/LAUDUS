@@ -73,7 +73,10 @@ export function MyPacsCard() {
           body: JSON.stringify({ plan, region, token })
         });
         const data = await res.json();
-        if (!res.ok || !data.agentUrl) throw new Error(data.error || 'Falha no provisionamento.');
+        if (!res.ok || !data.agentUrl) {
+          const diag = data.reason ? ` [${data.reason} · header:${data.hasHeader} · body:${data.hasBodyToken} · fbEnv:${data.hasFbEnv}${data.verifyErr ? ' · ' + data.verifyErr : ''}]` : '';
+          throw new Error((data.error || 'Falha no provisionamento.') + diag);
+        }
         result = data;
         if (data.provider === 'gcp') {
           const up = await pollAgentHealth(data.agentUrl);
