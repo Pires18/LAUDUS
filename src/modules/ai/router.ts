@@ -45,6 +45,10 @@ const RED_FLAG_TERMS: string[] = [
   // Obstétrico / ginecológico agudo
   'ectópica', 'ectopica', 'torção', 'torcao', 'aborto', 'óbito fetal', 'obito fetal',
   'centralização', 'centralizacao', 'oligoâmnio', 'oligoamnio', 'descolamento',
+  // Fetal crítico (Doppler / placentação de alto risco)
+  'diástole zero', 'diastole zero', 'diástole reversa', 'diastole reversa',
+  'aedv', 'redv', 'onda a reversa', 'hidropsia', 'hidropisia',
+  'vasa prévia', 'vasa previa', 'acretismo', 'placenta prévia', 'placenta previa',
   // Infeccioso / agudo
   'abscesso', 'séptic', 'septic', 'febre', 'piosalpinge',
   // Sinais de gravidade genéricos

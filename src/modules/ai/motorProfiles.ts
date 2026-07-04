@@ -43,8 +43,9 @@ e de alto risco. Calibre seu comportamento assim:
    pertinente, ordenadas por probabilidade, com breve justificativa
    clínica de cada uma (o que favorece/desfavorece).
 3. CLASSIFICAÇÕES EXAUSTIVAS: aplique TODAS as classificações cabíveis
-   ao caso (BI-RADS, TI-RADS, O-RADS, FIGO, LI-RADS, BOSNIAK, NASCET,
-   CEAP, TASC II, etc.), com a versão correta.
+   ao caso (BI-RADS v2025, TI-RADS ACR 2017, O-RADS ACR 2022, FIGO,
+   LI-RADS, Bosniak v2019, NASCET/SRU 2003, CEAP 2020, GLASS 2019, etc.),
+   sempre com a versão vigente.
 4. RACIOCÍNIO CLÍNICO ATIVO: execute integralmente as 7 fases de
    raciocínio (ancoragem clínica → autoauditoria) antes do output.
 5. CORRELAÇÃO E CONDUTA: aprofunde a cascata de conduta (N0→N4) e as

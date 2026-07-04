@@ -45,11 +45,19 @@ function ensureIsolationStyle(): void {
   const style = document.createElement('style');
   style.id = ISOLATION_STYLE_ID;
   style.setAttribute('data-pagedjs-ignore', 'true');
+  // Em tela, a saída fica FORA da viewport (não `display:none`) — o Paged.js
+  // precisa medir/paginar dentro de um elemento efetivamente renderizado; um
+  // container `display:none` faz a paginação travar. Ao imprimir, com a classe
+  // `printing-laudo` no <body>, a saída volta ao fluxo e o app é ocultado.
   style.textContent = `
-    @media screen { #${OUTPUT_ID} { display: none !important; } }
+    @media screen {
+      #${OUTPUT_ID} { position: absolute !important; left: -100000px !important; top: 0 !important; width: 210mm; }
+    }
     @media print {
       body.${PRINTING_CLASS} > *:not(#${OUTPUT_ID}) { display: none !important; }
-      body.${PRINTING_CLASS} > #${OUTPUT_ID} { display: block !important; }
+      body.${PRINTING_CLASS} > #${OUTPUT_ID} {
+        display: block !important; position: static !important; left: auto !important; width: auto !important;
+      }
       body.${PRINTING_CLASS} { background: #fff !important; }
     }
   `;

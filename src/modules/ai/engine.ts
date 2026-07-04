@@ -1183,7 +1183,7 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     const hasZeroEnd = /di[aá]stole\s+zero|fluxo\s+ausente|ausência\s+de\s+diástole/i.test(html);
     const hasAlerta = /ALERTA/i.test(html);
     if (hasZeroEnd && !hasAlerta) {
-      issues.push({ type: 'missing_alert', severity: 'error', message: 'Achado de diástole zero/ausente sem ALERTA OBSTÉTRICO nas recomendações (R9).' });
+      issues.push({ type: 'missing_alert', severity: 'error', message: 'Achado de diástole zero/ausente sem ALERTA OBSTÉTRICO nas recomendações (R6).' });
       score -= 20;
     }
   }
@@ -1204,14 +1204,24 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     }
   }
 
-  // ── R5: lesão focal descrita exige classificação sistematizada oficial (por área) ──
-  const classMap: Record<string, RegExp> = { mastologia: /BI-?RADS/i };
-  if (area && classMap[area]) {
-    const analiseMatch = html.match(/<h2[^>]*>AN[ÁA]LISE<\/h2>([\s\S]*?)(?=<h2|$)/i);
-    const analise = analiseMatch ? analiseMatch[1] : '';
-    if (/n[óo]dulo|massa|les[ãa]o focal/i.test(analise) && !classMap[area].test(html)) {
-      issues.push({ type: 'classification', severity: 'warning', message: 'Lesão focal descrita sem classificação sistematizada oficial (R5).' });
-      score -= 8;
+  // ── R5: lesão focal descrita exige classificação sistematizada oficial (órgão-específica) ──
+  // Só dispara quando o ÓRGÃO correto está descrito na ANÁLISE (evita falso-positivo em
+  // nódulo de partes moles/salivar/escroto, que não usam TI-RADS). O verifyReport (verification.ts)
+  // cobre estes casos de forma finding-específica; aqui reforçamos a pontuação estrutural.
+  const classRules: Array<{ area: string; organRe: RegExp; classRe: RegExp }> = [
+    { area: 'mastologia', organRe: /n[óo]dulo|massa|les[ãa]o focal/i, classRe: /BI-?RADS/i },
+    { area: 'pequenas-partes', organRe: /tire[óo]id[^.]{0,60}(n[óo]dulo)|(n[óo]dulo)[^.]{0,60}tire[óo]id/i, classRe: /TI-?RADS/i },
+    { area: 'ginecologia', organRe: /(ov[áa]ri|anexial|anexo)[^.]{0,60}(massa|cisto|forma[çc][ãa]o|tumor)/i, classRe: /O-?RADS/i },
+  ];
+  if (area) {
+    const rule = classRules.find((r) => r.area === area);
+    if (rule) {
+      const analiseMatch = html.match(/<h2[^>]*>AN[ÁA]LISE<\/h2>([\s\S]*?)(?=<h2|$)/i);
+      const analise = analiseMatch ? analiseMatch[1] : '';
+      if (rule.organRe.test(analise) && !rule.classRe.test(html)) {
+        issues.push({ type: 'classification', severity: 'warning', message: 'Lesão focal descrita sem classificação sistematizada oficial (R5).' });
+        score -= 8;
+      }
     }
   }
 
