@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useDocument } from '../../hooks/useFirestore';
-import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess, deleteWorklistEntry } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
@@ -359,6 +359,10 @@ export function ExamEditor({ examId }: Props) {
         showToast('Criando Google Doc e finalizando...', 'info');
         try {
           await createGoogleDoc(reportContentRef.current);
+          // O fluxo Google Doc finaliza o exame por conta própria (não passa
+          // por updateStatus), então removemos AQUI a entrada da Worklist do
+          // PACS — senão o exame continua listado como pendente no aparelho.
+          deleteWorklistEntry(exam.id, settings).catch(() => { /* best-effort */ });
           showToast('Exame finalizado e Google Doc criado!', 'success');
           return;
         } catch (e: unknown) {
