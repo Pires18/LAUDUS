@@ -121,6 +121,28 @@ export function AdminSupport() {
   const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
   const highPriorityCount = tickets.filter(t => t.priority === 'high' && t.status !== 'resolved').length;
 
+  // ── SLA ──────────────────────────────────────────────────────────────────
+  const HOUR = 3600000, DAY = 86400000;
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+  const fmtDur = (ms: number) => (ms <= 0 ? '—' : ms < DAY ? `${Math.round(ms / HOUR)}h` : `${(ms / DAY).toFixed(1)}d`);
+  // 1ª resposta: intervalo entre a criação e a 1ª mensagem de um admin (senderId != dono).
+  const firstResponses = tickets
+    .map(t => {
+      const firstAdmin = (t.messages || []).filter(m => m.senderId !== t.userId).sort((a, b) => a.timestamp - b.timestamp)[0];
+      return firstAdmin ? firstAdmin.timestamp - t.createdAt : null;
+    })
+    .filter((v): v is number => v !== null && v >= 0);
+  const resolutions = tickets
+    .filter(t => t.status === 'resolved')
+    .map(t => (t.updatedAt || 0) - (t.createdAt || 0))
+    .filter(v => v > 0);
+  const oldestOpenMs = tickets
+    .filter(t => t.status !== 'resolved')
+    .reduce((max, t) => Math.max(max, Date.now() - (t.createdAt || Date.now())), 0);
+  const slaFirstResponse = fmtDur(avg(firstResponses));
+  const slaResolution = fmtDur(avg(resolutions));
+  const slaOldestOpen = fmtDur(oldestOpenMs);
+
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-12rem)] bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden animate-fade-in">
       
@@ -166,6 +188,22 @@ export function AdminSupport() {
              <div className="text-center border-l border-ink-100">
                <p className="text-[8px] font-black text-purple-650 uppercase tracking-wider">Alta Pri.</p>
                <p className="text-sm font-black text-ink-900 mt-0.5">{highPriorityCount}</p>
+             </div>
+           </div>
+
+           {/* SLA */}
+           <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+             <div className="bg-ink-50/50 rounded-xl border border-ink-100 py-2">
+               <p className="text-[8px] font-black text-ink-400 uppercase tracking-wider">1ª resposta</p>
+               <p className="text-xs font-black text-ink-900 mt-0.5">{slaFirstResponse}</p>
+             </div>
+             <div className="bg-ink-50/50 rounded-xl border border-ink-100 py-2">
+               <p className="text-[8px] font-black text-ink-400 uppercase tracking-wider">Resolução</p>
+               <p className="text-xs font-black text-ink-900 mt-0.5">{slaResolution}</p>
+             </div>
+             <div className="bg-ink-50/50 rounded-xl border border-ink-100 py-2">
+               <p className="text-[8px] font-black text-ink-400 uppercase tracking-wider">Aberto + antigo</p>
+               <p className="text-xs font-black text-ink-900 mt-0.5">{slaOldestOpen}</p>
              </div>
            </div>
 

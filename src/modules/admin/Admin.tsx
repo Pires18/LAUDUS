@@ -6,7 +6,7 @@ import { useAdmin } from '../../hooks/useAdmin';
 import {
   ShieldCheck, Users, History,
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
-  Megaphone, Trash2, Loader2, DollarSign, CreditCard
+  Megaphone, Trash2, Loader2, DollarSign, CreditCard, Activity
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { logger } from '../../utils/logger';
@@ -19,9 +19,10 @@ import { AdminSupport } from './submodules/AdminSupport';
 import { AdminMasks } from './submodules/AdminMasks';
 import { AdminFinanceiro } from './submodules/AdminFinanceiro';
 import { AdminAnalytics } from './submodules/AdminAnalytics';
+import { AdminHealth } from './submodules/AdminHealth';
 import { SharedLaudIA } from '../laud-ia/SharedLaudIA';
 
-type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia';
+type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia' | 'health';
 
 export function Admin() {
   const { view } = useApp();
@@ -53,6 +54,7 @@ export function Admin() {
     { id: 'audit',      label: 'Auditoria',           icon: History         },
     { id: 'support',    label: 'Suporte',             icon: LifeBuoy        },
     { id: 'masks',      label: 'Máscaras',            icon: FileSignature   },
+    { id: 'health',     label: 'Saúde',               icon: Activity        },
   ] as const;
 
   return (
@@ -104,6 +106,7 @@ export function Admin() {
           {activeTab === 'audit'      && <AdminAudit />}
           {activeTab === 'support'    && <AdminSupport />}
           {activeTab === 'masks'      && <AdminMasks />}
+          {activeTab === 'health'     && <AdminHealth />}
         </div>
       </div>
     </div>
