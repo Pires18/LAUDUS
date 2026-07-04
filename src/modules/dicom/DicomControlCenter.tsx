@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useSubscription } from '../../hooks/useSubscription';
 import {
   Save, RotateCcw, Loader2, Database, Server, Wifi,
-  HardDrive, Shield, Cloud, Info, Network, BookOpen,
+  HardDrive, Cloud, Info, Network, BookOpen,
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
   Copy, Check, ArrowRight, Monitor, Radio
 } from 'lucide-react';
@@ -34,7 +34,6 @@ const JSON_TEMPLATE = `{
 }`;
 
 type ControlTab = 'config' | 'guides';
-type GuideMethod = 'local' | 'tailscale';
 
 /** Resultado de um teste de capacidade (imagens ou worklist) de um servidor. */
 type CapResult = { ok: boolean; msg: string; skipped?: boolean };
@@ -803,23 +802,17 @@ export function DicomControlCenter() {
                 <div className="col-span-1 border-r border-ink-100 bg-ink-50/50 p-4 space-y-1">
                   {[
                     { group: '▶ Comece aqui', items: [
-                      { id: 'cloud_vm', label: 'Servidor na Nuvem (VM) ★', icon: Cloud },
-                      { id: 'backup_local', label: 'Backup Local (auto-envio à VM)', icon: HardDrive },
-                      { id: 'walkthrough', label: 'Passo a passo (do zero)', icon: CheckCircle2 },
+                      { id: 'overview', label: 'Visão geral', icon: BookOpen },
+                      { id: 'setup_vm', label: '1 · Montar a VM (nuvem)', icon: Cloud },
+                      { id: 'app_config', label: '2 · Configurar no LAUD.US', icon: Server },
+                      { id: 'relay', label: '3 · Relé + ultrassom', icon: Radio },
                     ]},
-                    { group: 'Entender', items: [
-                      { id: 'concepts', label: 'O que é PACS / DICOM', icon: BookOpen },
-                      { id: 'architecture', label: 'Como funciona a rede', icon: Network },
-                    ]},
-                    { group: 'Configurar (detalhado)', items: [
-                      { id: 'prereq', label: '1 · Instalar os programas', icon: Cpu },
-                      { id: 'orthanc_json', label: '2 · Configurar o Orthanc', icon: FileText },
-                      { id: 'agent', label: '3 · Ligar o Agente', icon: Server },
-                      { id: 'tailscale', label: '4 · Tailscale (só nuvem)', icon: Cloud },
-                      { id: 'ultrasound', label: '5 · Conectar o aparelho', icon: Database },
+                    { group: 'Extras', items: [
+                      { id: 'backup', label: 'Backup local (opcional)', icon: HardDrive },
                     ]},
                     { group: 'Ajuda', items: [
                       { id: 'troubleshoot', label: 'Resolver problemas', icon: HelpCircle },
+                      { id: 'concepts', label: 'Conceitos & glossário', icon: Info },
                     ]},
                   ].map(grp => (
                     <div key={grp.group} className="mb-3.5 space-y-1">
@@ -845,963 +838,329 @@ export function DicomControlCenter() {
                       })}
                     </div>
                   ))}
+
+                  <div className="mt-4 p-3 rounded-xl bg-ink-900 text-white space-y-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <FileText size={13} className="text-emerald-400" />
+                      <span className="text-[9px] font-black uppercase tracking-widest">Projeto completo</span>
+                    </div>
+                    <p className="text-[10px] text-ink-300 leading-relaxed">Migração de exames, automação por usuário e riscos no documento:</p>
+                    <code className="block bg-black/40 p-1.5 rounded-lg text-[9px] text-emerald-300 break-all">docs/PROJETO_PACS_NUVEM.md</code>
+                  </div>
                 </div>
 
                 {/* Conteúdo da Seção Selecionada */}
                 <div className="col-span-3 p-6 overflow-y-auto max-h-[600px] custom-scrollbar">
-                  {selectedSection === 'cloud_vm' && (() => {
+                  {(() => {
                     const Cmd = ({ text, id }: { text: string; id: string }) => (
-                      <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
-                        <span className="break-all whitespace-pre-wrap">{text}</span>
+                      <div className="flex items-start justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px]">
+                        <span className="break-all whitespace-pre-wrap select-all leading-relaxed">{text}</span>
                         <button onClick={() => handleCopy(text, id)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">
                           {copiedField === id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                         </button>
                       </div>
                     );
-                    const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
+                    const Step = ({ n, title, children }: { n: number | string; title: string; children: ReactNode }) => (
                       <div className="flex gap-3.5">
                         <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-sm">{n}</div>
-                        <div className="flex-1 space-y-2 pb-1">
+                        <div className="flex-1 space-y-2 pb-1 min-w-0">
                           <h4 className="text-[13px] font-black text-ink-900 leading-tight pt-1">{title}</h4>
                           {children}
                         </div>
                       </div>
                     );
+                    const P = ({ children }: { children: ReactNode }) => (
+                      <p className="text-[11px] text-ink-600 leading-relaxed">{children}</p>
+                    );
+                    const Note = ({ tone = 'blue', children }: { tone?: 'blue' | 'amber' | 'emerald'; children: ReactNode }) => {
+                      const map: Record<string, string> = {
+                        blue: 'bg-blue-50/60 border-blue-100 text-blue-800',
+                        amber: 'bg-amber-50/60 border-amber-100 text-amber-800',
+                        emerald: 'bg-emerald-50/60 border-emerald-100 text-emerald-800',
+                      };
+                      return <div className={classNames('flex items-start gap-1.5 text-[11px] rounded-lg border px-2.5 py-2 leading-relaxed', map[tone])}><Info size={13} className="shrink-0 mt-0.5" /><span>{children}</span></div>;
+                    };
+
                     return (
-                      <div className="space-y-5 animate-fade-in">
-                        <div className="pb-3 border-b border-ink-100">
-                          <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> Servidor na Nuvem (VM) — arquitetura recomendada</h3>
-                          <p className="text-[11px] text-ink-500 font-medium">Orthanc + Agente rodam numa VM (Google Cloud). A clínica só faz um relé Tailscale. O servidor local vira backup opcional.</p>
-                        </div>
-
-                        {/* Topologia resumida */}
-                        <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-2">
-                          <h4 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Network size={13} /> Como fica</h4>
-                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                            <li><strong>VM (nuvem):</strong> Orthanc (Docker) + Agente LAUD.US + Tailscale Funnel. É o servidor <strong>principal</strong>, sempre ligado.</li>
-                            <li><strong>Clínica:</strong> um <strong>relé</strong> Tailscale (roteador GL.iNet, ou o PC do dia a dia) liga o ultrassom à VM. Sem Orthanc, sem dados locais.</li>
-                            <li><strong>LAUD.US (navegador):</strong> fala com a VM pela URL Funnel (HTTPS). <strong>Não precisa de Tailscale.</strong></li>
-                            <li><strong>Backup (opcional):</strong> um Orthanc local com auto-envio à VM — veja a aba <strong>“Backup Local”</strong>.</li>
-                          </ul>
-                        </div>
-
-                        {/* Atalho de 1 comando */}
-                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2">
-                          <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5"><CheckCircle2 size={13} /> Atalho: bootstrap em 1 comando</h4>
-                          <p className="text-[11px] text-ink-700 leading-relaxed">Na VM (Debian/Ubuntu), copie <code>scripts/agent.js</code>, <code>scripts/generate_wl.py</code> e <code>scripts/setup-vm.sh</code> e rode. Ele instala Docker, Orthanc, o agente (systemd), Tailscale e o Funnel, e imprime todos os valores para colar no app:</p>
-                          <Cmd id="cvm-oneshot" text="chmod +x ~/setup-vm.sh && sudo AGENT_SECRET=$(openssl rand -hex 32) ~/setup-vm.sh" />
-                          <p className="text-[10px] text-ink-500 leading-relaxed">Na 1ª vez o Tailscale pede login: rode <code>sudo tailscale up</code>, autentique no navegador e rode o script de novo (é idempotente). Os passos abaixo são o mesmo processo manual, detalhado.</p>
-                        </div>
-
-                        <Step n={1} title="Preparar a VM (Docker + Tailscale)">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Numa VM Debian/Ubuntu no Google Cloud (região <code>southamerica-east1</code>), instale Docker e Tailscale:</p>
-                          <Cmd id="cvm-docker" text="curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER" />
-                          <Cmd id="cvm-ts" text="curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up" />
-                          <Cmd id="cvm-ip" text="tailscale ip -4   # anote o IP 100.x.y.z da VM (o ultrassom vai usar este)" />
-                        </Step>
-
-                        <Step n={2} title="Subir o Orthanc (Docker, com Worklist + DICOMweb)">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Crie <code>/opt/orthanc/docker-compose.yml</code> (HTTP só no localhost; DICOM 4242 aberto para o relé):</p>
-                          <Cmd id="cvm-compose" text={`services:\n  orthanc:\n    image: orthancteam/orthanc:latest\n    restart: unless-stopped\n    ports:\n      - "127.0.0.1:8042:8042"\n      - "0.0.0.0:4242:4242"\n    volumes:\n      - /opt/orthanc-data:/var/lib/orthanc/db\n      - /opt/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro\n      - /opt/orthanc-data/worklists:/var/lib/orthanc/worklists`} />
-                          <p className="text-[11px] text-ink-600 leading-relaxed">E o <code>/opt/orthanc/orthanc.json</code> (modo prático, sem senha — a proteção é o Tailscale):</p>
-                          <Cmd id="cvm-json" text={`{\n  "Name": "PACS LAUDUS CLOUD",\n  "HttpPort": 8042, "HttpServerEnabled": true,\n  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",\n  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,\n  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true, "DicomAlwaysAllowFind": true,\n  "Worklists": { "Enable": true, "Database": "/var/lib/orthanc/worklists" },\n  "DicomWeb": { "Enable": true }\n}`} />
-                          <Cmd id="cvm-up" text="cd /opt/orthanc && docker compose up -d" />
-                        </Step>
-
-                        <Step n={3} title="Ligar o Agente LAUD.US na VM + expor via Funnel">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Copie <code>scripts/agent.js</code> e <code>scripts/generate_wl.py</code> para a VM, instale Node + <code>pip install pydicom</code>, e rode o agente (como serviço systemd) com as variáveis:</p>
-                          <Cmd id="cvm-agent" text={`LAUDUS_AGENT_SECRET=<segredo-forte> \\\nLAUDUS_WORKLIST_DIR=/opt/orthanc-data/worklists \\\nLAUDUS_ALLOWED_HOSTS=localhost,127.0.0.1 \\\nnode agent.js`} />
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Exponha <strong>só o agente</strong> (porta 3000) na internet via Funnel — devolve a URL <code>https://&lt;vm&gt;.&lt;tailnet&gt;.ts.net</code>:</p>
-                          <Cmd id="cvm-funnel" text="tailscale funnel --bg 3000" />
-                        </Step>
-
-                        <Step n={4} title="Configurar no LAUD.US (aba Servidores)">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Clique no preset <strong>“Servidor na Nuvem (VM)”</strong> na aba Servidores e complete:</p>
-                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                            <li><strong>URL do Agente Local</strong> = a URL do Funnel da VM (<code>https://…ts.net</code>).</li>
-                            <li><strong>URL do Servidor PACS</strong> = <code>http://127.0.0.1:8042</code> — o agente resolve na própria VM. <strong>Não</strong> use o IP tailnet aqui (o Orthanc só escuta no localhost da VM).</li>
-                            <li><strong>Segredo do Agente</strong> = o mesmo <code>LAUDUS_AGENT_SECRET</code>.</li>
-                            <li><strong>Pasta da Worklist</strong> = <code>/opt/orthanc-data/worklists</code>. Deixe <strong>URL Pública Tailscale</strong> vazia.</li>
-                          </ul>
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Salve e use <strong>“Executar Diagnóstico”</strong> — deve ficar tudo verde.</p>
-                          <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[10px] text-amber-800 leading-relaxed">
-                            <strong>Se aparecer loop de recarregamento</strong> após atualizar, limpe o Service Worker (PWA) do navegador: <code>F12 → Application → Service Workers → Unregister</code> e <code>Storage → Clear site data</code>. É cache antigo, não erro de config.
-                          </div>
-                        </Step>
-
-                        <Step n={5} title="Relé na clínica (ligar o ultrassom à VM)">
-                          <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1.5">
-                            <div className="font-black text-[11px] text-ink-800 uppercase">Modo A1 — Roteador GL.iNet (recomendado)</div>
-                            <p className="text-[11px] text-ink-600 leading-relaxed">O GL.iNet já roda Tailscale. Aprove as rotas no admin da tailnet. No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):4242</strong>, AE <code>ORTHANC</code>. Zero software extra.</p>
-                          </div>
-                          <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1.5">
-                            <div className="font-black text-[11px] text-ink-800 uppercase">Modo A2 — PC do dia a dia (com Tailscale)</div>
-                            <p className="text-[11px] text-ink-600 leading-relaxed">No PC (que roda Tailscale), encaminhe a porta 4242 para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:4242</strong>.</p>
-                            <p className="text-[10px] text-ink-500 font-bold mt-1">Windows:</p>
-                            <Cmd id="cvm-netsh" text="netsh interface portproxy add v4tov4 listenport=4242 listenaddress=0.0.0.0 connectport=4242 connectaddress=<IP-TAILNET-DA-VM>" />
-                            <p className="text-[10px] text-ink-500 font-bold mt-1">macOS/Linux:</p>
-                            <Cmd id="cvm-socat" text="socat TCP-LISTEN:4242,fork,reuseaddr TCP:<IP-TAILNET-DA-VM>:4242" />
-                            <p className="text-[10px] text-amber-700 leading-relaxed mt-1">⚠️ Neste modo, o ultrassom só alcança a VM com o PC ligado e no Tailscale.</p>
-                          </div>
-                        </Step>
-
-                        <Step n={6} title="Validar">
-                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                            <li>C-ECHO no ultrassom → sucesso.</li>
-                            <li>Criar exame no LAUD.US → a worklist aparece no aparelho.</li>
-                            <li>Fazer o exame → as imagens sobem à VM e aparecem no laudo.</li>
-                          </ul>
-                        </Step>
-
-                        <div className="p-3 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
-                          Migração dos exames antigos (local → VM) e desativação do servidor local estão no manual completo <code className="text-emerald-300">docs/PROJETO_PACS_NUVEM.md</code> (Fases 3 e 4). Migre e confira as contagens <strong>antes</strong> de desligar o local.
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {selectedSection === 'backup_local' && (() => {
-                    const Cmd = ({ text, id }: { text: string; id: string }) => (
-                      <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
-                        <span className="break-all whitespace-pre-wrap">{text}</span>
-                        <button onClick={() => handleCopy(text, id)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">
-                          {copiedField === id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                        </button>
-                      </div>
-                    );
-                    const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
-                      <div className="flex gap-3.5">
-                        <div className="shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm">{n}</div>
-                        <div className="flex-1 space-y-2 pb-1">
-                          <h4 className="text-[13px] font-black text-ink-900 leading-tight pt-1">{title}</h4>
-                          {children}
-                        </div>
-                      </div>
-                    );
-                    return (
-                      <div className="space-y-5 animate-fade-in">
-                        <div className="pb-3 border-b border-ink-100">
-                          <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><HardDrive size={16} className="text-indigo-600" /> Backup Local com auto-envio à VM (store-and-forward)</h3>
-                          <p className="text-[11px] text-ink-500 font-medium">Um Orthanc na clínica que guarda os exames <strong>temporariamente</strong> e os empurra para a VM assim que ela estiver acessível, apagando a cópia local depois. Contingência para quando a internet ou a VM caírem.</p>
-                        </div>
-
-                        {/* Como funciona */}
-                        <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-2">
-                          <h4 className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> A ideia</h4>
-                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                            <li>Em operação normal, o ultrassom manda para a <strong>VM</strong>. O backup fica <strong>vazio</strong>.</li>
-                            <li>Se a VM/internet cair, o ultrassom manda para o <strong>backup local</strong> (destino secundário no aparelho).</li>
-                            <li>Cada exame que chega ao backup é <strong>reenviado à VM</strong> (DICOM 4242 na tailnet). Se a VM aceita, a cópia local é <strong>apagada</strong>.</li>
-                            <li>Enquanto a VM estiver fora, o exame <strong>fica</strong> no backup; um <em>sweep</em> periódico reenvia quando ela voltar. Assim a VM continua sendo a dona única dos exames.</li>
-                          </ul>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed">
-                          <strong>Pré-requisito:</strong> o PC do backup precisa estar na <strong>mesma tailnet</strong> da VM (Tailscale instalado nele, ou atrás do roteador GL.iNet com rotas aprovadas), para alcançar o IP <code>100.x.y.z</code> da VM na porta <code>4242</code>.
-                        </div>
-
-                        <Step n={1} title="Subir o Orthanc de backup (Docker) na clínica">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">No PC sempre-ligado da clínica, crie <code>docker-compose.yml</code>. A porta <strong>4242</strong> fica aberta na LAN (o ultrassom envia aqui no modo de contingência):</p>
-                          <Cmd id="bk-compose" text={`services:\n  orthanc-backup:\n    image: orthancteam/orthanc:latest\n    restart: unless-stopped\n    ports:\n      - "8043:8042"        # REST (evita conflito com um Orthanc na 8042)\n      - "0.0.0.0:4242:4242" # DICOM (ultrassom envia aqui na contingencia)\n    volumes:\n      - ./data:/var/lib/orthanc/db\n      - ./orthanc.json:/etc/orthanc/orthanc.json:ro\n      - ./backup-forward.lua:/etc/orthanc/backup-forward.lua:ro`} />
-                        </Step>
-
-                        <Step n={2} title="Configurar o orthanc.json (modality CLOUD + Lua)">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Troque <code>100.x.y.z</code> pelo <strong>IP tailnet da VM</strong>. A modality <code>CLOUD</code> é o destino do reenvio; o Lua faz o encaminhar-e-apagar:</p>
-                          <Cmd id="bk-json" text={`{\n  "Name": "PACS BACKUP LOCAL",\n  "HttpPort": 8042, "HttpServerEnabled": true,\n  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",\n  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,\n  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true,\n  "StableAge": 30,\n  "DicomModalities": { "CLOUD": [ "ORTHANC", "100.x.y.z", 4242 ] },\n  "LuaScripts": [ "/etc/orthanc/backup-forward.lua" ]\n}`} />
-                          <p className="text-[10px] text-ink-500 leading-relaxed">Coloque o arquivo <code>scripts/backup-forward.lua</code> (deste projeto) ao lado do compose. Ele envia cada estudo estável à modality <code>CLOUD</code> e apaga o local em caso de sucesso.</p>
-                        </Step>
-
-                        <Step n={3} title="Subir e instalar o reenvio periódico (retry)">
-                          <Cmd id="bk-up" text="docker compose up -d" />
-                          <p className="text-[11px] text-ink-600 leading-relaxed">O Lua cobre o envio <em>na hora</em>. Para os exames que chegaram com a VM offline, agende o <em>sweep</em> (reenvia o que sobrou e apaga o aceito) a cada 10 min via cron:</p>
-                          <Cmd id="bk-cron" text={`*/10 * * * * ORTHANC=http://localhost:8042 /caminho/scripts/backup-forward-sweep.sh >> /var/log/backup-forward.log 2>&1`} />
-                        </Step>
-
-                        <Step n={4} title="Apontar o ultrassom (destino secundário)">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">No aparelho, mantenha o <strong>Storage principal</strong> na VM (IP tailnet da VM:4242). Adicione um <strong>segundo destino de Storage</strong> apontando para o <strong>IP LAN do PC de backup:4242</strong>, AE <code>ORTHANC</code>. Use-o quando a VM estiver inacessível (ou configure envio duplo, se o aparelho suportar).</p>
-                        </Step>
-
-                        <Step n={5} title="(Opcional) Registrar o backup no LAUD.US">
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Na aba <strong>Servidores & Conexão</strong>, ligue <strong>“Servidor PACS de Backup”</strong> e preencha a URL/pasta do backup local. Serve para o diagnóstico e para o app enxergar a redundância. O <em>encaminhamento</em> em si é feito pelo Orthanc (Lua + sweep), independente do app.</p>
-                        </Step>
-
-                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1.5">
-                          <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5"><CheckCircle2 size={13} /> Como validar</h4>
-                          <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                            <li>Com a VM <strong>online</strong>: envie um exame ao backup → em segundos ele some do backup e aparece na VM.</li>
-                            <li>Com a VM <strong>offline</strong> (desligue o Tailscale da VM p/ testar): o exame <strong>fica</strong> no backup. Religue a VM → o sweep reenvia e limpa o backup.</li>
-                          </ul>
-                          <p className="text-[10px] text-ink-500 leading-relaxed pt-1">Conferir contagem do backup: <code>curl -s http://localhost:8043/statistics</code> (deve tender a zero em operação normal).</p>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {selectedSection === 'walkthrough' && (() => {
-                    const Step = ({ n, title, children }: { n: number; title: string; children: ReactNode }) => (
-                      <div className="flex gap-3.5">
-                        <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-sm">{n}</div>
-                        <div className="flex-1 space-y-2 pb-1">
-                          <h4 className="text-[13px] font-black text-ink-900 leading-tight pt-1">{title}</h4>
-                          {children}
-                        </div>
-                      </div>
-                    );
-                    const Cmd = ({ text, id }: { text: string; id: string }) => (
-                      <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
-                        <span className="break-all">{text}</span>
-                        <button onClick={() => handleCopy(text, id)} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">
-                          {copiedField === id ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                        </button>
-                      </div>
-                    );
-                    const Check_ = ({ children }: { children: ReactNode }) => (
-                      <div className="flex items-start gap-1.5 text-[11px] text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-lg px-2.5 py-1.5">
-                        <CheckCircle2 size={13} className="shrink-0 mt-0.5" /><span className="leading-relaxed">{children}</span>
-                      </div>
-                    );
-                    return (
-                      <div className="space-y-5 animate-fade-in">
-                        <div className="pb-3 border-b border-ink-100">
-                          <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">★ Passo a Passo Completo — do Zero ao Funcionando</h3>
-                          <p className="text-[11px] text-ink-500 font-medium">Siga de cima para baixo, sem pular. Após o último passo, seu PACS estará operando.</p>
-                        </div>
-
-                        {/* Escolha do cenário */}
-                        <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 space-y-2.5">
-                          <h4 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Antes de começar: qual é o seu caso?</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="p-3 rounded-xl bg-white border border-ink-150">
-                              <div className="font-black text-[11px] text-ink-800 uppercase mb-1">🏠 Cenário LOCAL</div>
-                              <p className="text-[11px] text-ink-600 leading-relaxed">Você abre o LAUD.US <strong>no mesmo computador/rede</strong> da clínica. Não precisa de Tailscale. Faça os passos 1–4, 6, 7, 8 (pule o 5).</p>
-                            </div>
-                            <div className="p-3 rounded-xl bg-white border border-ink-150">
-                              <div className="font-black text-[11px] text-ink-800 uppercase mb-1">☁️ Cenário NUVEM</div>
-                              <p className="text-[11px] text-ink-600 leading-relaxed">Você acessa o LAUD.US pelo site (<strong>laud.us</strong>), de qualquer lugar. Precisa do Tailscale Funnel. Faça <strong>todos</strong> os passos (1 a 8).</p>
-                            </div>
-                          </div>
-                          <p className="text-[10px] text-ink-400">Todos os passos abaixo são feitos na <strong>máquina servidora</strong> (o computador da clínica que fica ligado com o Orthanc).</p>
-                        </div>
-
-                        <div className="space-y-5">
-                          <Step n={1} title="Instalar os 3 programas na máquina servidora">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">Instale, na ordem: <strong>Orthanc</strong> (o PACS), <strong>Node.js</strong> (roda o Agente) e <strong>Python + pydicom</strong> (gera a worklist).</p>
-                            <div className="text-[11px] text-ink-600 space-y-1.5">
-                              <div><strong>Windows:</strong> instalador do Orthanc (marque <em>"Install as a Windows Service"</em>) · Node LTS em nodejs.org · Python 3 (marque <em>"Add python.exe to PATH"</em>).</div>
-                              <Cmd text="pip install pydicom" id="wt_pip" />
-                              <div className="pt-1"><strong>macOS:</strong></div>
-                              <Cmd text="brew install orthanc node python && brew services start orthanc && pip3 install pydicom" id="wt_brew" />
-                            </div>
-                            <Check_>No terminal, <code>node --version</code> e <code>python --version</code> (ou <code>python3</code>) respondem com um número.</Check_>
-                          </Step>
-
-                          <Step n={2} title="Criar a pasta da Worklist">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">É onde os arquivos <code>.wl</code> serão gravados. Guarde este caminho — você vai usá-lo nos passos 3 e 6.</p>
-                            <div className="text-[11px] text-ink-600 space-y-1.5">
-                              <div><strong>Windows:</strong> crie a pasta <code>C:\OrthancServer\db\WorklistsDatabase\</code></div>
-                              <div><strong>macOS:</strong></div>
-                              <Cmd text="mkdir -p ~/OrthancServer/db/WorklistsDatabase" id="wt_mkdir" />
-                            </div>
-                            <Check_>A pasta existe no explorador de arquivos.</Check_>
-                          </Step>
-
-                          <Step n={3} title="Configurar o Orthanc (orthanc.json)">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">Abra o <code>orthanc.json</code>, apague o conteúdo e cole o modelo pronto (aba <strong>"3. Configuração do Orthanc"</strong> → botão <em>Copiar</em>). Troque o valor de <code>"Database"</code> pela pasta do passo 2. Salve e <strong>reinicie o Orthanc</strong> (Windows: services.msc → Orthanc → Reiniciar · macOS: <code>brew services restart orthanc</code>).</p>
-                            <Check_>Abra <code>http://localhost:8042</code> no navegador da máquina servidora — a tela do Orthanc aparece (sem pedir senha, no modo prático).</Check_>
-                          </Step>
-
-                          <Step n={4} title="Ligar o Agente LAUD.US">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">Na pasta do projeto LAUDUS, rode e <strong>deixe a janela aberta</strong>:</p>
-                            <Cmd text="node scripts/agent.js" id="wt_agent" />
-                            <Check_>Aparece: <code>LAUD.US Local Agent rodando na porta 3000</code>. (Para não precisar deixar aberto, veja a seção 4 — rodar como serviço.)</Check_>
-                          </Step>
-
-                          <Step n={5} title="SÓ NO CENÁRIO NUVEM: expor o Agente via Tailscale Funnel">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">Instale o Tailscale e faça login. No painel web (Settings → DNS) habilite <strong>MagicDNS</strong> e <strong>HTTPS Certificates</strong> (uma vez). Depois, com o Agente rodando, exponha a <strong>porta 3000</strong>:</p>
-                            <Cmd text="tailscale funnel --bg 3000" id="wt_funnel" />
-                            <Check_>O Tailscale mostra uma URL pública tipo <code>https://servidor-mac.tailXXXX.ts.net</code>. <strong>Copie-a</strong> para o passo 6.</Check_>
-                            <div className="text-[10px] text-amber-700 bg-amber-50/60 border border-amber-100 rounded-lg px-2.5 py-1.5">⚠️ No cenário LOCAL, pule este passo inteiro.</div>
-                          </Step>
-
-                          <Step n={6} title="Preencher no LAUD.US (Configurações → PACS/DICOM → aba Servidores)">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">Preencha conforme o seu cenário e clique em <strong>"Testar Conexão PACS"</strong>:</p>
-                            <div className="overflow-x-auto border border-ink-150 rounded-xl">
-                              <table className="w-full text-[11px] text-left">
-                                <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
-                                  <tr><th className="px-3 py-2">Campo</th><th className="px-3 py-2">🏠 Local</th><th className="px-3 py-2">☁️ Nuvem</th></tr>
-                                </thead>
-                                <tbody className="divide-y divide-ink-100 bg-white text-ink-700">
-                                  <tr><td className="px-3 py-2 font-bold">URL do Agente Local</td><td className="px-3 py-2 text-ink-400">(vazio)</td><td className="px-3 py-2 font-mono">a URL do Funnel</td></tr>
-                                  <tr><td className="px-3 py-2 font-bold">URL do Orthanc</td><td className="px-3 py-2 font-mono">http://localhost:8042</td><td className="px-3 py-2 font-mono">http://localhost:8042</td></tr>
-                                  <tr><td className="px-3 py-2 font-bold">URL Pública Tailscale</td><td className="px-3 py-2 text-ink-400">(vazio)</td><td className="px-3 py-2 text-ink-400 font-bold">(vazio!)</td></tr>
-                                  <tr><td className="px-3 py-2 font-bold">Usuário / Senha</td><td className="px-3 py-2 text-ink-400">(vazio)</td><td className="px-3 py-2 text-ink-400">(vazio)</td></tr>
-                                  <tr><td className="px-3 py-2 font-bold">Pasta da Worklist</td><td className="px-3 py-2" colSpan={2}>o mesmo caminho do passo 2</td></tr>
-                                  <tr><td className="px-3 py-2 font-bold">AE Title do Orthanc</td><td className="px-3 py-2 font-mono" colSpan={2}>ORTHANC</td></tr>
-                                </tbody>
-                              </table>
-                            </div>
-                            <Check_>Ao testar, aparece a <strong>versão do Orthanc</strong> = conexão OK. Se falhar, veja a seção 7 (Problemas).</Check_>
-                          </Step>
-
-                          <Step n={7} title="Configurar o aparelho de ultrassom (uma vez)">
-                            <p className="text-[11px] text-ink-600 leading-relaxed">No menu DICOM do aparelho, cadastre <strong>Worklist</strong> e <strong>Storage</strong> com os mesmos dados (o aparelho fala direto com o Orthanc na rede local):</p>
-                            <ul className="text-[11px] text-ink-600 space-y-0.5 list-disc pl-4">
-                              <li><strong>IP:</strong> o IP local da máquina servidora (ex: 192.168.1.100)</li>
-                              <li><strong>Porta:</strong> 4242 · <strong>AE Title remoto:</strong> ORTHANC</li>
-                              <li><strong>AE Title local:</strong> o nome do aparelho (ex: MINDRAYMX7)</li>
-                            </ul>
-                            <Check_>O botão <strong>Verify/Test</strong> do aparelho acusa "Sucesso".</Check_>
-                          </Step>
-
-                          <Step n={8} title="Testar tudo de ponta a ponta">
-                            <ul className="text-[11px] text-ink-600 space-y-1 list-disc pl-4">
-                              <li>Crie um exame no LAUD.US → confira se surgiu um arquivo <code>agendamento_XXX.wl</code> na pasta da worklist.</li>
-                              <li>No aparelho, busque a worklist → o paciente deve aparecer, sem digitar.</li>
-                              <li>Faça o exame → as imagens voltam e aparecem no editor de laudos.</li>
-                            </ul>
-                            <Check_>Funcionou os três? PACS configurado com sucesso. 🎉</Check_>
-                          </Step>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
-                          <strong className="text-emerald-400">Segurança (opcional):</strong> no cenário nuvem, o Funnel deixa o Agente público. Para fechá-lo, veja a seção 4 (variável <code>LAUDUS_AGENT_SECRET</code> + campo "Segredo do Agente"). No caminho prático, pode deixar aberto.
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {selectedSection === 'concepts' && (
+                    <>
+                  {selectedSection === 'overview' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🎓 Conceitos Básicos — Comece Por Aqui</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Nunca mexeu com PACS/DICOM? Sem problema. Esta página explica tudo em linguagem simples, sem termos técnicos.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> Visão geral — servidor PACS na nuvem</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">O servidor principal é uma VM (Google Cloud). A clínica só faz um relé Tailscale. O local vira backup opcional.</p>
                       </div>
 
-                      {/* O que é, em uma frase */}
-                      <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100 space-y-2">
-                        <h4 className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Em uma frase</h4>
-                        <p className="text-xs text-ink-700 leading-relaxed">
-                          Este módulo conecta o <strong>LAUD.US</strong> ao seu <strong>aparelho de ultrassom</strong>: ele <strong>envia os dados do paciente</strong> para a tela do aparelho (para você não redigitar nome/data) e <strong>traz as imagens capturadas</strong> de volta para dentro do laudo. É a ponte entre o computador e o ultrassom.
-                        </p>
+                      <div className="p-4 rounded-2xl bg-zinc-900 text-zinc-100 overflow-x-auto">
+                        <pre className="text-[10px] leading-relaxed font-mono text-zinc-300 whitespace-pre">{`  CLÍNICA                          NUVEM — VM do usuário
+  ┌───────────────────┐            ┌────────────────────────────┐
+  │ Ultrassom         │            │ Debian + Tailscale         │
+  │   │ DICOM :4242    │ Tailscale │  • Orthanc (Docker)        │
+  │   ▼                │══cripto══▶│      :8042 HTTP :4242 DICOM │
+  │ RELÉ              │            │  • Agente LAUD.US :3000    │
+  │ (GL.iNet ou PC)   │            │  • Funnel HTTPS (público)  │
+  └───────────────────┘            └─────────────┬──────────────┘
+                                                  │
+     LAUD.US (navegador) ── HTTPS via Funnel ─────┘`}</pre>
                       </div>
 
-                      {/* Analogia */}
-                      <div className="p-4 rounded-2xl border border-ink-150 bg-ink-50/30 space-y-2.5">
-                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5">🍽️ Uma analogia simples (restaurante)</h4>
-                        <ul className="text-xs text-ink-600 leading-relaxed space-y-1.5">
-                          <li><strong>A Worklist</strong> é como a <strong>comanda de pedidos</strong> que vai para a cozinha: você anota o pedido (o exame do paciente) e ele aparece na tela do ultrassom, prontinho, sem o operador digitar nada.</li>
-                          <li><strong>O PACS (Orthanc)</strong> é como o <strong>álbum de fotos</strong> do restaurante: guarda todas as imagens que o ultrassom "fotografou" e as organiza por paciente.</li>
-                          <li><strong>O Ultrassom</strong> é a <strong>câmera</strong>: lê a comanda, tira as fotos e as devolve para o álbum.</li>
-                          <li><strong>O LAUD.US</strong> é o <strong>garçom</strong>: anota o pedido, entrega na cozinha e traz as fotos até a sua mesa (o laudo).</li>
-                        </ul>
-                      </div>
-
-                      {/* As duas funções */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 space-y-1.5">
-                          <div className="flex items-center gap-1.5 text-blue-700 font-black text-xs uppercase tracking-wider"><FileText size={13} /> 1. Worklist (ida)</div>
-                          <p className="text-[11px] text-ink-600 leading-relaxed">O LAUD.US cria um "cartão de identificação" digital do paciente (arquivo <code>.wl</code>) e o entrega ao aparelho. No ultrassom, o operador só seleciona o nome — sem digitar.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1">
+                          <div className="flex items-center gap-1.5 text-emerald-700"><Cloud size={14} /><span className="text-[11px] font-black uppercase">VM (nuvem)</span></div>
+                          <p className="text-[10px] text-ink-600 leading-relaxed">Orthanc + Agente + dados. Servidor <strong>principal</strong>, sempre ligado.</p>
                         </div>
-                        <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/30 space-y-1.5">
-                          <div className="flex items-center gap-1.5 text-emerald-700 font-black text-xs uppercase tracking-wider"><Database size={13} /> 2. Imagens (volta)</div>
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Depois do exame, as imagens ficam guardadas no PACS. O LAUD.US as busca automaticamente e mostra dentro do editor de laudos, prontas para anexar.</p>
+                        <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1">
+                          <div className="flex items-center gap-1.5 text-ink-700"><Radio size={14} /><span className="text-[11px] font-black uppercase">Relé</span></div>
+                          <p className="text-[10px] text-ink-600 leading-relaxed">GL.iNet ou o PC do dia a dia. Liga o ultrassom à VM. Sem dados locais.</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1">
+                          <div className="flex items-center gap-1.5 text-blue-700"><Monitor size={14} /><span className="text-[11px] font-black uppercase">Navegador</span></div>
+                          <p className="text-[10px] text-ink-600 leading-relaxed">Abre o LAUD.US pelo site. Fala com a VM via Funnel. <strong>Sem Tailscale.</strong></p>
                         </div>
                       </div>
 
-                      {/* Glossário */}
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5"><BookOpen size={13} /> Glossário — o que cada palavra significa</h4>
+                      <div>
+                        <h4 className="text-[11px] font-black text-ink-800 uppercase tracking-wider mb-2">Quem precisa de Tailscale?</h4>
                         <div className="overflow-x-auto border border-ink-150 rounded-xl">
-                          <table className="w-full text-xs text-left">
+                          <table className="w-full text-[11px] text-left text-ink-600">
                             <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
-                              <tr><th className="px-3 py-2.5">Termo</th><th className="px-3 py-2.5">O que é (em português claro)</th></tr>
+                              <tr><th className="px-3 py-2">Peça</th><th className="px-3 py-2">Tailscale?</th></tr>
                             </thead>
                             <tbody className="divide-y divide-ink-100 bg-white">
-                              {[
-                                ['DICOM', 'O "idioma" universal que aparelhos médicos usam para trocar imagens e dados. Como o PDF é para documentos, o DICOM é para exames.'],
-                                ['PACS', 'O arquivo/servidor que guarda e organiza todas as imagens dos exames. É o "álbum de fotos" central.'],
-                                ['Orthanc', 'O programa gratuito que usamos como PACS. Roda no computador da clínica guardando as imagens.'],
-                                ['Worklist (MWL)', 'A "lista/fila de trabalho" que aparece no ultrassom com os pacientes agendados. Evita digitar dados no aparelho.'],
-                                ['Arquivo .wl', 'O cartão de identificação de um paciente dentro da worklist. Cada exame vira um arquivo .wl.'],
-                                ['AE Title', 'O "apelido" (nome de rede) de cada equipamento DICOM para que eles se reconheçam. Ex: ORTHANC, MINDRAYMX7.'],
-                                ['Porta (ex: 4242, 8042)', 'Um "número de porta de entrada" no computador. Cada serviço usa a sua: imagens numa, site do Orthanc noutra.'],
-                                ['C-STORE / C-FIND', 'Comandos DICOM: C-STORE = "guarde esta imagem"; C-FIND = "procure este paciente na lista".'],
-                                ['Agente Local', 'Pequeno programa do LAUD.US que roda na clínica e cria os arquivos .wl na pasta certa do Orthanc.'],
-                                ['Tailscale', 'Uma "rede privada segura" (VPN) que liga a clínica à internet com segurança, sem abrir portas no roteador.'],
-                                ['Funnel', 'Recurso do Tailscale que publica um endereço https seguro para a nuvem (Vercel) conseguir falar com a clínica.'],
-                                ['Proxy', 'Um "intermediário" que repassa pedidos. O LAUD.US usa um proxy para falar com o Orthanc com segurança.'],
-                              ].map(([term, desc]) => (
-                                <tr key={term}>
-                                  <td className="px-3 py-2.5 font-bold text-ink-800 font-mono text-[11px] whitespace-nowrap align-top">{term}</td>
-                                  <td className="px-3 py-2.5 text-ink-600 leading-relaxed">{desc}</td>
-                                </tr>
-                              ))}
+                              <tr><td className="px-3 py-2 font-bold">VM (Orthanc + Agente)</td><td className="px-3 py-2 text-emerald-700 font-bold">Sim — é o coração da rede.</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Relé da clínica (GL.iNet / PC)</td><td className="px-3 py-2 text-emerald-700 font-bold">Sim — liga o ultrassom à VM.</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Ultrassom</td><td className="px-3 py-2 text-rose-700 font-bold">Não — fala só com o relé (LAN).</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Navegador do médico</td><td className="px-3 py-2 text-rose-700 font-bold">Não — usa o site + Funnel.</td></tr>
                             </tbody>
                           </table>
                         </div>
                       </div>
 
-                      {/* Ordem recomendada */}
-                      <div className="p-4 rounded-2xl bg-ink-900 text-white space-y-2">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5"><CheckCircle2 size={13} /> Ordem recomendada de leitura</h4>
-                        <p className="text-[11px] text-ink-300 leading-relaxed">
-                          Siga os tópicos do menu na ordem: <strong className="text-white">1</strong> entenda o fluxo → <strong className="text-white">2</strong> prepare o servidor → <strong className="text-white">3</strong> configure o Orthanc → <strong className="text-white">4</strong> ligue o Agente → <strong className="text-white">5</strong> (nuvem) configure o Tailscale → <strong className="text-white">6</strong> ajuste o aparelho → <strong className="text-white">7</strong> resolva problemas. Ao final, use o botão <strong className="text-white">"Executar Diagnóstico"</strong> na aba de Servidores para conferir se está tudo verde.
-                        </p>
+                      <Note tone="emerald">Fluxo: criar exame no LAUD.US → Agente grava a worklist na VM → ultrassom lê e faz o exame → imagens sobem à VM (4242) → LAUD.US mostra as imagens no laudo (via Agente/Funnel).</Note>
+                    </div>
+                  )}
+
+                  {selectedSection === 'setup_vm' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> 1 · Montar a VM (Google Cloud)</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Rode estes comandos por SSH na sua VM Debian/Ubuntu. Região sugerida: southamerica-east1.</p>
+                      </div>
+
+                      <Step n={1} title="Instalar Docker e Tailscale">
+                        <P>Docker roda o Orthanc; o Tailscale liga a VM à sua rede privada.</P>
+                        <Cmd id="vm-docker" text="curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER" />
+                        <Cmd id="vm-ts" text="curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up" />
+                        <Cmd id="vm-ip" text="tailscale ip -4   # anote o IP 100.x.y.z da VM — o ultrassom vai usar este" />
+                      </Step>
+
+                      <Step n={2} title="Subir o Orthanc (Docker + Worklist + DICOMweb)">
+                        <P>Crie <code>/opt/orthanc/docker-compose.yml</code>. HTTP fica só no localhost (o Agente acessa); o DICOM 4242 fica aberto para o relé:</P>
+                        <Cmd id="vm-compose" text={`services:
+  orthanc:
+    image: orthancteam/orthanc:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8042:8042"
+      - "0.0.0.0:4242:4242"
+    volumes:
+      - /opt/orthanc-data:/var/lib/orthanc/db
+      - /opt/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
+      - /opt/orthanc-data/worklists:/var/lib/orthanc/worklists`} />
+                        <P>E o <code>/opt/orthanc/orthanc.json</code> (modo prático, sem senha — a proteção é o Tailscale):</P>
+                        <Cmd id="vm-json" text={`{
+  "Name": "PACS LAUDUS CLOUD",
+  "HttpPort": 8042, "HttpServerEnabled": true,
+  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",
+  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,
+  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true, "DicomAlwaysAllowFind": true,
+  "Worklists": { "Enable": true, "Database": "/var/lib/orthanc/worklists" },
+  "DicomWeb": { "Enable": true }
+}`} />
+                        <Cmd id="vm-up" text="cd /opt/orthanc && docker compose up -d" />
+                        <Note>Confira: <code>curl -s http://localhost:8042/system</code> na VM deve devolver a versão do Orthanc.</Note>
+                      </Step>
+
+                      <Step n={3} title="Ligar o Agente LAUD.US + expor via Funnel">
+                        <P>Copie <code>scripts/agent.js</code> e <code>scripts/generate_wl.py</code> para a VM. Instale Node e <code>pip install pydicom</code>. Rode o agente (idealmente como serviço systemd) com um segredo forte:</P>
+                        <Cmd id="vm-agent" text={`LAUDUS_AGENT_SECRET=<segredo-forte> \\
+LAUDUS_WORKLIST_DIR=/opt/orthanc-data/worklists \\
+LAUDUS_ALLOWED_HOSTS=localhost,127.0.0.1 \\
+node agent.js`} />
+                        <P>Exponha <strong>só o agente</strong> (porta 3000) na internet. O comando devolve a URL pública HTTPS:</P>
+                        <Cmd id="vm-funnel" text="tailscale funnel --bg 3000   # → https://<vm>.<tailnet>.ts.net" />
+                        <Note tone="amber">Guarde duas coisas para o próximo passo: a <strong>URL do Funnel</strong> e o <strong>segredo</strong> do agente.</Note>
+                      </Step>
+
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
+                        <ArrowRight size={14} /> VM pronta. Agora vá para <strong>2 · Configurar no LAUD.US</strong>.
                       </div>
                     </div>
                   )}
 
-                  {selectedSection === 'architecture' && (
+                  {selectedSection === 'app_config' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🌐 Como Funciona a Rede</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Quem fala com quem — e quem precisa (ou não) do Tailscale.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Server size={16} className="text-emerald-600" /> 2 · Configurar no LAUD.US</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Na aba <strong>Servidores &amp; Conexão</strong>, use o preset e preencha 2 campos.</p>
                       </div>
 
-                      {/* Diagrama visual do fluxo de dados */}
-                      <div className="rounded-2xl border border-ink-150 bg-ink-50/30 p-4 sm:p-5 space-y-4">
-                        <div className="flex items-center gap-2">
-                          <Network size={14} className="text-emerald-500" />
-                          <span className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Diagrama do Fluxo (modo nuvem via Tailscale)</span>
-                        </div>
-                        {renderFlow('① Imagens — visualização no editor', 'text-emerald-600', [
-                          { icon: Monitor, label: 'Navegador', sub: 'LAUD.US' },
-                          { icon: Cloud, label: 'Vercel', sub: 'proxy' },
-                          { icon: Database, label: 'Orthanc', sub: ':8443' },
-                        ])}
-                        {renderFlow('② Worklist — envio de exames (.wl)', 'text-blue-600', [
-                          { icon: Monitor, label: 'Navegador', sub: 'LAUD.US' },
-                          { icon: Cloud, label: 'Vercel', sub: 'serverless' },
-                          { icon: Cpu, label: 'Agente/Vite', sub: ':443' },
-                          { icon: FileText, label: 'Pasta .wl', sub: 'grava' },
-                          { icon: Database, label: 'Orthanc', sub: 'lê fila' },
-                        ])}
-                        {renderFlow('③ Ultrassom — captura de imagens', 'text-violet-600', [
-                          { icon: Radio, label: 'Ultrassom', sub: 'modalidade' },
-                          { icon: Database, label: 'Orthanc', sub: 'C-STORE :4242' },
-                        ])}
-                        <p className="text-[9px] text-ink-400 leading-normal pt-1 border-t border-ink-100">
-                          No modo <strong>local/on-premise</strong>, o navegador e o Vite ficam na própria máquina do PACS — os passos "Vercel" são omitidos e o acesso ao Orthanc é direto por HTTP na porta 8042.
-                        </p>
-                      </div>
+                      <Step n={1} title="Aplicar o preset">
+                        <P>No topo do card "Servidor PACS Principal", clique em <strong>☁️ Servidor na Nuvem (VM)</strong>. Ele preenche Orthanc = <code>http://localhost:8042</code>, AE = <code>ORTHANC</code> e a pasta da worklist, e ativa a sincronização.</P>
+                      </Step>
 
-                      {/* A REDE — quem fala com quem / quem precisa de Tailscale */}
-                      <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4 sm:p-5 space-y-4">
-                        <h4 className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1.5"><Network size={14} /> A Rede — Quem fala com quem (leia isto)</h4>
-
-                        <p className="text-[11px] text-ink-700 leading-relaxed">
-                          Existem <strong>duas conversas separadas</strong> e independentes. Entender isso resolve 90% da confusão:
-                        </p>
-
-                        <div className="grid grid-cols-1 gap-3">
-                          <div className="p-3.5 rounded-xl bg-white border border-ink-150 space-y-1.5">
-                            <div className="font-black text-[11px] text-violet-700 uppercase flex items-center gap-1.5"><Radio size={13} /> Conversa 1 — Aparelho ↔ Orthanc (SEMPRE local)</div>
-                            <p className="text-[11px] text-ink-600 leading-relaxed">
-                              O ultrassom conversa com o Orthanc <strong>pela rede local (Wi-Fi/cabo)</strong>, usando o <strong>IP local</strong> do servidor e a <strong>porta 4242</strong> (protocolo DICOM). Isso <strong>nunca</strong> passa pela internet nem pelo Tailscale. Os dois só precisam estar na <strong>mesma rede</strong> (mesma sub-rede, ex: ambos <code>192.168.1.x</code>).
-                            </p>
-                          </div>
-                          <div className="p-3.5 rounded-xl bg-white border border-ink-150 space-y-1.5">
-                            <div className="font-black text-[11px] text-emerald-700 uppercase flex items-center gap-1.5"><Cloud size={13} /> Conversa 2 — Nuvem ↔ Agente (só no cenário nuvem)</div>
-                            <p className="text-[11px] text-ink-600 leading-relaxed">
-                              Quando você abre o LAUD.US pela internet (site laud.us), o navegador precisa alcançar a clínica. O <strong>Tailscale Funnel</strong> dá um endereço HTTPS público ao <strong>Agente</strong>. Este é o <strong>único</strong> ponto que sai para a internet. No cenário 100% local, essa conversa não existe.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="overflow-x-auto border border-amber-200 rounded-xl bg-white">
-                          <table className="w-full text-[11px] text-left">
-                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
-                              <tr><th className="px-3 py-2">Componente</th><th className="px-3 py-2">Precisa de Tailscale?</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-ink-100 text-ink-700">
-                              <tr><td className="px-3 py-2 font-bold">Servidor (Orthanc + Agente)</td><td className="px-3 py-2"><strong className="text-emerald-700">Sim — só no cenário nuvem.</strong> A máquina do servidor entra na tailnet e roda o Funnel.</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">Aparelho de ultrassom</td><td className="px-3 py-2"><strong className="text-rose-700">❌ NÃO, nunca.</strong> Só precisa estar na mesma rede local do servidor. Aparelhos de US nem instalam Tailscale.</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">Navegador do médico</td><td className="px-3 py-2"><strong className="text-rose-700">❌ Não.</strong> Acessa o site normalmente; o app alcança a clínica sozinho via Funnel.</td></tr>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-ink-900 text-white text-[11px] leading-relaxed">
-                          <strong className="text-amber-400">Resposta direta:</strong> o <strong>aparelho de ultrassom NÃO precisa de Tailscale</strong> e não fica "conectado à rede Tailscale". Ele só precisa estar na <strong>mesma rede local</strong> do servidor Orthanc, apontando para o IP local dele na porta 4242. O Tailscale existe apenas para a <strong>nuvem alcançar a clínica</strong> — só a máquina servidora entra na tailnet.
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Rede local feita do jeito certo:</strong> deixe o servidor com <strong>IP fixo</strong> (reserve o IP no roteador por DHCP, ou configure IP estático) — se o IP mudar, o aparelho perde o servidor. Garanta que aparelho e servidor estão na <strong>mesma sub-rede</strong> e libere a <strong>porta 4242</strong> (entrada) no firewall da máquina servidora.
-                        </div>
-                      </div>
-
-                    </div>
-                  )}
-
-                  {selectedSection === 'prereq' && (
-                    <div className="space-y-5 animate-fade-in">
-                      <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🛠️ Preparação do Servidor</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Instalação das dependências fundamentais e pacotes básicos no servidor local.</p>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
-                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Em palavras simples:</strong> antes de conectar, o computador da clínica precisa de 3 programas — <strong>Python</strong> (o motor que cria os cartões de paciente <code>.wl</code>), a biblioteca <strong>pydicom</strong> (ensina o Python a "falar DICOM") e o <strong>Orthanc</strong> (o PACS que guarda as imagens). Instale-os uma única vez.
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">1. Instalar Python 3</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            A compilação de arquivos Modality Worklist (<code>.wl</code>) necessita do interpretador Python. Ao instalar no Windows, certifique-se de marcar a opção <strong>"Add python.exe to PATH"</strong> na tela inicial de instalação.
-                          </p>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-3">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">2. Instalar a biblioteca pydicom</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Abra o terminal/prompt de comando no servidor e execute o instalador do pacote:
-                          </p>
-                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                            <span>pip install pydicom</span>
-                            <button
-                              onClick={() => handleCopy('pip install pydicom', 'pip')}
-                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                              title="Copiar Comando"
-                            >
-                              {copiedField === 'pip' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">3. Instalar o Orthanc</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Baixe o instalador oficial do Orthanc Server. No Windows, instale-o marcando a opção <strong>"Install Orthanc as a Windows Service"</strong>. No macOS, use o Homebrew:
-                          </p>
-                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all mb-2">
-                            <span>brew install orthanc && brew services start orthanc</span>
-                            <button
-                              onClick={() => handleCopy('brew install orthanc && brew services start orthanc', 'brew')}
-                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                              title="Copiar Comando"
-                            >
-                              {copiedField === 'brew' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedSection === 'orthanc_json' && (
-                    <div className="space-y-5 animate-fade-in">
-                      <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">📄 Arquivo de Configuração orthanc.json</h3>
-                        <p className="text-[11px] text-ink-500 font-medium font-mono">C:\Program Files\Orthanc Server\Configuration\orthanc.json</p>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
-                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Em palavras simples:</strong> o Orthanc lê todas as suas configurações de um único arquivo de texto, o <code>orthanc.json</code> — é o "painel de controle" dele. O modelo abaixo é o <strong>prático (sem senha)</strong>: define as <strong>portas</strong> e a <strong>pasta da worklist</strong>. Copie, ajuste o caminho da worklist e reinicie o Orthanc. <em>(Para exigir senha, troque <code>"AuthenticationEnabled": true</code> e adicione <code>"RegisteredUsers"</code> — veja a seção Segurança.)</em>
-                        </div>
-                      </div>
-
-                      {/* Como o Orthanc funciona */}
-                      <div className="rounded-2xl border border-ink-150 bg-ink-50/30 p-4 space-y-2.5">
-                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Como o Orthanc funciona</h4>
-                        <p className="text-[11px] text-ink-600 leading-relaxed">
-                          O Orthanc é um servidor PACS que faz três coisas ao mesmo tempo, cada uma numa "porta":
-                        </p>
-                        <ul className="text-[11px] text-ink-600 leading-relaxed space-y-1.5">
-                          <li><strong className="font-mono">:4242 (DICOM)</strong> — a porta que o <strong>aparelho de ultrassom</strong> usa. Por ela o Orthanc recebe imagens (<strong>C-STORE</strong>) e responde à busca de worklist (<strong>C-FIND</strong>). É sempre acesso na rede local.</li>
-                          <li><strong className="font-mono">:8042 (HTTP/API)</strong> — a porta que o <strong>LAUD.US/Agente</strong> usa para ler imagens e informações. É também a interface web do Orthanc (abra <code>http://localhost:8042</code>).</li>
-                          <li><strong>Plugin de Worklist</strong> — o Orthanc lê os arquivos <code>.wl</code> de uma pasta (a que você define em <code>Worklists.Database</code>) e os oferece ao aparelho. O <strong>Agente LAUD.US</strong> é quem grava esses <code>.wl</code> ali.</li>
-                        </ul>
-                        <div className="p-2.5 rounded-lg bg-white border border-ink-150 text-[11px] text-ink-700 leading-relaxed">
-                          Fluxo completo: LAUD.US → Agente grava <code>.wl</code> → Orthanc oferece na worklist (4242) → aparelho lê e faz o exame → aparelho envia imagens (4242, C-STORE) → Orthanc guarda → LAUD.US busca as imagens (8042) e mostra no laudo.
-                        </div>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-ink-500">Modelo recomendado pré-configurado:</span>
-                          <button
-                            onClick={() => handleCopy(JSON_TEMPLATE, 'json_tpl')}
-                            className="h-8 px-3.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-[10px] uppercase tracking-wider transition-all flex items-center gap-1.5"
-                          >
-                            {copiedField === 'json_tpl' ? <Check size={11} /> : <Copy size={11} />}
-                            Copiar orthanc.json Completo
-                          </button>
-                        </div>
-                        <pre className="p-4 bg-zinc-950 text-emerald-400 rounded-xl font-mono text-[10px] overflow-y-auto max-h-[350px] leading-relaxed custom-scrollbar select-all">
-                          {JSON_TEMPLATE}
-                        </pre>
-                        <p className="text-[10px] text-ink-400 italic">Nota: Lembre-se de reiniciar o serviço do Orthanc no gerenciador do Windows após salvar as edições.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedSection === 'agent' && (
-                    <div className="space-y-5 animate-fade-in">
-                      <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🤖 O Agente Local (Laudus Local Agent)</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Executando o script agent.js como serviço persistente em segundo plano.</p>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
-                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Em palavras simples:</strong> um site, por segurança, não pode gravar arquivos direto no seu computador. O <strong>Agente</strong> é um programinha do LAUD.US que fica rodando na clínica e faz esse trabalho por ele — recebe o pedido e grava o arquivo <code>.wl</code> na pasta que o Orthanc vigia. Ele precisa estar <strong>sempre ligado</strong>.
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-100 text-emerald-900 text-xs leading-relaxed space-y-1">
-                          <strong className="block font-bold">Gateway único (worklist + imagens)</strong>
-                          O agente agora também faz proxy do Orthanc em <code>/api/orthanc-proxy</code>. Basta expor o agente via <strong>Tailscale Funnel (HTTPS)</strong> e preencher a "URL do Agente Local" — uma única exposição atende tanto a gravação de worklist (.wl) quanto a visualização de imagens na nuvem. Sem o agente exposto em HTTPS, a Worklist funciona no localhost mas falha no Vercel.
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-100 space-y-2">
-                          <h4 className="text-xs font-black text-rose-800 uppercase tracking-wider flex items-center gap-1.5"><Shield size={13} /> Segurança: proteja o agente antes de expor</h4>
-                          <p className="text-xs text-ink-700 leading-relaxed">
-                            Exponha via Funnel o <strong>Agente</strong> — <strong>nunca</strong> o servidor de desenvolvimento (<code>npm run dev</code>), que não tem autenticação. Antes de publicar o agente, defina um segredo compartilhado (o Vercel envia esse mesmo segredo automaticamente):
-                          </p>
-                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                            <span>export LAUDUS_AGENT_SECRET="uma-senha-longa-aleatoria"</span>
-                            <button
-                              onClick={() => handleCopy('export LAUDUS_AGENT_SECRET="uma-senha-longa-aleatoria"', 'agent_secret')}
-                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                              title="Copiar Comando"
-                            >
-                              {copiedField === 'agent_secret' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-ink-500 leading-relaxed">
-                            Defina a MESMA variável <code>LAUDUS_AGENT_SECRET</code> nas <strong>Environment Variables do Vercel</strong>. Sem o segredo, o agente aceita qualquer requisição (ok só em rede local isolada).
-                          </p>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">1. Execução Manual Temporária</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            No diretório raiz do projeto LAUDUS no servidor, execute:
-                          </p>
-                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                            <span>node scripts/agent.js</span>
-                            <button
-                              onClick={() => handleCopy('node scripts/agent.js', 'agent_run')}
-                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                              title="Copiar Comando"
-                            >
-                              {copiedField === 'agent_run' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-3">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">2. Rodando como Serviço no Windows (NSSM)</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Para evitar interrupção quando o usuário deslogar da máquina PACS:
-                          </p>
-                          <div className="text-xs text-ink-700 space-y-1.5 pl-1.5">
-                            <p>a. Faça o download do <strong>NSSM</strong> em <a href="https://nssm.cc" target="_blank" rel="noreferrer" className="text-emerald-600 font-bold hover:underline">nssm.cc</a>.</p>
-                            <p>b. Abra o prompt do Windows como Administrador e execute:</p>
-                            <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all my-2">
-                              <span>nssm install LaudusLocalAgent</span>
-                              <button
-                                onClick={() => handleCopy('nssm install LaudusLocalAgent', 'nssm_cmd')}
-                                className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                                title="Copiar Comando"
-                              >
-                                {copiedField === 'nssm_cmd' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                              </button>
-                            </div>
-                            <p>c. Na interface do NSSM:</p>
-                            <ul className="list-disc pl-5 space-y-1 text-ink-600 font-medium">
-                              <li><strong>Path:</strong> Aponte para o <code>node.exe</code> local.</li>
-                              <li><strong>Startup Directory:</strong> Selecione a pasta do projeto <code>LAUDUS</code>.</li>
-                              <li><strong>Arguments:</strong> Digite <code>scripts/agent.js</code></li>
-                            </ul>
-                            <p className="mt-1">d. Salve e inicialize o serviço <code>LaudusLocalAgent</code> pelo gerenciador de Serviços (<code>services.msc</code>).</p>
-                          </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-3">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">3. Rodando como Serviço no macOS (launchd)</h4>
-                          <p className="text-xs text-ink-600 leading-relaxed">
-                            Crie o arquivo <code>/Library/LaunchDaemons/com.laudus.agent.plist</code> com o seguinte conteúdo estrutural:
-                          </p>
-                          <pre className="p-3 bg-zinc-950 text-emerald-400 rounded-xl font-mono text-[9px] overflow-x-auto select-all max-h-[150px]">
-{`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.laudus.agent</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/node</string>
-        <string>/Users/usuario/Documents/LAUDUS/scripts/agent.js</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>`}
-                          </pre>
-                          <p className="text-xs text-ink-650">Carregue o serviço com privilégios administrativos:</p>
-                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                            <span>sudo launchctl load -w /Library/LaunchDaemons/com.laudus.agent.plist</span>
-                            <button
-                              onClick={() => handleCopy('sudo launchctl load -w /Library/LaunchDaemons/com.laudus.agent.plist', 'mac_cmd')}
-                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                              title="Copiar Comando"
-                            >
-                              {copiedField === 'mac_cmd' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-ink-50 border border-ink-150 text-[11px] text-ink-700 leading-relaxed space-y-1.5">
-                        <strong className="block text-ink-900">Variáveis opcionais do Agente</strong>
-                        <div><code>LAUDUS_AGENT_SECRET</code> — exige um segredo (feche o Agente na internet; cole o mesmo valor no campo "Segredo do Agente").</div>
-                        <div><code>LAUDUS_WORKLIST_DIR</code> — força a pasta onde grava a worklist.</div>
-                        <div><code>LAUDUS_ALLOWED_HOSTS</code> — restringe o proxy ao seu Orthanc (ex: <code>localhost,127.0.0.1</code>).</div>
-                        <div className="text-ink-400">Sem elas, o Agente roda aberto. Pasta padrão: <code>~/OrthancServer/db/WorklistsDatabase/</code> (macOS) ou <code>C:\OrthancServer\db\WorklistsDatabase\</code> (Windows).</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedSection === 'tailscale' && (
-                    <div className="space-y-5 animate-fade-in">
-                      <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🛡️ Método 2: Tailscale Funnel (Nuvem / Vercel)</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">HTTPS público para o Agente em 1 comando — sem certificados manuais.</p>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
-                        <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
-                        <div className="text-[11px] text-ink-700 leading-relaxed">
-                          <strong className="text-blue-800">Em palavras simples:</strong> quando o LAUD.US roda na nuvem (site <strong>laud.us</strong>), o navegador está "na internet" e o Orthanc está "trancado dentro da clínica". O <strong>Tailscale</strong> cria um túnel seguro com cadeado (HTTPS) entre os dois — <strong>sem precisar mexer no roteador</strong> nem abrir portas perigosas. Só é necessário se você usa a versão na nuvem.
-                        </div>
-                      </div>
-
-                      {/* Como funciona o Tailscale */}
-                      <div className="rounded-2xl border border-ink-150 bg-ink-50/30 p-4 space-y-2.5">
-                        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-1.5"><Info size={13} /> Como o Tailscale funciona (3 ideias)</h4>
-                        <ul className="text-[11px] text-ink-600 leading-relaxed space-y-1.5">
-                          <li><strong>1. VPN mesh:</strong> cada computador em que você instala o Tailscale e faz login com a mesma conta ganha um IP privado <code>100.x.y.z</code> e passa a "se enxergar" com os outros, de forma criptografada, <strong>sem abrir portas no roteador</strong>.</li>
-                          <li><strong>2. MagicDNS:</strong> em vez de decorar IPs, cada máquina ganha um nome <code>nome.tailXXXX.ts.net</code>.</li>
-                          <li><strong>3. Funnel:</strong> por padrão o Tailscale é <strong>privado</strong> (só entre as suas máquinas). O <strong>Funnel</strong> é o que <strong>publica um serviço na internet pública</strong> com HTTPS — é isso que a Vercel (que não está na sua tailnet) usa para alcançar o Agente.</li>
-                        </ul>
-                        <div className="p-2.5 rounded-lg bg-white border border-ink-150 text-[11px] text-ink-700 leading-relaxed">
-                          <strong>O que entra na tailnet:</strong> apenas a <strong>máquina servidora</strong> da clínica (a do Orthanc + Agente). <strong>NÃO</strong> o aparelho de ultrassom, <strong>NÃO</strong> o computador/celular do médico — o navegador acessa o site normalmente e o app faz a ponte via Funnel.
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-emerald-50/40 border border-emerald-100 text-emerald-900 text-xs leading-relaxed space-y-1">
-                          <strong className="block font-bold">Jeito simples: exponha só o Agente (Funnel)</strong>
-                          Em vez de gerar certificados e habilitar SSL no Orthanc, dê um endereço HTTPS público ao <strong>Agente</strong> com o Tailscale Funnel. O Agente já conversa com o Orthanc em <code>localhost</code> — você expõe <strong>um só</strong> componente, sem mexer no roteador e sem arquivos <code>.pem</code>.
-                        </div>
-
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 1: Habilitar HTTPS na tailnet (uma vez)</h4>
-                          <p className="text-xs text-ink-500 leading-relaxed">
-                            No console web do Tailscale, em <strong>Settings → DNS</strong>, habilite <strong>MagicDNS</strong> e <strong>HTTPS Certificates</strong>.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3 pt-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 2: Expor o Agente (porta 3000) via Funnel</h4>
-                          <p className="text-xs text-ink-500 leading-relaxed">
-                            No servidor, com o Agente rodando, execute (⚠️ o Agente, <strong>não</strong> o Orthanc nem o Vite):
-                          </p>
-                          <div className="flex items-center justify-between p-3 bg-zinc-900 text-zinc-100 rounded-xl font-mono text-xs select-all">
-                            <span>tailscale funnel --bg 3000</span>
-                            <button
-                              onClick={() => handleCopy('tailscale funnel --bg 3000', 'ts_funnel')}
-                              className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 ml-2"
-                              title="Copiar Comando"
-                            >
-                              {copiedField === 'ts_funnel' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                          <p className="text-xs text-ink-500 leading-relaxed">
-                            O Tailscale devolve uma URL pública, tipo <code>https://servidor-mac.tailXXXX.ts.net</code>.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3 pt-2">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase">Passo 3: Preencher no LAUD.US</h4>
-                          <p className="text-xs text-ink-500 leading-relaxed">
-                            Na aba de configuração, use: <strong>URL do Agente Local</strong> = a URL do Funnel; <strong>URL do Orthanc</strong> = <code>http://localhost:8042</code>; deixe a <strong>URL Pública Tailscale vazia</strong> (assim as imagens passam pelo Agente). Clique em <strong>Testar Conexão</strong>.
-                          </p>
-                          <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-100 text-[11px] text-amber-800 leading-relaxed">
-                            O Funnel deixa o Agente <strong>público</strong>. Para fechá-lo, defina um <strong>Segredo do Agente</strong> (campo na configuração) e inicie o Agente com <code>LAUDUS_AGENT_SECRET=… node agent.js</code>. Opcional, mas recomendado na nuvem.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedSection === 'ultrasound' && (
-                    <div className="space-y-5 animate-fade-in">
-                      <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">🖥️ Parametrização no Ultrassom (Modalidade)</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Configuração no teclado e console físico do aparelho de imagem.</p>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-100 text-[11px] text-ink-700 leading-relaxed">
-                        <strong className="text-amber-900">Antes de tudo:</strong> esta conexão é <strong>100% rede local</strong>. O aparelho fala com o Orthanc pelo <strong>IP local</strong> do servidor, na porta <strong>4242</strong> — <strong>sem Tailscale, sem internet</strong>. Aparelho e servidor precisam estar na <strong>mesma rede</strong> (mesmo Wi-Fi/switch).
-                      </div>
-
-                      {/* Pré-requisitos */}
-                      <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
-                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">✅ Pré-requisitos (confira antes)</h4>
-                        <ul className="text-[11px] text-ink-600 space-y-1 list-disc pl-4">
-                          <li>Orthanc <strong>rodando</strong> na máquina servidora (abra <code>http://localhost:8042</code> nela).</li>
-                          <li>Aparelho e servidor na <strong>mesma rede local</strong>.</li>
-                          <li>Servidor com <strong>IP fixo</strong> (reserve no roteador) — se mudar, o aparelho perde a conexão.</li>
-                          <li><strong>Porta 4242 liberada</strong> no firewall da máquina servidora (entrada).</li>
-                        </ul>
-                      </div>
-
-                      {/* Passo A: descobrir o IP */}
-                      <div className="p-4 rounded-xl bg-white border border-ink-150 space-y-2.5">
-                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Passo A — Descubra o IP local do servidor</h4>
-                        <p className="text-[11px] text-ink-600 leading-relaxed">Na <strong>máquina do Orthanc</strong>, rode:</p>
-                        <div className="space-y-1.5 text-[11px] text-ink-600">
-                          <div><strong>Windows:</strong></div>
-                          <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
-                            <span>ipconfig</span>
-                            <button onClick={() => handleCopy('ipconfig', 'us_ipcfg')} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">{copiedField === 'us_ipcfg' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}</button>
-                          </div>
-                          <div className="text-ink-400">→ procure "IPv4 Address" (ex: 192.168.1.100)</div>
-                          <div className="pt-1"><strong>macOS:</strong></div>
-                          <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-[11px] select-all">
-                            <span>ipconfig getifaddr en0</span>
-                            <button onClick={() => handleCopy('ipconfig getifaddr en0', 'us_ipmac')} className="p-1 bg-zinc-800 hover:bg-zinc-700 rounded-md border border-zinc-700 text-zinc-300 shrink-0" title="Copiar">{copiedField === 'us_ipmac' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}</button>
-                          </div>
-                          <div className="text-ink-400">(Wi-Fi: <code>en0</code>; cabo: tente <code>en1</code>). Anote esse número — é o <strong>IP do servidor</strong>.</div>
-                        </div>
-                      </div>
-
-                      {/* Os dados exatos */}
-                      <div className="p-4 rounded-xl bg-emerald-50/30 border border-emerald-100 space-y-2">
-                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Os 4 dados que o aparelho precisa</h4>
-                        <div className="overflow-x-auto border border-ink-150 rounded-xl bg-white">
-                          <table className="w-full text-[11px] text-left">
-                            <tbody className="divide-y divide-ink-100 text-ink-700">
-                              <tr><td className="px-3 py-2 font-bold w-1/2">IP do servidor (Host)</td><td className="px-3 py-2 font-mono">o IP do Passo A (ex: 192.168.1.100)</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">Porta</td><td className="px-3 py-2 font-mono">4242</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">AE Title do servidor (remoto)</td><td className="px-3 py-2 font-mono">{draft.dicomOrthancAETitle || 'ORTHANC'}</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">AE Title do aparelho (local)</td><td className="px-3 py-2 font-mono">o nome do aparelho (ex: MINDRAYMX7)</td></tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        <p className="text-[10px] text-ink-500 leading-relaxed">
-                          <strong>AE Title?</strong> É o "apelido de rede" de cada equipamento DICOM. No modelo prático deste guia, o Orthanc está com <code>DicomAlwaysAllow*: true</code> — então ele <strong>aceita qualquer</strong> AE Title do aparelho, sem precisar cadastrar. (Se você ligou a validação por <code>DicomModalities</code>, aí o AE local do aparelho precisa estar cadastrado lá com o mesmo nome.)
-                        </p>
-                      </div>
-
-                      {/* Passos B, C, D */}
-                      <div className="space-y-3">
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-1.5">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">Passo B — Teste a conexão primeiro (C-ECHO)</h4>
-                          <p className="text-[11px] text-ink-600 leading-relaxed">No menu DICOM do aparelho, crie um destino com os 4 dados acima e clique em <strong>Verify / Ping / Echo</strong>. <strong>Comece por aqui</strong>: se o Echo falhar, nada mais funciona (é rede/firewall). Deve retornar <strong>"Success"</strong>.</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-1.5">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">Passo C — Worklist / MWL (baixar a lista de pacientes)</h4>
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Em <strong>DICOM → Worklist / MWL</strong>, adicione um serviço com os mesmos 4 dados. É o que faz o paciente agendado aparecer na tela do aparelho (via <strong>C-FIND</strong>), sem digitar. Teste com <strong>Verify</strong>.</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-ink-50 border border-ink-100 space-y-1.5">
-                          <h4 className="text-xs font-bold text-ink-900 uppercase tracking-wider">Passo D — Storage (enviar as imagens)</h4>
-                          <p className="text-[11px] text-ink-600 leading-relaxed">Em <strong>DICOM → Storage / Store SCP</strong>, adicione um destino com os mesmos 4 dados. É por onde o aparelho envia as fotos ao Orthanc (via <strong>C-STORE</strong>) ao finalizar o exame. Teste com <strong>Verify</strong>.</p>
-                        </div>
-                      </div>
-
-                      {/* Onde fica no menu por marca */}
-                      <div className="p-4 rounded-xl bg-white border border-ink-150 space-y-2">
-                        <h4 className="text-xs font-black text-ink-900 uppercase tracking-wider">Onde fica no menu (por marca — pode variar por modelo)</h4>
+                      <Step n={2} title="Completar os 2 campos da sua VM">
                         <div className="overflow-x-auto border border-ink-150 rounded-xl">
-                          <table className="w-full text-[11px] text-left">
-                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider"><tr><th className="px-3 py-2">Marca</th><th className="px-3 py-2">Caminho aproximado</th></tr></thead>
-                            <tbody className="divide-y divide-ink-100 text-ink-700">
-                              <tr><td className="px-3 py-2 font-bold">Mindray</td><td className="px-3 py-2">Setup → DICOM/Network → Local + Worklist/Storage Server</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">GE (Logiq/Voluson)</td><td className="px-3 py-2">Utility/Config → Connectivity → Dataflow / Service (Worklist, Storage)</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">Samsung</td><td className="px-3 py-2">Setup → DICOM → Servidor (Worklist / Storage)</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">Philips (Affiniti/EPIQ)</td><td className="px-3 py-2">Setup → DICOM Settings → Worklist / Store destinations</td></tr>
-                              <tr><td className="px-3 py-2 font-bold">Canon/Toshiba</td><td className="px-3 py-2">Menu → DICOM → MWL + Storage SCU</td></tr>
+                          <table className="w-full text-[11px] text-left text-ink-600">
+                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
+                              <tr><th className="px-3 py-2">Campo</th><th className="px-3 py-2">Valor</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-ink-100 bg-white">
+                              <tr><td className="px-3 py-2 font-bold">URL do Agente Local</td><td className="px-3 py-2 font-mono">a URL do Funnel (<code>https://…ts.net</code>)</td></tr>
+                              <tr><td className="px-3 py-2 font-bold">Segredo do Agente</td><td className="px-3 py-2 font-mono">o mesmo <code>LAUDUS_AGENT_SECRET</code></td></tr>
+                              <tr><td className="px-3 py-2 font-bold text-ink-400">URL do Orthanc</td><td className="px-3 py-2 text-ink-400">já vem <code>http://localhost:8042</code></td></tr>
+                              <tr><td className="px-3 py-2 font-bold text-ink-400">Pasta da Worklist</td><td className="px-3 py-2 text-ink-400">já vem <code>/opt/orthanc-data/worklists</code></td></tr>
                             </tbody>
                           </table>
                         </div>
+                      </Step>
+
+                      <Step n={3} title="Salvar e testar">
+                        <P>Clique em <strong>Salvar</strong> e depois em <strong>Executar Diagnóstico</strong> (aba Servidores). Imagens e Worklist do "Servidor Principal" devem ficar verdes.</P>
+                      </Step>
+
+                      <Note tone="emerald">Pronto: worklist e imagens já passam pela VM. Falta só o relé para o ultrassom (passo 3).</Note>
+                    </div>
+                  )}
+
+                  {selectedSection === 'relay' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Radio size={16} className="text-emerald-600" /> 3 · Relé + ultrassom</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">O relé faz o ultrassom (que não roda Tailscale) alcançar a VM. Escolha o seu caso.</p>
                       </div>
 
-                      {/* Troubleshooting da conexão */}
-                      <div className="p-4 rounded-xl bg-rose-50/30 border border-rose-100 space-y-2">
-                        <h4 className="text-xs font-black text-rose-900 uppercase tracking-wider">Se não conectar</h4>
-                        <ul className="text-[11px] text-ink-700 space-y-1.5">
-                          <li><strong>Echo falha:</strong> IP errado / aparelho em outra rede / porta 4242 bloqueada no firewall. Teste um <code>ping IP_DO_SERVIDOR</code> do aparelho, se ele permitir.</li>
-                          <li><strong>Echo OK, mas worklist vazia:</strong> não há <code>.wl</code> na pasta (crie um exame no LAUD.US) ou o AE Title local do aparelho não bate com o <code>DicomModalities</code> (se você ligou a validação).</li>
-                          <li><strong>Imagens não chegam:</strong> destino de <strong>Storage</strong> não configurado ou AE/porta errados. Confira que o Store aponta para o mesmo IP:4242.</li>
-                          <li><strong>Nome do paciente não casa:</strong> acentos/caracteres. O nome vai em maiúsculas sem acento; se o aparelho filtrar por nome, apague o filtro e busque "todos".</li>
+                      <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-800"><Wifi size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A1 — Roteador GL.iNet (recomendado)</span></div>
+                        <P>O GL.iNet já roda Tailscale e roteia a LAN para a tailnet. Sempre ligado, zero software extra.</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li>No admin da tailnet, <strong>aprove as rotas</strong> anunciadas pelo GL.iNet.</li>
+                          <li>No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):4242</strong>, AE <code>ORTHANC</code>.</li>
                         </ul>
                       </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
+                        <div className="flex items-center gap-2 text-ink-800"><Cpu size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A2 — PC do dia a dia (com Tailscale)</span></div>
+                        <P>O PC não é o gateway, então encaminhamos a porta 4242 dele para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:4242</strong>.</P>
+                        <p className="text-[10px] text-ink-500 font-bold">Windows (nativo):</p>
+                        <Cmd id="relay-netsh" text="netsh interface portproxy add v4tov4 listenport=4242 listenaddress=0.0.0.0 connectport=4242 connectaddress=<IP-TAILNET-DA-VM>" />
+                        <p className="text-[10px] text-ink-500 font-bold">macOS/Linux:</p>
+                        <Cmd id="relay-socat" text="socat TCP-LISTEN:4242,fork,reuseaddr TCP:<IP-TAILNET-DA-VM>:4242" />
+                        <Note tone="amber">Neste modo o ultrassom só alcança a VM com o PC ligado e no Tailscale.</Note>
+                      </div>
+
+                      <Step n="✓" title="Validar (nos dois modos)">
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li><strong>C-ECHO</strong> no ultrassom → sucesso.</li>
+                          <li>Criar exame no LAUD.US → a worklist aparece no aparelho.</li>
+                          <li>Fazer o exame → as imagens sobem à VM e aparecem no laudo.</li>
+                        </ul>
+                      </Step>
+                    </div>
+                  )}
+
+                  {selectedSection === 'backup' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><HardDrive size={16} className="text-indigo-600" /> Backup local (opcional)</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Um Orthanc local como redundância — útil se a internet cair na clínica.</p>
+                      </div>
+
+                      <P>A VM é o principal. Se quiser contingência offline, mantenha um Orthanc local e ative-o como backup:</P>
+                      <Step n={1} title="Ligar um Orthanc local na clínica">
+                        <P>Instale o Orthanc num PC da clínica (mesmo <code>orthanc.json</code> prático). Ele guarda uma cópia das imagens.</P>
+                      </Step>
+                      <Step n={2} title="Cadastrar como backup no LAUD.US">
+                        <P>Na aba Servidores, ative <strong>"Habilitar Servidor de Redundância"</strong> e preencha a URL/agente do Orthanc local. O LAUD.US grava a worklist e busca imagens nos dois — se a VM cair, o backup cobre.</P>
+                      </Step>
+                      <Step n={3} title="Enviar imagens aos dois (no ultrassom)">
+                        <P>Configure no aparelho <strong>dois destinos de Storage</strong>: a VM (via relé) e o Orthanc local. Assim cada exame é gravado em ambos automaticamente.</P>
+                      </Step>
+                      <Note>Sem backup, tudo bem: a VM já é o servidor de verdade. O backup é só para quem quer redundância.</Note>
                     </div>
                   )}
 
                   {selectedSection === 'troubleshoot' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider">❓ Resolução de Problemas (Troubleshooting)</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">Identifique e resolva falhas comuns de comunicação com o PACS.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><HelpCircle size={16} className="text-emerald-600" /> Resolver problemas</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Falhas comuns no cenário da VM e como resolver.</p>
                       </div>
-
-                      <div className="space-y-4">
-                        <div className="overflow-x-auto border border-ink-150 rounded-xl">
-                          <table className="w-full text-xs text-left text-ink-600 font-medium">
-                            <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3">Sintoma</th>
-                                <th className="px-4 py-3">Causa Provável</th>
-                                <th className="px-4 py-3">Solução</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-ink-100 bg-white">
-                              <tr>
-                                <td className="px-4 py-3 font-bold text-ink-800">Ping do PACS falha na UI</td>
-                                <td className="px-4 py-3">Senha de acesso Basic Auth ou URL do proxy incorretas.</td>
-                                <td className="px-4 py-3">Confirme os dados cadastrados em `RegisteredUsers` no json do Orthanc.</td>
-                              </tr>
-                              <tr>
-                                <td className="px-4 py-3 font-bold text-ink-800">Erro de Mixed Content no navegador</td>
-                                <td className="px-4 py-3">Browser em HTTPS tentando consumir IP em HTTP comum.</td>
-                                <td className="px-4 py-3">Configure HTTPS no Tailscale e use a URL pública ts.net:8443 no painel.</td>
-                              </tr>
-                              <tr>
-                                <td className="px-4 py-3 font-bold text-ink-800">Worklist falha só na nuvem (Vercel)</td>
-                                <td className="px-4 py-3">Agente Local não exposto/HTTPS — a nuvem não alcança a porta 3000 da clínica.</td>
-                                <td className="px-4 py-3">Exponha o agente via Tailscale Funnel em HTTPS e preencha a "URL do Agente Local" com o endereço <code>https://...ts.net</code>.</td>
-                              </tr>
-                              <tr>
-                                <td className="px-4 py-3 font-bold text-ink-800">Ultrassom não localiza pacientes</td>
-                                <td className="px-4 py-3">AE Title incorreto ou falta de permissão na pasta Worklist.</td>
-                                <td className="px-4 py-3">Confirme se o AE Title do aparelho coincide exatamente com a entrada do servidor.</td>
-                              </tr>
-                              <tr>
-                                <td className="px-4 py-3 font-bold text-ink-800">Erro de Permissão no Laudus Local Agent</td>
-                                <td className="px-4 py-3">Falta de acesso à pasta física mapeada de Worklists.</td>
-                                <td className="px-4 py-3">Rode o prompt/Node como administrador ou ajuste as permissões de gravação da pasta.</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
+                      <div className="overflow-x-auto border border-ink-150 rounded-xl">
+                        <table className="w-full text-[11px] text-left text-ink-600">
+                          <thead className="text-[10px] text-ink-400 uppercase bg-ink-50/50 border-b border-ink-150 font-black tracking-wider">
+                            <tr><th className="px-3 py-3">Sintoma</th><th className="px-3 py-3">Causa provável</th><th className="px-3 py-3">Solução</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-ink-100 bg-white">
+                            <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">Diagnóstico vermelho / imagens não carregam</td>
+                              <td className="px-3 py-3">URL do Agente errada, agente parado, ou segredo diferente.</td>
+                              <td className="px-3 py-3">Confira a URL do Funnel (<code>https://…ts.net</code>) e se o <strong>Segredo do Agente</strong> é idêntico ao <code>LAUDUS_AGENT_SECRET</code> da VM. Teste <code>curl https://…ts.net/</code>.</td>
+                            </tr>
+                            <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">PDF/imagem cheia falha (401/403)</td>
+                              <td className="px-3 py-3">Segredo do agente ausente na sessão.</td>
+                              <td className="px-3 py-3">Preencha o <strong>Segredo do Agente</strong> e Salve. (Corrigido no app — recarrega sozinho ao salvar.)</td>
+                            </tr>
+                            <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">Worklist não aparece no ultrassom</td>
+                              <td className="px-3 py-3">Relé não alcança a VM, ou AE Title divergente.</td>
+                              <td className="px-3 py-3">Verifique o relé (IP tailnet:4242 ou portproxy). AE do aparelho deve bater com o servidor. Faça um C-ECHO.</td>
+                            </tr>
+                            <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">Ultrassom não envia imagens</td>
+                              <td className="px-3 py-3">Porta 4242 fechada no caminho relé→VM.</td>
+                              <td className="px-3 py-3">Confirme <code>0.0.0.0:4242</code> no docker-compose e o relé apontando para o IP tailnet da VM.</td>
+                            </tr>
+                            <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">Botão "Viewer" externo sumiu</td>
+                              <td className="px-3 py-3">É o esperado na nuvem.</td>
+                              <td className="px-3 py-3">O Stone externo não é alcançável na VM; use o <strong>visualizador embutido</strong> (funciona via Agente).</td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
+
+                  {selectedSection === 'concepts' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Info size={16} className="text-emerald-600" /> Conceitos &amp; glossário</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">O básico para entender cada peça do sistema.</p>
+                      </div>
+                      <div className="space-y-2.5">
+                        {[
+                          ['PACS', 'Sistema que guarda e distribui imagens médicas. Aqui, o Orthanc é o PACS.'],
+                          ['Orthanc', 'O servidor PACS (leve, open-source). Roda em Docker na VM. Guarda os estudos e oferece a worklist.'],
+                          ['DICOM', 'O "idioma" das imagens médicas. Trafega pela porta 4242 (C-ECHO, C-STORE, C-FIND).'],
+                          ['Worklist', 'A lista de exames pendentes que o aparelho lê. O Agente grava um arquivo .wl por exame.'],
+                          ['Agente LAUD.US', 'Programa que roda na VM: grava as worklists e faz de ponte (proxy) para o Orthanc. Único ponto exposto à internet.'],
+                          ['Tailscale', 'VPN privada que liga VM, relé e ultrassom com criptografia, sem abrir portas na internet.'],
+                          ['Funnel', 'Recurso do Tailscale que dá um endereço https:// público ao Agente, para o site (Vercel) alcançar a VM.'],
+                          ['Relé', 'Ponte na clínica (GL.iNet ou PC) que leva o tráfego DICOM do ultrassom até a VM pela tailnet.'],
+                          ['AE Title', 'O "nome" de cada nó DICOM. O AE do aparelho e o do servidor precisam bater.'],
+                        ].map(([term, desc]) => (
+                          <div key={term} className="flex gap-3 p-2.5 rounded-lg bg-white border border-ink-150">
+                            <span className="text-[11px] font-black text-emerald-700 shrink-0 w-28">{term}</span>
+                            <span className="text-[11px] text-ink-600 leading-relaxed">{desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                    </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
