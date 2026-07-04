@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "laudo-preview-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4321", "--directory", "/private/tmp/claude-501/-Users-matheuskistenmackerpires-Documents-LAUDUS/60a617d4-1cc0-495f-97ea-5dbfe1d44709/scratchpad/laudo-preview"],
+      "port": 4321
     }
   ]
 }

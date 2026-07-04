@@ -170,7 +170,13 @@ export function reportDocumentStyles(settings: AppSettings): string {
     .report-doc .print-prose p {
       margin-bottom: 8px;
       text-align: ${settings.pdfTextAlign || 'justify'};
+      orphans: 3;
+      widows: 3;
     }
+    /* Não fatiar parágrafos, itens de lista e linhas de tabela entre páginas. */
+    .report-doc .print-prose p,
+    .report-doc .print-prose li,
+    .report-doc .print-prose tr { break-inside: avoid; page-break-inside: avoid; }
     .report-doc .print-prose strong { color: #1a1a1a; font-weight: 700; }
     .report-doc .print-prose table {
       width: 100%;

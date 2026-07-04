@@ -12,9 +12,10 @@ import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search
 import { addToExcellenceCorpus } from '../ai/training/excellenceCorpus';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { AnimatePresence, motion } from 'framer-motion';
-import { classNames } from '../../utils/format';
+import { classNames, formatDate } from '../../utils/format';
 import { logger } from '../../utils/logger';
 import { PrintLayout } from '../export/PrintLayout';
+import { printLaudo } from '../export/printReport';
 import { ReportPreview } from '../export/ReportDocument';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
@@ -1308,7 +1309,11 @@ export function ExamEditor({ examId }: Props) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={(e) => { e.stopPropagation(); window.print(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
+                  void printLaudo(settings, footerId);
+                }}
                 className="h-9 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center gap-1.5 active:scale-95"
               >
                 <Printer size={13} /> Imprimir / PDF
