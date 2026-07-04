@@ -133,10 +133,49 @@ O ultrassom é físico; algo na LAN precisa levá-lo até a VM. Assistente com 2
 
 ---
 
-## 7. Custos e escala
-- **1 VM/usuário:** e2-small ≈ **US$ 13–18/mês** + disco (~US$ 0,17/GB/mês). Simples e isolado.
-- **Gatilho de reavaliação:** quando a frota tornar o custo por-VM relevante, migrar para **multi-tenant** (containers Orthanc isolados por tenant em VMs compartilhadas, um agente por tenant). Mantém isolamento lógico com melhor densidade. Decisão de produto — não bloqueia o começo.
-- **Controles:** desligar VM ociosa fora do horário (agendamento), alertas de custo, cotas de disco por plano.
+## 7. Modelos de Hospedagem & Rentabilidade
+
+### 7.1 Os três modelos
+| | **M1 — VM central compartilhada** | **M2 — VM dedicada por usuário** | **M3 — Container isolado por usuário** |
+|---|---|---|---|
+| Como é | 1 Orthanc para todos (rótulos) | Cada clínica tem sua VM completa | VMs "grandes" com 1 container Orthanc+Agente **por clínica** (sidecar Tailscale) |
+| Isolamento | ❌ Fraco | ✅ Máximo | ✅ Forte (processo/volume/rede por tenant) |
+| Custo/clínica | Baixíssimo | Alto | Baixo |
+| Ops (equipe pequena) | Simples | ❌ Frota de VMs pesa ao escalar | Médio (orquestração) |
+| LGPD/venda | Ruim | Excelente | Muito bom |
+| Pronto hoje? | Não | ✅ Sim | Não (engenharia) |
+
+**M1 está descartado** para dados médicos (risco de vazamento cruzado).
+
+### 7.2 A raiz da rentabilidade
+1. **O Orthanc de uma clínica fica ~99% ocioso** → pagar uma VM inteira por clínica (M2) desperdiça CPU. **CPU deve ser compartilhada (M3).**
+2. **O custo que cresce é o disco** (imagens de US: ~5–20 GB/mês/clínica; 100–250 GB/ano). **Armazenamento é isolado e é o que se cobra.**
+
+### 7.3 Matemática de custo (estimativas GCP São Paulo, ~2026)
+- **M2 dedicado:** e2-small 24/7 ≈ US$ 13–15 + disco 100GB ≈ US$ 10 → **~US$ 25/clínica**. Barateado (e2-micro + disco de arquivo) → **~US$ 10–12**. 200 clínicas ≈ **US$ 4–5k/mês** (muita CPU ociosa paga).
+- **M3 container:** VM e2-standard-4 (~US$ 100/mês) hospeda 20–40 clínicas → **~US$ 3–5 CPU/clínica** + disco. Total **~US$ 7–15/clínica**. 200 clínicas ≈ **US$ 1,5–2k/mês** → **metade do M2.**
+
+### 7.4 Estratégia recomendada — "M2 agora → M3 ao escalar" + preços em camadas
+- **➊ Agora (0–~30 clínicas):** **M2** (já pronto) — ao ar imediato, isolamento forte como argumento de venda. Barateado: **e2-micro + disco de arquivo + `StorageCompression` + liga/desliga por horário** (o relé bufferiza).
+- **➋ Ao crescer (~30–50+):** migrar para **M3** (container por tenant, sidecar Tailscale). Migração natural — o dado da clínica já vive num **volume isolado**; só reempacota o Orthanc num container. Provisionador e card "Meu PACS" servem aos dois modelos.
+- **➌ Camadas de plano** (o que fecha a conta): **Starter** (M3 compartilhado) × **Dedicado/Premium** (M2, upsell de isolamento/performance) + **cobrança de armazenamento por faixa**.
+
+### 7.5 Tabela de preços sugerida (ilustrativa — USD→BRL ≈ 5,2)
+| Plano | Modelo | Storage incluído | Custo est./clínica | **Preço sugerido/mês** | Margem bruta* |
+|---|---|---|---|---|---|
+| **PACS Starter** | M3 (M2-micro no lançamento) | 100 GB | ~US$ 7–12 (R$ 37–62) | **R$ 99** | ~40–60% |
+| **PACS Pro** | M3 + storage extra | 300 GB | ~US$ 12–16 (R$ 62–83) | **R$ 149** | ~45–55% |
+| **PACS Dedicado** | M2 (VM própria) | 300 GB | ~US$ 20–25 (R$ 104–130) | **R$ 249** | ~45–50% |
+| Excedente de storage | qualquer | — | ~US$ 0,02–0,10/GB | **R$ 0,50/GB/mês** | alta |
+
+\* Margem melhora quando o M3 entra (custo de CPU cai). No lançamento (só M2), o Starter roda em M2-micro (~R$ 52 de custo → margem ~47% a R$ 99).
+
+### 7.6 Alavancas de economia (todos os modelos)
+- **Compressão** no Orthanc; **tiering**: recentes em SSD, arquivar em **GCS Archive** (~US$ 0,0025/GB, ~40× mais barato) após N meses.
+- **Cotas de disco por plano** + excedente; **egress** (ver imagens ~US$ 0,08–0,12/GB) mitigado com miniaturas/cache.
+- **Desligar VM ociosa** (M2) / escalar containers (M3); alertas de custo no Admin.
+
+> **Alternativa a avaliar:** **Fly.io** (microVMs por tenant, isoladas, scale-to-zero, rede privada) encaixa no M3 com **menos engenharia de orquestração** que containers+sidecar no GCP. Vale um spike comparativo antes da migração M3.
 
 ---
 
@@ -159,8 +198,11 @@ O ultrassom é físico; algo na LAN precisa levá-lo até a VM. Assistente com 2
 | **F4 — Assistentes** | "Conectar ultrassom" (device wizard + teste) e "Relé" (GL.iNet/PC) e "Backup local" | 2–3 dias | F3 |
 | **F5 — Admin frota** | Submódulo admin: lista/ações/alertas/auditoria de VMs | 2–3 dias | F2 |
 | **F6 — Lifecycle + Ops** | Provisionar ao assinar / suspender ao cancelar (hook billing), backups, monitoramento, atualização blue/green | 3–5 dias | F2, F5 |
+| **F7 — Migração M2→M3** (ao escalar) | Container por tenant (sidecar Tailscale) em VMs compartilhadas; migrar volumes; provisionador passa a subir container em vez de VM | 5–8 dias | ~30–50 clínicas |
 
-**MVP recomendado:** F1 + F2 + F3 → "compra → VM pronta → app autoconfigurado", com o relé/aparelho ainda por assistente manual (F4 logo em seguida).
+**Modelo por etapa:** lançamento em **M2 (dedicado, já pronto)**; migração para **M3 (container por tenant)** quando o custo por-VM justificar (§7.4). O provisionador (F2) e o card (F3) são escritos para servir aos **dois modelos**.
+
+**MVP recomendado:** F1 + F2 + F3 → "compra → PACS pronto → app autoconfigurado", com o relé/aparelho por assistente (F4 em seguida).
 
 ---
 
