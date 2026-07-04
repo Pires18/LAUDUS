@@ -152,7 +152,10 @@ service cloud.firestore {
 
     // ---- Transações financeiras (sensível) --------------------------------
     match /transactions/{txId} {
-      allow read: if isAdmin();
+      // Admin lê tudo; o dono lê apenas as próprias transações (histórico de
+      // pagamentos no painel do usuário). A consulta precisa filtrar por userId.
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow write: if false; // somente Admin SDK (webhooks) escreve
     }
 

@@ -11,7 +11,7 @@ import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText,
   Building2, RefreshCw, ChevronDown, ChevronUp,
-  Package, ExternalLink, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus,
+  Package, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -435,12 +435,6 @@ export function SubscriptionCenter() {
 
             {/* Action buttons */}
             <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => window.location.href = '/api/abacatepay-portal'}
-                className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 transition-all flex items-center gap-1.5"
-              >
-                <CreditCard size={13} /> Gerenciar Pagamento
-              </button>
               {!isCanceled && (
                 <button
                   onClick={handleCancel}
@@ -712,23 +706,15 @@ export function SubscriptionCenter() {
 
             <div className="flex items-start gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-800">
               <CreditCard size={14} className="text-indigo-500 shrink-0 mt-0.5" />
-              <span className="font-medium">O histórico completo de faturas, comprovantes em PDF e recibos detalhados também está disponível no portal AbacatePay.</span>
+              <span className="font-medium">O comprovante de cada pagamento é enviado ao seu e-mail pela AbacatePay no momento da confirmação. Dúvidas sobre cobrança? Fale com o suporte.</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => window.location.href = '/api/abacatepay-portal'}
-                className="flex items-center justify-center gap-2 h-10 px-5 bg-white border border-ink-200 hover:bg-ink-50 text-ink-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                <ExternalLink size={13} /> Abrir Portal de Faturamento
-              </button>
-              {subscription && (
-                <div className="flex items-center gap-2 text-[10px] text-ink-400 font-medium px-2">
-                  <Calendar size={11} />
-                  Assinatura desde {new Date(subscription.createdAt || Date.now()).toLocaleDateString('pt-BR')}
-                </div>
-              )}
-            </div>
+            {subscription && (
+              <div className="flex items-center gap-2 text-[10px] text-ink-400 font-medium px-2">
+                <Calendar size={11} />
+                Assinatura desde {new Date(subscription.createdAt || Date.now()).toLocaleDateString('pt-BR')}
+              </div>
+            )}
           </div>
         )}
       </Card>
