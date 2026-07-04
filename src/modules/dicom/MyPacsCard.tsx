@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../../store/app';
-import { getCachedIdToken } from '../../lib/authToken';
+import { getIdToken } from '../../lib/authToken';
 import { classNames } from '../../utils/format';
 import type { PacsInstance } from '../../types';
 import {
@@ -68,7 +68,7 @@ export function MyPacsCard() {
         // Modo real — a função serverless cria a VM no GCP e devolve os dados.
         const res = await fetch(PROVISION_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getCachedIdToken()}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await getIdToken()}` },
           body: JSON.stringify({ plan, region })
         });
         const data = await res.json();
