@@ -1,4 +1,5 @@
 import { verifyFirebaseIdToken } from './_edgeAuth.js';
+import { hasPacsEntitlement } from './_entitlements.js';
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -29,6 +30,13 @@ export default async function handler(req: any, res: any) {
       res.statusCode = 401;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ success: false, error: 'Não autorizado. Faça login novamente.' }));
+      return;
+    }
+    // Enforcement de plano: PACS é add-on pago. Fail-open se a checagem falhar.
+    if (!(await hasPacsEntitlement(authed.uid, authed.email))) {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: false, error: 'O recurso PACS/DICOM não está incluído no seu plano.' }));
       return;
     }
   }

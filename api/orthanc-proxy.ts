@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
 import { verifyFirebaseIdToken } from './_edgeAuth.js';
+import { hasPacsEntitlement } from './_entitlements.js';
 
 // Desabilita o bodyParser padrão do Vercel Serverless Functions.
 // Isso impede que a Vercel tente analisar payloads binários brutos (como arquivos DICOM)
@@ -89,6 +90,13 @@ export default async function handler(req: any, res: any) {
       res.statusCode = 401;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' }));
+      return;
+    }
+    // Enforcement de plano: PACS é add-on pago (cache + fail-open no helper).
+    if (!(await hasPacsEntitlement(authed.uid, authed.email))) {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'O recurso PACS/DICOM não está incluído no seu plano.' }));
       return;
     }
   }
