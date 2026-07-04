@@ -64,7 +64,10 @@ export default async function handler(req: any, res: any) {
       return;
     }
     try {
-      const targetUrl = `${localAgentUrl.replace(/\/$/, '')}/api/worklist`;
+      // tenantId (VM compartilhada) vai na QUERY — o agente resolve a auth e a
+      // pasta pelo tenant antes de ler o corpo.
+      const tenantQs = body?.tenantId ? `?tenantId=${encodeURIComponent(String(body.tenantId))}` : '';
+      const targetUrl = `${localAgentUrl.replace(/\/$/, '')}/api/worklist${tenantQs}`;
       console.log(`[Vercel Worklist Proxy] Forwarding ${req.method} request to: ${targetUrl}`);
 
       const controller = new AbortController();

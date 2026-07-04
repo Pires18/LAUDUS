@@ -73,7 +73,9 @@ export async function syncExamToOrthancWorklist(
             stepTime,
             stepDescription,
             outputDir: settings.dicomWorklistFolder,
-            localAgentUrl: settings.dicomLocalAgentUrl
+            localAgentUrl: settings.dicomLocalAgentUrl,
+            tenantId: settings.dicomTenantId,
+            agentSecret: settings.dicomAgentSecret
           })
         });
         const result = await res.json();

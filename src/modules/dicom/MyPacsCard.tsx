@@ -51,13 +51,19 @@ export function MyPacsCard() {
     if (busy) return;
     setBusy(true);
     const region = 'southamerica-east1';
+    // Starter/Pro → tenant na VM COMPARTILHADA; Dedicado → VM própria.
+    const shared = plan !== 'dedicado';
+    // O endpoint real (F2) só provisiona VM dedicada; o compartilhado (S2) ainda
+    // usa simulação até termos a provisão de tenant na VM.
+    const useReal = !!PROVISION_ENDPOINT && plan === 'dedicado';
+    const providerVal: 'mock' | 'gcp' | 'shared' = shared ? 'shared' : (useReal ? 'gcp' : 'mock');
     try {
       await updateSettings({
-        pacsInstance: { status: 'provisioning', provider: PROVISION_ENDPOINT ? 'gcp' : 'mock', plan, region, createdAt: Date.now(), updatedAt: Date.now() }
+        pacsInstance: { status: 'provisioning', provider: providerVal, plan, region, createdAt: Date.now(), updatedAt: Date.now() }
       });
 
-      let result: Partial<PacsInstance> & { agentSecret?: string };
-      if (PROVISION_ENDPOINT) {
+      let result: Partial<PacsInstance> & { agentSecret?: string; tenantId?: string };
+      if (useReal) {
         // Modo real — a função serverless cria a VM no GCP e devolve os dados.
         const res = await fetch(PROVISION_ENDPOINT, {
           method: 'POST',
@@ -67,23 +73,17 @@ export function MyPacsCard() {
         const data = await res.json();
         if (!res.ok || !data.agentUrl) throw new Error(data.error || 'Falha no provisionamento.');
         result = data;
-        // VM real: espera o Agente subir antes de marcar como pronto.
         if (data.provider === 'gcp') {
           const up = await pollAgentHealth(data.agentUrl);
           if (!up) throw new Error('A VM foi criada, mas o Agente ainda não respondeu. Use "Tentar novamente" em alguns minutos.');
         }
       } else {
-        // Modo MOCK — simula o tempo de criação e devolve valores fictícios.
+        // Modo MOCK — simula a criação (tenant compartilhado ou VM dedicada).
         await new Promise((r) => setTimeout(r, 2600));
         const id = randomHex(4);
-        result = {
-          instanceName: `pacs-${id}`,
-          agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`,
-          agentSecret: randomHex(24),
-          orthancVersion: '1.12.4',
-          diskGb: PLANS[plan].disk,
-          diskUsedGb: 0,
-        };
+        result = shared
+          ? { instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 }
+          : { instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 };
       }
 
       // Autoconfigura as settings DICOM (o usuário não digita nada).
@@ -93,13 +93,15 @@ export function MyPacsCard() {
         dicomOrthancAETitle: 'ORTHANC',
         dicomWorklistFolder: '/opt/orthanc-data/worklists',
         dicomLocalAgentUrl: result.agentUrl,
+        dicomTenantId: result.tenantId || '',
         ...(result.agentSecret ? { dicomAgentSecret: result.agentSecret } : {}),
         pacsInstance: {
           status: 'ready',
-          provider: PROVISION_ENDPOINT ? 'gcp' : 'mock',
+          provider: providerVal,
           plan,
           region,
           instanceName: result.instanceName,
+          tenantId: result.tenantId,
           agentUrl: result.agentUrl,
           orthancVersion: result.orthancVersion,
           diskGb: result.diskGb ?? PLANS[plan].disk,
@@ -109,7 +111,7 @@ export function MyPacsCard() {
           lastHealthAt: Date.now(),
         }
       });
-      showToast('Seu PACS na nuvem está pronto! 🎉', 'success');
+      showToast(shared ? 'Seu PACS (compartilhado) está pronto! 🎉' : 'Seu PACS na nuvem está pronto! 🎉', 'success');
     } catch (err: any) {
       await updateSettings({
         pacsInstance: { ...inst, status: 'error', error: err.message || 'Erro ao provisionar', updatedAt: Date.now() }
@@ -128,6 +130,7 @@ export function MyPacsCard() {
       await updateSettings({
         dicomLocalAgentUrl: '',
         dicomAgentSecret: '',
+        dicomTenantId: '',
         pacsInstance: { status: 'none', updatedAt: Date.now() }
       });
       showToast('PACS na nuvem removido.', 'success');

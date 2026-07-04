@@ -1,24 +1,29 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 
-// Segredo compartilhado (opt-in). Quando definido em LAUDUS_AGENT_SECRET, TODA
-// requisição de escrita/proxy precisa trazer o header 'x-agent-secret' igual.
-// Isso permite expor o AGENTE com segurança via Tailscale Funnel (em vez do
-// servidor de desenvolvimento Vite, que não tem autenticação). Se não definido,
-// o agente roda aberto (retrocompatível) e avisa no console.
+// Segredo compartilhado (single-tenant). Quando definido em LAUDUS_AGENT_SECRET,
+// toda requisição de escrita/proxy precisa trazer 'x-agent-secret' igual. Usado
+// nas VMs DEDICADAS (um cliente por VM) e no dev local.
 const AGENT_SECRET = process.env.LAUDUS_AGENT_SECRET || '';
 
-// Endurecimento opt-in (anti-SSRF): se definido, o proxy só alcança estes hosts
-// (o Orthanc do usuário). Ex: LAUDUS_ALLOWED_HOSTS="localhost,127.0.0.1,192.168.1.50"
+// ── MULTI-TENANT (VM compartilhada) ──────────────────────────────────────────
+// Se LAUDUS_TENANTS_DIR estiver definido, o agente opera em modo MULTI-TENANT:
+// cada cliente tem uma pasta ${TENANTS_DIR}/<tenantId>/ com um tenant.json:
+//   { "secret": "...", "worklistDir": "...", "httpPort": 8101, "dicomPort": 4301 }
+// Toda requisição DEVE trazer ?tenantId=<id> e o segredo daquele tenant. O agente
+// resolve pasta/porta pelo tenant e NUNCA cruza clientes (personificação).
+const TENANTS_DIR = process.env.LAUDUS_TENANTS_DIR || '';
+
+// Endurecimento opt-in (anti-SSRF) para o modo single-tenant.
 const ALLOWED_HOSTS = (process.env.LAUDUS_ALLOWED_HOSTS || '')
   .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 
-// Se definido, TODA gravação de worklist usa este diretório (ignora o outputDir
-// do payload) — evita escrita de arquivo em caminho arbitrário.
+// Diretório de worklist fixo (single-tenant); no multi-tenant vem do tenant.json.
 const WORKLIST_DIR = process.env.LAUDUS_WORKLIST_DIR || '';
 
 // Endpoints de metadados de nuvem são SEMPRE bloqueados no proxy.
@@ -28,7 +33,7 @@ function isProxyTargetAllowed(targetUrlObj) {
   const host = (targetUrlObj.hostname || '').toLowerCase();
   if (BLOCKED_HOSTS.has(host)) return false;
   if (ALLOWED_HOSTS.length > 0) return ALLOWED_HOSTS.includes(host);
-  return true; // sem allowlist → retrocompatível (metadados já bloqueados)
+  return true;
 }
 
 function setCorsHeaders(res) {
@@ -37,76 +42,102 @@ function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-agent-secret');
 }
 
-// Retorna true se autorizado; caso contrário responde 401 e retorna false.
-function requireSecret(req, res) {
-  if (!AGENT_SECRET) return true; // sem segredo configurado → aberto (aviso no boot)
-  const headerSecret = req.headers['x-agent-secret'];
-  // Query param 'agentSecret' — necessário para requisições <img> (imagens
-  // DICOM), que não conseguem enviar headers customizados.
-  let querySecret = null;
-  try { querySecret = new URL(req.url, 'http://localhost').searchParams.get('agentSecret'); } catch {}
-  if ((headerSecret && headerSecret === AGENT_SECRET) || (querySecret && querySecret === AGENT_SECRET)) {
-    return true;
-  }
+function parseUrl(req) {
+  try { return new URL(req.url, 'http://localhost'); } catch { return new URL('http://localhost/'); }
+}
+
+function getProvidedSecret(req, u) {
+  return req.headers['x-agent-secret'] || u.searchParams.get('agentSecret') || null;
+}
+
+// tenantId seguro: alfanumérico/_/- (compõe caminho de pasta).
+function safeTenantId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id) ? id : null;
+}
+
+// Carrega o tenant a partir de ?tenantId= (só no modo multi-tenant). Blindado
+// contra path-traversal: o caminho resolvido precisa ficar dentro de TENANTS_DIR.
+function loadTenant(u) {
+  if (!TENANTS_DIR) return null;
+  const tid = safeTenantId(u.searchParams.get('tenantId'));
+  if (!tid) return null;
+  const base = path.resolve(TENANTS_DIR);
+  const file = path.resolve(path.join(base, tid, 'tenant.json'));
+  if (file !== path.join(base, tid, 'tenant.json') && !file.startsWith(base + path.sep)) return null;
+  try {
+    const t = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return { tenantId: tid, secret: t.secret, worklistDir: t.worklistDir, httpPort: t.httpPort, dicomPort: t.dicomPort };
+  } catch { return null; }
+}
+
+function unauthorized(res, msg) {
   res.statusCode = 401;
   res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify({ success: false, error: 'Não autorizado: segredo do agente ausente ou inválido.' }));
-  return false;
+  res.end(JSON.stringify({ success: false, error: msg || 'Não autorizado: segredo do agente ausente ou inválido.' }));
+}
+
+// Autoriza a requisição e resolve o tenant. Retorna { ok, tenant }.
+// - Multi-tenant (TENANTS_DIR): exige tenantId válido + segredo daquele tenant.
+// - Single-tenant: exige AGENT_SECRET (ou aberto se não configurado).
+function checkAuth(req, res, u) {
+  const provided = getProvidedSecret(req, u);
+  if (TENANTS_DIR) {
+    const tenant = loadTenant(u);
+    if (!tenant) { unauthorized(res, 'tenantId inválido ou ausente (servidor multi-tenant).'); return { ok: false }; }
+    if (provided && provided === tenant.secret) return { ok: true, tenant };
+    unauthorized(res); return { ok: false };
+  }
+  if (!AGENT_SECRET) return { ok: true, tenant: null };
+  if (provided && provided === AGENT_SECRET) return { ok: true, tenant: null };
+  unauthorized(res); return { ok: false };
 }
 
 const server = http.createServer((req, res) => {
   setCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.statusCode = 200; res.end(); return; }
 
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 200;
-    res.end();
-    return;
-  }
+  const u = parseUrl(req);
+  const pathname = u.pathname;
 
-  // GET / (health-check — sempre público, não expõe dados)
-  if (req.method === 'GET' && req.url === '/') {
+  // GET / (health-check — público, não expõe dados)
+  if (req.method === 'GET' && pathname === '/') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
-      status: 'online',
-      message: 'Laudus Local Agent is running!',
-      time: new Date().toISOString()
-    }));
+    res.end(JSON.stringify({ status: 'online', message: 'Laudus Local Agent is running!', mode: TENANTS_DIR ? 'multi-tenant' : 'single-tenant', time: new Date().toISOString() }));
     return;
   }
 
-  // /api/orthanc-proxy -> Proxy para o Orthanc local (qualquer método)
-  // Permite que o agente seja o ÚNICO gateway exposto via Tailscale: além de
-  // gravar arquivos .wl, ele encaminha as chamadas REST ao Orthanc que roda na
-  // mesma máquina (localhost:8042). Assim a nuvem não precisa expor o Orthanc
-  // separadamente, e o getProxyEndpoint do app pode apontar para este agente.
-  if (req.url && req.url.startsWith('/api/orthanc-proxy')) {
-    if (!requireSecret(req, res)) return;
+  // /api/orthanc-proxy -> proxy para o Orthanc (multi-tenant: para o Orthanc do tenant)
+  if (pathname === '/api/orthanc-proxy') {
+    const auth = checkAuth(req, res, u); if (!auth.ok) return;
+    const tenant = auth.tenant;
     (async () => {
       try {
-        const parsedUrl = new URL(req.url, 'http://localhost');
-        const targetUrl = parsedUrl.searchParams.get('url');
-        if (!targetUrl) {
-          res.statusCode = 400;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'O parâmetro query "url" é obrigatório.' }));
-          return;
+        const rawUrl = u.searchParams.get('url');
+        if (!rawUrl) {
+          res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'O parâmetro query "url" é obrigatório.' })); return;
         }
 
+        // No multi-tenant, ignoramos o host informado e forçamos o Orthanc do
+        // tenant (127.0.0.1:<httpPort>) — preservando só path+query.
+        let targetUrl;
+        if (tenant) {
+          const src = new URL(rawUrl);
+          targetUrl = `http://127.0.0.1:${tenant.httpPort}${src.pathname}${src.search}`;
+        } else {
+          targetUrl = rawUrl;
+          const targetUrlObj = new URL(targetUrl);
+          if (!isProxyTargetAllowed(targetUrlObj)) {
+            res.statusCode = 403; res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Destino não permitido pelo agente.' })); return;
+          }
+        }
         const targetUrlObj = new URL(targetUrl);
-        if (!isProxyTargetAllowed(targetUrlObj)) {
-          res.statusCode = 403;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Destino não permitido pelo agente.' }));
-          return;
-        }
-        const headers = {};
 
-        // Credenciais do Orthanc: query params ou embutidas na URL. Sem
-        // credenciais, segue anônima — NUNCA usar senha default (evita que uma
-        // senha embutida no código funcione como backdoor).
-        const queryUsername = parsedUrl.searchParams.get('username');
-        const queryPassword = parsedUrl.searchParams.get('password');
+        const headers = {};
+        const queryUsername = u.searchParams.get('username');
+        const queryPassword = u.searchParams.get('password');
         if (queryUsername && queryPassword) {
           headers['Authorization'] = `Basic ${Buffer.from(`${queryUsername}:${queryPassword}`).toString('base64')}`;
         } else if (targetUrlObj.username && targetUrlObj.password) {
@@ -114,7 +145,6 @@ const server = http.createServer((req, res) => {
         }
         if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
 
-        // Lê o corpo bruto para métodos com payload
         let body;
         if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
           body = await new Promise((resolve, reject) => {
@@ -125,11 +155,9 @@ const server = http.createServer((req, res) => {
           });
         }
 
-        // Timeout: generoso para imagens/instâncias, curto para metadados
         const controller = new AbortController();
         const heavy = req.method === 'GET' && /\/(instances|preview|rendered|wado|file)/.test(targetUrl);
         const timeoutId = setTimeout(() => controller.abort(), heavy ? 30000 : 10000);
-
         const response = await fetch(targetUrl, { method: req.method, headers, body, signal: controller.signal });
         clearTimeout(timeoutId);
 
@@ -144,185 +172,111 @@ const server = http.createServer((req, res) => {
         res.end(Buffer.from(arrayBuffer));
       } catch (err) {
         console.error('[Agent Orthanc Proxy] Erro:', err.message);
-        res.statusCode = 500;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: err.message || 'Erro ao conectar ao Orthanc local.' }));
+        res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: err.message || 'Erro ao conectar ao Orthanc.' }));
       }
     })();
     return;
   }
 
-  // POST /api/worklist -> Criação de Worklist
-  if (req.method === 'POST' && req.url === '/api/worklist') {
-    if (!requireSecret(req, res)) return;
+  // POST /api/worklist -> criação/ping de worklist
+  if (req.method === 'POST' && pathname === '/api/worklist') {
+    const auth = checkAuth(req, res, u); if (!auth.ok) return;
+    const tenant = auth.tenant;
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
         const payload = JSON.parse(body);
 
-        // Restrição opt-in: força o diretório de saída configurado no agente,
-        // ignorando o outputDir do payload (evita escrita em caminho arbitrário).
-        if (WORKLIST_DIR) payload.outputDir = WORKLIST_DIR;
+        // Diretório de saída: multi-tenant → pasta do tenant; senão WORKLIST_DIR.
+        if (tenant && tenant.worklistDir) payload.outputDir = tenant.worklistDir;
+        else if (WORKLIST_DIR) payload.outputDir = WORKLIST_DIR;
 
-        // Caminho para o script python
         const pythonScriptPath = path.join(__dirname, 'generate_wl.py');
-        
-        // Tenta executar com 'python' ou 'python3' ou 'py'
         const commandsToTry = ['python', 'python3', 'py'];
         let commandIndex = 0;
-        
-        // Envia a resposta HTTP uma ÚNICA vez (evita ERR_HTTP_HEADERS_SENT
-        // quando os eventos 'error' e 'close' de um mesmo processo disparam juntos).
         let responded = false;
         function respond(status, bodyStr) {
-          if (responded) return;
-          responded = true;
-          res.statusCode = status;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(bodyStr);
+          if (responded) return; responded = true;
+          res.statusCode = status; res.setHeader('Content-Type', 'application/json'); res.end(bodyStr);
         }
-
-        // Quando o comando atual não existe (ENOENT), tenta o próximo da lista;
-        // se acabou a lista, reporta a falha de inicialização.
         function tryNextOrFail(err) {
-          if (commandIndex < commandsToTry.length - 1) {
-            commandIndex++;
-            runPython(commandsToTry[commandIndex]);
-          } else {
-            respond(500, JSON.stringify({
-              success: false,
-              error: `Erro ao iniciar script do Python (pydicom): ${err.message}`
-            }));
-          }
+          if (commandIndex < commandsToTry.length - 1) { commandIndex++; runPython(commandsToTry[commandIndex]); }
+          else respond(500, JSON.stringify({ success: false, error: `Erro ao iniciar script do Python (pydicom): ${err.message}` }));
         }
-
         function runPython(cmd) {
           console.log(`[Agent] Tentando gerar worklist com comando: ${cmd}`);
-          // 'settled' garante que, para um mesmo processo, apenas o primeiro
-          // evento ('error' OU 'close') seja tratado. Um spawn que falha com
-          // ENOENT pode emitir os dois — sem esta guarda, o handler roda 2x.
           let settled = false;
           let pyProcess;
-          try {
-            pyProcess = spawn(cmd, [pythonScriptPath]);
-          } catch (err) {
-            tryNextOrFail(err);
-            return;
-          }
-          let stdout = '';
-          let stderr = '';
-
+          try { pyProcess = spawn(cmd, [pythonScriptPath]); } catch (err) { tryNextOrFail(err); return; }
+          let stdout = ''; let stderr = '';
           pyProcess.stdout.on('data', data => { stdout += data; });
           pyProcess.stderr.on('data', data => { stderr += data; });
-
-          // 'error' = comando inexistente / falha ao iniciar → tenta o próximo.
           pyProcess.on('error', err => {
-            if (settled) return;
-            settled = true;
-            console.error(`[Agent] Erro ao spawnar processo (${cmd}): ${err.message}`);
-            tryNextOrFail(err);
+            if (settled) return; settled = true;
+            console.error(`[Agent] Erro ao spawnar processo (${cmd}): ${err.message}`); tryNextOrFail(err);
           });
-
-          // 'close' = o comando existe e executou. code 0 → sucesso; caso
-          // contrário o SCRIPT falhou (não adianta trocar de comando) → reporta.
           pyProcess.on('close', code => {
-            if (settled) return;
-            settled = true;
-            if (code === 0) {
-              console.log('[Agent] Worklist gerado com sucesso via Python');
-              respond(200, stdout);
-            } else {
-              console.error(`[Agent] Python (${cmd}) exit code ${code}. Stderr: ${stderr}`);
-              respond(500, JSON.stringify({
-                success: false,
-                error: `Falha na execução do Python: ${stderr || 'Erro desconhecido.'}`
-              }));
-            }
+            if (settled) return; settled = true;
+            if (code === 0) { console.log('[Agent] Worklist gerado com sucesso via Python'); respond(200, stdout); }
+            else { console.error(`[Agent] Python (${cmd}) exit code ${code}. Stderr: ${stderr}`); respond(500, JSON.stringify({ success: false, error: `Falha na execução do Python: ${stderr || 'Erro desconhecido.'}` })); }
           });
-
-          // Envia o JSON do payload para o stdin do script python.
-          // Protegido: se o processo não iniciou (ENOENT), o handler 'error' trata.
-          try {
-            pyProcess.stdin.write(JSON.stringify(payload));
-            pyProcess.stdin.end();
-          } catch (err) {
-            /* noop — tratado por 'error' */
-          }
+          try { pyProcess.stdin.write(JSON.stringify(payload)); pyProcess.stdin.end(); } catch (err) { /* tratado por 'error' */ }
         }
-
         runPython(commandsToTry[commandIndex]);
-        
       } catch (err) {
         console.error('[Agent] Erro ao processar payload JSON:', err);
-        res.statusCode = 400;
-        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: false, error: 'JSON inválido no corpo da requisição.' }));
       }
     });
     return;
   }
 
-  // DELETE /api/worklist -> Remoção de Worklist
-  if (req.method === 'DELETE' && req.url === '/api/worklist') {
-    if (!requireSecret(req, res)) return;
+  // DELETE /api/worklist -> remoção de worklist
+  if (req.method === 'DELETE' && pathname === '/api/worklist') {
+    const auth = checkAuth(req, res, u); if (!auth.ok) return;
+    const tenant = auth.tenant;
     let body = '';
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
         const payload = JSON.parse(body);
         const { examId, outputDir } = payload;
-
         if (!examId) {
-          res.statusCode = 400;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ success: false, error: 'O campo examId é obrigatório.' }));
-          return;
+          res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: 'O campo examId é obrigatório.' })); return;
         }
-        // Anti path-traversal: examId compõe o nome do arquivo — só alfanumérico.
         if (!/^[A-Za-z0-9_-]+$/.test(String(examId))) {
-          res.statusCode = 400;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ success: false, error: 'examId inválido.' }));
-          return;
+          res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: 'examId inválido.' })); return;
         }
-
-        // Mapeia pasta final (WORKLIST_DIR do agente tem prioridade, se definido)
-        let dir = WORKLIST_DIR || outputDir;
+        let dir = (tenant && tenant.worklistDir) || WORKLIST_DIR || outputDir;
         if (!dir) {
-          const isWindows = process.platform === 'win32';
-          dir = isWindows
+          dir = process.platform === 'win32'
             ? 'C:\\OrthancServer\\db\\WorklistsDatabase\\'
-            : path.join(require('os').homedir(), 'OrthancServer', 'db', 'WorklistsDatabase');
+            : path.join(os.homedir(), 'OrthancServer', 'db', 'WorklistsDatabase');
         }
-        
         const filePath = path.join(dir, `agendamento_${examId}.wl`);
         console.log(`[Agent] Tentando remover arquivo .wl: ${filePath}`);
-        
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
-          console.log(`[Agent] Arquivo ${filePath} removido com sucesso.`);
-          res.statusCode = 200;
-          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ success: true, message: 'Arquivo .wl removido com sucesso.' }));
         } else {
-          console.log(`[Agent] Arquivo .wl não existe mais: ${filePath}`);
-          res.statusCode = 200; // Retorna 200 mesmo se não existir para evitar erros na UI
-          res.setHeader('Content-Type', 'application/json');
+          res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ success: true, message: 'Arquivo .wl já estava removido.' }));
         }
-        
       } catch (err) {
         console.error('[Agent] Erro ao deletar arquivo .wl:', err);
-        res.statusCode = 500;
-        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: false, error: err.message }));
       }
     });
     return;
   }
 
-  // 404 Not Found
   res.statusCode = 404;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify({ success: false, error: 'Endpoint não encontrado.' }));
@@ -331,12 +285,14 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`==================================================`);
   console.log(`  LAUD.US Local Agent rodando na porta ${PORT}      `);
-  console.log(`  Pronto para intermediar conexões DICOM / .wl   `);
-  if (AGENT_SECRET) {
-    console.log(`  🔒 Autenticação ATIVA (x-agent-secret exigido)  `);
+  if (TENANTS_DIR) {
+    console.log(`  🏢 Modo MULTI-TENANT (dir: ${TENANTS_DIR})`);
+    console.log(`     Cada requisição exige ?tenantId= + segredo do tenant.`);
+  } else if (AGENT_SECRET) {
+    console.log(`  🔒 Single-tenant, autenticação ATIVA (x-agent-secret).`);
   } else {
-    console.log(`  ⚠️  SEM autenticação. Se for expor via Funnel,   `);
-    console.log(`     defina LAUDUS_AGENT_SECRET antes de publicar. `);
+    console.log(`  ⚠️  Single-tenant SEM autenticação. Defina LAUDUS_AGENT_SECRET`);
+    console.log(`     antes de expor via Funnel.`);
   }
   console.log(`==================================================`);
 });

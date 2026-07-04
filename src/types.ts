@@ -188,8 +188,10 @@ export type PacsInstanceStatus =
 /** Instância PACS gerenciada de um usuário (grava-se em settings.pacsInstance). */
 export interface PacsInstance {
   status: PacsInstanceStatus;
-  /** 'mock' (simulado, sem nuvem) ou 'gcp' (VM real). */
-  provider?: 'mock' | 'gcp';
+  /** 'mock' (simulado), 'gcp' (VM dedicada real) ou 'shared' (tenant na VM compartilhada). */
+  provider?: 'mock' | 'gcp' | 'shared';
+  /** ID do tenant quando provider = 'shared'. */
+  tenantId?: string;
   /** Plano contratado (define modelo/quota). */
   plan?: 'starter' | 'pro' | 'dedicado';
   region?: string;

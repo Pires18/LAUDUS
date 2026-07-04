@@ -1136,7 +1136,9 @@ export async function deleteWorklistEntry(examId: string, settings: AppSettings)
     body: JSON.stringify({
       examId,
       outputDir: settings.dicomWorklistFolder,
-      localAgentUrl: settings.dicomLocalAgentUrl
+      localAgentUrl: settings.dicomLocalAgentUrl,
+      tenantId: settings.dicomTenantId,
+      agentSecret: settings.dicomAgentSecret
     })
   }).catch((err) => {
     logger.warn('[Orthanc Worklist] Falha ao remover entrada primária:', err);
