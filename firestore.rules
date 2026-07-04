@@ -167,6 +167,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ---- Métricas diárias agregadas (telemetria) --------------------------
+    // Escritas SOMENTE pelo CRON via Admin SDK (collection-group sobre ai_usage);
+    // o painel admin apenas lê.
+    match /metrics_daily/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ---- Bloqueio padrão ---------------------------------------------------
     // Qualquer caminho não declarado acima é negado por omissão.
   }

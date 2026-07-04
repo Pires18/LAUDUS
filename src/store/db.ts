@@ -1207,3 +1207,37 @@ export async function getAiUsageStats(startDateMs: number, endDateMs: number): P
     return [];
   }
 }
+
+/** Métrica diária agregada (escrita pelo CRON /api/cron-aggregate-metrics). */
+export interface DailyMetric {
+  date: string;          // YYYY-MM-DD
+  reports: number;
+  reportsLite: number;
+  reportsPro: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  activeUsers: number;
+}
+
+/**
+ * Lê as métricas diárias agregadas (SISTEMA INTEIRO) da coleção global
+ * `metrics_daily` — barato, poucos docs. Só admin (regra do Firestore).
+ * Alimenta o dashboard executivo (laudos/dia, usuários ativos, custo de IA)
+ * com dados persistentes, substituindo o `callMetricsHistory` em memória.
+ */
+export async function getDailyMetrics(days = 30): Promise<DailyMetric[]> {
+  try {
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const q = query(
+      collection(firestore, 'metrics_daily'),
+      where('date', '>=', from),
+      orderBy('date', 'asc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data() as DailyMetric);
+  } catch (err) {
+    logger.error('[DB] Erro ao buscar métricas diárias', err);
+    return [];
+  }
+}
