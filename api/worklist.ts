@@ -1,4 +1,4 @@
-import { verifyAuth } from './_auth.js';
+import { verifyFirebaseIdToken } from './_edgeAuth.js';
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -15,8 +15,16 @@ export default async function handler(req: any, res: any) {
 
   // Autenticação obrigatória na nuvem (o encaminhamento server-side para o
   // Agente Local não pode ficar aberto à internet).
+  // Usa verificação por JWKS (mesma dos endpoints de IA, comprovadamente
+  // funcional no Vercel) em vez do Firebase Admin SDK — este último exige a
+  // conta de serviço (FIREBASE_CLIENT_EMAIL/PRIVATE_KEY) que pode não estar
+  // provisionada no ambiente serverless, causando 401 mesmo com token válido.
   if (process.env.VERCEL) {
-    const authed = await verifyAuth(req);
+    const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
+    const bearer = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+      ? authHeader.slice('Bearer '.length).trim()
+      : '';
+    const authed = await verifyFirebaseIdToken(bearer);
     if (!authed) {
       res.statusCode = 401;
       res.setHeader('Content-Type', 'application/json');
