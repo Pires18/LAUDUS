@@ -54,7 +54,7 @@ export function DicomControlCenter() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
-  const [selectedSection, setSelectedSection] = useState<'walkthrough' | 'cloud_vm' | 'backup_local' | 'concepts' | 'architecture' | 'prereq' | 'orthanc_json' | 'agent' | 'tailscale' | 'ultrasound' | 'troubleshoot'>('cloud_vm');
+  const [selectedSection, setSelectedSection] = useState<'overview' | 'setup_vm' | 'app_config' | 'relay' | 'backup' | 'troubleshoot' | 'concepts'>('overview');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
