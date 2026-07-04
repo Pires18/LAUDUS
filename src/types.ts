@@ -301,6 +301,10 @@ export interface AppSettings {
   dicomAgentSecret?: string;
   /** PACS gerenciado (self-service): estado do provisionamento da VM/container. */
   pacsInstance?: PacsInstance;
+  /** ID do tenant na VM compartilhada (planos Starter/Pro). Enviado ao agente
+   *  como ?tenantId= para rotear ao Orthanc/pasta isolados do cliente. Vazio no
+   *  modo dedicado (VM própria) ou local (single-tenant). */
+  dicomTenantId?: string;
 
   // Configurações do PACS de Backup (Redundância)
   dicomBackupViewerUrl?: string;
