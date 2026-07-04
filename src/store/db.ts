@@ -1208,6 +1208,22 @@ export async function getAiUsageStats(startDateMs: number, endDateMs: number): P
   }
 }
 
+/**
+ * Uso de IA de UM usuário específico (subcoleção users/{uid}/ai_usage).
+ * Usado pelo painel admin (visão 360º) — o admin pode ler qualquer subárvore.
+ */
+export async function getUserAiUsageStats(uid: string, startDateMs: number, endDateMs: number): Promise<AiUsageLog[]> {
+  try {
+    const colRef = collection(firestore, `users/${uid}/ai_usage`);
+    const q = query(colRef, where('timestamp', '>=', startDateMs), where('timestamp', '<=', endDateMs));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AiUsageLog));
+  } catch (err) {
+    logger.error('[DB] Erro ao buscar uso de IA do usuário', err);
+    return [];
+  }
+}
+
 /** Métrica diária agregada (escrita pelo CRON /api/cron-aggregate-metrics). */
 export interface DailyMetric {
   date: string;          // YYYY-MM-DD

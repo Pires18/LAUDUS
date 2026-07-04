@@ -21,8 +21,9 @@ import {
   Users, DollarSign, AlertTriangle, TrendingDown, CheckCircle, Sparkles,
   Search, Shield, ChevronDown, Trash2, Filter, Edit2, Calculator, Database,
   MoreVertical, CheckCircle2, XCircle, Loader2, RefreshCw, ShieldAlert,
-  UserCheck, Zap, ChevronRight, ChevronUp, Plus, FileText, Check, CalendarDays, Hospital,
+  UserCheck, Zap, ChevronRight, ChevronUp, Plus, FileText, Check, CalendarDays, Hospital, Eye,
 } from 'lucide-react';
+import { AdminUserDetail } from './AdminUserDetail';
 
 // ─── Local types ──────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export function AdminUsersSubscriptions() {
 
   // Modals
   const [roleTarget,    setRoleTarget]   = useState<SystemUser | null>(null);
+  const [detailTarget,  setDetailTarget] = useState<SystemUser | null>(null);
   const [statusTarget,  setStatusTarget] = useState<SystemUser | null>(null);
   const [deleteTarget,  setDeleteTarget] = useState<SystemUser | null>(null);
   const [assignTarget,  setAssignTarget] = useState<SystemUser | null>(null);
@@ -784,6 +786,14 @@ export function AdminUsersSubscriptions() {
                               </div>
                             </DetailBox>
                           </div>
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              onClick={() => setDetailTarget(u)}
+                              className="inline-flex items-center gap-1.5 h-8 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            >
+                              <Eye size={12} /> Ver visão 360º (pagamentos, uso, tickets)
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -794,6 +804,9 @@ export function AdminUsersSubscriptions() {
           </table>
         </div>
       </div>
+
+      {/* ── VISÃO 360º DO CLIENTE ──────────────────────────────────────── */}
+      <AdminUserDetail user={detailTarget} onClose={() => setDetailTarget(null)} />
 
       {/* ── ASSIGN SUBSCRIPTION MODAL ──────────────────────────────────── */}
       {assignTarget && (
