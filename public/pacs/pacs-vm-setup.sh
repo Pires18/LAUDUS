@@ -41,7 +41,8 @@ curl -fsSL "$SCRIPTS_URL/agent.js"        -o "$AGENT_DIR/agent.js"
 curl -fsSL "$SCRIPTS_URL/generate_wl.py"  -o "$AGENT_DIR/generate_wl.py"
 curl -fsSL "$SCRIPTS_URL/pacs-tenant.sh"  -o /opt/pacs-tenant.sh
 curl -fsSL "$SCRIPTS_URL/pacs-harden.sh"  -o /opt/pacs-harden.sh
-chmod +x /opt/pacs-tenant.sh /opt/pacs-harden.sh
+curl -fsSL "$SCRIPTS_URL/pacs-import.sh"  -o /opt/pacs-import.sh
+chmod +x /opt/pacs-tenant.sh /opt/pacs-harden.sh /opt/pacs-import.sh
 ok "Scripts atualizados."
 
 log "2/6 Dependências (Docker / Node / Python / pydicom)"
