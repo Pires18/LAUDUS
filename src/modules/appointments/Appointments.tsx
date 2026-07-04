@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
+import { useSubscription } from '../../hooks/useSubscription';
+import { FeatureLocked } from '../../components/FeatureLocked';
 import { addItemWithId, genId, updateItem, deleteItem, generateNumericId } from '../../store/db';
 import { Patient, ReportTemplate, Clinic, ExamRequest, Appointment } from '../../types';
 import { 
@@ -28,6 +30,7 @@ import { ShiftConfigPanel } from './components/ShiftConfigPanel';
 
 export function Appointments() {
   const { setView, selectedClinicId, showToast, settings } = useApp();
+  const { hasAppointments } = useSubscription();
   const { data: appointments, loading: loadingAppointments } = useCollection<Appointment>('appointments');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: templates } = useCollection<ReportTemplate>('templates');
@@ -375,6 +378,16 @@ export function Appointments() {
       showToast('Erro ao salvar configuração de turnos', 'error');
     }
   };
+
+  if (!hasAppointments) {
+    return (
+      <FeatureLocked
+        title="Módulo de Agendamentos"
+        addonLabel="Agendamentos"
+        description="Ative-o na sua assinatura para gerenciar a agenda, marcar exames e enviar a worklist ao aparelho automaticamente."
+      />
+    );
+  }
 
   return (
     <div className="module-container">

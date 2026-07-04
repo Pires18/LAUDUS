@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
+import { useSubscription } from '../../hooks/useSubscription';
 import { PageHeader } from '../../components/PageHeader';
+import { FeatureLocked } from '../../components/FeatureLocked';
 import { Clinic } from '../../types';
 import { 
   Plus, Search, Building2, MapPin, Phone, 
@@ -12,6 +14,7 @@ import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
 export function Clinics() {
   const { setView, selectedClinicId, setSelectedClinic } = useApp();
+  const { hasClinics } = useSubscription();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'todas' | 'ativas' | 'inativas'>('todas');
 
@@ -33,6 +36,16 @@ export function Clinics() {
     active: clinics.filter(c => c.active).length,
     inactive: clinics.filter(c => !c.active).length,
   }), [clinics]);
+
+  if (!hasClinics) {
+    return (
+      <FeatureLocked
+        title="Módulo de Clínicas"
+        addonLabel="Clínicas"
+        description="Ative-o na sua assinatura para cadastrar múltiplas clínicas, personalizar cabeçalhos de laudo e organizar exames por unidade."
+      />
+    );
+  }
 
   return (
     <div className="module-container">

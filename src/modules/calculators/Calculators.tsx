@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { CALCULATORS } from './registry';
 import {
-  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, CheckCircle2, Copy, LayoutGrid, Lock
+  Calculator, Search, RotateCcw, LayoutList, ChevronRight, X, Activity, CheckCircle2, Copy, LayoutGrid
 } from 'lucide-react';
 import { EXAM_AREAS, ExamArea } from '../../types';
 import { classNames } from '../../utils/format';
@@ -11,11 +11,10 @@ import { CalculatorReference } from './components/CalculatorUI';
 import { FIELD_LABELS, isDisplayableMetric } from './constants/fieldLabels';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSubscription } from '../../hooks/useSubscription';
-import { useApp } from '../../store/app';
+import { FeatureLocked } from '../../components/FeatureLocked';
 
 export function Calculators() {
   const { hasCalculators } = useSubscription();
-  const { setView } = useApp();
   const [areaFilter, setAreaFilter] = useState<ExamArea | 'todas'>('todas');
   const [search, setSearch] = useState('');
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(null);
@@ -37,25 +36,11 @@ export function Calculators() {
 
   if (!hasCalculators) {
     return (
-      <div className="module-container">
-        <div className="max-w-7xl mx-auto w-full animate-fade-in">
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-indigo-50 text-indigo-400 flex items-center justify-center mb-6 shadow-sm border border-indigo-100">
-              <Lock size={36} />
-            </div>
-            <h2 className="text-xl font-black text-ink-900 mb-2">Calculadoras Clínicas</h2>
-            <p className="text-sm text-ink-500 max-w-sm mb-8 leading-relaxed">
-              Este módulo requer o add-on <strong className="text-ink-700">Calculadoras Clínicas</strong>. Ative-o na sua assinatura para liberar biometria fetal, volumes, doppler e mais de 20 calculadores especializados.
-            </p>
-            <button
-              onClick={() => setView({ name: 'settings', activeTab: 'assinatura' })}
-              className="h-11 px-8 rounded-xl text-xs font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all cursor-pointer active:scale-95"
-            >
-              Ativar Add-on Calculadoras
-            </button>
-          </div>
-        </div>
-      </div>
+      <FeatureLocked
+        title="Calculadoras Clínicas"
+        addonLabel="Calculadoras Clínicas"
+        description="Ative-o na sua assinatura para liberar biometria fetal, volumes, doppler e mais de 20 calculadores especializados."
+      />
     );
   }
 
