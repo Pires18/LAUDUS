@@ -1400,6 +1400,45 @@ function TransactionsTab() {
     }
   }, [showToast]);
 
+  const [exporting, setExporting] = useState(false);
+  // Exporta TODAS as transações (histórico completo) em CSV — ação explícita.
+  const exportCsv = useCallback(async () => {
+    setExporting(true);
+    try {
+      const snap = await getDocs(query(collection(firestore, 'transactions'), orderBy('timestamp', 'desc')));
+      const cell = (v: unknown) => {
+        const s = String(v ?? '');
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = ['Data/Hora', 'Usuário', 'Tipo', 'Descrição', 'Valor (R$)', 'Método', 'Status'];
+      const rows = snap.docs.map(d => {
+        const t = d.data() as any;
+        return [
+          t.timestamp ? new Date(t.timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '',
+          t.userEmail || '',
+          t.type || '',
+          t.description || '',
+          (t.amount || 0).toFixed(2),
+          t.paymentMethod || '',
+          t.status || '',
+        ].map(cell).join(',');
+      });
+      const csv = '﻿' + [header.join(','), ...rows].join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transacoes_laudus_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      logger.error('Erro ao exportar transações:', err);
+      showToast('Falha ao exportar CSV.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  }, [showToast]);
+
   useEffect(() => {
     loadStats();
     loadFirstPage();
@@ -1422,6 +1461,14 @@ function TransactionsTab() {
           <p className="text-[11px] text-ink-500 font-medium mt-0.5">Veja todas as transações, assinaturas e compras de add-ons realizadas no sistema.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            disabled={exporting}
+            title="Exporta todo o histórico de transações em CSV"
+            className="flex items-center gap-1.5 h-10 px-4 bg-white border border-ink-200 text-ink-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={12} className="animate-spin" /> : <FileText size={12} />} Exportar CSV
+          </button>
           <button
             onClick={recalcStats}
             disabled={recalculating}

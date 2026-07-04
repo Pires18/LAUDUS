@@ -37,9 +37,13 @@ export default async function handler(req: any, res: any) {
     type DayAgg = {
       reports: number; reportsLite: number; reportsPro: number;
       inputTokens: number; outputTokens: number; costUsd: number;
-      users: Set<string>;
+      revenue: number; users: Set<string>;
     };
     const byDay: Record<string, DayAgg> = {};
+    const mkDay = (): DayAgg => ({
+      reports: 0, reportsLite: 0, reportsPro: 0,
+      inputTokens: 0, outputTokens: 0, costUsd: 0, revenue: 0, users: new Set<string>(),
+    });
 
     snap.forEach((doc: any) => {
       const d = doc.data() || {};
@@ -47,16 +51,24 @@ export default async function handler(req: any, res: any) {
       const day = new Date(ts).toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
       const uid = doc.ref.parent?.parent?.id || 'unknown';
       const isPro = /pro/i.test(String(d.model || ''));
-      const b = byDay[day] || (byDay[day] = {
-        reports: 0, reportsLite: 0, reportsPro: 0,
-        inputTokens: 0, outputTokens: 0, costUsd: 0, users: new Set<string>(),
-      });
+      const b = byDay[day] || (byDay[day] = mkDay());
       b.reports += 1;
       if (isPro) b.reportsPro += 1; else b.reportsLite += 1;
       b.inputTokens += Number(d.inputTokens) || 0;
       b.outputTokens += Number(d.outputTokens) || 0;
       b.costUsd += Number(d.costUsd) || 0;
       b.users.add(uid);
+    });
+
+    // Receita por dia (transações pagas na janela). where só no timestamp
+    // (single-field) e filtro de status em memória — evita índice composto.
+    const txSnap = await db.collection('transactions').where('timestamp', '>=', windowStart).get();
+    txSnap.forEach((doc: any) => {
+      const t = doc.data() || {};
+      if (t.status !== 'paid') return;
+      const day = new Date(typeof t.timestamp === 'number' ? t.timestamp : now).toISOString().slice(0, 10);
+      const b = byDay[day] || (byDay[day] = mkDay());
+      b.revenue += Number(t.amount) || 0;
     });
 
     const batch = db.batch();
@@ -69,11 +81,50 @@ export default async function handler(req: any, res: any) {
         inputTokens: b.inputTokens,
         outputTokens: b.outputTokens,
         costUsd: Math.round(b.costUsd * 10000) / 10000,
+        revenue: Math.round(b.revenue * 100) / 100,
         activeUsers: b.users.size,
         updatedAt: Date.now(),
       }, { merge: true });
     }
     await batch.commit();
+
+    // MRR / ARR: soma o preço mensal-equivalente das assinaturas ativas.
+    // Grava um doc único (global_config/metrics_summary) que o painel lê barato.
+    try {
+      const [subsSnap, plansSnap] = await Promise.all([
+        db.collection('subscriptions').get(),
+        db.collection('saas_plans').get(),
+      ]);
+      const planPrice: Record<string, { price: number; interval: string }> = {};
+      plansSnap.forEach((p: any) => {
+        const d = p.data() || {};
+        const entry = { price: Number(d.price) || 0, interval: String(d.interval || 'month') };
+        planPrice[p.id] = entry;
+        if (d.name) planPrice[String(d.name).toLowerCase()] = entry;
+      });
+      let mrr = 0, activeSubscribers = 0, trials = 0;
+      subsSnap.forEach((s: any) => {
+        const d = s.data() || {};
+        if (d.status === 'active') {
+          activeSubscribers += 1;
+          const pl = planPrice[d.planId] || planPrice[String(d.plan || '').toLowerCase()];
+          if (pl) mrr += pl.interval === 'year' ? pl.price / 12 : pl.price;
+        } else if (d.status === 'trialing') {
+          trials += 1;
+        }
+      });
+      // Guardado em metrics_daily/_summary (mesma regra admin-only). Sem campo
+      // `date`, então não aparece nas consultas por intervalo de datas.
+      await db.collection('metrics_daily').doc('_summary').set({
+        mrr: Math.round(mrr * 100) / 100,
+        arr: Math.round(mrr * 12 * 100) / 100,
+        activeSubscribers,
+        trials,
+        updatedAt: Date.now(),
+      }, { merge: true });
+    } catch (e: any) {
+      console.warn('[CRON aggregate-metrics] Falha no resumo MRR (ignorado):', e?.message);
+    }
 
     return res.status(200).json({ ok: true, daysWritten: Object.keys(byDay).length, eventsScanned: snap.size });
   } catch (e: any) {

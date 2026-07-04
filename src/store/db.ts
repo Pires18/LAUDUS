@@ -1233,7 +1233,28 @@ export interface DailyMetric {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  revenue: number;       // receita paga no dia (R$)
   activeUsers: number;
+}
+
+/** Resumo de assinaturas (MRR/ARR) mantido pelo CRON em metrics_daily/_summary. */
+export interface MetricsSummary {
+  mrr: number;
+  arr: number;
+  activeSubscribers: number;
+  trials: number;
+  updatedAt?: number;
+}
+
+/** Lê o resumo MRR/ARR (metrics_daily/_summary) — admin apenas. */
+export async function getMetricsSummary(): Promise<MetricsSummary | null> {
+  try {
+    const snap = await getDoc(doc(firestore, 'metrics_daily', '_summary'));
+    return snap.exists() ? (snap.data() as MetricsSummary) : null;
+  } catch (err) {
+    logger.error('[DB] Erro ao buscar resumo de métricas', err);
+    return null;
+  }
 }
 
 /**

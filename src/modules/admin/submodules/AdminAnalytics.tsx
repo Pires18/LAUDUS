@@ -1,30 +1,33 @@
 import { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
-import { getDailyMetrics, type DailyMetric } from '../../../store/db';
+import { getDailyMetrics, getMetricsSummary, type DailyMetric, type MetricsSummary } from '../../../store/db';
 import { logger } from '../../../utils/logger';
 import { classNames } from '../../../utils/format';
-import { TrendingUp, FileText, Users, Cpu, DollarSign, Loader2 } from 'lucide-react';
+import { TrendingUp, FileText, Users, Cpu, DollarSign, Loader2, Repeat } from 'lucide-react';
 
 type FinanceStats = { totalRevenue?: number; paidCount?: number; pixCount?: number; ccCount?: number; manualCount?: number };
 
-/** Dashboard executivo: séries reais de metrics_daily + finance_stats. */
+/** Dashboard executivo: séries reais de metrics_daily + finance_stats + resumo MRR. */
 export function AdminAnalytics() {
   const [daily, setDaily] = useState<DailyMetric[]>([]);
   const [finance, setFinance] = useState<FinanceStats | null>(null);
+  const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [d, fSnap] = await Promise.all([
+        const [d, fSnap, sum] = await Promise.all([
           getDailyMetrics(30),
           getDoc(doc(firestore, 'global_config', 'finance_stats')),
+          getMetricsSummary(),
         ]);
         if (!active) return;
         setDaily(d);
         setFinance(fSnap.exists() ? (fSnap.data() as FinanceStats) : null);
+        setSummary(sum);
       } catch (err) {
         logger.error('[AdminAnalytics] Falha ao carregar métricas:', err);
       } finally {
@@ -42,17 +45,23 @@ export function AdminAnalytics() {
 
   const reports30 = daily.reduce((a, d) => a + (d.reports || 0), 0);
   const cost30 = daily.reduce((a, d) => a + (d.costUsd || 0), 0);
-  const peakActive = daily.reduce((a, d) => Math.max(a, d.activeUsers || 0), 0);
+  const revenue30 = daily.reduce((a, d) => a + (d.revenue || 0), 0);
   const revenue = finance?.totalRevenue ?? 0;
+  const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   const kpis = [
-    { label: 'Faturamento acumulado', value: `R$ ${revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: DollarSign, tone: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Laudos (30 dias)', value: reports30.toLocaleString('pt-BR'), icon: FileText, tone: 'text-blue-600 bg-blue-50' },
-    { label: 'Pico de ativos/dia', value: peakActive.toLocaleString('pt-BR'), icon: Users, tone: 'text-violet-600 bg-violet-50' },
-    { label: 'Custo de IA (30d)', value: `US$ ${cost30.toFixed(2)}`, icon: Cpu, tone: 'text-amber-600 bg-amber-50' },
+    { label: 'MRR', value: brl(summary?.mrr ?? 0), icon: Repeat, tone: 'text-emerald-600 bg-emerald-50' },
+    { label: 'ARR', value: brl(summary?.arr ?? 0), icon: TrendingUp, tone: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Assinantes ativos', value: (summary?.activeSubscribers ?? 0).toLocaleString('pt-BR'), icon: Users, tone: 'text-blue-600 bg-blue-50' },
+    { label: 'Trials', value: (summary?.trials ?? 0).toLocaleString('pt-BR'), icon: Users, tone: 'text-amber-600 bg-amber-50' },
+    { label: 'Faturamento acumulado', value: brl(revenue), icon: DollarSign, tone: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Receita (30d)', value: brl(revenue30), icon: DollarSign, tone: 'text-teal-600 bg-teal-50' },
+    { label: 'Laudos (30 dias)', value: reports30.toLocaleString('pt-BR'), icon: FileText, tone: 'text-indigo-600 bg-indigo-50' },
+    { label: 'Custo de IA (30d)', value: `US$ ${cost30.toFixed(2)}`, icon: Cpu, tone: 'text-violet-600 bg-violet-50' },
   ];
 
   const hasSeries = daily.length > 0;
+  const hasRevenue = daily.some(d => (d.revenue || 0) > 0);
 
   return (
     <div className="space-y-5">
@@ -91,6 +100,11 @@ export function AdminAnalytics() {
           <ChartCard title="Usuários ativos por dia">
             <AreaLine data={daily.map(d => ({ date: d.date, value: d.activeUsers || 0 }))} color="#10b981" />
           </ChartCard>
+          {hasRevenue && (
+            <ChartCard title="Receita por dia" subtitle="Transações pagas (R$)">
+              <AreaLine data={daily.map(d => ({ date: d.date, value: d.revenue || 0 }))} color="#0ea5e9" money />
+            </ChartCard>
+          )}
         </div>
       )}
     </div>
@@ -158,7 +172,8 @@ function StackedBars({ data }: { data: DailyMetric[] }) {
 }
 
 /** Gráfico de área/linha simples — SVG. */
-function AreaLine({ data, color }: { data: { date: string; value: number }[]; color: string }) {
+function AreaLine({ data, color, money }: { data: { date: string; value: number }[]; color: string; money?: boolean }) {
+  const fmt = (v: number) => (money ? `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : `${v}`);
   const max = Math.max(1, ...data.map(d => d.value));
   const n = data.length;
   const stepX = n > 1 ? (CHART_W - PAD * 2) / (n - 1) : 0;
@@ -175,7 +190,7 @@ function AreaLine({ data, color }: { data: { date: string; value: number }[]; co
       <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {pts.map((p) => (
         <circle key={p.d.date} cx={p.x} cy={p.y} r={2} fill={color}>
-          <title>{`${p.d.date}: ${p.d.value} ativos`}</title>
+          <title>{`${p.d.date}: ${fmt(p.d.value)}`}</title>
         </circle>
       ))}
     </svg>
