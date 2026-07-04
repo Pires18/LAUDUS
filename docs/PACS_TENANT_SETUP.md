@@ -76,9 +76,20 @@ sudo /opt/pacs-tenant.sh remove <id>  # remove container; move dados p/ /opt/ten
 docker stats --no-stream              # uso de CPU/RAM por container
 ```
 
-## Segurança (checklist S4 — próximo)
-- [ ] Disco de dados separado do boot montado em `/opt/tenants` + snapshots diários.
-- [ ] Firewall GCP: nenhuma porta pública (só Tailscale). As portas `43xx` ficam
-      acessíveis apenas via tailnet ao relé de cada cliente.
+## Segurança / hardening (S4)
+Rode o script de endurecimento na VM (idempotente):
+```bash
+sudo cp ~/pacs-harden.sh /opt/ && sudo chmod +x /opt/pacs-harden.sh
+# Com disco de dados dedicado (recomendado — anexe um disco no GCP antes):
+sudo DATA_DISK=/dev/sdb /opt/pacs-harden.sh
+# Sem disco extra (só permissões + limite de logs):
+sudo /opt/pacs-harden.sh
+```
+Ele faz: monta o **disco de dados** em `/opt/tenants` (+fstab, migra dados), aplica
+**permissões 0700**, **limita logs do Docker** (10m×3) e imprime o **checklist GCP**.
+
+Checklist adicional (fora da VM):
+- [ ] **Firewall GCP:** nenhuma regra pública para `8042/4242/3000/43xx` (as portas `43xx` são alcançadas só via tailnet pelo relé). `gcloud compute firewall-rules list --filter="direction=INGRESS"`.
+- [ ] **Snapshots** diários do disco de dados (comandos impressos pelo script; retenção 14 dias).
 - [ ] (Opcional) ACL Tailscale restringindo cada relé à porta do seu tenant.
-- [ ] Rotação dos segredos GCP/Tailscale que apareceram no chat.
+- [ ] **Rotação** dos segredos GCP/Tailscale que apareceram no chat.
