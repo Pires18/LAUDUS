@@ -17,7 +17,7 @@
     },
     {
       "path": "/api/cron-aggregate-metrics",
-      "schedule": "10 * * * *"
+      "schedule": "30 3 * * *"
     }
   ],
   "headers": [
