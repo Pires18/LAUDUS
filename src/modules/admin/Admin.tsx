@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { collection, query, where, getCountFromServer } from 'firebase/firestore';
+import { firestore } from '../../lib/firebase';
 import { useApp } from '../../store/app';
 import { useAdmin } from '../../hooks/useAdmin';
-import { useCollection } from '../../hooks/useFirestore';
 import {
   ShieldCheck, Users, History,
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
   Megaphone, Trash2, Loader2, DollarSign, CreditCard
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
+import { logger } from '../../utils/logger';
 import { setBroadcast } from '../../store/db';
 import { callMetricsHistory } from '../ai/engine';
 
@@ -114,37 +116,66 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
   const [broadcastType, setBroadcastType] = useState<'info' | 'warning' | 'error'>('info');
   const [isSending, setIsSending] = useState(false);
 
-  // Live Metrics
-  const { data: users } = useCollection<any>('users', { isGlobal: true });
-  const { data: rawPlans } = useCollection<any>('saas_plans', { isGlobal: true });
-  const plans = rawPlans.filter(p => !p.id.startsWith('LICENSE_'));
-  const { data: tickets } = useCollection<any>('support_tickets', { isGlobal: true });
-  const { data: auditLogs } = useCollection<any>('audit_logs', { isGlobal: true });
+  // Métricas: contagem SERVER-SIDE (getCountFromServer) em vez de baixar as
+  // coleções inteiras só para contar — barato e escalável.
+  const [counts, setCounts] = useState({ users: 0, activeSubs: 0, trials: 0, openTickets: 0, resolvedTickets: 0, activity24h: 0 });
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const usersCol = collection(firestore, 'users');
+        const ticketsCol = collection(firestore, 'support_tickets');
+        const logsCol = collection(firestore, 'audit_logs');
+        const cutoff = Date.now() - 86400000;
+        const [u, aSub, tr, ot, rt, act] = await Promise.all([
+          getCountFromServer(usersCol),
+          getCountFromServer(query(usersCol, where('subscriptionStatus', '==', 'active'))),
+          getCountFromServer(query(usersCol, where('subscriptionStatus', '==', 'trialing'))),
+          getCountFromServer(query(ticketsCol, where('status', '==', 'open'))),
+          getCountFromServer(query(ticketsCol, where('status', '==', 'resolved'))),
+          getCountFromServer(query(logsCol, where('timestamp', '>', cutoff))),
+        ]);
+        if (!active) return;
+        setCounts({
+          users: u.data().count,
+          activeSubs: aSub.data().count,
+          trials: tr.data().count,
+          openTickets: ot.data().count,
+          resolvedTickets: rt.data().count,
+          activity24h: act.data().count,
+        });
+      } catch (err) {
+        logger.error('[Admin] Falha ao carregar contadores do dashboard:', err);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const stats = [
-    { 
-      label: 'Total de Usuários', 
-      value: users.length.toString(), 
-      change: users.filter(u => u.active !== false).length + ' Ativos', 
-      icon: Users, color: 'text-blue-600', tab: 'users' 
+    {
+      label: 'Total de Usuários',
+      value: counts.users.toString(),
+      change: (counts.activeSubs + counts.trials) + ' com assinatura',
+      icon: Users, color: 'text-blue-600', tab: 'users'
     },
     {
       label: 'Assinaturas Ativas',
-      value: users.filter(u => u.subscriptionStatus === 'active').length.toString(),
-      change: users.filter(u => u.subscriptionStatus === 'trialing').length + ' Trials',
+      value: counts.activeSubs.toString(),
+      change: counts.trials + ' Trials',
       icon: Users, color: 'text-emerald-600', tab: 'users'
     },
-    { 
-      label: 'Chamados Abertos', 
-      value: tickets.filter(t => t.status === 'open').length.toString(), 
-      change: tickets.filter(t => t.status === 'resolved').length + ' Resolvidos', 
-      icon: LifeBuoy, color: 'text-red-600', tab: 'support' 
+    {
+      label: 'Chamados Abertos',
+      value: counts.openTickets.toString(),
+      change: counts.resolvedTickets + ' Resolvidos',
+      icon: LifeBuoy, color: 'text-red-600', tab: 'support'
     },
-    { 
-      label: 'Atividade (24h)', 
-      value: auditLogs.filter(l => l.timestamp > Date.now() - 86400000).length.toString(), 
-      change: 'Logs Reais', 
-      icon: History, color: 'text-purple-600', tab: 'audit' 
+    {
+      label: 'Atividade (24h)',
+      value: counts.activity24h.toString(),
+      change: 'Logs Reais',
+      icon: History, color: 'text-purple-600', tab: 'audit'
     },
   ];
 

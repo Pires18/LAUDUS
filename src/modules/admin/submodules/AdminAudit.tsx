@@ -33,6 +33,32 @@ export function AdminAudit() {
 
   const modules = Array.from(new Set(logs.map(l => l.module))).filter(Boolean);
 
+  function handleExportCsv() {
+    // Escapa um campo para CSV (aspas, vírgulas, quebras de linha).
+    const cell = (v: unknown) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ['Data/Hora', 'Usuário', 'Módulo', 'Ação', 'Detalhes', 'UserID'];
+    const rows = filtered.map(l => [
+      new Date(l.timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      l.userName || '',
+      l.module || '',
+      l.action || '',
+      l.details || '',
+      l.userId || '',
+    ].map(cell).join(','));
+    // BOM (﻿) para o Excel abrir acentos corretamente.
+    const csv = '﻿' + [header.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `auditoria_laudus_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -40,7 +66,12 @@ export function AdminAudit() {
           <h3 className="text-xl font-black text-ink-900">Histórico de Auditoria</h3>
           <p className="text-sm text-ink-500">Rastreabilidade forense de todas as ações críticas no ecossistema.</p>
         </div>
-        <button className="btn-ghost border border-ink-100 group">
+        <button
+          onClick={handleExportCsv}
+          disabled={filtered.length === 0}
+          title={filtered.length === 0 ? 'Nenhum log para exportar' : `Exportar ${filtered.length} logs filtrados`}
+          className="btn-ghost border border-ink-100 group disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           <Download size={18} className="group-hover:-translate-y-0.5 transition-transform" />
           Exportar Relatório (CSV)
         </button>
