@@ -27,8 +27,9 @@ function randomHex(bytes: number): string {
   return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Aguarda o Agente da VM responder (GET {agentUrl}/). A VM leva 1–4 min no boot.
-async function pollAgentHealth(agentUrl: string, timeoutMs = 240000): Promise<boolean> {
+// Aguarda o Agente da VM responder (GET {agentUrl}/). Sem imagem dourada, o
+// boot (apt + docker + pull do Orthanc) leva ~6 min; com imagem dourada, ~1 min.
+async function pollAgentHealth(agentUrl: string, timeoutMs = 600000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   const url = `${agentUrl.replace(/\/$/, '')}/`;
   while (Date.now() < deadline) {
@@ -150,7 +151,7 @@ export function MyPacsCard() {
           <Loader2 size={20} className="text-emerald-600 animate-spin shrink-0" />
           <div>
             <p className="text-sm font-black text-emerald-800">Criando seu PACS na nuvem…</p>
-            <p className="text-[11px] text-ink-500">Provisionando servidor, configurando Orthanc e conectando com segurança. Isso leva ~1–3 minutos.</p>
+            <p className="text-[11px] text-ink-500">Provisionando servidor, configurando Orthanc e conectando com segurança. Pode levar alguns minutos (até ~7 min na primeira vez). Mantenha esta aba aberta.</p>
           </div>
         </div>
         <div className="h-1.5 w-full bg-ink-100 rounded-full overflow-hidden">

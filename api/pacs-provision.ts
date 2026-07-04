@@ -79,6 +79,9 @@ async function createTailscaleAuthKey(): Promise<string> {
 }
 
 // startup-script (roda na VM no 1º boot): Docker+Orthanc, Tailscale, Agente, Funnel.
+// startup-script ENXUTO — a imagem dourada (laudus-pacs-v1) já traz Docker,
+// Tailscale, Node, pydicom e a imagem do Orthanc pré-baixada. Aqui só injetamos
+// a identidade/segredo e subimos os serviços → boot ~1 min (vs ~6 min do zero).
 function buildStartupScript(hostname: string): string {
   const scriptsUrl = (process.env.PACS_SCRIPTS_URL || '').replace(/\/$/, '');
   return `#!/usr/bin/env bash
@@ -86,15 +89,7 @@ set -euo pipefail
 META="http://metadata.google.internal/computeMetadata/v1/instance/attributes"
 SECRET=$(curl -s -H 'Metadata-Flavor: Google' "$META/LAUDUS_AGENT_SECRET")
 TSKEY=$(curl -s -H 'Metadata-Flavor: Google' "$META/TS_AUTHKEY")
-export DEBIAN_FRONTEND=noninteractive
-# Docker + Tailscale
-command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
-command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up --authkey="$TSKEY" --hostname="${hostname}" --ssh || true
-# Node + Python + pydicom
-apt-get update -y && apt-get install -y nodejs npm python3 python3-pip
-pip3 install --break-system-packages pydicom || pip3 install pydicom
-# Orthanc (Docker) com Worklist + DICOMweb
 mkdir -p /opt/orthanc-data/worklists /opt/orthanc /opt/laudus-agent
 cat > /opt/orthanc/orthanc.json <<'JSON'
 { "Name":"PACS LAUDUS CLOUD","StorageDirectory":"/var/lib/orthanc/db","IndexDirectory":"/var/lib/orthanc/db",
@@ -108,7 +103,7 @@ docker run -d --name orthanc --restart unless-stopped \
   -p 127.0.0.1:8042:8042 -p 0.0.0.0:4242:4242 \
   -v /opt/orthanc-data:/var/lib/orthanc/db -v /opt/orthanc-data/worklists:/var/lib/orthanc/worklists \
   -v /opt/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro orthancteam/orthanc:latest
-# Agente LAUD.US
+# Agente LAUD.US (sempre baixa a versão mais recente — não fica preso à imagem)
 curl -fsSL "${scriptsUrl}/agent.js" -o /opt/laudus-agent/agent.js
 curl -fsSL "${scriptsUrl}/generate_wl.py" -o /opt/laudus-agent/generate_wl.py
 cat > /etc/systemd/system/laudus-agent.service <<UNIT
@@ -127,7 +122,6 @@ Restart=always
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload && systemctl enable --now laudus-agent
-# Funnel do agente (porta 3000) → https público
 tailscale funnel --bg 3000 || true
 `;
 }
@@ -181,11 +175,14 @@ export default async function handler(req: any, res: any) {
       createTailscaleAuthKey(),
     ]);
 
+    // Imagem dourada (Docker+Tailscale+Node+pydicom+Orthanc pré-instalados) →
+    // boot ~1 min. Override via env PACS_IMAGE; default à família no projeto.
+    const sourceImage = process.env.PACS_IMAGE || `projects/${project}/global/images/family/laudus-pacs`;
     const instanceBody = {
       name,
       machineType: `zones/${zone}/machineTypes/${spec.machineType}`,
       disks: [
-        { boot: true, autoDelete: true, initializeParams: { sourceImage: 'projects/debian-cloud/global/images/family/debian-12', diskSizeGb: 20 } },
+        { boot: true, autoDelete: true, initializeParams: { sourceImage, diskSizeGb: 20 } },
         { autoDelete: false, initializeParams: { diskSizeGb: spec.dataDiskGb } },
       ],
       networkInterfaces: [{ network: 'global/networks/default', accessConfigs: [{ type: 'ONE_TO_ONE_NAT', name: 'External NAT' }] }],
