@@ -8,7 +8,7 @@ import { useCollection } from '../../../hooks/useFirestore';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
-import { addAuditLog } from '../../../store/db';
+import { addAuditLog, getMetricsSummary, type MetricsSummary } from '../../../store/db';
 import { updateUserRole, setUserActiveStatus, deleteUserDocument } from '../../../store/adminUsers';
 import type { UserRole } from '../../../types';
 import {
@@ -122,6 +122,11 @@ export function AdminUsersSubscriptions() {
       .catch(() => {});
   }, []);
 
+  // MRR/ARR autoritativos vêm do agregado do CRON (metrics_daily/_summary) —
+  // consistente com o dashboard. Enquanto não populado, cai no cálculo local.
+  const [summary, setSummary] = useState<MetricsSummary | null>(null);
+  useEffect(() => { getMetricsSummary().then(setSummary).catch(() => {}); }, []);
+
   if (loadingUsers || loadingSubs) {
     return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-brand-500" /></div>;
   }
@@ -158,15 +163,18 @@ export function AdminUsersSubscriptions() {
     }
   });
 
-  const arr = mrr * 12;
-  const arpu = activeCount > 0 ? mrr / activeCount : 0;
+  // Prefere o agregado do CRON (autoritativo); cai no cálculo local se ausente.
+  const mrrDisplay = summary?.mrr ?? mrr;
+  const arr = mrrDisplay * 12;
+  const activeDisplay = summary?.activeSubscribers ?? activeCount;
+  const arpu = activeDisplay > 0 ? mrrDisplay / activeDisplay : 0;
 
   const legacyUsers = users.filter(u => u.licenseExpiresAt && u.licenseExpiresAt > Date.now());
 
   // ─── Filters ─────────────────────────────────────────────────────────────────
   const filtered = users.filter(u => {
-    const txt     = `${u.name || ''} ${u.email || ''}`.toLowerCase();
     const sub     = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
+    const txt     = `${u.name || ''} ${u.email || ''} ${sub?.plan || ''} ${u.subscriptionStatus || ''}`.toLowerCase();
     const matchTx = txt.includes(search.toLowerCase());
     const matchRo = roleFilter === 'all' || u.role === roleFilter;
     const matchSt = statusFilter === 'all' || u.subscriptionStatus === statusFilter;
@@ -388,11 +396,11 @@ export function AdminUsersSubscriptions() {
       {/* ── METRICS ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {[
-          { label: 'MRR Estimado',    value: `R$ ${mrr.toLocaleString('pt-BR')}`,  icon: DollarSign,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'ARR Estimado',    value: `R$ ${arr.toLocaleString('pt-BR')}`,  icon: DollarSign,    color: 'text-emerald-700', bg: 'bg-emerald-100/50' },
+          { label: summary ? 'MRR' : 'MRR (local)', value: `R$ ${mrrDisplay.toLocaleString('pt-BR')}`,  icon: DollarSign,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'ARR',             value: `R$ ${arr.toLocaleString('pt-BR')}`,  icon: DollarSign,    color: 'text-emerald-700', bg: 'bg-emerald-100/50' },
           { label: 'ARPU',            value: `R$ ${arpu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Churn Rate',      value: `${churnRate}%`,                       icon: TrendingDown,  color: 'text-pink-600',    bg: 'bg-pink-50'    },
-          { label: 'Ativos',          value: activeCount,                           icon: Users,         color: 'text-emerald-600', bg: 'bg-emerald-50'  },
+          { label: 'Ativos',          value: activeDisplay,                         icon: Users,         color: 'text-emerald-600', bg: 'bg-emerald-50'  },
           { label: 'Trials',          value: trialCount,                            icon: Sparkles,      color: 'text-amber-600',   bg: 'bg-amber-50'   },
           { label: 'Em Atraso',       value: pastDueCount,                          icon: AlertTriangle, color: 'text-rose-600',    bg: 'bg-rose-50'    },
           { label: 'Total Usuários',  value: users.length,                          icon: Users,         color: 'text-teal-600',    bg: 'bg-teal-50'    },
@@ -447,9 +455,12 @@ export function AdminUsersSubscriptions() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Pesquisar por nome ou e-mail..."
-            className="w-full h-10 pl-9 pr-4 bg-ink-50 border border-ink-200 rounded-xl focus:border-indigo-400 outline-none text-xs font-semibold"
+            placeholder="Pesquisar por nome, e-mail, plano ou status..."
+            className="w-full h-10 pl-9 pr-24 bg-ink-50 border border-ink-200 rounded-xl focus:border-indigo-400 outline-none text-xs font-semibold"
           />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-ink-400 tabular-nums">
+            {filtered.length}/{users.length}
+          </span>
         </div>
 
         <div className="flex gap-2 flex-wrap">
