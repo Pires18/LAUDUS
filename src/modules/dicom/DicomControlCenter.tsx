@@ -7,7 +7,8 @@ import {
   HardDrive, Cloud, Info, Network, BookOpen,
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
   Copy, Check, ArrowRight, Monitor, Radio,
-  Users, Layers, Image, RefreshCw, Sparkles
+  Users, Layers, Image, RefreshCw, Sparkles,
+  SlidersHorizontal, ChevronDown
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
@@ -72,6 +73,8 @@ export function DicomControlCenter() {
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
+  // A VM autoconfigura tudo; os campos técnicos ficam recolhidos por padrão.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedSection, setSelectedSection] = useState<'overview' | 'setup_vm' | 'app_config' | 'relay' | 'backup' | 'troubleshoot' | 'concepts'>('overview');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -463,6 +466,25 @@ export function DicomControlCenter() {
                 {/* Conectar ultrassom — ajustes simples pessoais + aparelhos */}
                 <UltrasoundSetupCard />
 
+                {/* ── Configuração avançada (recolhida — a VM autoconfigura) ── */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-white border border-ink-150 hover:border-ink-300 shadow-sm transition-all"
+                >
+                  <span className="flex items-center gap-2 text-xs font-black text-ink-600 uppercase tracking-wider">
+                    <SlidersHorizontal size={14} className="text-ink-400" />
+                    Configuração avançada (manual)
+                  </span>
+                  <ChevronDown size={16} className={classNames('text-ink-400 transition-transform', showAdvanced && 'rotate-180')} />
+                </button>
+                {!showAdvanced && (
+                  <p className="text-[11px] text-ink-400 -mt-3 px-1 leading-relaxed">
+                    Servidor, agente, segredo, pasta e backup são preenchidos automaticamente pelo "Criar meu PACS". Abra apenas para ajustes ou suporte.
+                  </p>
+                )}
+
+                {showAdvanced && (<>
                 {/* Servidor PACS Principal */}
                 <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-5">
                   <div className="flex items-center gap-3 pb-3 border-b border-ink-50">
@@ -780,6 +802,7 @@ export function DicomControlCenter() {
                     </div>
                   )}
                 </div>
+                </>)}
               </div>
 
               {/* Barra Lateral de Diagnóstico e Parâmetros (Direita - 1 coluna) */}
@@ -838,66 +861,15 @@ export function DicomControlCenter() {
                   })()}
                 </div>
 
-                {/* Parâmetros Rápidos para Ultrassom */}
-                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Cpu size={16} className="text-teal-600" />
-                    <h3 className="text-xs font-black text-ink-900 uppercase tracking-wider">Parâmetros DICOM</h3>
-                  </div>
-                  <p className="text-[10px] text-ink-500 leading-normal">
-                    Utilize os valores abaixo na configuração do painel do seu aparelho de ultrassom:
-                  </p>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="p-3 bg-ink-50 border border-ink-100 rounded-xl relative group">
-                      <span className="text-[9px] font-bold text-ink-400 uppercase tracking-widest block">IP Servidor PACS (Principal)</span>
-                      <strong className="text-ink-800 text-[11px] break-all select-all font-mono">
-                        {(() => {
-                          try { return draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : '127.0.0.1'; } catch { return '127.0.0.1'; }
-                        })()}
-                      </strong>
-                      <button
-                        onClick={() => handleCopy(draft.dicomViewerUrl ? new URL(draft.dicomViewerUrl).hostname : '', 'ip')}
-                        className="absolute right-2.5 top-2.5 p-1 bg-white hover:bg-ink-100 rounded-md border border-ink-200 text-ink-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copiar IP"
-                      >
-                        {copiedField === 'ip' ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                      </button>
-                    </div>
-
-                    <div className="p-3 bg-ink-50 border border-ink-100 rounded-xl relative group">
-                      <span className="text-[9px] font-bold text-ink-400 uppercase tracking-widest block">AE Title (Orthanc)</span>
-                      <strong className="text-ink-800 text-[11px] select-all font-mono">
-                        {draft.dicomOrthancAETitle || 'ORTHANC'}
-                      </strong>
-                      <button
-                        onClick={() => handleCopy(draft.dicomOrthancAETitle || 'ORTHANC', 'aet')}
-                        className="absolute right-2.5 top-2.5 p-1 bg-white hover:bg-ink-100 rounded-md border border-ink-200 text-ink-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Copiar AE Title"
-                      >
-                        {copiedField === 'aet' ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                      </button>
-                    </div>
-
-                    <div className="p-3 bg-ink-50 border border-ink-100 rounded-xl">
-                      <span className="text-[9px] font-bold text-ink-400 uppercase tracking-widest block">Porta DICOM</span>
-                      <strong className="text-ink-800 text-[11px] font-mono">4242</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Arquivos de Manual Físicos */}
+                {/* Ajuda rápida — remete ao guia in-app em vez de repetir dados */}
                 <div className="p-4 bg-ink-900 border border-ink-800 rounded-2xl text-white space-y-2">
                   <div className="flex items-center gap-2">
-                    <FileText size={15} className="text-emerald-400" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Manual Físico Completo</span>
+                    <BookOpen size={15} className="text-emerald-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Precisa de ajuda?</span>
                   </div>
                   <p className="text-[10px] text-ink-300 leading-relaxed">
-                    Você pode acessar um manual de rede completo e detalhado com exemplos de arquivos de configuração em:
+                    Os valores para o aparelho estão no card <strong className="text-white">"Conectar meu ultrassom"</strong>. O passo a passo completo está na aba <strong className="text-white">"Guia de Configuração"</strong>.
                   </p>
-                  <div className="bg-ink-900 p-2 rounded-xl border border-ink-800 font-mono text-[9px] text-brand-300 break-all select-all">
-                    PACS_MANUAL.md
-                  </div>
                 </div>
               </div>
             </div>
