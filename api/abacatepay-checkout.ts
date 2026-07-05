@@ -121,12 +121,48 @@ export default async function handler(req: any, res: any) {
       || (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
       || 'http://localhost:5173';
 
-    // ID de produto DETERMINÍSTICO por (plano|add-on) × intervalo. Se o admin
-    // configurou um abacatePayProductId, respeita; senão gera um estável — assim
-    // a AbacatePay reconhece cada assinatura recorrente sem cadastro manual.
-    const autoProductId = (abacatePayProductId
-      || `laudus-${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${planInterval}`
+    // externalId DETERMINÍSTICO por (plano|add-on) × intervalo × preço. Inclui o
+    // preço para que uma mudança de valor gere um novo produto automaticamente.
+    const externalId = (abacatePayProductId
+      || `laudus-${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${planInterval}-${amount}`
     ).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+    // Ciclo de assinatura (produtos recorrentes). Consumível = avulso (sem cycle).
+    const cycle = addonIsOneTime ? null
+      : planInterval === 'year' ? 'ANNUALLY'
+      : planInterval === 'semester' ? 'SEMIANNUALLY'
+      : 'MONTHLY';
+
+    const apiBase = 'https://api.abacatepay.com/v2';
+    const authHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+
+    // ── Garante o produto na loja da AbacatePay (auto-cadastro) ──
+    // O checkout v2 referencia produtos EXISTENTES por id. Procuramos pelo
+    // externalId; se não existir, criamos. Assim o admin não cadastra nada.
+    let productId = '';
+    try {
+      const listRes = await fetch(`${apiBase}/products/list?externalId=${encodeURIComponent(externalId)}`, { headers: authHeaders });
+      const listJson = await listRes.json();
+      const found = Array.isArray(listJson?.data) ? listJson.data.find((p: any) => p.externalId === externalId) : null;
+      if (found?.id) productId = found.id;
+    } catch (e) {
+      console.warn('[ABACATEPAY] products/list falhou (segue p/ create):', e);
+    }
+    if (!productId) {
+      const createRes = await fetch(`${apiBase}/products/create`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ externalId, name: productName, price: amount, currency: 'BRL', ...(cycle ? { cycle } : {}) }),
+      });
+      const createJson = await createRes.json();
+      const perr = createJson?.error && (createJson.error.message || createJson.error);
+      productId = createJson?.data?.id;
+      if (!createRes.ok || perr || !productId) {
+        console.error('[ABACATEPAY] Erro ao criar produto:', JSON.stringify(createJson));
+        return res.status(500).json({ error: perr || 'Falha ao registrar o produto na AbacatePay.' });
+      }
+    }
+
     const metadata = {
       userId,
       email,
@@ -135,39 +171,30 @@ export default async function handler(req: any, res: any) {
       planId: selectedPlanId,
       interval: planInterval,
     };
-    // API oficial: POST /v1/billing/create com `products` (não `items`), preço
-    // em centavos, methods=['PIX'], frequency ONE_TIME | MULTIPLE_PAYMENTS.
-    // O erro "No products found" vinha do endpoint/campo errados (v2/items).
+
+    // Checkout v2: referencia o produto pelo id público; total vem do produto.
     const payload = {
-      // Consumível (token/laudo) = ONE_TIME; plano/módulo = MULTIPLE_PAYMENTS
-      // (a billing da AbacatePay não faz débito recorrente automático — é uma
-      // cobrança pagável a cada período; a concessão acontece no webhook).
-      frequency: addonIsOneTime ? 'ONE_TIME' : 'MULTIPLE_PAYMENTS',
-      methods: ['PIX'],
-      products: [{
-        externalId: autoProductId,
-        name: productName,
-        quantity: 1,
-        price: amount, // centavos
-      }],
+      items: [{ id: productId, quantity: 1 }],
+      methods: ['PIX', 'CARD'],
       returnUrl: `${returnBase}/#settings?tab=assinatura`,
       completionUrl: `${returnBase}/#settings?tab=assinatura`,
+      externalId,
       metadata,
     };
 
-    const response = await fetch('https://api.abacatepay.com/v1/billing/create', {
+    const response = await fetch(`${apiBase}/checkouts/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      headers: authHeaders,
       body: JSON.stringify(payload),
     });
 
     const result = await response.json();
-    // A billing retorna { data: { url, id, ... }, error }. Sucesso = url presente.
-    const billingUrl = result?.data?.url || result?.url;
+    // { data: Billing, error, success }. Sucesso = success true e url presente.
+    const billingUrl = result?.data?.url;
     const billingErr = result?.error && (result.error.message || result.error);
     if (!response.ok || billingErr || !billingUrl) {
-      console.error('[ABACATEPAY] Erro billing:', JSON.stringify(result));
-      return res.status(500).json({ error: billingErr || 'Erro ao criar cobrança.' });
+      console.error('[ABACATEPAY] Erro checkout:', JSON.stringify(result));
+      return res.status(500).json({ error: billingErr || 'Erro ao criar checkout.' });
     }
 
     // Fallback de metadata: persistimos a intenção por checkoutId para que o
