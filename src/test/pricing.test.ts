@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, planPrices, planPriceBrl, ADDON_DEFAULTS } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -81,6 +81,46 @@ describe('financeMethodKey', () => {
   it('método desconhecido/ausente → otherCount', () => {
     expect(financeMethodKey('boleto')).toBe('otherCount');
     expect(financeMethodKey(undefined)).toBe('otherCount');
+  });
+});
+
+describe('planPrices', () => {
+  it('usa o objeto prices quando presente (modelo novo)', () => {
+    expect(planPrices({ prices: { month: 149, semester: 799, year: 1490 } }))
+      .toEqual({ month: 149, semester: 799, year: 1490 });
+  });
+
+  it('deriva os 3 preços de um plano legado mensal (price + interval)', () => {
+    expect(planPrices({ price: 100, interval: 'month' }))
+      .toEqual({ month: 100, semester: 600, year: 1200 });
+  });
+
+  it('deriva o equivalente mensal de um plano legado anual', () => {
+    expect(planPrices({ price: 1200, interval: 'year' }))
+      .toEqual({ month: 100, semester: 600, year: 1200 });
+  });
+
+  it('plano sem preços → tudo zero', () => {
+    expect(planPrices({})).toEqual({ month: 0, semester: 0, year: 0 });
+    expect(planPrices(null)).toEqual({ month: 0, semester: 0, year: 0 });
+  });
+
+  it('ignora campos não-numéricos em prices', () => {
+    expect(planPrices({ prices: { month: 'x', semester: null, year: 90 } as any }))
+      .toEqual({ month: 0, semester: 0, year: 90 });
+  });
+});
+
+describe('planPriceBrl', () => {
+  const plan = { prices: { month: 149, semester: 799, year: 1490 } };
+  it('retorna o preço do intervalo pedido', () => {
+    expect(planPriceBrl(plan, 'month')).toBe(149);
+    expect(planPriceBrl(plan, 'semester')).toBe(799);
+    expect(planPriceBrl(plan, 'year')).toBe(1490);
+  });
+  it('intervalo ausente/inválido → mensal', () => {
+    expect(planPriceBrl(plan)).toBe(149);
+    expect(planPriceBrl(plan, 'weekly')).toBe(149);
   });
 });
 

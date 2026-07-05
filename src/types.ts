@@ -541,8 +541,14 @@ export interface Plan {
   id: string;
   name: string;
   description: string;
+  /**
+   * Os 3 preços do plano (R$) — um único plano cobre mensal/semestral/anual.
+   * O usuário escolhe o intervalo no checkout; ver planPrices()/planPriceBrl().
+   */
+  prices?: { month: number; semester: number; year: number };
+  /** @deprecated Legado — preço único. Use `prices`. Mantido para compat. */
   price: number;
-  /** Mensal, Semestral ou Anual. Só o Anual é recorrente (ver isRecurringInterval). */
+  /** @deprecated Legado — intervalo único do plano. O plano agora cobre os 3. */
   interval: 'month' | 'semester' | 'year';
   /** Recorrência (auto-renova). Derivado do intervalo (só 'year'); persistido p/ o webhook. */
   autoRenew?: boolean;

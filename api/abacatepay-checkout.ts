@@ -1,6 +1,6 @@
 import { getDb } from './_firebase.js';
 import { verifyAuth, isProduction } from './_auth.js';
-import { mapAddonKey, ADDON_NAMES, resolveAddon, intervalMultiplier } from './_pricing.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon, intervalMultiplier, planPriceBrl } from './_pricing.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -84,14 +84,17 @@ export default async function handler(req: any, res: any) {
       }
       if (addonMeta?.abacatePayProductId) abacatePayProductId = addonMeta.abacatePayProductId;
     } else {
+      // Intervalo escolhido pelo usuário (mensal/semestral/anual) — o plano tem
+      // os 3 preços embutidos, então selecionamos o certo por `prices[interval]`.
+      planInterval = ['month', 'semester', 'year'].includes(reqInterval) ? reqInterval : 'month';
+      const intLabel = planInterval === 'year' ? 'Anual' : planInterval === 'semester' ? 'Semestral' : 'Mensal';
       if (selectedPlanId) {
         const planSnap = await db.collection('saas_plans').doc(selectedPlanId).get();
         if (planSnap.exists) {
           const planData = planSnap.data();
           if (planData) {
-            productName = `Plano ${planData.name}`;
-            amount = Math.round((planData.price || 149) * 100);
-            planInterval = planData.interval || 'month';
+            productName = `Plano ${planData.name} (${intLabel})`;
+            amount = Math.round(planPriceBrl(planData, planInterval) * 100) || 14900;
             if (planData.abacatePayProductId) abacatePayProductId = planData.abacatePayProductId;
           }
         }
@@ -100,9 +103,8 @@ export default async function handler(req: any, res: any) {
         const basePlan = plansQuery.docs.find((d: any) => d.data().name?.toLowerCase().includes('base'));
         if (basePlan) {
           selectedPlanId = basePlan.id;
-          productName = `Plano ${basePlan.data().name}`;
-          amount = Math.round((basePlan.data().price || 149) * 100);
-          planInterval = basePlan.data().interval || 'month';
+          productName = `Plano ${basePlan.data().name} (${intLabel})`;
+          amount = Math.round(planPriceBrl(basePlan.data(), planInterval) * 100) || 14900;
           if (basePlan.data().abacatePayProductId) abacatePayProductId = basePlan.data().abacatePayProductId;
         }
       }

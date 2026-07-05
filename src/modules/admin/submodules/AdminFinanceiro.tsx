@@ -15,6 +15,7 @@ import { useConfirm } from '../../../hooks/useConfirm';
 import { getAiUsageStats } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
+import { planPrices } from '../../../../api/_pricing';
 import { Modal } from '../../../components/Modal';
 import {
   DollarSign, Settings, Cpu, Loader2, Save, Plus, Trash2, Edit3,
@@ -33,6 +34,7 @@ type PlanForm = Omit<Plan, 'id' | 'examLimit' | 'clinicLimit' | 'iaLimit' | 'sto
 const EMPTY_PLAN: PlanForm = {
   name: '',
   description: '',
+  prices: { month: 149, semester: 149 * 6, year: 149 * 12 },
   price: 149,
   interval: 'month',
   active: true,
@@ -164,7 +166,8 @@ function PlansTab() {
   const openNew = () => { setForm(EMPTY_PLAN); setEditingId(null); setShowForm(true); };
 
   const openEdit = (plan: Plan & { id: string }) => {
-    setForm({ ...EMPTY_PLAN, ...plan });
+    // Migra planos legados (price único) para o modelo de 3 preços embutidos.
+    setForm({ ...EMPTY_PLAN, ...plan, prices: planPrices(plan) });
     setEditingId(plan.id);
     setShowForm(true);
   };
@@ -173,7 +176,16 @@ function PlansTab() {
     if (!form.name.trim()) { showToast('Nome do plano é obrigatório.', 'error'); return; }
     setSaving(true);
     try {
-      const data = { ...form, updatedAt: Date.now() };
+      const prices = form.prices || { month: form.price || 0, semester: (form.price || 0) * 6, year: (form.price || 0) * 12 };
+      // `price` (legado) espelha o mensal; `interval` fica 'month' — o plano cobre os 3.
+      const data = {
+        ...form,
+        prices,
+        price: prices.month,
+        interval: 'month' as const,
+        category: 'subscription' as const,
+        updatedAt: Date.now(),
+      };
       if (editingId) {
         await updateDoc(doc(firestore, 'saas_plans', editingId), data);
         showToast('Plano atualizado!', 'success');
@@ -204,45 +216,6 @@ function PlansTab() {
       showToast('Plano removido.', 'info');
       await loadPlans();
     } catch { showToast('Erro ao remover plano.', 'error'); }
-  };
-
-  // Gera as 3 variações de intervalo (mensal/semestral/anual) do plano em edição,
-  // todas como assinatura recorrente e mesmo tier (agrupa na vitrine). Os IDs de
-  // produto são automáticos (checkout); o admin só ajusta os preços depois.
-  const handleGenerateVariants = async () => {
-    if (!form.name.trim()) { showToast('Preencha o nome do plano antes de gerar variações.', 'error'); return; }
-    setSaving(true);
-    try {
-      const baseName = form.name.replace(/\s*[—-]\s*(Mensal|Semestral|Anual)\s*$/i, '').trim();
-      const tier = (form.tier || baseName).trim();
-      const variants: { interval: 'month' | 'semester' | 'year'; label: string; mult: number }[] = [
-        { interval: 'month',    label: 'Mensal',    mult: 1  },
-        { interval: 'semester', label: 'Semestral', mult: 6  },
-        { interval: 'year',     label: 'Anual',     mult: 12 },
-      ];
-      for (const v of variants) {
-        await addDoc(collection(firestore, 'saas_plans'), {
-          ...form,
-          name: `${baseName} — ${v.label}`,
-          tier,
-          interval: v.interval,
-          autoRenew: true,
-          category: 'subscription',
-          price: Math.round((form.price || 0) * v.mult * 100) / 100,
-          featured: v.interval === 'year' && !!form.featured,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-      }
-      showToast(`3 variações de "${baseName}" criadas (mensal/semestral/anual). Ajuste os preços se quiser.`, 'success');
-      setShowForm(false);
-      setEditingId(null);
-      await loadPlans();
-    } catch {
-      showToast('Erro ao gerar variações.', 'error');
-    } finally {
-      setSaving(false);
-    }
   };
 
   if (loading) return <Spinner />;
@@ -281,7 +254,6 @@ function PlansTab() {
           form={form} setForm={setForm}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingId(null); }}
-          onGenerateVariants={handleGenerateVariants}
           saving={saving}
           isNew={!editingId}
         />
@@ -316,10 +288,26 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan & { id: string }; onE
         </span>
       </div>
 
-      <div className="text-2xl font-black text-ink-950">
-        R$ {plan.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-        <span className="text-xs font-medium text-ink-400">/{plan.interval === 'year' ? 'ano' : plan.interval === 'semester' ? 'semestre' : 'mês'}</span>
-      </div>
+      {(() => {
+        const pr = planPrices(plan);
+        const fmt = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        return (
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { label: 'Mensal',    value: pr.month },
+              { label: 'Semestral', value: pr.semester },
+              { label: 'Anual',     value: pr.year },
+            ].map(x => (
+              <div key={x.label} className="bg-ink-50/60 rounded-lg px-2 py-1.5 text-center">
+                <div className="text-[8px] font-black text-ink-400 uppercase tracking-widest">{x.label}</div>
+                <div className="text-sm font-black text-ink-950 leading-tight mt-0.5">
+                  <span className="text-[9px] text-ink-400 font-bold">R$</span> {fmt(x.value)}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-2 gap-1.5">
         <Pill label={plan.reportsQuota   === 0 ? 'Laudos ∞' : `${plan.reportsQuota} laudos/mês`}           on />
@@ -371,22 +359,19 @@ function Pill({ label, on }: { label: string; on: boolean }) {
   );
 }
 
-function PlanFormModal({ form, setForm, onSave, onCancel, onGenerateVariants, saving, isNew }: {
+function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
   form: PlanForm; setForm: (f: PlanForm) => void;
-  onSave: () => void; onCancel: () => void; onGenerateVariants: () => void;
+  onSave: () => void; onCancel: () => void;
   saving: boolean; isNew: boolean;
 }) {
   const set = <K extends keyof PlanForm>(k: K, v: PlanForm[K]) => setForm({ ...form, [k]: v });
+  const prices = form.prices || { month: form.price || 0, semester: (form.price || 0) * 6, year: (form.price || 0) * 12 };
+  const setPrice = (k: 'month' | 'semester' | 'year', v: number) => set('prices', { ...prices, [k]: v });
 
   const modalFooter = (
     <>
       <button onClick={onCancel} className="h-10 px-4 rounded-xl border border-ink-200 text-ink-700 text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all">
         Cancelar
-      </button>
-      <button onClick={onGenerateVariants} disabled={saving}
-        title="Cria os 3 planos (mensal/semestral/anual) deste tier de uma vez, todos recorrentes"
-        className="flex items-center gap-2 h-10 px-4 border border-brand-200 text-brand-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-50 disabled:opacity-50 transition-all">
-        <Plus size={13} /> Gerar 3 intervalos
       </button>
       <button onClick={onSave} disabled={saving}
         className="flex items-center gap-2 h-10 px-5 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all">
@@ -422,34 +407,42 @@ function PlanFormModal({ form, setForm, onSave, onCancel, onGenerateVariants, sa
                 className="input text-sm w-full resize-none" rows={2} />
             </div>
             <div>
-              <FormLabel>Preço (R$)</FormLabel>
-              <input type="number" min={0} step={0.01} value={form.price}
-                onChange={e => set('price', parseFloat(e.target.value) || 0)}
-                className="input h-10 text-sm w-full" />
-            </div>
-            <div>
-              <FormLabel>Periodicidade</FormLabel>
-              <select value={form.interval} onChange={e => set('interval', e.target.value as 'month' | 'semester' | 'year')} className="input h-10 text-sm w-full">
-                <option value="month">Mensal</option>
-                <option value="semester">Semestral</option>
-                <option value="year">Anual</option>
-              </select>
-              <p className="text-[10px] text-ink-400 mt-1 leading-relaxed">
-                {form.interval === 'year'
-                  ? '↻ Anual = assinatura recorrente (auto-renova na AbacatePay).'
-                  : '• Pagamento único: vale pelo período e expira (o cliente re-compra).'}
-              </p>
-            </div>
-            <div>
               <FormLabel>ID Produto AbacatePay</FormLabel>
               <input type="text" value={form.abacatePayProductId || ''} onChange={e => set('abacatePayProductId', e.target.value)}
-                className="input h-10 text-sm w-full" placeholder="prod_XXXX" />
+                className="input h-10 text-sm w-full" placeholder="opcional — auto-gerado" />
             </div>
             <div>
               <FormLabel>Dias de Trial</FormLabel>
               <input type="number" min={0} value={form.trialDays} onChange={e => set('trialDays', parseInt(e.target.value) || 0)} className="input h-10 text-sm w-full" />
             </div>
           </div>
+        </section>
+
+        {/* Preços — os 3 intervalos no mesmo plano */}
+        <section className="space-y-3">
+          <SectionTitle>Preços por Intervalo</SectionTitle>
+          <p className="text-[11px] text-ink-500 font-medium -mt-1">
+            Um único plano cobre os 3 intervalos. O usuário escolhe mensal, semestral ou anual no checkout.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {([
+              { key: 'month'    as const, label: 'Mensal',    hint: 'cobrado a cada mês' },
+              { key: 'semester' as const, label: 'Semestral', hint: 'cobrado a cada 6 meses' },
+              { key: 'year'     as const, label: 'Anual',     hint: 'cobrado a cada 12 meses' },
+            ]).map(iv => (
+              <div key={iv.key} className="rounded-xl border border-ink-100 bg-ink-50/40 p-3">
+                <FormLabel>{iv.label} (R$)</FormLabel>
+                <input type="number" min={0} step={0.01} value={prices[iv.key]}
+                  onChange={e => setPrice(iv.key, parseFloat(e.target.value) || 0)}
+                  className="input h-10 text-sm w-full font-black" />
+                <p className="text-[9px] text-ink-400 mt-1">{iv.hint}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-ink-400 leading-relaxed flex items-start gap-1.5">
+            <Info size={12} className="shrink-0 mt-0.5" />
+            Todos os intervalos são cobrados como assinatura recorrente na AbacatePay. Os IDs de produto são gerados automaticamente por intervalo.
+          </p>
         </section>
 
         {/* Quotas */}

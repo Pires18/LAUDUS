@@ -106,6 +106,38 @@ export function intervalMultiplier(interval?: string): number {
 }
 
 /**
+ * Normaliza os 3 preços (mensal/semestral/anual) de um plano.
+ *
+ * Modelo novo: o plano guarda `prices: { month, semester, year }` — um único
+ * documento cobre os 3 intervalos, sem precisar duplicar planos.
+ *
+ * Compat: planos legados guardavam um único `price` + `interval`; nesse caso
+ * derivamos o equivalente mensal e projetamos os 3 intervalos.
+ * Fonte única usada por checkout, vitrine e admin.
+ */
+export function planPrices(plan: any): { month: number; semester: number; year: number } {
+  const p = plan?.prices;
+  if (p && typeof p === 'object') {
+    return {
+      month:    Number(p.month)    || 0,
+      semester: Number(p.semester) || 0,
+      year:     Number(p.year)     || 0,
+    };
+  }
+  const base = Number(plan?.price) || 0;
+  const iv = plan?.interval || 'month';
+  const monthly = iv === 'year' ? base / 12 : iv === 'semester' ? base / 6 : base;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { month: round(monthly), semester: round(monthly * 6), year: round(monthly * 12) };
+}
+
+/** Preço (R$) de um plano para um intervalo específico. */
+export function planPriceBrl(plan: any, interval?: string): number {
+  const iv: PlanInterval = interval === 'year' ? 'year' : interval === 'semester' ? 'semester' : 'month';
+  return planPrices(plan)[iv];
+}
+
+/**
  * Resolve preço (em centavos) e bundleSize de um add-on, priorizando o
  * metadata do Firestore e caindo para os defaults acima.
  */

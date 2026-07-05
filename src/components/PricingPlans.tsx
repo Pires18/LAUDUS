@@ -4,6 +4,7 @@ import { firestore } from '../lib/firebase';
 import { Plan } from '../types';
 import { logger } from '../utils/logger';
 import { classNames } from '../utils/format';
+import { planPriceBrl, planPrices } from '../../api/_pricing';
 import { X, Check, Loader2, Sparkles, Calculator, Database, CalendarDays, Building2, Star } from 'lucide-react';
 
 interface Props {
@@ -33,8 +34,8 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
         if (!active) return;
         const list = snap.docs
           .map(d => ({ id: d.id, ...d.data() } as Plan & { id: string }))
-          .filter(p => !p.id.startsWith('LICENSE_'))
-          .sort((a, b) => (a.price || 0) - (b.price || 0));
+          .filter(p => !p.id.startsWith('LICENSE_') && p.category !== 'pacs')
+          .sort((a, b) => planPrices(a).month - planPrices(b).month);
         setPlans(list);
       } catch (err) {
         logger.error('[PricingPlans] Falha ao carregar planos:', err);
@@ -76,33 +77,32 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
               </button>
             </div>
           ) : (() => {
-            const available = ['month', 'semester', 'year'].filter(iv => plans.some(p => (p.interval || 'month') === iv)) as ('month' | 'semester' | 'year')[];
-            const activeIv = available.includes(interval) ? interval : (available[0] || 'month');
-            const shown = plans.filter(p => (p.interval || 'month') === activeIv);
+            // Cada plano cobre os 3 intervalos — o seletor troca só o preço exibido.
+            const available: ('month' | 'semester' | 'year')[] = ['month', 'semester', 'year'];
+            const activeIv = interval;
             const label: Record<string, string> = { month: 'Mensal', semester: 'Semestral', year: 'Anual' };
+            const savingHint: Record<string, string> = { month: '', semester: '−1 mês grátis', year: '−2 meses grátis' };
             return (
               <>
-                {available.length > 1 && (
-                  <div className="flex justify-center mb-7">
-                    <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-2xl border border-ink-200">
-                      {available.map(iv => (
-                        <button
-                          key={iv}
-                          onClick={() => setInterval(iv)}
-                          className={classNames(
-                            'px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all',
-                            activeIv === iv ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-800'
-                          )}
-                        >
-                          {label[iv]}{iv === 'year' && <span className="ml-1 text-[8px] opacity-80">↻</span>}
-                        </button>
-                      ))}
-                    </div>
+                <div className="flex justify-center mb-7">
+                  <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-2xl border border-ink-200">
+                    {available.map(iv => (
+                      <button
+                        key={iv}
+                        onClick={() => setInterval(iv)}
+                        className={classNames(
+                          'relative px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all',
+                          activeIv === iv ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-800'
+                        )}
+                      >
+                        {label[iv]}
+                      </button>
+                    ))}
                   </div>
-                )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {shown.map((p) => (
-                    <PlanCard key={p.id} plan={p} onChoose={() => onChoose(p.id)} />
+                  {plans.map((p) => (
+                    <PlanCard key={p.id} plan={p} interval={activeIv} savingHint={savingHint[activeIv]} onChoose={() => onChoose(p.id)} />
                   ))}
                 </div>
               </>
@@ -118,11 +118,11 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
   );
 }
 
-function PlanCard({ plan, onChoose }: { plan: Plan & { id: string }; onChoose: () => void }) {
+function PlanCard({ plan, interval, savingHint, onChoose }: { plan: Plan & { id: string }; interval: 'month' | 'semester' | 'year'; savingHint?: string; onChoose: () => void }) {
   const featured = !!plan.featured;
-  const price = plan.price || 0;
-  const recurring = plan.interval === 'year';
-  const period = plan.interval === 'year' ? '/ano' : plan.interval === 'semester' ? '/semestre' : '/mês';
+  const price = planPriceBrl(plan, interval);
+  const recurring = true; // todos os intervalos são assinatura recorrente
+  const period = interval === 'year' ? '/ano' : interval === 'semester' ? '/semestre' : '/mês';
   const reports = plan.reportsQuota === 0 ? 'Laudos ilimitados' : `${plan.reportsQuota} laudos/mês`;
   const addons: { on: boolean | undefined; icon: any; label: string }[] = [
     { on: plan.includesCalculators, icon: Calculator, label: 'Calculadoras clínicas' },
@@ -148,12 +148,16 @@ function PlanCard({ plan, onChoose }: { plan: Plan & { id: string }; onChoose: (
         <span className="text-3xl font-black text-ink-900">R$ {price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
         <span className="text-xs font-bold text-ink-400 mb-1">{period}</span>
       </div>
-      <span className={classNames(
-        'mt-1.5 inline-flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md',
-        recurring ? 'bg-brand-50 text-brand-700 border border-brand-100' : 'bg-ink-100 text-ink-500'
-      )}>
-        {recurring ? '↻ Assinatura recorrente' : '• Pagamento único'}
-      </span>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-brand-50 text-brand-700 border border-brand-100">
+          ↻ Assinatura recorrente
+        </span>
+        {savingHint && (
+          <span className="inline-flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">
+            {savingHint}
+          </span>
+        )}
+      </div>
       {plan.trialDays > 0 && (
         <span className="mt-2 inline-flex w-fit items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
           {plan.trialDays} dias grátis

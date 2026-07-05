@@ -7,6 +7,7 @@ import { createSupportTicket, getAiUsageStats } from '../../store/db';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { firestore, auth } from '../../lib/firebase';
 import { classNames } from '../../utils/format';
+import { planPriceBrl } from '../../../api/_pricing';
 import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText,
@@ -56,6 +57,7 @@ export function SubscriptionCenter() {
   const confirm = useConfirm();
 
   const [loadingAddon,      setLoadingAddon]      = useState<string | null>(null);
+  const [planInterval,      setPlanInterval]      = useState<'month' | 'semester' | 'year'>('month');
   const [addonInterval,     setAddonInterval]     = useState<'month' | 'semester' | 'year'>('month');
   const addonMult = addonInterval === 'year' ? 12 : addonInterval === 'semester' ? 6 : 1;
   const addonPer = addonInterval === 'year' ? 'ano' : addonInterval === 'semester' ? 'semestre' : 'mês';
@@ -182,7 +184,7 @@ export function SubscriptionCenter() {
       const res = await fetch('/api/abacatepay-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
-        body: JSON.stringify({ userId: user.uid, email: user.email, type: 'subscription', planId }),
+        body: JSON.stringify({ userId: user.uid, email: user.email, type: 'subscription', planId, interval: planInterval }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao iniciar checkout.');
@@ -282,6 +284,30 @@ export function SubscriptionCenter() {
       {(!subscription || isCanceled) && plansList.length > 0 && (
         <div className="space-y-4">
           <SectionHeader icon={Sparkles} title="Escolha seu Plano de Assinatura" />
+
+          {/* Seletor de intervalo — cada plano cobre os 3 (mensal/semestral/anual) */}
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-2xl border border-ink-200">
+              {([
+                { iv: 'month'    as const, label: 'Mensal',    hint: '' },
+                { iv: 'semester' as const, label: 'Semestral', hint: '−1 mês' },
+                { iv: 'year'     as const, label: 'Anual',     hint: '−2 meses' },
+              ]).map(o => (
+                <button
+                  key={o.iv}
+                  onClick={() => setPlanInterval(o.iv)}
+                  className={classNames(
+                    'px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5',
+                    planInterval === o.iv ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-800'
+                  )}
+                >
+                  {o.label}
+                  {o.hint && <span className={classNames('text-[8px] font-black px-1 rounded', planInterval === o.iv ? 'bg-white/20' : 'text-emerald-600')}>{o.hint}</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {plansList.map((p) => {
               const isSelected = (subscription as any)?.planId === p.id;
@@ -305,11 +331,18 @@ export function SubscriptionCenter() {
                     <h4 className="text-sm font-black text-ink-950">{p.name}</h4>
                     {p.description && <p className="text-[10px] text-ink-400 font-medium leading-relaxed mt-0.5">{p.description}</p>}
 
-                    <div className="flex items-baseline gap-0.5 my-4">
-                      <span className="text-xs font-bold text-ink-400">R$</span>
-                      <span className="text-3xl font-black text-ink-950 tracking-tight">{Math.floor(p.price)}</span>
-                      <span className="text-[10px] font-bold text-ink-400">,00/{p.interval === 'year' ? 'ano' : p.interval === 'semester' ? 'semestre' : 'mês'}</span>
-                    </div>
+                    {(() => {
+                      const pv = planPriceBrl(p, planInterval);
+                      const per = planInterval === 'year' ? 'ano' : planInterval === 'semester' ? 'semestre' : 'mês';
+                      const cents = Math.round((pv % 1) * 100).toString().padStart(2, '0');
+                      return (
+                        <div className="flex items-baseline gap-0.5 my-4">
+                          <span className="text-xs font-bold text-ink-400">R$</span>
+                          <span className="text-3xl font-black text-ink-950 tracking-tight">{Math.floor(pv)}</span>
+                          <span className="text-[10px] font-bold text-ink-400">,{cents}/{per}</span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="space-y-2 border-t border-ink-50 pt-3 text-[11px] font-medium text-ink-600">
                       <div className="flex items-center gap-2">
@@ -409,7 +442,7 @@ export function SubscriptionCenter() {
                   </div>
                   <p className="text-[11px] text-ink-400 font-medium mt-0.5">
                     {subscription?.lifetime
-                      ? '♾️ Plano vitalício · sem expiração'
+                      ? '♾️ Plano vitalício · acesso permanente sem custos'
                       : isTrialing
                       ? `Trial expira em ${trialDaysLeft} dias`
                       : nextReset
@@ -443,7 +476,7 @@ export function SubscriptionCenter() {
             <div className="flex gap-2 flex-wrap">
               {subscription?.lifetime && (
                 <span className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-violet-50 border border-violet-100 text-violet-600 flex items-center gap-1.5">
-                  ♾️ Vitalício
+                  ♾️ Vitalício · R$ 0 — sem cobranças
                 </span>
               )}
               {!isCanceled && !subscription?.lifetime && (
