@@ -162,8 +162,12 @@ service cloud.firestore {
     }
 
     // ---- Configuração global e mensagens de sistema -----------------------
+    // Docs SENSÍVEIS (chave de pagamento, receita agregada) → só admin.
+    // Demais docs (prompts/planos/preços que os usuários herdam) → qualquer
+    // usuário autenticado. Nenhum cliente não-admin lê os sensíveis.
     match /global_config/{docId} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin()
+        || (isSignedIn() && !(docId in ['abacatepay_config', 'finance_stats']));
       allow write: if isAdmin();
     }
 
