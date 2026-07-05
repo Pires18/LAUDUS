@@ -4,6 +4,7 @@ import { FormLabel, NumInput, BoolToggle, MiniToggle, TextField, PasswordField }
 import { TransactionsTab } from './finance/TransactionsTab';
 import { PacsPlansTab } from './finance/PacsPlansTab';
 import { VmInfraTab } from './finance/VmInfraTab';
+import { FinanceOverviewTab } from './finance/FinanceOverviewTab';
 import { Spinner } from './finance/Spinner';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
@@ -23,10 +24,10 @@ import {
   Info, BarChart3, Check, X, RefreshCw, Calculator, Database,
   FileText, Building2, Zap, Sparkles, Globe, Lock, Eye, EyeOff,
   Copy, CheckCheck, Terminal, Key, QrCode, CreditCard, ShieldCheck,
-  AlertTriangle, CalendarDays, Hospital, Server,
+  AlertTriangle, CalendarDays, Hospital, Server, Wallet,
 } from 'lucide-react';
 
-type FinTab = 'plans' | 'pacs-plans' | 'vm-infra' | 'features' | 'extra-resources' | 'abacatepay' | 'ia-costs' | 'transactions';
+type FinTab = 'overview' | 'plans' | 'pacs-plans' | 'vm-infra' | 'features' | 'extra-resources' | 'abacatepay' | 'ia-costs' | 'transactions';
 
 // ─── Plan form ───────────────────────────────────────────────────────────────
 
@@ -97,9 +98,10 @@ const GEMINI_PRICING: Record<string, { inputPer1M: number; outputPer1M: number; 
 // ─── Shared helper components ─────────────────────────────────────────────────
 
 export function AdminFinanceiro() {
-  const [activeTab, setActiveTab] = useState<FinTab>('plans');
+  const [activeTab, setActiveTab] = useState<FinTab>('overview');
 
   const tabs: { id: FinTab; label: string; icon: typeof DollarSign }[] = [
+    { id: 'overview',        label: 'Central',           icon: Wallet     },
     { id: 'plans',           label: 'Planos',            icon: DollarSign },
     { id: 'pacs-plans',      label: 'Planos PACS',       icon: Database   },
     { id: 'vm-infra',        label: 'VMs / Infra',       icon: Server     },
@@ -131,6 +133,7 @@ export function AdminFinanceiro() {
         })}
       </div>
 
+      {activeTab === 'overview'         && <FinanceOverviewTab />}
       {activeTab === 'plans'            && <PlansTab />}
       {activeTab === 'pacs-plans'       && <PacsPlansTab />}
       {activeTab === 'vm-infra'         && <VmInfraTab />}
