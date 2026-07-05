@@ -200,6 +200,10 @@ function PlansTab() {
         price: prices.month,
         interval: 'month' as const,
         category: 'subscription' as const,
+        // Laudos unificados em LAUD.IA: Lite não tem limite próprio (sai do total).
+        // A quota Pro só existe quando o Motor Pro está incluso no plano.
+        tokenQuotaLite: 0,
+        tokenQuotaPro: formData.motorProDefault ? formData.tokenQuotaPro : 0,
         updatedAt: Date.now(),
       };
       if (editingId) {
@@ -408,10 +412,11 @@ function PlanCard({ plan, selected, onToggleSelect, onEdit, onDelete }: { plan: 
       })()}
 
       <div className="grid grid-cols-2 gap-1.5">
-        <Pill label={plan.reportsQuota   === 0 ? 'Laudos ∞' : `${plan.reportsQuota} laudos/mês`}           on />
-        <Pill label={plan.clinicsQuota   === 0 ? 'Clínicas ∞' : `${plan.clinicsQuota} clínicas`}           on />
-        <Pill label={plan.tokenQuotaLite === 0 ? 'Lite ∞' : `${plan.tokenQuotaLite} laudos Lite`}          on />
-        <Pill label={plan.tokenQuotaPro  === 0 ? 'Pro ∞' : `${plan.tokenQuotaPro} laudos Pro`}             on />
+        <Pill label={plan.reportsQuota === 0 ? 'Laudos LAUD.IA ∞' : `${plan.reportsQuota} laudos LAUD.IA/mês`} on />
+        <Pill label={plan.clinicsQuota === 0 ? 'Clínicas ∞' : `${plan.clinicsQuota} clínicas`}                on />
+        {plan.motorProDefault && (
+          <Pill label={plan.tokenQuotaPro === 0 ? 'Laudos Pro ∞' : `${plan.tokenQuotaPro} laudos Pro`} on />
+        )}
         <Pill label="Calculadoras" on={plan.includesCalculators} />
         <Pill label="PACS/DICOM"   on={plan.includesPacs} />
         <Pill label="Agendamentos" on={plan.includesAppointments ?? false} />
@@ -541,12 +546,19 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
         {/* Quotas */}
         <section className="space-y-3">
           <SectionTitle>Quotas e Limites</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <NumInput label="Laudos/mês (total)"    hint="0 = ilimitado" value={form.reportsQuota}    onChange={v => set('reportsQuota', v)}    />
-            <NumInput label="Clínicas"              hint="0 = ilimitado" value={form.clinicsQuota}    onChange={v => set('clinicsQuota', v)}    />
-            <NumInput label="Laudos Lite / mês"     hint="0 = ilimitado (1 laudo = 1 Token Lite)"  value={form.tokenQuotaLite}  onChange={v => set('tokenQuotaLite', v)} />
-            <NumInput label="Laudos Pro / mês"      hint="0 = ilimitado (1 laudo = 1 Token Pro)"   value={form.tokenQuotaPro}   onChange={v => set('tokenQuotaPro', v)}  />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <NumInput label="Laudos LAUD.IA / mês" hint="0 = ilimitado · total unificado (Lite + Pro)" value={form.reportsQuota} onChange={v => set('reportsQuota', v)} />
+            <NumInput label="Clínicas"             hint="0 = ilimitado" value={form.clinicsQuota} onChange={v => set('clinicsQuota', v)} />
+            {form.motorProDefault && (
+              <NumInput label="Laudos Pro / mês" hint="0 = ilimitado · quantos do total podem usar o Motor Pro" value={form.tokenQuotaPro} onChange={v => set('tokenQuotaPro', v)} />
+            )}
           </div>
+          <p className="text-[10px] text-ink-400 leading-relaxed flex items-start gap-1.5">
+            <Info size={12} className="shrink-0 mt-0.5" />
+            {form.motorProDefault
+              ? 'Os laudos LAUD.IA são um total único (Lite + Pro). A quota "Laudos Pro" limita quantos desse total podem usar o Motor Pro.'
+              : 'Ative o Motor Pro (abaixo) para liberar uma quota específica de laudos Pro. Sem ele, todos os laudos usam o Motor Lite dentro do total LAUD.IA.'}
+          </p>
         </section>
 
         {/* Funcionalidades */}

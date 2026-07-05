@@ -358,16 +358,10 @@ export function SubscriptionCenter() {
                         <CheckCircle2 size={12} className="text-indigo-600 shrink-0" />
                         <span>Até <strong>{p.clinicsQuota === 0 ? 'clínicas ilimitadas' : `${p.clinicsQuota} clínicas`}</strong></span>
                       </div>
-                      {p.tokenQuotaLite > 0 && (
+                      {p.motorProDefault && p.tokenQuotaPro > 0 && (
                         <div className="flex items-center gap-2">
-                          <CheckCircle2 size={12} className="text-indigo-600 shrink-0" />
-                          <span>Gerações Lite: <strong>{p.tokenQuotaLite}/mês</strong></span>
-                        </div>
-                      )}
-                      {p.tokenQuotaPro > 0 && (
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 size={12} className="text-indigo-600 shrink-0" />
-                          <span>Gerações Pro: <strong>{p.tokenQuotaPro}/mês</strong></span>
+                          <CheckCircle2 size={12} className="text-violet-600 shrink-0" />
+                          <span>Motor Pro: <strong>{p.tokenQuotaPro} laudos Pro/mês</strong></span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
@@ -521,7 +515,7 @@ export function SubscriptionCenter() {
             {/* Total quota bar */}
             <div>
               <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-bold text-ink-700">Total de Laudos (mês)</span>
+                <span className="font-bold text-ink-700">Laudos LAUD.IA (mês)</span>
                 <span className={classNames('font-black', isHighUsage ? 'text-rose-600' : 'text-ink-600')}>
                   {reportsUsed} / {reportsQuota === 9999 ? '∞' : reportsQuota}
                 </span>
@@ -541,10 +535,11 @@ export function SubscriptionCenter() {
               )}
             </div>
 
-            {/* Lite / Pro breakdown */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-ink-50">
+            {/* Breakdown — laudos LAUD.IA unificados; a quota Pro só aparece
+                quando o Motor Pro está disponível para o usuário. */}
+            <div className={classNames('grid gap-3 pt-2 border-t border-ink-50', canUsePro ? 'grid-cols-2' : 'grid-cols-1')}>
               <LaudoBar tier="lite" used={laudoStats.liteCount} quota={tokenQuotaLite} percent={litePct} />
-              <LaudoBar tier="pro"  used={laudoStats.proCount}  quota={tokenQuotaPro}  percent={proPct}  />
+              {canUsePro && <LaudoBar tier="pro" used={laudoStats.proCount} quota={tokenQuotaPro} percent={proPct} />}
             </div>
 
             <div className="flex items-center justify-between text-[10px] text-ink-400 pt-1">
