@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { 
-  Loader2, ShieldCheck, Sparkles, 
+import {
+  Loader2, ShieldCheck, Sparkles,
   Lock, CheckCircle, FileText, Layers,
-  Mail, KeyRound
+  Mail, KeyRound, Database, Calculator, CalendarDays, Building2, CreditCard
 } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
+
+const LANDING_FEATURES = [
+  { icon: Sparkles,    label: 'Laudos com IA' },
+  { icon: Database,    label: 'PACS / DICOM' },
+  { icon: Calculator,  label: 'Calculadoras clínicas' },
+  { icon: CalendarDays,label: 'Agenda & Worklist' },
+  { icon: Building2,   label: 'Múltiplas clínicas' },
+  { icon: CreditCard,  label: 'Planos & assinatura' },
+];
 
 export function LoginScreen() {
   const { signIn, signInWithEmail, signUpWithEmail, loading, error } = useAuth();
@@ -49,34 +58,52 @@ export function LoginScreen() {
           </div>
         </div>
 
-        {/* Center: Minimalist Proposition */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center items-start max-w-lg mt-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-ink-100 border border-ink-200 mb-6">
+        {/* Center: Value proposition + real feature map */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center items-start max-w-lg mt-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-100 mb-6">
             <Sparkles size={14} className="text-brand-500" />
-            <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">LAUD.IA CORE V2.0 ATIVO</span>
+            <span className="text-[10px] font-black text-brand-700 uppercase tracking-widest">LAUD.IA · Powered by Google Gemini</span>
           </div>
-          
-          <h2 className="text-4xl xl:text-5xl font-black tracking-tight leading-[1.1] text-ink-900 mb-6">
-            Inteligência e agilidade na sua rotina clínica.
+
+          <h2 className="text-4xl xl:text-5xl font-black tracking-tight leading-[1.1] text-ink-900 mb-5">
+            Do agendamento ao laudo assinado — em minutos.
           </h2>
-          <p className="text-ink-500 text-lg leading-relaxed font-medium">
-            Plataforma ultrarrápida e minimalista de laudos estruturados. Reduza a carga cognitiva, foque no diagnóstico e deixe a IA cuidar do resto.
+          <p className="text-ink-500 text-base leading-relaxed font-medium mb-8">
+            Plataforma completa de laudos ultrassonográficos com IA, PACS/DICOM integrado e gestão de clínica. Foque no diagnóstico; a LAUD.IA cuida do resto.
           </p>
+
+          {/* Funcionalidades reais, mapeadas */}
+          <div className="grid grid-cols-2 gap-2.5 w-full">
+            {LANDING_FEATURES.map((f) => (
+              <div key={f.label} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-ink-50/70 border border-ink-100">
+                <div className="w-8 h-8 rounded-lg bg-white border border-ink-100 flex items-center justify-center text-brand-600 shrink-0">
+                  <f.icon size={15} />
+                </div>
+                <span className="text-xs font-bold text-ink-700">{f.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Bottom Feature Metrics */}
-        <div className="relative z-10 flex flex-wrap items-center gap-12 pt-8 border-t border-ink-100">
-          <div className="space-y-1">
-            <h5 className="text-2xl font-black text-ink-900">90%</h5>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Mais ágil</p>
+        {/* Bottom: métricas + planos */}
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-ink-100">
+          <div className="flex flex-wrap items-center gap-8">
+            <div className="space-y-0.5">
+              <h5 className="text-xl font-black text-ink-900">90%</h5>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Mais ágil</p>
+            </div>
+            <div className="space-y-0.5">
+              <h5 className="text-xl font-black text-ink-900">Cloud</h5>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Sync nativo</p>
+            </div>
+            <div className="space-y-0.5">
+              <h5 className="text-xl font-black text-ink-900">LGPD</h5>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Conformidade</p>
+            </div>
           </div>
-          <div className="space-y-1">
-            <h5 className="text-2xl font-black text-ink-900">Cloud</h5>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Sync Nativo</p>
-          </div>
-          <div className="space-y-1">
-            <h5 className="text-2xl font-black text-ink-900">HIPAA</h5>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Compliance</p>
+          <div className="text-right">
+            <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Planos a partir de</p>
+            <p className="text-lg font-black text-brand-600">assinatura mensal</p>
           </div>
         </div>
 

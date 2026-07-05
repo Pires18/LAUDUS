@@ -1,10 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Rounded square with subtle shadow & light blue border -->
-  <rect x="2" y="2" width="28" height="28" rx="8" fill="#ffffff" stroke="#3b82f6" stroke-width="1" opacity="0.2" />
-  <rect x="2.5" y="2.5" width="27" height="27" rx="7.5" fill="#ffffff" />
-  
-  <!-- Wi-Fi/Ultrasound waves -->
-  <path d="M8 15.5A11 11 0 0 1 24 15.5" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" />
-  <path d="M11.5 19A6 6 0 0 1 20.5 19" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" />
-  <path d="M14.5 22.5A2 2 0 0 1 17.5 22.5" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- LAUD.US — marca padrão (idêntica ao LogoIcon do app): ondas de ultrassom -->
+  <defs>
+    <linearGradient id="laudus-blue" x1="0" y1="100" x2="100" y2="0">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+  <!-- Fundo branco arredondado (visibilidade em abas claras/escuras) -->
+  <rect x="3" y="3" width="94" height="94" rx="22" fill="#ffffff" />
+  <!-- Onda 1 (interna) -->
+  <path d="M 39 71 A 14 14 0 0 1 61 71" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
+  <!-- Onda 2 (média) -->
+  <path d="M 29 53 A 29 29 0 0 1 71 53" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
+  <!-- Onda 3 (externa) -->
+  <path d="M 19 35 A 44 44 0 0 1 81 35" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
+  <!-- Ponto do transdutor (origem das ondas) -->
+  <circle cx="50" cy="78" r="4.5" fill="#2563eb" />
 </svg>
