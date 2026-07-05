@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { collection, query, where, limit, getCountFromServer } from 'firebase/firestore';
+import { firestore } from '../../../lib/firebase';
 import { addSupportMessage, updateGlobalItem, clearAllSupportTickets } from '../../../store/db';
 import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
@@ -18,10 +20,31 @@ export function AdminSupport() {
   const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'pending' | 'resolved'>('all');
-  const { data: tickets, loading, error } = useCollection<SupportTicket>('support_tickets', { 
+  // Carrega apenas os tickets MAIS RECENTES (cap) — a coleção cresce sem limite.
+  // Os contadores de status vêm do servidor (getCountFromServer), então as
+  // métricas seguem exatas mesmo com a lista limitada.
+  const { data: tickets, loading, error } = useCollection<SupportTicket>('support_tickets', {
     isGlobal: true,
-    constraints: [orderBy('updatedAt', 'desc')]
+    constraints: [orderBy('updatedAt', 'desc'), limit(200)]
   });
+
+  const [counts, setCounts] = useState({ open: 0, pending: 0, resolved: 0, total: 0 });
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const col = collection(firestore, 'support_tickets');
+        const [o, p, r, t] = await Promise.all([
+          getCountFromServer(query(col, where('status', '==', 'open'))),
+          getCountFromServer(query(col, where('status', '==', 'pending'))),
+          getCountFromServer(query(col, where('status', '==', 'resolved'))),
+          getCountFromServer(col),
+        ]);
+        if (active) setCounts({ open: o.data().count, pending: p.data().count, resolved: r.data().count, total: t.data().count });
+      } catch { /* mantém contadores da lista carregada */ }
+    })();
+    return () => { active = false; };
+  }, [tickets.length]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -116,9 +139,11 @@ export function AdminSupport() {
     }
   }
 
-  const openCount = tickets.filter(t => t.status === 'open').length;
-  const pendingCount = tickets.filter(t => t.status === 'pending').length;
-  const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
+  // Contadores exatos (servidor); fallback para a lista carregada se a contagem falhar.
+  const openCount = counts.open || tickets.filter(t => t.status === 'open').length;
+  const pendingCount = counts.pending || tickets.filter(t => t.status === 'pending').length;
+  const resolvedCount = counts.resolved || tickets.filter(t => t.status === 'resolved').length;
+  // Alta prioridade entre os tickets recentes carregados (indicador de fila quente).
   const highPriorityCount = tickets.filter(t => t.priority === 'high' && t.status !== 'resolved').length;
 
   // ── SLA ──────────────────────────────────────────────────────────────────
