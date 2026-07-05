@@ -1,6 +1,6 @@
 import { getDb } from './_firebase.js';
 import { verifyAuth, isProduction } from './_auth.js';
-import { mapAddonKey, ADDON_NAMES, resolveAddon } from './_pricing.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon, intervalMultiplier } from './_pricing.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,7 +11,7 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
-    const { userId, email, type, addon, planId } = req.body || {};
+    const { userId, email, type, addon, planId, interval: reqInterval } = req.body || {};
     if (!userId || !email) {
       return res.status(400).json({ error: 'userId e email são obrigatórios.' });
     }
@@ -62,13 +62,26 @@ export default async function handler(req: any, res: any) {
     let planInterval = 'month';
     let abacatePayProductId = '';
 
+    // Pacotes consumíveis (compra única) — NÃO viram assinatura.
+    const ONE_TIME_ADDONS = new Set(['token_lite', 'token_pro', 'extra_reports']);
+    const addonIsOneTime = type === 'addon' && ONE_TIME_ADDONS.has(addon);
+
     if (type === 'addon' && addon) {
       const dbKey = mapAddonKey(addon);
       const addonsSnap = await db.collection('global_config').doc('addons_config').get();
       const addonMeta = addonsSnap.exists ? addonsSnap.data()?.[dbKey] : null;
       const { priceCents } = resolveAddon(addon, addonMeta);
-      productName = ADDON_NAMES[addon] || `Add-on ${addon}`;
-      amount = priceCents;
+      if (addonIsOneTime) {
+        // Consumível: preço fixo, sem intervalo.
+        productName = ADDON_NAMES[addon] || `Add-on ${addon}`;
+        amount = priceCents;
+      } else {
+        // Add-on de módulo: assinatura recorrente nos 3 intervalos (mensal ×1).
+        planInterval = ['month', 'semester', 'year'].includes(reqInterval) ? reqInterval : 'month';
+        const intLabel = planInterval === 'year' ? 'Anual' : planInterval === 'semester' ? 'Semestral' : 'Mensal';
+        productName = `${ADDON_NAMES[addon] || `Add-on ${addon}`} (${intLabel})`;
+        amount = priceCents * intervalMultiplier(planInterval);
+      }
       if (addonMeta?.abacatePayProductId) abacatePayProductId = addonMeta.abacatePayProductId;
     } else {
       if (selectedPlanId) {
@@ -117,9 +130,9 @@ export default async function handler(req: any, res: any) {
       interval: planInterval,
     };
     const payload = {
-      // Add-ons e planos são assinatura recorrente (SUBSCRIPTION) em todos os
-      // intervalos. A AbacatePay cobra na cadência do intervalo do item.
-      frequency: 'SUBSCRIPTION',
+      // Planos e add-ons de módulo = assinatura recorrente; pacotes consumíveis
+      // (tokens/laudos extras) = pagamento único.
+      frequency: addonIsOneTime ? 'ONE_TIME' : 'SUBSCRIPTION',
       methods: ['PIX', 'CARD'],
       items: [{
         id: autoProductId,

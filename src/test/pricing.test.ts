@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, ADDON_DEFAULTS } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -117,5 +117,14 @@ describe('intervalLabel', () => {
     expect(intervalLabel('semester')).toBe('semestre');
     expect(intervalLabel('year')).toBe('ano');
     expect(intervalLabel(undefined)).toBe('mês');
+  });
+});
+
+describe('intervalMultiplier', () => {
+  it('mês ×1, semestre ×6, ano ×12', () => {
+    expect(intervalMultiplier('month')).toBe(1);
+    expect(intervalMultiplier('semester')).toBe(6);
+    expect(intervalMultiplier('year')).toBe(12);
+    expect(intervalMultiplier(undefined)).toBe(1);
   });
 });

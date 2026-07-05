@@ -56,6 +56,10 @@ export function SubscriptionCenter() {
   const confirm = useConfirm();
 
   const [loadingAddon,      setLoadingAddon]      = useState<string | null>(null);
+  const [addonInterval,     setAddonInterval]     = useState<'month' | 'semester' | 'year'>('month');
+  const addonMult = addonInterval === 'year' ? 12 : addonInterval === 'semester' ? 6 : 1;
+  const addonPer = addonInterval === 'year' ? 'ano' : addonInterval === 'semester' ? 'semestre' : 'mês';
+  const addonPrice = (base: number) => `R$ ${(base * addonMult).toFixed(2).replace('.', ',')}/${addonPer}`;
   const [sendingPacsTicket, setSendingPacsTicket] = useState(false);
   const [pacsRequested,     setPacsRequested]     = useState(false);
   const [showHistory,       setShowHistory]       = useState(true);
@@ -154,7 +158,7 @@ export function SubscriptionCenter() {
       const res = await fetch('/api/abacatepay-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
-        body: JSON.stringify({ userId: user.uid, email: user.email, type: 'addon', addon }),
+        body: JSON.stringify({ userId: user.uid, email: user.email, type: 'addon', addon, interval: addonInterval }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao iniciar checkout.');
@@ -514,7 +518,24 @@ export function SubscriptionCenter() {
 
       {/* ═══ 3. ADD-ONS E MÓDULOS ════════════════════════════════════════════ */}
       <Card>
-        <SectionHeader icon={Package} title="Funcionalidades / Módulos Extras" />
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <SectionHeader icon={Package} title="Funcionalidades / Módulos Extras" noMargin />
+          <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-xl border border-ink-200">
+            {(['month', 'semester', 'year'] as const).map(iv => (
+              <button
+                key={iv}
+                onClick={() => setAddonInterval(iv)}
+                className={classNames(
+                  'px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all',
+                  addonInterval === iv ? 'bg-brand-600 text-white' : 'text-ink-500 hover:text-ink-800'
+                )}
+              >
+                {iv === 'month' ? 'Mensal' : iv === 'semester' ? 'Semestral' : 'Anual'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-[11px] text-ink-400 mb-4">Add-ons são assinaturas recorrentes; semestral = 6× e anual = 12× o valor mensal.</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {/* Calculadoras */}
@@ -522,7 +543,7 @@ export function SubscriptionCenter() {
             icon={Calculator} iconColor="indigo"
             title="Calculadoras Clínicas"
             description={ac.calculators?.description ?? ADDONS_DEFAULT.calculators!.description}
-            price={`R$ ${(ac.calculators?.price ?? 49).toFixed(2).replace('.', ',')}/mês`}
+            price={addonPrice(ac.calculators?.price ?? 49)}
             active={hasCalculators}
             actionLabel="Assinar Módulo"
             onAction={() => handleBuyAddon('calculators')}
@@ -534,7 +555,7 @@ export function SubscriptionCenter() {
             icon={Database} iconColor="emerald"
             title="PACS / DICOM Sync"
             description={ac.pacs?.description ?? ADDONS_DEFAULT.pacs!.description}
-            price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : `R$ ${(ac.pacs!.price).toFixed(2).replace('.', ',')}/mês`}
+            price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : addonPrice(ac.pacs!.price)}
             active={hasPacs}
             actionLabel={pacsRequested ? 'Solicitação Enviada' : 'Solicitar PACS'}
             actionIcon={pacsRequested ? Clock : undefined}
@@ -548,7 +569,7 @@ export function SubscriptionCenter() {
             icon={CalendarDays} iconColor="amber"
             title="Módulo de Agendamentos"
             description={ac.appointments?.description ?? ADDONS_DEFAULT.appointments!.description}
-            price={`R$ ${(ac.appointments?.price ?? 39).toFixed(2).replace('.', ',')}/mês`}
+            price={addonPrice(ac.appointments?.price ?? 39)}
             active={hasAppointments}
             actionLabel="Assinar Módulo"
             onAction={() => handleBuyAddon('appointments')}
@@ -560,7 +581,7 @@ export function SubscriptionCenter() {
             icon={Hospital} iconColor="teal"
             title="Módulo de Clínicas"
             description={ac.clinics?.description ?? ADDONS_DEFAULT.clinics!.description}
-            price={`R$ ${(ac.clinics?.price ?? 49).toFixed(2).replace('.', ',')}/mês`}
+            price={addonPrice(ac.clinics?.price ?? 49)}
             active={hasClinics}
             actionLabel="Assinar Módulo"
             onAction={() => handleBuyAddon('clinics')}

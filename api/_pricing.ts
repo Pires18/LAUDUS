@@ -97,6 +97,15 @@ export function intervalLabel(interval?: string): string {
 }
 
 /**
+ * Multiplicador do preço-base (mensal) por intervalo — usado para precificar
+ * add-ons nos 3 intervalos sem config extra (mês ×1, semestre ×6, ano ×12).
+ * Planos definem cada preço explicitamente; add-ons derivam do preço mensal.
+ */
+export function intervalMultiplier(interval?: string): number {
+  return interval === 'year' ? 12 : interval === 'semester' ? 6 : 1;
+}
+
+/**
  * Resolve preço (em centavos) e bundleSize de um add-on, priorizando o
  * metadata do Firestore e caindo para os defaults acima.
  */
