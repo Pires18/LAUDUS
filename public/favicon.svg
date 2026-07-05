@@ -6,15 +6,19 @@
       <stop offset="50%" stop-color="#3b82f6" />
       <stop offset="100%" stop-color="#0ea5e9" />
     </linearGradient>
+    <style>
+      .laudus-bg { fill: #ffffff; }
+      @media (prefers-color-scheme: dark) {
+        .laudus-bg { fill: #1e222a; }
+      }
+    </style>
   </defs>
-  <!-- Fundo branco arredondado (visibilidade em abas claras/escuras) -->
-  <rect x="3" y="3" width="94" height="94" rx="22" fill="#ffffff" />
+  <!-- Fundo arredondado — branco no claro, grafite no escuro (acompanha o SO/navegador) -->
+  <rect class="laudus-bg" x="3" y="3" width="94" height="94" rx="22" />
   <!-- Onda 1 (interna) -->
-  <path d="M 39 71 A 14 14 0 0 1 61 71" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
+  <path d="M 39 74.4 A 14 14 0 0 1 61 74.4" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
   <!-- Onda 2 (média) -->
-  <path d="M 29 53 A 29 29 0 0 1 71 53" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
+  <path d="M 29 56.4 A 29 29 0 0 1 71 56.4" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
   <!-- Onda 3 (externa) -->
-  <path d="M 19 35 A 44 44 0 0 1 81 35" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
-  <!-- Ponto do transdutor (origem das ondas) -->
-  <circle cx="50" cy="78" r="4.5" fill="#2563eb" />
+  <path d="M 19 38.4 A 44 44 0 0 1 81 38.4" stroke="url(#laudus-blue)" stroke-width="6" stroke-linecap="round" />
 </svg>

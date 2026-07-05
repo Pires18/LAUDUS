@@ -1,8 +1,10 @@
 # Política de Retenção e Expurgo de Dados — LAUD.US
 
-**Versão:** 1.0 · **Vigência a partir de:** 2026-07-05 · **Status:** vivo
+**Versão:** 2.0 · **Vigência a partir de:** 2026-07-06 · **Status:** vivo · **Operadora:** Kist Serviços Médicos LTDA (CNPJ 46.706.765/0001-42)
 
-> ⚠️ **Rascunho técnico — requer validação jurídica e definição de negócio antes de execução.** Os prazos abaixo seguem a orientação usual do Conselho Federal de Medicina para guarda de prontuário; a implementação de qualquer rotina de exclusão automática é destrutiva e não foi codificada — carece de decisão explícita do responsável pelo produto antes de ligar qualquer expurgo automático.
+> ⚠️ **Rascunho técnico revisado — ainda requer validação jurídica e definição de negócio antes de execução.** Os prazos abaixo seguem a orientação usual do Conselho Federal de Medicina para guarda de prontuário; a implementação de qualquer rotina de exclusão automática é destrutiva e não foi codificada — carece de decisão explícita do responsável pelo produto antes de ligar qualquer expurgo automático.
+>
+> **Nota sobre a fase de testes restrita:** enquanto o LAUD.US estiver em fase de testes (ver Termos de Uso §1.3), dados podem ser resetados/migrados manualmente para ajuste da plataforma, mediante aviso — essa possibilidade é distinta e não substitui os prazos de retenção regulares descritos abaixo, que valem a partir do início da operação comercial plena.
 
 ## 1. Objeto
 
@@ -38,4 +40,4 @@ Definir por quanto tempo os dados tratados pelo LAUD.US são retidos e o process
 
 ## 6. Contato
 
-Dúvidas sobre esta política podem ser encaminhadas ao canal de suporte da plataforma.
+Dúvidas sobre esta política, ou solicitações ao Encarregado de Dados (DPO), podem ser encaminhadas para **contato.laudus@gmail.com**.

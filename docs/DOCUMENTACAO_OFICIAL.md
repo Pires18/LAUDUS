@@ -396,7 +396,7 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 | Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário |
 | Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — aguardando o Google popular a 1ª tabela (~24-48h) | Tempo de propagação do Google, não decisão/trabalho pendente |
 | Teto de 12 funções serverless (Vercel Hobby) | Já no limite — próxima função nova quebra o deploy | Consolidar mais endpoints ou migrar para o plano Pro |
-| Revisão jurídica dos Termos/Privacidade/Retenção | Pacote pronto em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) (8 pontos específicos + contexto) | Validação por advogado especializado em LGPD/saúde digital |
+| Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v2.0 finalizados com operadora identificada (Kist Serviços Médicos LTDA, CNPJ 46.706.765/0001-42) e seção de fase de testes restrita. Pacote atualizado em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) (9 pontos específicos) | Validação por advogado especializado em LGPD/saúde digital |
 
 ---
 
