@@ -137,17 +137,18 @@ export default async function handler(req: any, res: any) {
     const authHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
 
     // ── Garante o produto na loja da AbacatePay (auto-cadastro) ──
-    // O checkout v2 referencia produtos EXISTENTES por id. Procuramos pelo
-    // externalId; se não existir, criamos. Assim o admin não cadastra nada.
-    let productId = '';
-    try {
-      const listRes = await fetch(`${apiBase}/products/list?externalId=${encodeURIComponent(externalId)}`, { headers: authHeaders });
-      const listJson = await listRes.json();
-      const found = Array.isArray(listJson?.data) ? listJson.data.find((p: any) => p.externalId === externalId) : null;
-      if (found?.id) productId = found.id;
-    } catch (e) {
-      console.warn('[ABACATEPAY] products/list falhou (segue p/ create):', e);
-    }
+    // O checkout v2 referencia produtos EXISTENTES por id. Busca pelo externalId
+    // (products/get); se não existir, cria. Se a criação colidir ("already
+    // exists"), busca de novo. Assim o admin não cadastra nada manualmente.
+    const getProductId = async (): Promise<string> => {
+      try {
+        const r = await fetch(`${apiBase}/products/get?externalId=${encodeURIComponent(externalId)}`, { headers: authHeaders });
+        const j = await r.json();
+        return j?.data?.id || '';
+      } catch { return ''; }
+    };
+
+    let productId = await getProductId();
     if (!productId) {
       const createRes = await fetch(`${apiBase}/products/create`, {
         method: 'POST',
@@ -155,10 +156,12 @@ export default async function handler(req: any, res: any) {
         body: JSON.stringify({ externalId, name: productName, price: amount, currency: 'BRL', ...(cycle ? { cycle } : {}) }),
       });
       const createJson = await createRes.json();
-      const perr = createJson?.error && (createJson.error.message || createJson.error);
-      productId = createJson?.data?.id;
-      if (!createRes.ok || perr || !productId) {
-        console.error('[ABACATEPAY] Erro ao criar produto:', JSON.stringify(createJson));
+      productId = createJson?.data?.id || '';
+      // Produto já existia (corrida ou busca que não retornou) → tenta obter.
+      if (!productId) productId = await getProductId();
+      if (!productId) {
+        const perr = createJson?.error && (createJson.error.message || createJson.error);
+        console.error('[ABACATEPAY] Erro ao criar/obter produto:', JSON.stringify(createJson));
         return res.status(500).json({ error: perr || 'Falha ao registrar o produto na AbacatePay.' });
       }
     }
