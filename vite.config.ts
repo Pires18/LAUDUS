@@ -54,6 +54,57 @@ function localOrthancWorklistPlugin() {
           }
         }
 
+        // ── Proxy do Gemini (dev) — espelha api/gemini.ts (Edge) ──
+        // Faz a chamada ao Google com headers LIMPOS (nunca repassa o
+        // Authorization Bearer do Firebase) e injeta a chave via ?key=. Isso
+        // elimina o 401 "Expected OAuth 2 access token" que ocorria quando o
+        // http-proxy vazava o Bearer sem chave. Chave: x-api-key > env.
+        if (req.url && req.url.split('?')[0] === '/api/gemini') {
+          if (req.method === 'GET' && req.url.includes('ping=1')) {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ proxy: 'dev-middleware', features: ['generate', 'stream', 'embed', 'embed-batch'] }));
+            return;
+          }
+          if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
+          const key = String(req.headers['x-api-key'] || req.headers['x-gemini-key'] || process.env.GOOGLE_API_KEY || '').trim();
+          if (!key) {
+            res.statusCode = 503;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Chave de IA ausente no servidor de dev. Defina GOOGLE_API_KEY no .env e reinicie o "npm run dev".' }));
+            return;
+          }
+          const model = String(req.headers['x-gemini-model'] || 'gemini-3.5-flash');
+          const task = String(req.headers['x-gemini-task'] || 'generate');
+          const isStream = req.headers['x-gemini-stream'] === 'true';
+          const action = task === 'embed' ? 'embedContent'
+            : task === 'embed-batch' ? 'batchEmbedContents'
+            : isStream ? 'streamGenerateContent' : 'generateContent';
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}?key=${key}${isStream ? '&alt=sse' : ''}`;
+          try {
+            const chunks: Buffer[] = [];
+            for await (const c of req) chunks.push(Buffer.from(c));
+            const body = Buffer.concat(chunks).toString('utf8');
+            const gres = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+            res.statusCode = gres.status;
+            res.setHeader('Content-Type', gres.headers.get('content-type') || 'application/json');
+            if (gres.body) {
+              const reader = (gres.body as any).getReader();
+              // eslint-disable-next-line no-constant-condition
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                res.write(Buffer.from(value));
+              }
+            }
+            res.end();
+          } catch (e: any) {
+            res.statusCode = 502;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: `Falha ao contatar o Gemini: ${e?.message || e}` }));
+          }
+          return;
+        }
+
         if (req.url && req.url.includes('/api/orthanc-proxy')) {
           const parsedUrl = new URL(req.url, 'http://localhost');
           const targetUrl = parsedUrl.searchParams.get('url');
@@ -531,32 +582,8 @@ export default defineConfig({
           });
         },
       },
-      '/api/gemini': {
-        target: 'https://generativelanguage.googleapis.com',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path: string) => {
-          // Strip /api/gemini — actual URL is built in configure
-          return path.replace('/api/gemini', '');
-        },
-        configure: (proxy: any, _options: any) => {
-          proxy.on('proxyReq', (proxyReq: any, req: any) => {
-            // Remove o Authorization Bearer (token Firebase) destinado apenas
-            // ao proxy de produção; a API do Gemini usa a chave na query string.
-            proxyReq.removeHeader('authorization');
-            const key = req.headers['x-api-key'] || process.env.GOOGLE_API_KEY || '';
-            const model = req.headers['x-gemini-model'] || 'gemini-3.5-flash';
-            const task = req.headers['x-gemini-task'] || 'generate';
-            const isStream = req.headers['x-gemini-stream'] === 'true';
-            let action: string;
-            if (task === 'embed') action = 'embedContent';
-            else if (task === 'embed-batch') action = 'batchEmbedContents';
-            else action = isStream ? 'streamGenerateContent' : 'generateContent';
-            const url = `/v1beta/models/${model}:${action}?key=${key}${isStream ? '&alt=sse' : ''}`;
-            proxyReq.path = url;
-          });
-        },
-      },
+      // /api/gemini é tratado pelo middleware acima (configureServer) com
+      // headers limpos — NÃO usar http-proxy aqui (vazava o Authorization).
     }
   }
 })
