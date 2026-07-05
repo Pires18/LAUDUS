@@ -301,7 +301,12 @@ Quando `currentPeriodEnd` vence com status `active`/`past_due`:
 ## 11. Integrações externas
 - **Google Gemini** — IA (server-side, `GOOGLE_API_KEY`); custo por chamada gravado em `ai_usage` (tokens + `costUsd`).
 - **AbacatePay** — pagamentos (checkout/webhook/cancel); webhook valida HMAC-SHA256 + idempotência (`webhook_events`); mock bloqueado em produção.
-- **Google Cloud** — provisão **e desprovisão** de VM PACS (`pacs-provision.ts`, `POST`/`DELETE`). **Não integrado:** monitoramento de custo/billing real do GCP no Admin — o custo de VM exibido no painel Financeiro é uma estimativa por tabela de preço fixa (plano × disco), não a fatura real da nuvem.
+- **Google Cloud** — provisão **e desprovisão** de VM PACS (`pacs-provision.ts`, `POST`/`DELETE`).
+  - **Billing real (em setup, 05/07/2026):** a Cloud Billing API sozinha **não expõe gasto real** — só confirma billing ativo/conta vinculada e catálogo de preços (SKUs). Para custo detalhado é necessário o **BigQuery Billing Export**. Já configurado nesta sessão:
+    1. Cloud Billing API (`cloudbilling.googleapis.com`) e BigQuery API (`bigquery.googleapis.com`) habilitadas no projeto `antigravity-laudus`.
+    2. Billing Console → Billing export → BigQuery export → dataset **`laudussys`** criado no projeto `antigravity-laudus`, exportação "Standard usage cost" ativada.
+    3. Service account (a mesma do `GCP_SA_KEY`) recebeu os papéis **BigQuery Data Viewer** e **BigQuery Job User** no dataset `laudussys`.
+    4. **Pendente:** aguardando o Google criar a 1ª tabela e popular dados (~24-48h após a ativação — normal não haver tabela nem linhas nesse meio-tempo). Quando a tabela `laudussys.gcp_billing_export_v1_XXXXXX` (nome exato varia) tiver linhas, falta implementar a query server-side (BigQuery API, mesma service account) e ligar ao painel Financeiro (`FinanceOverviewTab.tsx`), substituindo a estimativa fixa por custo real por SKU/serviço.
 - **Tailscale** — VPN/Funnel do PACS; auth-keys pré-autorizadas geradas por VM/tenant.
 - **Google Docs/Drive/Picker** (`lib/google*`) — export do laudo para Google Docs, seleção de arquivos; refresh silencioso de token OAuth com fallback interativo.
 - **Sentry** — monitoramento de erros (opt-in por DSN), com redação de PII (e-mail/CPF/telefone) antes do envio.
@@ -364,7 +369,8 @@ Painel **Financeiro** (`AdminFinanceiro.tsx`, 9 sub-abas: overview, plans, pacs-
 - **Alerta de prejuízo por usuário:** compara o custo real de IA do mês de cada assinante (via `getAiUsageByUser`, collection-group `ai_usage`) com a receita mensal-equivalente do plano dele (`price / intervalMultiplier(interval)`); lista quem está dando prejuízo.
 - **Top 10 consumidores de IA (`ia-costs`):** ranking por custo, com e-mail do usuário — corrige um bug em que o total de "Custos de IA" só refletia o próprio uso do admin (a função usada não fazia collection-group; hoje `getAllUsersAiUsageStats` cobre todos os usuários, restrito a admin pelas regras).
 - **Fonte única de agregação por usuário:** `groupAiUsageByUser` (`store/db.ts`), usada tanto pelo ranking quanto pelo alerta de prejuízo, evita duas implementações divergentes do mesmo cálculo.
-- **Não implementado:** integração com a Billing API real do Google Cloud (custo de VM é estimativa por tabela de preço, não a fatura real); lifecycle automático de VM disparado por cancelamento de assinatura (a desprovisão é manual, pelo botão do usuário — ver §6).
+- **Custo de VM ainda é estimativa por tabela de preço fixa** (plano × disco) — a integração com o custo real do GCP está com o setup de infraestrutura pronto (BigQuery Billing Export configurado, ver §11), só falta o Google popular os dados (~24-48h) e então implementar a leitura no painel.
+- **Lifecycle automático de VM por cancelamento de assinatura:** implementado (ver §6) — não depende mais de ação manual do usuário.
 
 ---
 
@@ -388,7 +394,7 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 | Item | Descrição | Bloqueador |
 |---|---|---|
 | Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário |
-| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real | Usuário habilitando a Cloud Billing API + permissão na service account (em andamento) |
+| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — aguardando o Google popular a 1ª tabela (~24-48h) | Tempo de propagação do Google, não decisão/trabalho pendente |
 | Teto de 12 funções serverless (Vercel Hobby) | Já no limite — próxima função nova quebra o deploy | Consolidar mais endpoints ou migrar para o plano Pro |
 | Revisão jurídica dos Termos/Privacidade/Retenção | Pacote pronto em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) (8 pontos específicos + contexto) | Validação por advogado especializado em LGPD/saúde digital |
 
