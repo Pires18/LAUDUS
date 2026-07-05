@@ -11,13 +11,29 @@ import { Modal } from '../../../components/Modal';
 export function AdminAudit() {
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
+  const [actionFilter, setActionFilter] = useState<'all' | 'create' | 'update' | 'delete'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+  // Categoriza a ação (EN/PT) para o filtro por tipo.
+  const actionKind = (a: string): 'create' | 'update' | 'delete' | 'other' => {
+    const s = (a || '').toUpperCase();
+    if (/DELETE|EXCLU|REMOV|CANCEL/.test(s)) return 'delete';
+    if (/UPDATE|ALTER|EDIT|ATUALIZ|TROC/.test(s)) return 'update';
+    if (/CREATE|CRIAR|ADICION|ATRIBU|GERAR|IMPORT/.test(s)) return 'create';
+    return 'other';
+  };
 
   const { data: logs, loading, loadMore, hasMore } = usePaginatedCollection<AuditLog>('audit_logs', {
     isGlobal: true,
     initialLimit: 100,
     constraints: [orderBy('timestamp', 'desc')]
   });
+
+  const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+  const toMs   = dateTo   ? new Date(`${dateTo}T23:59:59`).getTime()   : null;
+  const anyFilter = !!search || moduleFilter !== 'all' || actionFilter !== 'all' || !!dateFrom || !!dateTo;
 
   const filtered = logs
     .filter(l => {
@@ -27,8 +43,11 @@ export function AdminAudit() {
         l.userName?.toLowerCase().includes(search.toLowerCase());
 
       const matchesModule = moduleFilter === 'all' || l.module === moduleFilter;
+      const matchesAction = actionFilter === 'all' || actionKind(l.action) === actionFilter;
+      const matchesFrom = fromMs === null || l.timestamp >= fromMs;
+      const matchesTo   = toMs === null || l.timestamp <= toMs;
 
-      return matchesSearch && matchesModule;
+      return matchesSearch && matchesModule && matchesAction && matchesFrom && matchesTo;
     });
 
   const modules = Array.from(new Set(logs.map(l => l.module))).filter(Boolean);
@@ -89,8 +108,8 @@ export function AdminAudit() {
             />
           </div>
           
-          <div className="flex gap-2">
-            <select 
+          <div className="flex gap-2 flex-wrap">
+            <select
               value={moduleFilter}
               onChange={(e) => setModuleFilter(e.target.value)}
               className="h-14 bg-white border border-ink-100 rounded-2xl px-4 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-brand-500"
@@ -100,6 +119,20 @@ export function AdminAudit() {
                 <option key={m} value={m}>{m.replace('_', ' ')}</option>
               ))}
             </select>
+            <select
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value as any)}
+              className="h-14 bg-white border border-ink-100 rounded-2xl px-4 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="all">Todas as Ações</option>
+              <option value="create">Criação</option>
+              <option value="update">Alteração</option>
+              <option value="delete">Exclusão</option>
+            </select>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="De"
+              className="h-14 bg-white border border-ink-100 rounded-2xl px-3 text-xs font-bold text-ink-600 outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} title="Até"
+              className="h-14 bg-white border border-ink-100 rounded-2xl px-3 text-xs font-bold text-ink-600 outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
         </div>
 
@@ -181,7 +214,7 @@ export function AdminAudit() {
           </table>
         </div>
 
-        {hasMore && !search && moduleFilter === 'all' && (
+        {hasMore && !anyFilter && (
           <div className="p-4 border-t border-ink-100 flex justify-center">
             <button
               onClick={loadMore}
