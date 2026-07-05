@@ -7,7 +7,7 @@ import {
   HardDrive, Cloud, Info, Network, BookOpen,
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
   Copy, Check, ArrowRight, Monitor, Radio,
-  Users, Layers, Image, RefreshCw, Sparkles,
+  Users, Image, RefreshCw, Sparkles,
   SlidersHorizontal, ChevronDown
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
@@ -49,10 +49,8 @@ type ServerStorage = {
   name?: string;
   countPatients?: number;
   countStudies?: number;
-  countSeries?: number;
   countInstances?: number;
   diskMB?: number;
-  uncompressedMB?: number;
 };
 
 /** Resultado de um teste de capacidade (imagens ou worklist) de um servidor. */
@@ -194,10 +192,8 @@ export function DicomControlCenter() {
         name: sys.Name,
         countPatients: num(stats.CountPatients),
         countStudies: num(stats.CountStudies),
-        countSeries: num(stats.CountSeries),
         countInstances: num(stats.CountInstances),
         diskMB: num(stats.TotalDiskSizeMB),
-        uncompressedMB: num(stats.TotalUncompressedSizeMB),
       };
     } catch (e: any) {
       return { label, isBackup, ok: false, error: e.message || 'Servidor inacessível (offline ou fora do Funnel)' };
@@ -219,13 +215,17 @@ export function DicomControlCenter() {
     }
   }
 
+  // Nada configurado ainda (nem PACS gerenciado, nem agente manual) — não faz
+  // sentido consultar o Orthanc; mostramos direto o estado vazio guiado.
+  const noPacsConfigured = (!settings.pacsInstance || settings.pacsInstance.status === 'none') && !settings.dicomLocalAgentUrl;
+
   // Carrega as estatísticas ao abrir a aba de Armazenamento (uma vez por abertura).
   useEffect(() => {
-    if (activeTab === 'storage' && !storage && !storageLoading) {
+    if (activeTab === 'storage' && !storage && !storageLoading && !noPacsConfigured) {
       refreshStorage();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, noPacsConfigured]);
 
   // Testa a WORKLIST de ponta a ponta (agente/Vite → Python → pydicom → pasta)
   // via ping, sem gerar arquivo .wl.
@@ -461,7 +461,7 @@ export function DicomControlCenter() {
               {/* Form de Configuração Principal (Esquerda - 2 colunas) */}
               <div className="lg:col-span-2 space-y-5">
                 {/* PACS gerenciado (self-service) — provisiona e autoconfigura */}
-                <MyPacsCard />
+                <MyPacsCard onOpenExams={() => setActiveTab('storage')} />
 
                 {/* Conectar ultrassom — ajustes simples pessoais + aparelhos */}
                 <UltrasoundSetupCard />
@@ -1275,7 +1275,23 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                   </div>
                 </div>
 
-                {storageLoading && !storage && (
+                {noPacsConfigured ? (
+                  <div className="flex flex-col items-center justify-center text-center py-16 gap-3 bg-white rounded-2xl border border-dashed border-ink-200">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <Cloud size={26} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-ink-900">Você ainda não tem um PACS configurado</p>
+                      <p className="text-[11px] text-ink-500 mt-1 max-w-sm mx-auto leading-relaxed">Crie seu PACS na nuvem em um clique — nós provisionamos e configuramos tudo automaticamente.</p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('config')}
+                      className="h-10 px-4 rounded-xl text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-sm transition-all flex items-center gap-2"
+                    >
+                      <Sparkles size={13} /> Criar meu PACS
+                    </button>
+                  </div>
+                ) : storageLoading && !storage && (
                   <div className="flex flex-col items-center justify-center py-20 gap-3 bg-white rounded-2xl border border-ink-100">
                     <Loader2 size={28} className="animate-spin text-emerald-500" />
                     <span className="text-[11px] font-black uppercase tracking-wider text-ink-400">Consultando os servidores…</span>
@@ -1300,31 +1316,19 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                     </div>
 
                     {s.ok ? (
-                      <div className="p-5 space-y-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          <Metric icon={Database} label="Exames (estudos)" value={fmtNum(s.countStudies)} tone="bg-emerald-50 text-emerald-600" />
+                      <div className="p-5 space-y-3">
+                        <div className="grid grid-cols-3 gap-3">
+                          <Metric icon={Database} label="Exames" value={fmtNum(s.countStudies)} tone="bg-emerald-50 text-emerald-600" />
                           <Metric icon={Users} label="Pacientes" value={fmtNum(s.countPatients)} tone="bg-blue-50 text-blue-600" />
-                          <Metric icon={Layers} label="Séries" value={fmtNum(s.countSeries)} tone="bg-amber-50 text-amber-600" />
                           <Metric icon={Image} label="Imagens" value={fmtNum(s.countInstances)} tone="bg-fuchsia-50 text-fuchsia-600" />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center shrink-0">
-                              <HardDrive size={18} />
-                            </div>
-                            <div>
-                              <span className="text-xl font-black text-ink-900 leading-none block">{fmtSize(s.diskMB)}</span>
-                              <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Espaço em disco usado</span>
-                            </div>
+                        <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-ink-900 text-white flex items-center justify-center shrink-0">
+                            <HardDrive size={18} />
                           </div>
-                          <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-ink-200 text-ink-600 flex items-center justify-center shrink-0">
-                              <FileText size={18} />
-                            </div>
-                            <div>
-                              <span className="text-xl font-black text-ink-900 leading-none block">{fmtSize(s.uncompressedMB)}</span>
-                              <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Tamanho descompactado</span>
-                            </div>
+                          <div>
+                            <span className="text-xl font-black text-ink-900 leading-none block">{fmtSize(s.diskMB)}</span>
+                            <span className="text-[10px] font-bold text-ink-400 uppercase tracking-wider">Espaço em disco usado</span>
                           </div>
                         </div>
                       </div>

@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { getIdToken } from '../../lib/authToken';
 import { classNames } from '../../utils/format';
 import type { PacsInstance } from '../../types';
+import { getActivePacsUrl, getProxyEndpoint, getDicomAuthParams } from '../../store/db';
 import {
   Cloud, Loader2, CheckCircle2, AlertTriangle, RefreshCw, Trash2,
-  Server, HardDrive, MapPin, Sparkles, ShieldCheck
+  Server, HardDrive, MapPin, Sparkles, ShieldCheck, FolderOpen
 } from 'lucide-react';
 
 // Endpoint real de provisionamento (GCP). Quando ausente, o card opera em
@@ -42,11 +43,34 @@ async function pollAgentHealth(agentUrl: string, timeoutMs = 600000): Promise<bo
   return false;
 }
 
-export function MyPacsCard() {
+export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
   const { settings, updateSettings, showToast } = useApp();
   const inst: PacsInstance = settings.pacsInstance || { status: 'none' };
   const [busy, setBusy] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>('pro');
+
+  // Uso de disco REAL (não o campo salvo no provisionamento, que fica parado em
+  // 0) — consulta ao vivo o /statistics do Orthanc pelo mesmo proxy das imagens.
+  const [liveDiskMB, setLiveDiskMB] = useState<number | null>(null);
+  const [liveVersion, setLiveVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (inst.status !== 'ready') return;
+    let cancelled = false;
+    const baseUrl = getActivePacsUrl(settings, false);
+    const auth = getDicomAuthParams(settings, false);
+    const proxyPath = getProxyEndpoint(settings, false);
+    const base = baseUrl.replace(/\/$/, '');
+    Promise.all([
+      fetch(`${proxyPath}?url=${encodeURIComponent(`${base}/statistics`)}${auth}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`${proxyPath}?url=${encodeURIComponent(`${base}/system`)}${auth}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([stats, sys]) => {
+      if (cancelled) return;
+      if (stats?.TotalDiskSizeMB !== undefined) setLiveDiskMB(parseInt(stats.TotalDiskSizeMB, 10) || 0);
+      if (sys?.Version) setLiveVersion(sys.Version);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inst.status, settings.dicomLocalAgentUrl, settings.dicomTenantId]);
 
   async function provision(plan: Plan) {
     if (busy) return;
@@ -167,7 +191,10 @@ export function MyPacsCard() {
 
   // ── Estado: PRONTO ──
   if (inst.status === 'ready') {
-    const usedPct = inst.diskGb ? Math.round(((inst.diskUsedGb || 0) / inst.diskGb) * 100) : 0;
+    const diskGb = inst.diskGb ?? PLANS[(inst.plan as Plan) || 'pro'].disk;
+    const usedGb = liveDiskMB !== null ? liveDiskMB / 1024 : null;
+    const usedPct = usedGb !== null && diskGb ? Math.min(100, Math.round((usedGb / diskGb) * 100)) : null;
+    const version = liveVersion || inst.orthancVersion;
     return (
       <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm p-5 space-y-4">
         <Header isMock={isMock} />
@@ -180,11 +207,30 @@ export function MyPacsCard() {
         </div>
         <div className="grid grid-cols-2 gap-2.5 text-xs">
           <Info icon={MapPin} label="Região" value={inst.region || '—'} />
-          <Info icon={Server} label="Orthanc" value={`v${inst.orthancVersion || '—'}`} />
-          <Info icon={HardDrive} label="Armazenamento" value={`${inst.diskUsedGb ?? 0} / ${inst.diskGb ?? '—'} GB (${usedPct}%)`} />
+          <Info icon={Server} label="Orthanc" value={version ? `v${version}` : '—'} />
           <Info icon={ShieldCheck} label="Conexão" value="Segura (Funnel)" />
+          <div className="p-2.5 rounded-lg bg-ink-50 border border-ink-100 col-span-2">
+            <div className="flex items-center justify-between text-[9px] font-black text-ink-400 uppercase tracking-wider">
+              <span className="flex items-center gap-1"><HardDrive size={10} />Armazenamento</span>
+              <span>{usedGb !== null ? `${usedGb.toFixed(2)} / ${diskGb} GB` : `— / ${diskGb} GB`}</span>
+            </div>
+            <div className="h-1.5 mt-1.5 w-full bg-ink-200 rounded-full overflow-hidden">
+              <div
+                className={classNames('h-full rounded-full', usedPct !== null && usedPct >= 90 ? 'bg-rose-500' : 'bg-emerald-500')}
+                style={{ width: `${usedPct ?? 0}%` }}
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onOpenExams && (
+            <button
+              onClick={onOpenExams}
+              className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-500 transition-all flex items-center gap-1.5"
+            >
+              <FolderOpen size={12} /> Ver meus exames
+            </button>
+          )}
           <button
             onClick={() => provision((inst.plan as Plan) || 'pro')}
             disabled={busy}
@@ -200,7 +246,6 @@ export function MyPacsCard() {
           >
             <Trash2 size={12} /> Remover
           </button>
-          <p className="ml-auto text-[10px] text-ink-400">Agente e segredo configurados automaticamente.</p>
         </div>
       </div>
     );

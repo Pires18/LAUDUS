@@ -1095,7 +1095,14 @@ export function getWorklistEndpoint(settings: AppSettings, isBackup = false): st
   // (não nesta máquina). Sem agente HTTPS, cai no middleware do Vite (grava local).
   const agent = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
   if (agent && /^https:\/\//i.test(agent)) {
-    return `${agent.replace(/\/$/, '')}/api/worklist`;
+    // O agente multi-tenant só resolve o tenant pela QUERY STRING (?tenantId=),
+    // nunca pelo corpo — é assim que o proxy do Vercel já encaminha (ver
+    // api/worklist.ts). Indo direto ao agente (como aqui), é preciso montar essa
+    // mesma query, senão o agente responde "tenantId inválido ou ausente".
+    const tenantQs = (!isBackup && settings.dicomTenantId)
+      ? `?tenantId=${encodeURIComponent(settings.dicomTenantId)}`
+      : '';
+    return `${agent.replace(/\/$/, '')}/api/worklist${tenantQs}`;
   }
   return '/api/worklist';
 }

@@ -40,6 +40,16 @@ describe('getWorklistEndpoint', () => {
     expect(getWorklistEndpoint({ dicomLocalAgentUrl: 'http://localhost:3000' } as any))
       .toBe('/api/worklist');
   });
+
+  it('inclui ?tenantId= ao falar direto com o Agente (VM compartilhada multi-tenant)', () => {
+    const s = { dicomLocalAgentUrl: 'https://vm.tail.ts.net', dicomTenantId: 't1da0af' } as any;
+    expect(getWorklistEndpoint(s)).toBe('https://vm.tail.ts.net/api/worklist?tenantId=t1da0af');
+  });
+
+  it('NÃO inclui tenantId no agente de backup (single-tenant do próprio cliente)', () => {
+    const s = { dicomBackupLocalAgentUrl: 'https://bkp.tail.ts.net', dicomTenantId: 't1da0af' } as any;
+    expect(getWorklistEndpoint(s, true)).toBe('https://bkp.tail.ts.net/api/worklist');
+  });
 });
 
 describe('getActivePacsUrl', () => {

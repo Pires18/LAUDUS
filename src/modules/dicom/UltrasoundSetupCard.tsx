@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { classNames } from '../../utils/format';
 import type { DicomDevice } from '../../types';
@@ -19,6 +19,21 @@ export function UltrasoundSetupCard() {
   const pacsAe = settings.dicomOrthancAETitle || 'ORTHANC';
   const deviceAe = settings.dicomModalityAETitle || 'MINDRAYMX7';
   const devices = settings.dicomDevices || [];
+  const dicomPort = settings.pacsInstance?.dicomPort || 4242;
+
+  // IP tailnet da VM do PACS — consultado direto no Agente (health-check
+  // público) para montar a instrução do relé já pronta com o endereço real.
+  const [vmTailnetIp, setVmTailnetIp] = useState<string | null>(null);
+  useEffect(() => {
+    const agentUrl = settings.dicomLocalAgentUrl;
+    if (!agentUrl || !/^https:\/\//i.test(agentUrl)) { setVmTailnetIp(null); return; }
+    let cancelled = false;
+    fetch(`${agentUrl.replace(/\/$/, '')}/`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setVmTailnetIp(d?.tailscaleIp || null); })
+      .catch(() => { if (!cancelled) setVmTailnetIp(null); });
+    return () => { cancelled = true; };
+  }, [settings.dicomLocalAgentUrl]);
 
   // AE Title do aparelho — editável (cada ultrassom tem o seu).
   const [aeInput, setAeInput] = useState(deviceAe);
@@ -89,6 +104,15 @@ export function UltrasoundSetupCard() {
         <Router size={15} className="text-blue-500 shrink-0 mt-0.5" />
         <div className="text-[11px] text-ink-700 leading-relaxed">
           <strong className="text-blue-800">Passo 1 — o Relé:</strong> como o aparelho é físico na clínica, algo na sua rede leva ele até o PACS na nuvem. Use seu <strong>roteador GL.iNet</strong> (com Tailscale) ou o <strong>PC do dia a dia</strong>. Veja o passo a passo em <strong>Guias → Tailscale VPN &amp; SSL</strong>. O <strong>endereço (IP)</strong> que você vai digitar no aparelho é o do relé na sua rede local.
+          {vmTailnetIp && (
+            <div className="mt-2 p-2.5 rounded-lg bg-white border border-blue-200">
+              <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Regra de encaminhamento no relé (já com seus dados)</p>
+              <p className="font-mono text-[11px] text-ink-800">
+                destino <strong>{vmTailnetIp}:{dicomPort}</strong> → aparelho fala com o relé nessa mesma porta
+              </p>
+              <p className="text-[10px] text-ink-400 mt-1">IP tailnet do seu PACS na nuvem: <span className="font-mono font-bold text-ink-600">{vmTailnetIp}</span>. Configure o encaminhamento (port-forward) do relé para esse destino.</p>
+            </div>
+          )}
         </div>
       </div>
 
