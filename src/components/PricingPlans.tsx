@@ -21,6 +21,7 @@ interface Props {
 export function PricingPlans({ open, onClose, onChoose }: Props) {
   const [plans, setPlans] = useState<(Plan & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [interval, setInterval] = useState<'month' | 'semester' | 'year'>('month');
 
   useEffect(() => {
     if (!open) return;
@@ -74,13 +75,39 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
                 Criar conta grátis
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {plans.map((p) => (
-                <PlanCard key={p.id} plan={p} onChoose={() => onChoose(p.id)} />
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const available = ['month', 'semester', 'year'].filter(iv => plans.some(p => (p.interval || 'month') === iv)) as ('month' | 'semester' | 'year')[];
+            const activeIv = available.includes(interval) ? interval : (available[0] || 'month');
+            const shown = plans.filter(p => (p.interval || 'month') === activeIv);
+            const label: Record<string, string> = { month: 'Mensal', semester: 'Semestral', year: 'Anual' };
+            return (
+              <>
+                {available.length > 1 && (
+                  <div className="flex justify-center mb-7">
+                    <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-2xl border border-ink-200">
+                      {available.map(iv => (
+                        <button
+                          key={iv}
+                          onClick={() => setInterval(iv)}
+                          className={classNames(
+                            'px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all',
+                            activeIv === iv ? 'bg-brand-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-800'
+                          )}
+                        >
+                          {label[iv]}{iv === 'year' && <span className="ml-1 text-[8px] opacity-80">↻</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {shown.map((p) => (
+                    <PlanCard key={p.id} plan={p} onChoose={() => onChoose(p.id)} />
+                  ))}
+                </div>
+              </>
+            );
+          })()}
 
           <p className="text-center text-[11px] text-ink-400 font-medium mt-8 leading-relaxed">
             Add-ons (PACS/DICOM, Calculadoras, Agendamentos, Clínicas) podem ser incluídos no plano ou contratados à parte no Centro de Assinatura. O pagamento é processado com segurança pela AbacatePay.
@@ -94,7 +121,8 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
 function PlanCard({ plan, onChoose }: { plan: Plan & { id: string }; onChoose: () => void }) {
   const featured = !!plan.featured;
   const price = plan.price || 0;
-  const period = plan.interval === 'year' ? '/ano' : '/mês';
+  const recurring = plan.interval === 'year';
+  const period = plan.interval === 'year' ? '/ano' : plan.interval === 'semester' ? '/semestre' : '/mês';
   const reports = plan.reportsQuota === 0 ? 'Laudos ilimitados' : `${plan.reportsQuota} laudos/mês`;
   const addons: { on: boolean | undefined; icon: any; label: string }[] = [
     { on: plan.includesCalculators, icon: Calculator, label: 'Calculadoras clínicas' },
@@ -120,6 +148,12 @@ function PlanCard({ plan, onChoose }: { plan: Plan & { id: string }; onChoose: (
         <span className="text-3xl font-black text-ink-900">R$ {price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
         <span className="text-xs font-bold text-ink-400 mb-1">{period}</span>
       </div>
+      <span className={classNames(
+        'mt-1.5 inline-flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md',
+        recurring ? 'bg-brand-50 text-brand-700 border border-brand-100' : 'bg-ink-100 text-ink-500'
+      )}>
+        {recurring ? '↻ Assinatura recorrente' : '• Pagamento único'}
+      </span>
       {plan.trialDays > 0 && (
         <span className="mt-2 inline-flex w-fit items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
           {plan.trialDays} dias grátis

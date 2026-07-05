@@ -233,7 +233,7 @@ export function OnboardingScreen() {
                       {Math.floor(selectedPlan?.price || 149)}
                     </span>
                     <span className="text-xs font-bold text-ink-500">
-                      ,{String(Math.round(((selectedPlan?.price || 149) % 1) * 100)).padStart(2, '0')}/{selectedPlan?.interval === 'year' ? 'ano' : 'mês'}
+                      ,{String(Math.round(((selectedPlan?.price || 149) % 1) * 100)).padStart(2, '0')}/{selectedPlan?.interval === 'year' ? 'ano' : selectedPlan?.interval === 'semester' ? 'semestre' : 'mês'}
                     </span>
                   </div>
                   <p className="text-[10px] text-ink-500 font-medium mt-1.5">

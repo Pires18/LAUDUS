@@ -1053,7 +1053,7 @@ function AssignSubModal({
                     </div>
                     <p className="text-base font-black text-ink-950 mb-2">
                       R$ {p.price.toFixed(2)}
-                      <span className="text-[10px] font-medium text-ink-400">/{p.interval === 'month' ? 'mês' : 'ano'}</span>
+                      <span className="text-[10px] font-medium text-ink-400">/{p.interval === 'year' ? 'ano' : p.interval === 'semester' ? 'semestre' : 'mês'}</span>
                     </p>
                     <div className="flex flex-wrap gap-1">
                       <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">

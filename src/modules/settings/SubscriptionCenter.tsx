@@ -304,7 +304,7 @@ export function SubscriptionCenter() {
                     <div className="flex items-baseline gap-0.5 my-4">
                       <span className="text-xs font-bold text-ink-400">R$</span>
                       <span className="text-3xl font-black text-ink-950 tracking-tight">{Math.floor(p.price)}</span>
-                      <span className="text-[10px] font-bold text-ink-400">,00/{p.interval === 'year' ? 'ano' : 'mês'}</span>
+                      <span className="text-[10px] font-bold text-ink-400">,00/{p.interval === 'year' ? 'ano' : p.interval === 'semester' ? 'semestre' : 'mês'}</span>
                     </div>
 
                     <div className="space-y-2 border-t border-ink-50 pt-3 text-[11px] font-medium text-ink-600">
