@@ -151,6 +151,14 @@ function PlansTab() {
   const [showForm, setShowForm]   = useState(false);
   const [form, setForm]           = useState<PlanForm>(EMPTY_PLAN);
   const [saving, setSaving]       = useState(false);
+  const [selected, setSelected]   = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy]   = useState(false);
+
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const loadPlans = useCallback(async () => {
     try {
@@ -213,19 +221,52 @@ function PlansTab() {
     if (!ok) return;
     try {
       await deleteDoc(doc(firestore, 'saas_plans', id));
+      setSelected(prev => { const n = new Set(prev); n.delete(id); return n; });
       showToast('Plano removido.', 'info');
       await loadPlans();
-    } catch { showToast('Erro ao remover plano.', 'error'); }
+    } catch (err: any) {
+      // Surfacia o erro real (ex.: permission-denied → regras não publicadas).
+      const code = err?.code ? ` (${err.code})` : '';
+      showToast(`Erro ao remover plano${code}. ${err?.message || ''}`.trim(), 'error');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: `Excluir ${ids.length} plano(s)`,
+      message: `Excluir permanentemente ${ids.length} plano(s) selecionado(s)? Assinaturas existentes não são afetadas. Ideal para remover as variantes de intervalo criadas automaticamente.`,
+      variant: 'danger',
+      confirmLabel: `Excluir ${ids.length}`,
+    });
+    if (!ok) return;
+    setBulkBusy(true);
+    const results = await Promise.allSettled(
+      ids.map(id => deleteDoc(doc(firestore, 'saas_plans', id)))
+    );
+    const failed = results.filter(r => r.status === 'rejected');
+    const okCount = ids.length - failed.length;
+    setSelected(new Set());
+    await loadPlans();
+    setBulkBusy(false);
+    if (failed.length === 0) {
+      showToast(`${okCount} plano(s) removido(s).`, 'success');
+    } else {
+      const firstErr = (failed[0] as PromiseRejectedResult).reason;
+      const code = firstErr?.code ? ` (${firstErr.code})` : '';
+      showToast(`${okCount} removido(s), ${failed.length} falhou/falharam${code}. ${firstErr?.message || ''}`.trim(), 'error');
+    }
   };
 
   if (loading) return <Spinner />;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest">Planos de Assinatura</h3>
-          <p className="text-[11px] text-ink-500 font-medium mt-0.5">Configure múltiplos planos com quotas e funcionalidades distintas.</p>
+          <p className="text-[11px] text-ink-500 font-medium mt-0.5">Cada plano cobre mensal, semestral e anual. Selecione para excluir vários de uma vez.</p>
         </div>
         <button
           onClick={openNew}
@@ -234,6 +275,42 @@ function PlansTab() {
           <Plus size={13} /> Novo Plano
         </button>
       </div>
+
+      {/* Barra de seleção múltipla — remover as variantes duplicadas rapidamente */}
+      {plans.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap bg-ink-50 border border-ink-100 rounded-xl px-3 py-2">
+          <label className="flex items-center gap-2 text-[11px] font-bold text-ink-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selected.size === plans.length && plans.length > 0}
+              ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < plans.length; }}
+              onChange={e => setSelected(e.target.checked ? new Set(plans.map(p => p.id)) : new Set())}
+              className="w-4 h-4 rounded accent-brand-600 cursor-pointer"
+            />
+            Selecionar todos ({plans.length})
+          </label>
+          <div className="flex-1" />
+          {selected.size > 0 && (
+            <>
+              <span className="text-[11px] font-black text-ink-600">{selected.size} selecionado(s)</span>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="h-8 px-3 rounded-lg border border-ink-200 text-ink-600 text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all"
+              >
+                Limpar
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkBusy}
+                className="flex items-center gap-1.5 h-8 px-3.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50 transition-all"
+              >
+                {bulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Excluir selecionados
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {plans.length === 0 ? (
         <div className="text-center py-16 text-ink-400 bg-white rounded-2xl border border-ink-100">
@@ -244,7 +321,14 @@ function PlansTab() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {plans.map(plan => (
-            <PlanCard key={plan.id} plan={plan} onEdit={() => openEdit(plan)} onDelete={() => handleDelete(plan.id)} />
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              selected={selected.has(plan.id)}
+              onToggleSelect={() => toggleSelect(plan.id)}
+              onEdit={() => openEdit(plan)}
+              onDelete={() => handleDelete(plan.id)}
+            />
           ))}
         </div>
       )}
@@ -262,11 +346,11 @@ function PlansTab() {
   );
 }
 
-function PlanCard({ plan, onEdit, onDelete }: { plan: Plan & { id: string }; onEdit: () => void; onDelete: () => void }) {
+function PlanCard({ plan, selected, onToggleSelect, onEdit, onDelete }: { plan: Plan & { id: string }; selected: boolean; onToggleSelect: () => void; onEdit: () => void; onDelete: () => void }) {
   return (
     <div className={classNames(
-      'bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 relative',
-      plan.featured ? 'border-brand-400 ring-1 ring-brand-300/40' : 'border-ink-100',
+      'bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 relative transition-all',
+      selected ? 'border-rose-400 ring-2 ring-rose-200' : plan.featured ? 'border-brand-400 ring-1 ring-brand-300/40' : 'border-ink-100',
       !plan.active && 'opacity-60'
     )}>
       {plan.featured && (
@@ -274,10 +358,16 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan & { id: string }; onE
           <span className="text-[9px] font-black uppercase tracking-widest bg-brand-600 text-white px-2 py-0.5 rounded-full shadow-sm">Destaque</span>
         </div>
       )}
-
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h4 className="text-sm font-black text-ink-950">{plan.name}</h4>
+      <div className="flex items-start gap-2.5">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          title="Selecionar para exclusão"
+          className="w-4 h-4 mt-0.5 rounded accent-rose-600 cursor-pointer shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-black text-ink-950 truncate">{plan.name}</h4>
           {plan.description && <p className="text-[11px] text-ink-500 font-medium mt-0.5 line-clamp-2">{plan.description}</p>}
         </div>
         <span className={classNames(
