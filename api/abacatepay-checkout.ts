@@ -135,38 +135,44 @@ export default async function handler(req: any, res: any) {
       planId: selectedPlanId,
       interval: planInterval,
     };
+    // API oficial: POST /v1/billing/create com `products` (não `items`), preço
+    // em centavos, methods=['PIX'], frequency ONE_TIME | MULTIPLE_PAYMENTS.
+    // O erro "No products found" vinha do endpoint/campo errados (v2/items).
     const payload = {
-      // Planos e add-ons de módulo = assinatura recorrente; pacotes consumíveis
-      // (tokens/laudos extras) = pagamento único.
-      frequency: addonIsOneTime ? 'ONE_TIME' : 'SUBSCRIPTION',
-      methods: ['PIX', 'CARD'],
-      items: [{
-        id: autoProductId,
+      // Consumível (token/laudo) = ONE_TIME; plano/módulo = MULTIPLE_PAYMENTS
+      // (a billing da AbacatePay não faz débito recorrente automático — é uma
+      // cobrança pagável a cada período; a concessão acontece no webhook).
+      frequency: addonIsOneTime ? 'ONE_TIME' : 'MULTIPLE_PAYMENTS',
+      methods: ['PIX'],
+      products: [{
+        externalId: autoProductId,
         name: productName,
         quantity: 1,
-        price: amount,
-        externalId: autoProductId,
+        price: amount, // centavos
       }],
       returnUrl: `${returnBase}/#settings?tab=assinatura`,
       completionUrl: `${returnBase}/#settings?tab=assinatura`,
       metadata,
     };
 
-    const response = await fetch('https://api.abacatepay.com/v2/checkouts/create', {
+    const response = await fetch('https://api.abacatepay.com/v1/billing/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify(payload),
     });
 
     const result = await response.json();
-    if (!response.ok || !result.success) {
-      console.error('[ABACATEPAY] Erro checkout:', result);
-      return res.status(500).json({ error: result.error || 'Erro ao criar checkout.' });
+    // A billing retorna { data: { url, id, ... }, error }. Sucesso = url presente.
+    const billingUrl = result?.data?.url || result?.url;
+    const billingErr = result?.error && (result.error.message || result.error);
+    if (!response.ok || billingErr || !billingUrl) {
+      console.error('[ABACATEPAY] Erro billing:', JSON.stringify(result));
+      return res.status(500).json({ error: billingErr || 'Erro ao criar cobrança.' });
     }
 
     // Fallback de metadata: persistimos a intenção por checkoutId para que o
     // webhook consiga resolver o usuário mesmo se o AbacatePay não ecoar o metadata.
-    const checkoutId = result.data?.id || result.data?.checkoutId;
+    const checkoutId = result.data?.id || result.data?.billId || result.id;
     if (checkoutId) {
       try {
         await db.collection('pending_checkouts').doc(String(checkoutId)).set({
@@ -180,7 +186,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    return res.status(200).json({ url: result.data.url, mock: false });
+    return res.status(200).json({ url: billingUrl, mock: false });
 
   } catch (error: any) {
     console.error('[ABACATEPAY] Erro interno:', error);
