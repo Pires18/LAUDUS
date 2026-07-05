@@ -44,8 +44,11 @@ async function runCronBatch(req: any, res: any) {
 
     // Expiração de período: recorrente (anual) vira past_due (aguarda retry/webhook da
     // AbacatePay); avulso (mensal/semestral, sem cobrança futura) vira expired e perde acesso.
+    // `interval` ausente (assinaturas gravadas antes deste campo existir) é tratado como
+    // recorrente por padrão — mais seguro errar mantendo acesso do que cortar assinante
+    // anual pago por engano só porque o doc é antigo.
     if ((sub.status === 'active' || sub.status === 'past_due') && sub.currentPeriodEnd && now > sub.currentPeriodEnd) {
-      const recurring = isRecurringInterval(sub.interval);
+      const recurring = sub.interval ? isRecurringInterval(sub.interval) : true;
       const nextStatus = recurring ? 'past_due' : 'expired';
       if (sub.status !== nextStatus) {
         updates.status = nextStatus;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, collectionGroup, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { firestore } from '../../../../lib/firebase';
-import { getDailyMetrics, getMetricsSummary, getAiCostByUser, type DailyMetric, type MetricsSummary } from '../../../../store/db';
+import { getDailyMetrics, getMetricsSummary, getAiUsageByUser, type DailyMetric, type MetricsSummary } from '../../../../store/db';
 import { intervalMultiplier } from '../../../../../api/_pricing';
 import { logger } from '../../../../utils/logger';
 import { classNames } from '../../../../utils/format';
@@ -57,19 +57,27 @@ export function FinanceOverviewTab() {
       // Assinaturas de cortesia/vitalício (não geram receita) — visibilidade.
       setCompCount(subsSnap.docs.filter(s => { const x: any = s.data(); return x.comp || x.lifetime; }).length);
 
+      // As duas varreduras abaixo (ai_usage e settings, ambas collection group)
+      // são independentes entre si — rodam em paralelo em vez de sequenciais.
+      const now2 = new Date();
+      const monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1).getTime();
+      const rate = (typeof vc.usdToBrl === 'number' && vc.usdToBrl > 0) ? vc.usdToBrl : usdToBrl;
+
+      const [usageResult, settingsResult] = await Promise.allSettled([
+        getAiUsageByUser(monthStart, Date.now()),
+        getDocs(collectionGroup(firestore, 'settings')),
+      ]);
+
       // Alerta de prejuízo: compara o custo real de IA do mês (por usuário)
       // com a receita mensal-equivalente do plano dele. Assinaturas de
       // cortesia/vitalício ficam de fora (não têm receita, dariam falso-positivo).
-      try {
-        const now2 = new Date();
-        const monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1).getTime();
-        const rate = (typeof vc.usdToBrl === 'number' && vc.usdToBrl > 0) ? vc.usdToBrl : usdToBrl;
-        const costByUid = await getAiCostByUser(monthStart, Date.now());
+      if (usageResult.status === 'fulfilled') {
+        const usageByUid = usageResult.value;
         const lossy: { userId: string; email: string; revenueBrl: number; costBrl: number }[] = [];
         subsSnap.docs.forEach(s => {
           const x: any = s.data();
           if (x.comp || x.lifetime || x.status !== 'active') return;
-          const costUsd = costByUid[x.userId] || 0;
+          const costUsd = usageByUid[x.userId]?.costUsd || 0;
           if (costUsd <= 0) return;
           const costBrl = costUsd * rate;
           const monthlyRevenue = (x.price || 0) / intervalMultiplier(x.interval);
@@ -78,15 +86,14 @@ export function FinanceOverviewTab() {
           }
         });
         setLossyUsers(lossy.sort((a, b) => (b.costBrl - b.revenueBrl) - (a.costBrl - a.revenueBrl)));
-      } catch (err) {
-        logger.error('[FinanceOverview] falha ao calcular alerta de prejuízo:', err);
+      } else {
+        logger.error('[FinanceOverview] falha ao calcular alerta de prejuízo:', usageResult.reason);
       }
 
       // Custo de VMs: agrega instâncias PACS ativas (collection group settings).
-      try {
-        const settingsSnap = await getDocs(collectionGroup(firestore, 'settings'));
+      if (settingsResult.status === 'fulfilled') {
         let cost = 0, count = 0;
-        settingsSnap.forEach((s: any) => {
+        settingsResult.value.forEach((s: any) => {
           const inst = (s.data() || {}).pacsInstance;
           if (!inst || inst.status !== 'ready') return;
           count += 1;
@@ -95,7 +102,8 @@ export function FinanceOverviewTab() {
         });
         setVmCount(count);
         setVmCostBrl(cost);
-      } catch (err: any) {
+      } else {
+        const err: any = settingsResult.reason;
         setAggWarn(err?.code === 'permission-denied'
           ? 'Custo de VMs indisponível: publique as regras do Firestore (firebase deploy --only firestore:rules).'
           : 'Não foi possível agregar o custo das VMs.');

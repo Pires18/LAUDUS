@@ -1252,18 +1252,31 @@ export async function getAllUsersAiUsageStats(startDateMs: number, endDateMs: nu
 }
 
 /**
- * Custo de IA (USD) agregado por uid num período — mesma fonte que
- * [[getAllUsersAiUsageStats]], só que já somado por usuário. Usado para
- * comparar custo real de IA vs receita do plano (alerta de prejuízo).
+ * Agrupa logs de `ai_usage` (com `uid` preenchido, ver [[getAllUsersAiUsageStats]])
+ * por usuário — calls + custo USD. Função pura: reaproveitada tanto por
+ * [[getAiUsageByUser]] (busca + agrupa) quanto por telas que já têm os logs em
+ * memória (ex.: AdminFinanceiro, evitando um segundo round-trip ao Firestore).
  */
-export async function getAiCostByUser(startDateMs: number, endDateMs: number): Promise<Record<string, number>> {
-  const logs = await getAllUsersAiUsageStats(startDateMs, endDateMs);
-  const byUser: Record<string, number> = {};
+export function groupAiUsageByUser(logs: AiUsageLog[]): Record<string, { calls: number; costUsd: number }> {
+  const byUser: Record<string, { calls: number; costUsd: number }> = {};
   logs.forEach(l => {
     if (!l.uid) return;
-    byUser[l.uid] = (byUser[l.uid] || 0) + (l.costUsd || 0);
+    const u = byUser[l.uid] || (byUser[l.uid] = { calls: 0, costUsd: 0 });
+    u.calls += 1;
+    u.costUsd += l.costUsd || 0;
   });
   return byUser;
+}
+
+/**
+ * Uso de IA agregado por uid num período — mesma fonte que
+ * [[getAllUsersAiUsageStats]], só que já somado por usuário (calls + custo
+ * USD). Fonte única para "quem consome mais IA": usada tanto pelo alerta de
+ * prejuízo (FinanceOverviewTab) quanto pelo ranking de consumo (AdminFinanceiro).
+ */
+export async function getAiUsageByUser(startDateMs: number, endDateMs: number): Promise<Record<string, { calls: number; costUsd: number }>> {
+  const logs = await getAllUsersAiUsageStats(startDateMs, endDateMs);
+  return groupAiUsageByUser(logs);
 }
 
 /**

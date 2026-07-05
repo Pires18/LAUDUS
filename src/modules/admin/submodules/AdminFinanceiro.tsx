@@ -14,7 +14,7 @@ import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { useApp } from '../../../store/app';
 import { useConfirm } from '../../../hooks/useConfirm';
-import { getAllUsersAiUsageStats } from '../../../store/db';
+import { getAllUsersAiUsageStats, groupAiUsageByUser } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
 import { planPrices, addonPrices } from '../../../../api/_pricing';
@@ -1270,15 +1270,9 @@ function IACostsTab() {
     byModel[m].costUsd  += l.costUsd      || 0;
   });
 
-  // Ranking de consumo por usuário — usa o `uid` que getAiUsageStats agora
+  // Ranking de consumo por usuário — usa o `uid` que getAllUsersAiUsageStats
   // preenche a partir do collection group (antes só refletia o próprio admin).
-  const byUser: Record<string, { calls: number; costUsd: number }> = {};
-  statsLogs.forEach(l => {
-    const uid = l.uid || 'desconhecido';
-    if (!byUser[uid]) byUser[uid] = { calls: 0, costUsd: 0 };
-    byUser[uid].calls   += 1;
-    byUser[uid].costUsd += l.costUsd || 0;
-  });
+  const byUser = groupAiUsageByUser(statsLogs);
   const topUsers = Object.entries(byUser)
     .sort((a, b) => b[1].costUsd - a[1].costUsd)
     .slice(0, 10);
