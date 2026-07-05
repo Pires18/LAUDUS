@@ -7,7 +7,7 @@ import { createSupportTicket, getAiUsageStats } from '../../store/db';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { firestore, auth } from '../../lib/firebase';
 import { classNames } from '../../utils/format';
-import { planPriceBrl } from '../../../api/_pricing';
+import { planPriceBrl, addonPriceBrl } from '../../../api/_pricing';
 import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText,
@@ -61,7 +61,12 @@ export function SubscriptionCenter() {
   const [addonInterval,     setAddonInterval]     = useState<'month' | 'semester' | 'year'>('month');
   const addonMult = addonInterval === 'year' ? 12 : addonInterval === 'semester' ? 6 : 1;
   const addonPer = addonInterval === 'year' ? 'ano' : addonInterval === 'semester' ? 'semestre' : 'mês';
-  const addonPrice = (base: number) => `R$ ${(base * addonMult).toFixed(2).replace('.', ',')}/${addonPer}`;
+  // Usa os preços explícitos por intervalo do módulo (admin) quando existirem;
+  // senão projeta do mensal (×1/×6/×12).
+  const addonPriceMeta = (meta: any, fallbackBase: number) => {
+    const brl = meta?.prices ? addonPriceBrl(meta, addonInterval) : (meta?.price ?? fallbackBase) * addonMult;
+    return `R$ ${brl.toFixed(2).replace('.', ',')}/${addonPer}`;
+  };
   const [sendingPacsTicket, setSendingPacsTicket] = useState(false);
   const [pacsRequested,     setPacsRequested]     = useState(false);
   const [showHistory,       setShowHistory]       = useState(true);
@@ -583,7 +588,7 @@ export function SubscriptionCenter() {
             icon={Calculator} iconColor="indigo"
             title="Calculadoras Clínicas"
             description={ac.calculators?.description ?? ADDONS_DEFAULT.calculators!.description}
-            price={addonPrice(ac.calculators?.price ?? 49)}
+            price={addonPriceMeta(ac.calculators, 49)}
             active={hasCalculators}
             actionLabel="Assinar Módulo"
             onAction={() => handleBuyAddon('calculators')}
@@ -595,7 +600,7 @@ export function SubscriptionCenter() {
             icon={Database} iconColor="emerald"
             title="PACS / DICOM Sync"
             description={ac.pacs?.description ?? ADDONS_DEFAULT.pacs!.description}
-            price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : addonPrice(ac.pacs!.price)}
+            price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : addonPriceMeta(ac.pacs, 0)}
             active={hasPacs}
             actionLabel={pacsRequested ? 'Solicitação Enviada' : 'Solicitar PACS'}
             actionIcon={pacsRequested ? Clock : undefined}
@@ -609,7 +614,7 @@ export function SubscriptionCenter() {
             icon={CalendarDays} iconColor="amber"
             title="Módulo de Agendamentos"
             description={ac.appointments?.description ?? ADDONS_DEFAULT.appointments!.description}
-            price={addonPrice(ac.appointments?.price ?? 39)}
+            price={addonPriceMeta(ac.appointments, 39)}
             active={hasAppointments}
             actionLabel="Assinar Módulo"
             onAction={() => handleBuyAddon('appointments')}
@@ -621,7 +626,7 @@ export function SubscriptionCenter() {
             icon={Hospital} iconColor="teal"
             title="Módulo de Clínicas"
             description={ac.clinics?.description ?? ADDONS_DEFAULT.clinics!.description}
-            price={addonPrice(ac.clinics?.price ?? 49)}
+            price={addonPriceMeta(ac.clinics, 49)}
             active={hasClinics}
             actionLabel="Assinar Módulo"
             onAction={() => handleBuyAddon('clinics')}

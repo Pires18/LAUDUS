@@ -1,6 +1,6 @@
 import { getDb } from './_firebase.js';
 import { verifyAuth, isProduction } from './_auth.js';
-import { mapAddonKey, ADDON_NAMES, resolveAddon, intervalMultiplier, planPriceBrl } from './_pricing.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon, intervalMultiplier, planPriceBrl, addonPriceBrl } from './_pricing.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -76,11 +76,15 @@ export default async function handler(req: any, res: any) {
         productName = ADDON_NAMES[addon] || `Add-on ${addon}`;
         amount = priceCents;
       } else {
-        // Add-on de módulo: assinatura recorrente nos 3 intervalos (mensal ×1).
+        // Add-on de módulo: assinatura recorrente nos 3 intervalos. Se o admin
+        // configurou preços explícitos por intervalo (addonMeta.prices), usa-os;
+        // senão projeta do preço mensal (mês ×1, semestre ×6, ano ×12).
         planInterval = ['month', 'semester', 'year'].includes(reqInterval) ? reqInterval : 'month';
         const intLabel = planInterval === 'year' ? 'Anual' : planInterval === 'semester' ? 'Semestral' : 'Mensal';
         productName = `${ADDON_NAMES[addon] || `Add-on ${addon}`} (${intLabel})`;
-        amount = priceCents * intervalMultiplier(planInterval);
+        amount = addonMeta?.prices
+          ? Math.round(addonPriceBrl(addonMeta, planInterval) * 100)
+          : priceCents * intervalMultiplier(planInterval);
       }
       if (addonMeta?.abacatePayProductId) abacatePayProductId = addonMeta.abacatePayProductId;
     } else {

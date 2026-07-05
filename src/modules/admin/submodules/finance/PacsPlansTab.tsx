@@ -3,14 +3,17 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firestore } from '../../../../lib/firebase';
 import { useApp } from '../../../../store/app';
 import { logger } from '../../../../utils/logger';
-import { Save, Database, Loader2, Server } from 'lucide-react';
+import { Save, Database, Loader2, Server, Info } from 'lucide-react';
 import { Spinner } from './Spinner';
+import { planPrices } from '../../../../../api/_pricing';
 
 /** Um plano de infra do PACS (VM/tenant) — controlado no Financeiro do admin. */
 export interface PacsPlan {
   label: string;
-  price: number;              // R$
-  interval: 'month' | 'semester' | 'year';
+  /** Preços por intervalo (R$) — um único plano cobre mensal/semestral/anual. */
+  prices?: { month: number; semester: number; year: number };
+  price: number;              // legado (espelha o mensal)
+  interval: 'month' | 'semester' | 'year'; // legado
   disk: number;               // GB
   model: string;              // ex.: "Compartilhado isolado" | "VM exclusiva"
   badge?: string;
@@ -20,9 +23,9 @@ export type PacsPlansConfig = { starter: PacsPlan; pro: PacsPlan; dedicado: Pacs
 
 // Defaults = os valores que hoje estão hardcoded em MyPacsCard (retrocompat).
 const DEFAULTS: PacsPlansConfig = {
-  starter:  { label: 'Starter',  price: 99,  interval: 'month', disk: 100, model: 'Compartilhado isolado', active: true },
-  pro:      { label: 'Pro',      price: 149, interval: 'month', disk: 300, model: 'Compartilhado isolado', badge: 'Popular', active: true },
-  dedicado: { label: 'Dedicado', price: 249, interval: 'month', disk: 300, model: 'VM exclusiva', active: true },
+  starter:  { label: 'Starter',  price: 99,  prices: { month: 99,  semester: 534,  year: 950  }, interval: 'month', disk: 100, model: 'Compartilhado isolado', active: true },
+  pro:      { label: 'Pro',      price: 149, prices: { month: 149, semester: 804,  year: 1430 }, interval: 'month', disk: 300, model: 'Compartilhado isolado', badge: 'Popular', active: true },
+  dedicado: { label: 'Dedicado', price: 249, prices: { month: 249, semester: 1344, year: 2390 }, interval: 'month', disk: 300, model: 'VM exclusiva', active: true },
 };
 
 const KEYS: (keyof PacsPlansConfig)[] = ['starter', 'pro', 'dedicado'];
@@ -58,10 +61,22 @@ export function PacsPlansTab() {
   const upd = (key: keyof PacsPlansConfig, field: keyof PacsPlan, value: any) =>
     setCfg(c => ({ ...c, [key]: { ...c[key], [field]: value } }));
 
+  const setPrice = (key: keyof PacsPlansConfig, iv: 'month' | 'semester' | 'year', v: number) =>
+    setCfg(c => {
+      const pr = planPrices(c[key]);
+      return { ...c, [key]: { ...c[key], prices: { ...pr, [iv]: v } } };
+    });
+
   async function handleSave() {
     setSaving(true);
     try {
-      await setDoc(doc(firestore, 'global_config', 'pacs_plans'), { ...cfg, updatedAt: Date.now() }, { merge: true });
+      // price (legado) espelha o mensal; interval fica 'month' — cobre os 3.
+      const synced: any = { ...cfg };
+      KEYS.forEach(k => {
+        const pr = planPrices(synced[k]);
+        synced[k] = { ...synced[k], prices: pr, price: pr.month, interval: 'month' };
+      });
+      await setDoc(doc(firestore, 'global_config', 'pacs_plans'), { ...synced, updatedAt: Date.now() }, { merge: true });
       showToast('Planos de PACS salvos. O card de provisão passa a usar estes valores.', 'success');
     } catch (err) {
       logger.error('[PacsPlansTab] Falha ao salvar:', err);
@@ -109,17 +124,26 @@ export function PacsPlansTab() {
               </div>
 
               <Field label="Nome"><input className="input h-9 text-sm w-full" value={p.label} onChange={e => upd(key, 'label', e.target.value)} /></Field>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Preço (R$)"><input type="number" step="0.01" className="input h-9 text-sm w-full" value={p.price} onChange={e => upd(key, 'price', parseFloat(e.target.value) || 0)} /></Field>
-                <Field label="Disco (GB)"><input type="number" className="input h-9 text-sm w-full" value={p.disk} onChange={e => upd(key, 'disk', parseInt(e.target.value, 10) || 0)} /></Field>
-              </div>
-              <Field label="Periodicidade">
-                <select className="input h-9 text-sm w-full" value={p.interval} onChange={e => upd(key, 'interval', e.target.value)}>
-                  <option value="month">Mensal</option>
-                  <option value="semester">Semestral</option>
-                  <option value="year">Anual (recorrente)</option>
-                </select>
-              </Field>
+              {(() => {
+                const pr = planPrices(p);
+                return (
+                  <Field label="Preço por intervalo (R$)">
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { iv: 'month' as const,    label: 'Mensal' },
+                        { iv: 'semester' as const, label: 'Semestral' },
+                        { iv: 'year' as const,     label: 'Anual' },
+                      ]).map(x => (
+                        <div key={x.iv}>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-ink-400 block mb-0.5">{x.label}</span>
+                          <input type="number" step="0.01" className="input h-9 text-sm w-full font-bold" value={pr[x.iv]} onChange={e => setPrice(key, x.iv, parseFloat(e.target.value) || 0)} />
+                        </div>
+                      ))}
+                    </div>
+                  </Field>
+                );
+              })()}
+              <Field label="Disco (GB)"><input type="number" className="input h-9 text-sm w-full" value={p.disk} onChange={e => upd(key, 'disk', parseInt(e.target.value, 10) || 0)} /></Field>
               <Field label="Modelo"><input className="input h-9 text-sm w-full" value={p.model} onChange={e => upd(key, 'model', e.target.value)} placeholder="Compartilhado isolado / VM exclusiva" /></Field>
               <Field label="Badge (opcional)"><input className="input h-9 text-sm w-full" value={p.badge || ''} onChange={e => upd(key, 'badge', e.target.value)} placeholder="Popular" /></Field>
             </div>
@@ -127,8 +151,9 @@ export function PacsPlansTab() {
         })}
       </div>
 
-      <p className="text-[11px] text-ink-400 leading-relaxed">
-        Só o intervalo <strong>Anual</strong> é assinatura recorrente; Mensal/Semestral são pagamentos avulsos que expiram ao fim do período.
+      <p className="text-[11px] text-ink-400 leading-relaxed flex items-start gap-1.5">
+        <Info size={13} className="shrink-0 mt-0.5" />
+        Cada plano de PACS cobre os 3 intervalos — o usuário escolhe mensal, semestral ou anual no card de provisão. Os IDs de produto são gerados automaticamente; nada a criar na AbacatePay.
       </p>
     </div>
   );

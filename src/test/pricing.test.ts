@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, planPrices, planPriceBrl, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, planPrices, planPriceBrl, addonPrices, addonPriceBrl, ADDON_DEFAULTS } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -121,6 +121,25 @@ describe('planPriceBrl', () => {
   it('intervalo ausente/inválido → mensal', () => {
     expect(planPriceBrl(plan)).toBe(149);
     expect(planPriceBrl(plan, 'weekly')).toBe(149);
+  });
+});
+
+describe('addonPrices / addonPriceBrl', () => {
+  it('usa prices explícitos do add-on quando presentes', () => {
+    const meta = { price: 49, prices: { month: 49, semester: 249, year: 449 } };
+    expect(addonPrices(meta)).toEqual({ month: 49, semester: 249, year: 449 });
+    expect(addonPriceBrl(meta, 'semester')).toBe(249);
+    expect(addonPriceBrl(meta, 'year')).toBe(449);
+  });
+
+  it('sem prices → projeta do mensal (×1/×6/×12)', () => {
+    expect(addonPrices({ price: 39 })).toEqual({ month: 39, semester: 234, year: 468 });
+    expect(addonPriceBrl({ price: 39 }, 'year')).toBe(468);
+    expect(addonPriceBrl({ price: 39 })).toBe(39);
+  });
+
+  it('meta vazio → tudo zero', () => {
+    expect(addonPrices(null)).toEqual({ month: 0, semester: 0, year: 0 });
   });
 });
 

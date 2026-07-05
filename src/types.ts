@@ -478,11 +478,14 @@ export interface Subscription {
   updatedAt: number;
 }
 /** Configuração de funcionalidades extras (add-ons) */
+/** Preços por intervalo (R$) de um add-on de módulo recorrente. */
+export type AddonPrices = { month: number; semester: number; year: number };
+
 export interface SaasAddonsConfig {
-  calculators: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
-  pacs: { price: number; description: string; enabled: boolean; assisted: boolean; abacatePayProductId?: string; };
-  appointments: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
-  clinics: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
+  calculators: { price: number; prices?: AddonPrices; description: string; enabled: boolean; abacatePayProductId?: string; };
+  pacs: { price: number; prices?: AddonPrices; description: string; enabled: boolean; assisted: boolean; abacatePayProductId?: string; };
+  appointments: { price: number; prices?: AddonPrices; description: string; enabled: boolean; abacatePayProductId?: string; };
+  clinics: { price: number; prices?: AddonPrices; description: string; enabled: boolean; abacatePayProductId?: string; };
   extraReport: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
   extraClinic: { price: number; description: string; enabled: boolean; abacatePayProductId?: string; };
   tokenLite: { price: number; bundleSize: number; description: string; enabled: boolean; abacatePayProductId?: string; };

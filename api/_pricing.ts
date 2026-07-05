@@ -138,6 +138,26 @@ export function planPriceBrl(plan: any, interval?: string): number {
 }
 
 /**
+ * Preços por intervalo de um ADD-ON de módulo recorrente.
+ * Modelo novo: `meta.prices = { month, semester, year }`.
+ * Compat: só `meta.price` (mensal) → projeta mês ×1, semestre ×6, ano ×12.
+ */
+export function addonPrices(meta: any): { month: number; semester: number; year: number } {
+  const p = meta?.prices;
+  if (p && typeof p === 'object' && (Number(p.month) || Number(p.semester) || Number(p.year))) {
+    return { month: Number(p.month) || 0, semester: Number(p.semester) || 0, year: Number(p.year) || 0 };
+  }
+  const base = Number(meta?.price) || 0;
+  return { month: base, semester: base * 6, year: base * 12 };
+}
+
+/** Preço (R$) de um add-on de módulo para um intervalo específico. */
+export function addonPriceBrl(meta: any, interval?: string): number {
+  const iv: PlanInterval = interval === 'year' ? 'year' : interval === 'semester' ? 'semester' : 'month';
+  return addonPrices(meta)[iv];
+}
+
+/**
  * Resolve preço (em centavos) e bundleSize de um add-on, priorizando o
  * metadata do Firestore e caindo para os defaults acima.
  */

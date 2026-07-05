@@ -15,7 +15,7 @@ import { useConfirm } from '../../../hooks/useConfirm';
 import { getAiUsageStats } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
-import { planPrices } from '../../../../api/_pricing';
+import { planPrices, addonPrices } from '../../../../api/_pricing';
 import { Modal } from '../../../components/Modal';
 import {
   DollarSign, Settings, Cpu, Loader2, Save, Plus, Trash2, Edit3,
@@ -502,11 +502,6 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
                 className="input text-sm w-full resize-none" rows={2} />
             </div>
             <div>
-              <FormLabel>ID Produto AbacatePay</FormLabel>
-              <input type="text" value={form.abacatePayProductId || ''} onChange={e => set('abacatePayProductId', e.target.value)}
-                className="input h-10 text-sm w-full" placeholder="opcional — auto-gerado" />
-            </div>
-            <div>
               <FormLabel>Dias de Trial</FormLabel>
               <input type="number" min={0} value={form.trialDays} onChange={e => set('trialDays', parseInt(e.target.value) || 0)} className="input h-10 text-sm w-full" />
             </div>
@@ -633,7 +628,13 @@ function FeaturesTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(firestore, 'global_config', 'addons_config'), { ...extras, updatedAt: Date.now() }, { merge: true });
+      // `price` (mensal) espelha prices.month para compat com quem lê só price.
+      const synced: any = { ...extras };
+      (['calculators', 'pacs', 'appointments', 'clinics'] as const).forEach(k => {
+        const e: any = synced[k];
+        if (e?.prices) synced[k] = { ...e, price: e.prices.month };
+      });
+      await setDoc(doc(firestore, 'global_config', 'addons_config'), { ...synced, updatedAt: Date.now() }, { merge: true });
       showToast('Configuração de funcionalidades salva!', 'success');
     } catch { showToast('Erro ao salvar.', 'error'); }
     finally { setSaving(false); }
@@ -649,7 +650,7 @@ function FeaturesTab() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest">Funcionalidades do Sistema</h3>
-          <p className="text-[11px] text-ink-500 font-medium mt-0.5">Configure preços e disponibilidade de cada módulo para usuários.</p>
+          <p className="text-[11px] text-ink-500 font-medium mt-0.5">Cada módulo tem preço mensal, semestral e anual. Os IDs de produto são gerados automaticamente.</p>
         </div>
         <button onClick={handleSave} disabled={saving}
           className="flex items-center gap-2 h-10 px-5 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all">
@@ -659,7 +660,7 @@ function FeaturesTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {FEATURES_META.map(({ key, label, icon: Icon, color, priceLabel }) => {
+        {FEATURES_META.map(({ key, label, icon: Icon, color }) => {
           const extra = extras[key] as any || DEFAULT_EXTRAS[key];
           return (
             <div key={key} className={classNames('bg-white rounded-2xl border border-ink-100 shadow-sm p-5 space-y-4 transition-all', !extra.enabled && 'opacity-60')}>
@@ -675,29 +676,41 @@ function FeaturesTab() {
                 </div>
                 <MiniToggle value={extra.enabled} onChange={v => setField(key, { enabled: v } as any)} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <FormLabel>{priceLabel}</FormLabel>
-                  <input type="number" min={0} step={0.01} value={extra.price}
-                    onChange={e => setField(key, { price: parseFloat(e.target.value) || 0 } as any)}
-                    className="input h-9 text-sm w-full" />
-                </div>
-                {key === 'pacs' ? (
-                  <div className="flex items-center gap-2 self-end pb-2">
-                    <MiniToggle value={extra.assisted} onChange={v => setField('pacs', { assisted: v })} />
-                    <span className="text-[10px] text-ink-500 font-medium">Ativação assistida</span>
-                  </div>
-                ) : <div />}
-              </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <FormLabel>ID Produto AbacatePay</FormLabel>
-                  <input type="text" value={extra.abacatePayProductId || ''}
-                    onChange={e => setField(key, { abacatePayProductId: e.target.value } as any)}
-                    className="input h-9 text-sm w-full" placeholder="prod_XXXX" />
+              {(() => {
+                const pr = addonPrices(extra);
+                const setPrice = (iv: 'month' | 'semester' | 'year', v: number) =>
+                  setField(key, { prices: { ...pr, [iv]: v } } as any);
+                return (
+                  <div>
+                    <FormLabel>Preço por intervalo (R$)</FormLabel>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      {([
+                        { iv: 'month' as const,    label: 'Mensal' },
+                        { iv: 'semester' as const, label: 'Semestral' },
+                        { iv: 'year' as const,     label: 'Anual' },
+                      ]).map(x => (
+                        <div key={x.iv}>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-ink-400 block mb-0.5">{x.label}</span>
+                          <input type="number" min={0} step={0.01} value={pr[x.iv]}
+                            onChange={e => setPrice(x.iv, parseFloat(e.target.value) || 0)}
+                            className="input h-9 text-sm w-full font-bold" />
+                        </div>
+                      ))}
+                    </div>
+                    {key === 'pacs' && (
+                      <p className="text-[10px] text-ink-400 mt-1.5">Preço mensal 0 = "sob consulta".</p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {key === 'pacs' && (
+                <div className="flex items-center gap-2">
+                  <MiniToggle value={extra.assisted} onChange={v => setField('pacs', { assisted: v })} />
+                  <span className="text-[10px] text-ink-500 font-medium">Ativação assistida</span>
                 </div>
-              </div>
+              )}
 
               <div>
                 <FormLabel>Descrição exibida ao usuário</FormLabel>
@@ -709,6 +722,11 @@ function FeaturesTab() {
           );
         })}
       </div>
+
+      <p className="text-[11px] text-ink-400 leading-relaxed flex items-start gap-1.5">
+        <Info size={13} className="shrink-0 mt-0.5" />
+        Todos os módulos são cobrados como assinatura recorrente. Os IDs de produto na AbacatePay são gerados automaticamente por módulo × intervalo — você não precisa criar nada lá.
+      </p>
     </div>
   );
 }
@@ -792,15 +810,6 @@ function ExtraResourcesTab() {
                 ) : <div />}
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <FormLabel>ID Produto AbacatePay</FormLabel>
-                  <input type="text" value={extra.abacatePayProductId || ''}
-                    onChange={e => setField(key, { abacatePayProductId: e.target.value } as any)}
-                    className="input h-9 text-sm w-full" placeholder="prod_XXXX" />
-                </div>
-              </div>
-
               <div>
                 <FormLabel>Descrição exibida ao usuário</FormLabel>
                 <input type="text" value={extra.description}
@@ -811,6 +820,11 @@ function ExtraResourcesTab() {
           );
         })}
       </div>
+
+      <p className="text-[11px] text-ink-400 leading-relaxed flex items-start gap-1.5">
+        <Info size={13} className="shrink-0 mt-0.5" />
+        Pacotes de laudos/tokens são compra única; clínica extra é recorrente. Os IDs de produto na AbacatePay são gerados automaticamente — sem cadastro manual.
+      </p>
     </div>
   );
 }

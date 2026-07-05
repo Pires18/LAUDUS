@@ -8,6 +8,7 @@ import {
   Cloud, Loader2, CheckCircle2, AlertTriangle, RefreshCw, Trash2,
   Server, HardDrive, MapPin, Sparkles, ShieldCheck, FolderOpen
 } from 'lucide-react';
+import { planPriceBrl } from '../../../api/_pricing';
 
 // Endpoint real de provisionamento (GCP). Quando ausente, o card opera em
 // modo MOCK (simula a criação da VM) — permite testar toda a experiência
@@ -15,17 +16,19 @@ import {
 const PROVISION_ENDPOINT = (import.meta as any).env?.VITE_PACS_PROVISION_ENDPOINT || '';
 
 type Plan = 'starter' | 'pro' | 'dedicado';
-type PacsPlan = { label: string; price: number; interval: 'month' | 'semester' | 'year'; disk: number; model: string; badge?: string; active?: boolean };
+type PacsInterval = 'month' | 'semester' | 'year';
+type PacsPlan = { label: string; price: number; prices?: { month: number; semester: number; year: number }; interval: PacsInterval; disk: number; model: string; badge?: string; active?: boolean };
 type PacsPlans = Record<Plan, PacsPlan>;
 
 // Defaults (retrocompat) — o admin sobrepõe em global_config/pacs_plans.
 const DEFAULT_PLANS: PacsPlans = {
-  starter:  { label: 'Starter',  price: 99,  interval: 'month', disk: 100, model: 'Compartilhado isolado' },
-  pro:      { label: 'Pro',      price: 149, interval: 'month', disk: 300, model: 'Compartilhado isolado', badge: 'Popular' },
-  dedicado: { label: 'Dedicado', price: 249, interval: 'month', disk: 300, model: 'VM exclusiva' },
+  starter:  { label: 'Starter',  price: 99,  prices: { month: 99,  semester: 534,  year: 950  }, interval: 'month', disk: 100, model: 'Compartilhado isolado' },
+  pro:      { label: 'Pro',      price: 149, prices: { month: 149, semester: 804,  year: 1430 }, interval: 'month', disk: 300, model: 'Compartilhado isolado', badge: 'Popular' },
+  dedicado: { label: 'Dedicado', price: 249, prices: { month: 249, semester: 1344, year: 2390 }, interval: 'month', disk: 300, model: 'VM exclusiva' },
 };
 
 const intervalShort = (i?: string) => (i === 'year' ? 'ano' : i === 'semester' ? 'sem' : 'mês');
+const fmtBrl = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 function randomHex(bytes: number): string {
   const arr = new Uint8Array(bytes);
@@ -53,6 +56,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
   const inst: PacsInstance = settings.pacsInstance || { status: 'none' };
   const [busy, setBusy] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>('pro');
+  const [pacsInterval, setPacsInterval] = useState<PacsInterval>('month');
 
   // Planos de PACS gerenciados no Admin → Financeiro (global_config/pacs_plans);
   // fallback para os defaults se o admin ainda não publicou.
@@ -307,10 +311,34 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
       <p className="text-xs text-ink-600 leading-relaxed">
         Crie seu <strong>PACS na nuvem</strong> em um clique. Nós provisionamos e configuramos tudo — você só precisa depois <strong>apontar o ultrassom</strong> (assistente) e, se quiser, ligar o backup local.
       </p>
+      {/* Seletor de intervalo — cada plano cobre os 3 (mensal/semestral/anual) */}
+      <div className="flex justify-center">
+        <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-xl border border-ink-200">
+          {([
+            { iv: 'month' as const,    label: 'Mensal',    hint: '' },
+            { iv: 'semester' as const, label: 'Semestral', hint: 'economize' },
+            { iv: 'year' as const,     label: 'Anual',     hint: 'melhor preço' },
+          ]).map(o => (
+            <button
+              key={o.iv}
+              onClick={() => setPacsInterval(o.iv)}
+              className={classNames(
+                'px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5',
+                pacsInterval === o.iv ? 'bg-emerald-600 text-white shadow-sm' : 'text-ink-500 hover:text-ink-800'
+              )}
+            >
+              {o.label}
+              {o.hint && <span className={classNames('text-[8px] font-bold normal-case', pacsInterval === o.iv ? 'text-white/80' : 'text-emerald-600')}>{o.hint}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         {(Object.keys(plans) as Plan[]).filter((p) => plans[p].active !== false).map((p) => {
           const plan = plans[p];
           const active = selectedPlan === p;
+          const price = planPriceBrl(plan, pacsInterval);
           return (
             <button
               key={p}
@@ -324,7 +352,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
                 <span className="absolute -top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-600 text-white">{plan.badge}</span>
               )}
               <p className="text-xs font-black text-ink-900">{plan.label}</p>
-              <p className="text-sm font-black text-emerald-700">R$ {plan.price}<span className="text-[9px] text-ink-400 font-bold">/{intervalShort(plan.interval)}</span></p>
+              <p className="text-sm font-black text-emerald-700">R$ {fmtBrl(price)}<span className="text-[9px] text-ink-400 font-bold">/{intervalShort(pacsInterval)}</span></p>
               <p className="text-[10px] text-ink-500 mt-1">{plan.disk} GB · {plan.model}</p>
             </button>
           );
