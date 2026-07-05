@@ -1,9 +1,11 @@
 import { getDb, getAdminAuth } from './_firebase.js';
 import { safeEqual } from './_secure.js';
 import { isRecurringInterval } from './_pricing.js';
+import { destroyPacsInstance } from './_pacsLifecycle.js';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;
+const PACS_GRACE_PERIOD_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Modo CRON (GET): protegido por CRON_SECRET (Vercel envia `Authorization: Bearer <CRON_SECRET>`).
@@ -27,10 +29,14 @@ async function runCronBatch(req: any, res: any) {
   let pastDueCount = 0;
   let expiredCount = 0;
   const batch = db.batch();
+  // Guarda o status FINAL (pós-atualização deste run) de cada assinatura —
+  // usado na 2ª fase (lifecycle de PACS) sem precisar reler do banco.
+  const finalStatusByDocId = new Map<string, string>();
 
   snap.docs.forEach((docSnap: any) => {
     const sub = docSnap.data() || {};
     const updates: Record<string, any> = {};
+    finalStatusByDocId.set(docSnap.id, sub.status);
 
     // Reset de quota mensal vencida.
     const lastResetAt = sub.lastResetAt || 0;
@@ -52,6 +58,7 @@ async function runCronBatch(req: any, res: any) {
       const nextStatus = recurring ? 'past_due' : 'expired';
       if (sub.status !== nextStatus) {
         updates.status = nextStatus;
+        finalStatusByDocId.set(docSnap.id, nextStatus);
         if (recurring) pastDueCount++; else expiredCount++;
         if (sub.userId) {
           batch.set(db.collection('users').doc(sub.userId), { subscriptionStatus: nextStatus, updatedAt: now }, { merge: true });
@@ -66,6 +73,55 @@ async function runCronBatch(req: any, res: any) {
   });
 
   await batch.commit();
+
+  // ── Lifecycle de PACS (VM/tenant) por cancelamento/expiração ──
+  // Fase 2, após o commit acima para já usar o status FINAL da assinatura:
+  //  - status virou canceled/expired + PACS 'ready'  → marca 'suspended' com
+  //    prazo de graça (não destrói ainda — dá tempo do usuário reativar).
+  //  - 'suspended' com prazo vencido + AINDA canceled/expired → destrói de
+  //    vez (GCP/tenant compartilhado) e zera o estado local.
+  //  - 'suspended' mas a assinatura foi reativada antes do prazo → desfaz a
+  //    suspensão (nunca chega a destruir).
+  let pacsSuspendedCount = 0, pacsDestroyedCount = 0, pacsReactivatedCount = 0;
+  const pacsBatch = db.batch();
+  for (const docSnap of snap.docs) {
+    const sub = docSnap.data() || {};
+    const userId = sub.userId;
+    if (!userId) continue;
+    const finalStatus = finalStatusByDocId.get(docSnap.id);
+    const isCanceledOrExpired = finalStatus === 'canceled' || finalStatus === 'expired';
+
+    try {
+      const settingsRef = db.collection('users').doc(userId).collection('settings').doc('app');
+      const settingsSnap = await settingsRef.get();
+      if (!settingsSnap.exists) continue;
+      const inst = (settingsSnap.data() || {}).pacsInstance;
+      if (!inst) continue;
+
+      if (isCanceledOrExpired && inst.status === 'ready') {
+        pacsBatch.set(settingsRef, {
+          pacsInstance: { ...inst, status: 'suspended', scheduledDeletionAt: now + PACS_GRACE_PERIOD_MS, updatedAt: now },
+        }, { merge: true });
+        pacsSuspendedCount++;
+      } else if (isCanceledOrExpired && inst.status === 'suspended' && inst.scheduledDeletionAt && now > inst.scheduledDeletionAt) {
+        const result = await destroyPacsInstance({ provider: inst.provider, instanceName: inst.instanceName, tenantId: inst.tenantId });
+        if (result.success) {
+          pacsBatch.set(settingsRef, { pacsInstance: { status: 'none', updatedAt: now } }, { merge: true });
+          pacsDestroyedCount++;
+        } else {
+          console.error(`[CRON PACS] Falha ao destruir PACS de ${userId}:`, result.error);
+        }
+      } else if (!isCanceledOrExpired && inst.status === 'suspended') {
+        pacsBatch.set(settingsRef, {
+          pacsInstance: { ...inst, status: 'ready', updatedAt: now },
+        }, { merge: true });
+        pacsReactivatedCount++;
+      }
+    } catch (pacsErr) {
+      console.error(`[CRON PACS] Falha ao processar lifecycle de ${userId}:`, pacsErr);
+    }
+  }
+  await pacsBatch.commit();
 
   // Limpa pending_checkouts com mais de 7 dias (evita acúmulo indefinido).
   let cleanedCheckouts = 0;
@@ -83,8 +139,11 @@ async function runCronBatch(req: any, res: any) {
     console.warn('[CRON RESET] Falha ao limpar pending_checkouts:', cleanErr);
   }
 
-  console.log(`[CRON RESET] reset=${resetCount} pastDue=${pastDueCount} expired=${expiredCount} cleanedCheckouts=${cleanedCheckouts} de ${snap.size} assinaturas.`);
-  return res.status(200).json({ success: true, reset: resetCount, pastDue: pastDueCount, expired: expiredCount, cleanedCheckouts, total: snap.size });
+  console.log(`[CRON RESET] reset=${resetCount} pastDue=${pastDueCount} expired=${expiredCount} cleanedCheckouts=${cleanedCheckouts} pacsSuspended=${pacsSuspendedCount} pacsDestroyed=${pacsDestroyedCount} pacsReactivated=${pacsReactivatedCount} de ${snap.size} assinaturas.`);
+  return res.status(200).json({
+    success: true, reset: resetCount, pastDue: pastDueCount, expired: expiredCount, cleanedCheckouts, total: snap.size,
+    pacsSuspended: pacsSuspendedCount, pacsDestroyed: pacsDestroyedCount, pacsReactivated: pacsReactivatedCount,
+  });
 }
 
 export default async function handler(req: any, res: any) {

@@ -52,7 +52,7 @@ async function pollAgentHealth(agentUrl: string, timeoutMs = 600000): Promise<bo
 }
 
 export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
-  const { settings, updateSettings, showToast } = useApp();
+  const { settings, updateSettings, showToast, setView } = useApp();
   const inst: PacsInstance = settings.pacsInstance || { status: 'none' };
   const [busy, setBusy] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>((settings.pacsSelectedPlan as Plan) || 'pro');
@@ -250,6 +250,35 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
         <div className="h-1.5 w-full bg-ink-100 rounded-full overflow-hidden">
           <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 animate-pulse" style={{ width: '66%' }} />
         </div>
+      </div>
+    );
+  }
+
+  // ── Estado: SUSPENSO (assinatura cancelada/expirada — período de graça) ──
+  if (inst.status === 'suspended') {
+    const daysLeft = inst.scheduledDeletionAt
+      ? Math.max(0, Math.ceil((inst.scheduledDeletionAt - Date.now()) / (24 * 60 * 60 * 1000)))
+      : null;
+    return (
+      <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 space-y-4">
+        <Header isMock={isMock} />
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50/60 border border-amber-100">
+          <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-black text-amber-800">PACS suspenso — assinatura inativa</p>
+            <p className="text-[11px] text-ink-500 mt-1">
+              {daysLeft !== null
+                ? `Sua VM/tenant será destruída em ${daysLeft} dia${daysLeft === 1 ? '' : 's'} se a assinatura não for reativada. Depois disso, os dados armazenados no PACS não podem ser recuperados.`
+                : 'Sua VM/tenant será destruída em breve se a assinatura não for reativada. Depois disso, os dados armazenados no PACS não podem ser recuperados.'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setView({ name: 'settings', activeTab: 'assinatura' })}
+          className="w-full h-11 bg-brand-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-brand-700 transition-all"
+        >
+          Reativar assinatura agora
+        </button>
       </div>
     );
   }

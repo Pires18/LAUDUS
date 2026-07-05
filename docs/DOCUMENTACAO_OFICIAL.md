@@ -3,7 +3,7 @@
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
 Versão do documento: 2026-07-05 (v3 — produção multi-usuário, LGPD/CFM, landing institucional) · Ambiente: produção (Vercel + Firebase).
 
-**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Auditoria Integrações/Financeiro](AUDITORIA_INTEGRACOES_FINANCEIRO_2026-07.md) · [Plano de Refinamento](PLANO_REFINAMENTO.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md).
+**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Auditoria Integrações/Financeiro](AUDITORIA_INTEGRACOES_FINANCEIRO_2026-07.md) · [Plano de Refinamento](PLANO_REFINAMENTO.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md).
 
 ---
 
@@ -178,7 +178,9 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 4. Cliente faz **polling de saúde** do Agente até responder; `MyPacsCard` mostra **uso de disco real**, versão do Orthanc, status.
 5. `settings.pacsInstance` guarda o estado (`PacsInstanceStatus`: none/provisioning/ready/error/suspended).
 
-**Desprovisão real (`DELETE /api/pacs-provision`):** o botão "Remover PACS" não apenas limpa o Firestore — **destrói de fato** a infraestrutura: VM dedicada via GCP Compute API (`instances.delete`) ou tenant na VM compartilhada via novo endpoint `DELETE /api/admin/tenant/:id` no Agente (`scripts/agent.js`, roda `pacs-tenant.sh remove`). Sem isso, VMs ficavam órfãs (rodando e sendo cobradas) mesmo após "removidas" pelo app. **Atenção operacional:** o Agente da VM compartilhada precisa estar rodando a versão atualizada de `agent.js` para que o endpoint DELETE exista — o Agente se auto-atualiza no boot, mas não em quente; se a VM compartilhada não for reiniciada após esta mudança, a desprovisão de tenants falha com erro claro (não silenciosamente).
+**Desprovisão real (`DELETE /api/pacs-provision`):** o botão "Remover PACS" não apenas limpa o Firestore — **destrói de fato** a infraestrutura: VM dedicada via GCP Compute API (`instances.delete`) ou tenant na VM compartilhada via endpoint `DELETE /api/admin/tenant/:id` no Agente (`scripts/agent.js`, roda `pacs-tenant.sh remove`). A destruição em si mora em `api/_pacsLifecycle.ts` (helper compartilhado, não conta como função serverless própria). **Atenção operacional:** o Agente da VM compartilhada precisa estar rodando a versão atualizada de `agent.js` para que o endpoint DELETE exista — o Agente se auto-atualiza no boot, mas não em quente; se a VM compartilhada não for reiniciada após esta mudança, a desprovisão de tenants falha com erro claro (não silenciosamente).
+
+**Lifecycle automático por cancelamento (`api/reset-monthly-reports.ts`, CRON diário):** quando a assinatura de um usuário vira `canceled`/`expired` e ele tem PACS `ready`, o CRON marca `pacsInstance.status = 'suspended'` com `scheduledDeletionAt` = agora + **14 dias de período de graça** (`MyPacsCard.tsx` mostra contagem regressiva + CTA "Reativar assinatura agora"). Se a assinatura for reativada dentro do prazo, o CRON desfaz a suspensão automaticamente. Se o prazo vencer e a assinatura continuar cancelada/expirada, o CRON chama `destroyPacsInstance()` (mesmo helper do botão manual) e zera o estado local. Sem isso, VMs de assinantes cancelados ficariam rodando (e sendo cobradas) indefinidamente.
 
 **Fluxo de dados:** LAUD.US → Agente grava `.wl` → Orthanc oferece worklist (4242) → aparelho lê e faz o exame → envia imagens (C-STORE 4242) → Orthanc guarda → LAUD.US busca imagens (8042) pelo proxy do Agente (Funnel HTTPS) e mostra no laudo.
 
@@ -386,10 +388,9 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 | Item | Descrição | Bloqueador |
 |---|---|---|
 | Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário |
-| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real | Decisão de investimento/escala |
-| Lifecycle automático de VM por cancelamento | Desprovisão hoje é manual (botão do usuário) | Requer desenho de grace period/notificação antes de destruir infraestrutura automaticamente |
+| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real | Usuário habilitando a Cloud Billing API + permissão na service account (em andamento) |
 | Teto de 12 funções serverless (Vercel Hobby) | Já no limite — próxima função nova quebra o deploy | Consolidar mais endpoints ou migrar para o plano Pro |
-| Revisão jurídica dos Termos/Privacidade/Retenção | Conteúdo é rascunho técnico, alinhado ao que o sistema realmente faz | Validação por advogado especializado em LGPD/saúde digital |
+| Revisão jurídica dos Termos/Privacidade/Retenção | Pacote pronto em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) (8 pontos específicos + contexto) | Validação por advogado especializado em LGPD/saúde digital |
 
 ---
 

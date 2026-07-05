@@ -210,6 +210,12 @@ export interface PacsInstance {
   lastHealthAt?: number;
   /** Mensagem de erro amigável quando status = 'error'. */
   error?: string;
+  /**
+   * epoch ms — quando status = 'suspended' (assinatura cancelada/expirada),
+   * data a partir da qual o CRON de lifecycle destrói de vez a VM/tenant.
+   * Limpo automaticamente se a assinatura for reativada antes desse prazo.
+   */
+  scheduledDeletionAt?: number;
 }
 
 /** Configurações globais do aplicativo/usuário */

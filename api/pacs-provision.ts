@@ -129,7 +129,8 @@ tailscale funnel --bg 3000 || true
  * DELETE /api/pacs-provision — destrói de verdade o PACS gerenciado do usuário
  * (VM real no GCP ou tenant na VM compartilhada). Consolidado neste arquivo
  * (em vez de api/pacs-deprovision.ts próprio) para caber no limite de 12
- * funções serverless do plano Hobby da Vercel.
+ * funções serverless do plano Hobby da Vercel. A destruição em si mora em
+ * `_pacsLifecycle.ts` (compartilhada com o CRON de lifecycle automático).
  */
 async function handleDeprovision(req: any, res: any) {
   let body = req.body;
@@ -151,80 +152,11 @@ async function handleDeprovision(req: any, res: any) {
     return;
   }
 
-  const { provider, instanceName, tenantId } = body || {};
-
-  // Mock ou nunca provisionado de verdade: nada para destruir na nuvem.
-  if (!provider || provider === 'mock' || !instanceName) {
-    res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ success: true, note: 'Nada a destruir (instância simulada ou inexistente).' }));
-    return;
-  }
-
-  // ── Tenant na VM compartilhada (Starter/Pro) ──
-  if (provider === 'shared') {
-    const sharedUrl = process.env.PACS_SHARED_AGENT_URL;
-    const sharedAdmin = process.env.PACS_ADMIN_SECRET;
-    if (!sharedUrl || !sharedAdmin || !tenantId) {
-      res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ success: true, note: 'PACS compartilhado não configurado ou sem tenantId — nada a destruir remotamente.' }));
-      return;
-    }
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-      const r = await fetch(`${sharedUrl.replace(/\/$/, '')}/api/admin/tenant/${encodeURIComponent(tenantId)}`, {
-        method: 'DELETE',
-        headers: { 'x-admin-secret': sharedAdmin },
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!r.ok) {
-        const d: any = await r.json().catch(() => ({}));
-        throw new Error(d?.error || `Agente respondeu ${r.status} ao remover o tenant.`);
-      }
-      res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ success: true }));
-    } catch (err: any) {
-      res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: err.message || 'Falha ao remover tenant compartilhado.' }));
-    }
-    return;
-  }
-
-  // ── VM dedicada real (GCP) ──
-  if (provider === 'gcp') {
-    const gcpConfigured = !!process.env.GCP_SA_KEY;
-    if (!gcpConfigured) {
-      res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ success: true, note: 'GCP não configurado no servidor — nada a destruir remotamente.' }));
-      return;
-    }
-    try {
-      const sa = JSON.parse(process.env.GCP_SA_KEY!);
-      const project = sa.project_id || process.env.GCP_PROJECT_ID;
-      const zone = process.env.GCP_ZONE || 'southamerica-east1-c';
-      const gcpToken = await getGcpAccessToken(sa, 'https://www.googleapis.com/auth/compute');
-      const delRes = await fetch(
-        `https://compute.googleapis.com/compute/v1/projects/${project}/zones/${zone}/instances/${encodeURIComponent(instanceName)}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${gcpToken}` } }
-      );
-      const delData: any = await delRes.json().catch(() => ({}));
-      // 404 = já não existe (idempotente, trata como sucesso).
-      if (!delRes.ok && delRes.status !== 404) {
-        throw new Error(`GCP delete: ${delData?.error?.message || JSON.stringify(delData)}`);
-      }
-      res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ success: true }));
-    } catch (err: any) {
-      console.error('[pacs-deprovision] erro:', err);
-      res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: err.message || 'Falha ao destruir a VM.' }));
-    }
-    return;
-  }
-
-  res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify({ error: `provider desconhecido: ${provider}` }));
+  const { destroyPacsInstance } = await import('./_pacsLifecycle.js');
+  const result = await destroyPacsInstance(body || {});
+  res.statusCode = result.success ? 200 : 500;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(result));
 }
 
 export default async function handler(req: any, res: any) {
