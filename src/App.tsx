@@ -241,6 +241,9 @@ function UserAccessGate({ children }: { children: ReactNode }) {
 
     const userRef = doc(firestore, 'users', user.uid);
 
+    // Rede de segurança: nunca travar eternamente na tela de homologação.
+    let gateTimer: any;
+
     const unsub = onSnapshot(userRef, async (snap) => {
       try {
         let userData = snap.exists() ? snap.data() : null;
@@ -316,10 +319,23 @@ function UserAccessGate({ children }: { children: ReactNode }) {
         setIsAllowed(false);
       } finally {
         setChecking(false);
+        clearTimeout(gateTimer);
       }
+    }, (err) => {
+      logger.error('[AccessGate] Listener do Firestore falhou:', err);
+      setIsAllowed(false);
+      setChecking(false);
+      clearTimeout(gateTimer);
     });
 
-    return () => unsub();
+    // Se o Firestore não responder em 15s (ex.: env do Firebase quebrada no
+    // build), libera a UI em vez de congelar para sempre na homologação.
+    gateTimer = setTimeout(() => {
+      logger.warn('[AccessGate] Timeout ao validar acesso — liberando a UI.');
+      setChecking(false);
+    }, 15000);
+
+    return () => { unsub(); clearTimeout(gateTimer); };
   }, [user]);
 
   if (checking) {
