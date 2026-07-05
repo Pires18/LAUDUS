@@ -206,6 +206,45 @@ function PlansTab() {
     } catch { showToast('Erro ao remover plano.', 'error'); }
   };
 
+  // Gera as 3 variações de intervalo (mensal/semestral/anual) do plano em edição,
+  // todas como assinatura recorrente e mesmo tier (agrupa na vitrine). Os IDs de
+  // produto são automáticos (checkout); o admin só ajusta os preços depois.
+  const handleGenerateVariants = async () => {
+    if (!form.name.trim()) { showToast('Preencha o nome do plano antes de gerar variações.', 'error'); return; }
+    setSaving(true);
+    try {
+      const baseName = form.name.replace(/\s*[—-]\s*(Mensal|Semestral|Anual)\s*$/i, '').trim();
+      const tier = (form.tier || baseName).trim();
+      const variants: { interval: 'month' | 'semester' | 'year'; label: string; mult: number }[] = [
+        { interval: 'month',    label: 'Mensal',    mult: 1  },
+        { interval: 'semester', label: 'Semestral', mult: 6  },
+        { interval: 'year',     label: 'Anual',     mult: 12 },
+      ];
+      for (const v of variants) {
+        await addDoc(collection(firestore, 'saas_plans'), {
+          ...form,
+          name: `${baseName} — ${v.label}`,
+          tier,
+          interval: v.interval,
+          autoRenew: true,
+          category: 'subscription',
+          price: Math.round((form.price || 0) * v.mult * 100) / 100,
+          featured: v.interval === 'year' && !!form.featured,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+      showToast(`3 variações de "${baseName}" criadas (mensal/semestral/anual). Ajuste os preços se quiser.`, 'success');
+      setShowForm(false);
+      setEditingId(null);
+      await loadPlans();
+    } catch {
+      showToast('Erro ao gerar variações.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) return <Spinner />;
 
   return (
@@ -242,6 +281,7 @@ function PlansTab() {
           form={form} setForm={setForm}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingId(null); }}
+          onGenerateVariants={handleGenerateVariants}
           saving={saving}
           isNew={!editingId}
         />
@@ -331,9 +371,9 @@ function Pill({ label, on }: { label: string; on: boolean }) {
   );
 }
 
-function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
+function PlanFormModal({ form, setForm, onSave, onCancel, onGenerateVariants, saving, isNew }: {
   form: PlanForm; setForm: (f: PlanForm) => void;
-  onSave: () => void; onCancel: () => void;
+  onSave: () => void; onCancel: () => void; onGenerateVariants: () => void;
   saving: boolean; isNew: boolean;
 }) {
   const set = <K extends keyof PlanForm>(k: K, v: PlanForm[K]) => setForm({ ...form, [k]: v });
@@ -342,6 +382,11 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
     <>
       <button onClick={onCancel} className="h-10 px-4 rounded-xl border border-ink-200 text-ink-700 text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all">
         Cancelar
+      </button>
+      <button onClick={onGenerateVariants} disabled={saving}
+        title="Cria os 3 planos (mensal/semestral/anual) deste tier de uma vez, todos recorrentes"
+        className="flex items-center gap-2 h-10 px-4 border border-brand-200 text-brand-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-50 disabled:opacity-50 transition-all">
+        <Plus size={13} /> Gerar 3 intervalos
       </button>
       <button onClick={onSave} disabled={saving}
         className="flex items-center gap-2 h-10 px-5 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-700 disabled:opacity-50 transition-all">
