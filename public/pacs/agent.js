@@ -35,6 +35,23 @@ const WORKLIST_DIR = process.env.LAUDUS_WORKLIST_DIR || '';
 // Endpoints de metadados de nuvem são SEMPRE bloqueados no proxy.
 const BLOCKED_HOSTS = new Set(['169.254.169.254', 'metadata.google.internal']);
 
+// IP tailnet da própria VM (faixa CGNAT do Tailscale, 100.64.0.0/10) — usado
+// pelo card "Conectar meu ultrassom" para montar a instrução de relé pronta
+// (endereço a apontar no roteador/PC-relé), sem depender do binário `tailscale`.
+function getTailscaleIp() {
+  try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name] || []) {
+        if (net.family === 'IPv4' && !net.internal && /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(net.address)) {
+          return net.address;
+        }
+      }
+    }
+  } catch { /* melhor esforço — sem IP, o card cai no fallback por hostname */ }
+  return null;
+}
+
 function isProxyTargetAllowed(targetUrlObj) {
   const host = (targetUrlObj.hostname || '').toLowerCase();
   if (BLOCKED_HOSTS.has(host)) return false;
@@ -109,7 +126,13 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && pathname === '/') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ status: 'online', message: 'Laudus Local Agent is running!', mode: TENANTS_DIR ? 'multi-tenant' : 'single-tenant', time: new Date().toISOString() }));
+    res.end(JSON.stringify({
+      status: 'online',
+      message: 'Laudus Local Agent is running!',
+      mode: TENANTS_DIR ? 'multi-tenant' : 'single-tenant',
+      tailscaleIp: getTailscaleIp(),
+      time: new Date().toISOString()
+    }));
     return;
   }
 
