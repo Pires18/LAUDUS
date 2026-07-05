@@ -74,10 +74,26 @@ export const ADDON_DEFAULTS: Record<string, { price: number; bundleSize: number 
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export type PlanInterval = 'month' | 'semester' | 'year';
+
 /** Calcula o fim do período de cobrança respeitando o intervalo do plano. */
 export function periodEndFrom(start: number, interval?: string): number {
-  const days = interval === 'year' ? 365 : 30;
+  const days = interval === 'year' ? 365 : interval === 'semester' ? 182 : 30;
   return start + days * DAY_MS;
+}
+
+/**
+ * Só o intervalo ANUAL é assinatura recorrente (auto-renova na AbacatePay).
+ * Mensal e semestral são pagamentos avulsos (pagou → vale pelo período → expira).
+ * Fonte única usada por checkout, webhook e UI.
+ */
+export function isRecurringInterval(interval?: string): boolean {
+  return interval === 'year';
+}
+
+/** Rótulo curto do intervalo para a UI. */
+export function intervalLabel(interval?: string): string {
+  return interval === 'year' ? 'ano' : interval === 'semester' ? 'semestre' : 'mês';
 }
 
 /**

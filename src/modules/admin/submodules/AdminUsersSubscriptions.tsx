@@ -60,7 +60,7 @@ interface SaasPlan {
   name: string;
   description?: string;
   price: number;
-  interval: 'month' | 'year';
+  interval: 'month' | 'semester' | 'year';
   reportsQuota: number;
   clinicsQuota: number;
   tokenQuotaLite: number;

@@ -538,7 +538,14 @@ export interface Plan {
   name: string;
   description: string;
   price: number;
-  interval: 'month' | 'year';
+  /** Mensal, Semestral ou Anual. Só o Anual é recorrente (ver isRecurringInterval). */
+  interval: 'month' | 'semester' | 'year';
+  /** Recorrência (auto-renova). Derivado do intervalo (só 'year'); persistido p/ o webhook. */
+  autoRenew?: boolean;
+  /** Agrupador da vitrine (mesmo tier em intervalos diferentes). */
+  tier?: string;
+  /** 'subscription' (padrão) | 'pacs' (planos de infra PACS gerenciados no Financeiro). */
+  category?: 'subscription' | 'pacs';
   active: boolean;
   featured?: boolean;
 

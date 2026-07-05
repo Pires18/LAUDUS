@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, ADDON_DEFAULTS } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -93,7 +93,29 @@ describe('periodEndFrom', () => {
     expect(periodEndFrom(start, 'month')).toBe(start + 30 * DAY);
   });
 
+  it('semestral → +182 dias', () => {
+    expect(periodEndFrom(start, 'semester')).toBe(start + 182 * DAY);
+  });
+
   it('anual → +365 dias', () => {
     expect(periodEndFrom(start, 'year')).toBe(start + 365 * DAY);
+  });
+});
+
+describe('isRecurringInterval', () => {
+  it('só o anual é recorrente', () => {
+    expect(isRecurringInterval('year')).toBe(true);
+    expect(isRecurringInterval('month')).toBe(false);
+    expect(isRecurringInterval('semester')).toBe(false);
+    expect(isRecurringInterval(undefined)).toBe(false);
+  });
+});
+
+describe('intervalLabel', () => {
+  it('rótulo por intervalo', () => {
+    expect(intervalLabel('month')).toBe('mês');
+    expect(intervalLabel('semester')).toBe('semestre');
+    expect(intervalLabel('year')).toBe('ano');
+    expect(intervalLabel(undefined)).toBe('mês');
   });
 });
