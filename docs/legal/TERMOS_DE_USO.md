@@ -1,16 +1,16 @@
 # Termos de Uso — LAUD.US
 
-**Versão:** 2.0 · **Vigência a partir de:** 2026-07-06 · **Operadora:** Kist Serviços Médicos LTDA (CNPJ 46.706.765/0001-42)
+**Versão:** 3.0 · **Vigência a partir de:** 2026-07-06
 
-> ⚠️ **Rascunho técnico revisado — ainda requer validação jurídica final** antes de valer como termo contratual definitivo, especialmente quanto às cláusulas de limitação de responsabilidade e ao enquadramento regulatório específico (CFM) descrito no §1.2. Redigido para refletir com precisão o que o sistema realmente faz e o estágio atual (fase de testes restrita), mas não substitui parecer de advogado.
+> ⚠️ **Rascunho técnico revisado — ainda requer validação jurídica final** antes de valer como termo contratual definitivo, especialmente quanto às cláusulas de limitação de responsabilidade e ao enquadramento regulatório específico (CFM) descrito no §1.2. **Nota:** a identificação formal da operadora (razão social/CNPJ) foi omitida por decisão do responsável durante a fase de testes restrita (§1.3) — será divulgada antes do início da operação comercial plena. Redigido para refletir com precisão o que o sistema realmente faz, mas não substitui parecer de advogado.
 
 ## 1. Objeto
 
 ### 1.1 O que é o LAUD.US
-O LAUD.US é uma plataforma de software como serviço (SaaS), operada por **Kist Serviços Médicos LTDA** (CNPJ 46.706.765/0001-42), destinada a profissionais de saúde regularmente inscritos em seus conselhos de classe (CFM/CRM e correlatos), para apoio à elaboração de laudos de exames de imagem (ultrassonografia e correlatos), gestão de pacientes, agenda, integração com equipamentos DICOM/PACS e uso de inteligência artificial como ferramenta de apoio à redação — nunca como substituto do julgamento clínico do profissional responsável.
+O LAUD.US — Sistemas de Laudos Inteligentes é uma plataforma de software como serviço (SaaS) destinada a profissionais de saúde regularmente inscritos em seus conselhos de classe (CFM/CRM e correlatos), para apoio à elaboração de laudos de exames de imagem (ultrassonografia e correlatos), gestão de pacientes, agenda, integração com equipamentos DICOM/PACS e uso de inteligência artificial como ferramenta de apoio à redação — nunca como substituto do julgamento clínico do profissional responsável.
 
 ### 1.2 Natureza da relação — fornecimento de software, não prestação de atendimento médico
-Nesta relação contratual, a Kist Serviços Médicos LTDA atua exclusivamente como **fornecedora de ferramenta de tecnologia** (SaaS). A contratação do LAUD.US **não constitui, em nenhuma hipótese, prestação de serviço médico, teleconsulta, telediagnóstico ou qualquer ato médico** por parte da operadora. O exercício da medicina, a responsabilidade técnica pelo laudo, pelo diagnóstico e pelo cuidado do paciente são, em todos os casos, exclusivos do profissional usuário da plataforma, no âmbito da sua própria relação assistencial.
+Nesta relação contratual, o LAUD.US atua exclusivamente como **fornecedor de ferramenta de tecnologia** (SaaS). A contratação do LAUD.US **não constitui, em nenhuma hipótese, prestação de serviço médico, teleconsulta, telediagnóstico ou qualquer ato médico** por parte da operadora. O exercício da medicina, a responsabilidade técnica pelo laudo, pelo diagnóstico e pelo cuidado do paciente são, em todos os casos, exclusivos do profissional usuário da plataforma, no âmbito da sua própria relação assistencial.
 
 ### 1.3 Programa de Testes Restrito (fase atual)
 **O LAUD.US encontra-se, nesta data, em fase de testes com acesso restrito/por convite** (não é ainda uma operação comercial plena e amplamente disponível). Nesta fase:
@@ -46,7 +46,7 @@ O tratamento de dados pessoais e dados de saúde é regido pela [Política de Pr
 
 ## 6. Propriedade intelectual
 
-O software, sua marca, layout e funcionalidades são de propriedade da Kist Serviços Médicos LTDA. Os dados de pacientes e laudos gerados pelo usuário permanecem de titularidade do usuário/instituição de saúde responsável pelo tratamento — a operadora não reivindica propriedade sobre o conteúdo clínico inserido pelo usuário.
+O software, sua marca, layout e funcionalidades são de propriedade da operadora do LAUD.US. Os dados de pacientes e laudos gerados pelo usuário permanecem de titularidade do usuário/instituição de saúde responsável pelo tratamento — a operadora não reivindica propriedade sobre o conteúdo clínico inserido pelo usuário.
 
 ## 7. Disponibilidade e limitação de responsabilidade
 
@@ -64,7 +64,7 @@ Alterações materiais nestes Termos serão comunicadas ao usuário, com necessi
 
 ## 10. Foro e legislação aplicável
 
-Estes Termos são regidos pelas leis da República Federativa do Brasil, incluindo a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), o Marco Civil da Internet (Lei nº 12.965/2014), o Código de Defesa do Consumidor (quando aplicável) e as normas do Conselho Federal de Medicina aplicáveis a prontuários e laudos eletrônicos (incluindo, no que couber, a Resolução CFM nº 2.299/2021 e correlatas). Fica eleito o foro do domicílio da Kist Serviços Médicos LTDA para dirimir eventuais controvérsias, com renúncia a qualquer outro, por mais privilegiado que seja, ressalvada a competência de foro de domicílio do consumidor quando de aplicação obrigatória.
+Estes Termos são regidos pelas leis da República Federativa do Brasil, incluindo a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), o Marco Civil da Internet (Lei nº 12.965/2014), o Código de Defesa do Consumidor (quando aplicável) e as normas do Conselho Federal de Medicina aplicáveis a prontuários e laudos eletrônicos (incluindo, no que couber, a Resolução CFM nº 2.299/2021 e correlatas). O foro para dirimir eventuais controvérsias será definido conforme a legislação aplicável ao caso (em regra, o domicílio do usuário, quando de aplicação obrigatória em favor do consumidor) — a eleição de foro específico será formalizada quando da identificação pública da operadora, ao final da fase de testes.
 
 ## 11. Contato
 

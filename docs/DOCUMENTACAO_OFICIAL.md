@@ -36,7 +36,7 @@ O LAUD.US é um **PWA** que cobre o ciclo completo do laudo ultrassonográfico:
 
 Sobre isso roda um **SaaS**: assinatura mensal/semestral/anual, add-ons pagos (PACS, Calculadoras, Agendamentos, Clínicas), cotas de laudos, cobrança via AbacatePay e um **painel administrativo** de operação (usuários, planos, financeiro MRR/ARR/reconciliação, telemetria, suporte, saúde).
 
-Há também uma **landing page institucional separada** (`landing/`, site estático próprio, ver §2) para marketing/aquisição, distinta do app autenticado.
+A landing institucional (hero, funcionalidades, planos, FAQ) vive **dentro do próprio app** como a tela inicial de quem não está logado — não é mais um site separado (ver §2).
 
 **Diferenciais técnicos:** IA server-side (Gemini) com rate limit distribuído, **PACS gerenciado por VM na nuvem** (provisão E desprovisão self-service — a VM/tenant é realmente destruída ao remover o PACS), telemetria persistente e agregada com reconciliação financeira (MRR teórico vs receita real, alerta de prejuízo por usuário), gating de features por plano (cliente + servidor), conformidade LGPD/CFM (Termos de Uso, Política de Privacidade, consentimento explícito no cadastro, política de retenção documentada).
 
@@ -73,7 +73,7 @@ Há também uma **landing page institucional separada** (`landing/`, site estát
 
 **Roteamento (SPA, view-based, `App.tsx`):** sem React Router; um `view` no store define a tela. Módulos são **lazy-loaded** com `Suspense` e `ErrorBoundary` por rota. Pré-login → só `LoginScreen` (+ vitrine de planos pública + modal de Termos/Privacidade).
 
-**Landing institucional (`landing/`):** projeto **separado**, HTML/CSS puro (sem framework, sem build), deploy independente na Vercel (domínio/subdomínio próprio, ex. `laudus.com.br` apontando para o marketing enquanto o app fica em outro domínio). Hero, funcionalidades, planos, FAQ e páginas públicas de Termos/Privacidade; CTAs apontam para a URL do app (constante `APP_URL` em `landing/index.html`).
+**Landing institucional (`src/components/LandingScreen.tsx`):** unificada no mesmo app React (mesmo domínio/deploy — decisão revertida em 2026-07-06, antes era um site estático separado). É a tela renderizada por padrão para quem não está logado (`AuthRouter`/`UnauthenticatedGate` em `App.tsx`) — hero, funcionalidades, vitrine de planos (`PricingPlans`), FAQ e footer com Termos/Privacidade (`LegalModal`). Os CTAs "Entrar"/"Começar grátis" revelam a tela de login/cadastro (`LoginScreen.tsx`, agora simplificada — sem painel de marketing duplicado) dentro do mesmo app, sem navegação de página. Ao deslogar, o usuário sempre volta para a landing (nunca fica "preso" na tela de login).
 
 **Rate limit distribuído (`api/_rateLimit.ts`):** `/api/gemini` usa Vercel KV/Upstash Redis via REST (`KV_REST_API_URL`/`KV_REST_API_TOKEN`) quando configurado; cai para memória local por instância como fallback (funciona, mas não é compartilhado entre instâncias Edge).
 
@@ -109,7 +109,6 @@ public/                    # favicon.svg + icons/*.png (marca padrão) + manifes
 docs/                      # documentação: DOCUMENTACAO_OFICIAL (este) + legal/ (Termos/Privacidade)
                            #   + roadmaps/ (specs pendentes) + pacs/ (arquitetura/manuais PACS)
                            #   + archive/ (planos/auditorias históricas, já concluídos)
-landing/                   # site institucional separado (HTML/CSS puro, deploy Vercel independente)
 firestore.rules            # RBAC · firestore.indexes.json · vercel.json · firebase.json
 ```
 
@@ -263,13 +262,13 @@ Quando `currentPeriodEnd` vence com status `active`/`past_due`:
 
 ## 9. Segurança, RBAC & LGPD
 
-- **Auth:** Firebase (Google + e-mail/senha). Todo acesso exige login (exceto vitrine de planos e landing institucional). Contas por e-mail/senha exigem **e-mail verificado** para gerar laudos com IA (`sendEmailVerification`, checado server-side em `/api/gemini` via claim `email_verified` do token — contas Google já chegam verificadas). "Esqueci minha senha" via `sendPasswordResetEmail`.
+- **Auth:** Firebase (Google + e-mail/senha). Todo acesso exige login (exceto a landing/vitrine de planos, pública). Contas por e-mail/senha exigem **e-mail verificado** para gerar laudos com IA (`sendEmailVerification`, checado server-side em `/api/gemini` via claim `email_verified` do token — contas Google já chegam verificadas). "Esqueci minha senha" via `sendPasswordResetEmail`.
 - **RBAC:** `admin | medico | recepcao`. **Privilégio de admin só por `users/{uid}.role`** (campo protegido) — `useAdmin` não confia em `settings.currentRole`; `Admin.tsx` tem guarda própria; super-admin por e-mail.
 - **RBAC de clínica (equipe multiusuário) — implementado:** `clinic_memberships` permite convidar um segundo usuário (papel `editor`/`viewer`) para colaborar numa clínica (`ClinicTeamCard.tsx` + `api/clinic-invite.ts`). Regras do Firestore validam acesso a `clinics`/`patients`/`exams`/`appointments` por membership, **incluindo proteção contra um editor reatribuir `clinicId` de um registro para fora da clínica dele** (o `update` exige que `clinicId` não mude — só dono/admin podem reclassificar). A camada de dados do cliente (`useFirestore.ts`/`db.ts`) redireciona corretamente para a subárvore do dono via `resolveOwnerUid` (`store/clinicAccess.ts`) — um membro convidado já visualiza/edita os dados do dono pela UI dentro do contexto da clínica ativa (ver §16 para detalhes e limitações).
 - **Firestore rules:** default-deny; impedem escalonamento de privilégio, inflar cota, auto-conceder add-ons; contador de uso só cresce; `transactions`/`metrics_daily` restritos; `clinic_memberships` só criado pelo servidor; webhooks usam Admin SDK (ignoram rules).
 - **Endpoints:** auth JWKS (Edge/serverless); **rate-limit distribuído** no `gemini` (Vercel KV/Upstash, fallback em memória); `safeEqual` (timing-safe) em segredos; entitlement server-side (PACS + cota) **fail-open**; `promote-admin` com trava tripla.
 - **Segredos:** `.env`/`.env.example` sem valores reais (chave privada do Firebase Admin SDK e chave Gemini que estavam commitadas em texto puro foram rotacionadas e revogadas em 05/07/2026); chaves só em env da Vercel; senhas PACS e segredo do Agente **criptografados por-usuário** (`crypto.ts`); anti-SSRF no Agente.
-- **LGPD/CFM:** trilha de acesso a paciente (`logPatientAccess`), pseudonimização nos prompts (`scrubForGeneration`), consentimento no editor, **Termos de Uso e Política de Privacidade publicados** (`docs/legal/*.md`, modal no app, páginas públicas na landing) com **checkbox obrigatório e registro de aceite** (`termsAcceptedAt`/`termsVersion` em `users/{uid}`), **política de retenção documentada** (`docs/LGPD_POLITICA_RETENCAO.md` — prazos de guarda, pendências de expurgo/portal do titular). Assinatura digital ICP-Brasil: **desenho pronto, não implementada** (aguarda escolha de fornecedor — ClickSign/D4Sign — e credenciais do usuário; ver `docs/roadmaps/ASSINATURA_ICP_BRASIL.md`).
+- **LGPD/CFM:** trilha de acesso a paciente (`logPatientAccess`), pseudonimização nos prompts (`scrubForGeneration`), consentimento no editor, **Termos de Uso e Política de Privacidade publicados** (`docs/legal/*.md`, `LegalModal.tsx` acessível a partir da landing e do login) com **checkbox obrigatório e registro de aceite** (`termsAcceptedAt`/`termsVersion` em `users/{uid}`), **política de retenção documentada** (`docs/LGPD_POLITICA_RETENCAO.md` — prazos de guarda, pendências de expurgo/portal do titular). **Identificação da operadora (razão social/CNPJ) omitida intencionalmente** dos documentos e da interface durante a fase de testes restrita (decisão do responsável, 2026-07-06) — ver alerta em `docs/legal/PACOTE_REVISAO_JURIDICA.md`. Assinatura digital ICP-Brasil: **desenho pronto, não implementada** (aguarda escolha de fornecedor — ClickSign/D4Sign — e credenciais do usuário; ver `docs/roadmaps/ASSINATURA_ICP_BRASIL.md`).
 - **Monitoramento:** Sentry (opt-in por DSN); **aba Saúde** (admin) com status real.
 
 ---
@@ -340,7 +339,7 @@ Quando `currentPeriodEnd` vence com status `active`/`past_due`:
 ## 13. Fluxos de ponta a ponta
 
 **A. Visitante → cliente pagante**
-Landing institucional ou vitrine de planos (pré-login) → "Começar" → **cadastro** (checkbox obrigatório de Termos/Privacidade, e-mail de verificação enviado) → trial 14d → Centro de Assinatura → **checkout AbacatePay** → webhook concede (add-ons/cota, grava `interval`/`price`) → `useSubscription` reflete via snapshot → módulos liberam. Geração de laudos com IA exige e-mail confirmado (contas e-mail/senha).
+Landing (tela inicial, deslogado) → "Começar grátis"/"Entrar" → **cadastro** (checkbox obrigatório de Termos/Privacidade, e-mail de verificação enviado) → trial 14d → Centro de Assinatura → **checkout AbacatePay** → webhook concede (add-ons/cota, grava `interval`/`price`) → `useSubscription` reflete via snapshot → módulos liberam. Geração de laudos com IA exige e-mail confirmado (contas e-mail/senha).
 
 **B. Exame → laudo → PDF**
 Agenda/Worklist cria exame → (PACS) worklist ao aparelho → imagens recebidas → Editor gera laudo IA (**cota checada no servidor**) → refino/copiloto → qualidade/anti-alucinação → export **PDF** (laudo + imagens) ou **Google Docs** → finaliza (remove `.wl`).
@@ -396,7 +395,8 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 | Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário |
 | Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — aguardando o Google popular a 1ª tabela (~24-48h) | Tempo de propagação do Google, não decisão/trabalho pendente |
 | Teto de 12 funções serverless (Vercel Hobby) | Já no limite — próxima função nova quebra o deploy | Consolidar mais endpoints ou migrar para o plano Pro |
-| Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v2.0 finalizados com operadora identificada (Kist Serviços Médicos LTDA, CNPJ 46.706.765/0001-42) e seção de fase de testes restrita. Pacote atualizado em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) (9 pontos específicos) | Validação por advogado especializado em LGPD/saúde digital |
+| Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v3.0 sem identificação da operadora (razão social/CNPJ removida por decisão do responsável durante a fase de testes) — pacote em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) já sinaliza esse ponto como prioritário para o advogado | Validação por advogado especializado em LGPD/saúde digital |
+| Identificação da operadora nos documentos legais | Razão social/CNPJ removidos de todos os documentos e da interface durante a fase de testes — recomendável reintroduzir ao menos nos documentos legais antes da operação comercial plena (ver alerta em `PACOTE_REVISAO_JURIDICA.md`) | Decisão do responsável, a rever com o advogado |
 
 ---
 

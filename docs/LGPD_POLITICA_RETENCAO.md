@@ -1,6 +1,6 @@
 # Política de Retenção e Expurgo de Dados — LAUD.US
 
-**Versão:** 2.0 · **Vigência a partir de:** 2026-07-06 · **Status:** vivo · **Operadora:** Kist Serviços Médicos LTDA (CNPJ 46.706.765/0001-42)
+**Versão:** 3.0 · **Vigência a partir de:** 2026-07-06 · **Status:** vivo
 
 > ⚠️ **Rascunho técnico revisado — ainda requer validação jurídica e definição de negócio antes de execução.** Os prazos abaixo seguem a orientação usual do Conselho Federal de Medicina para guarda de prontuário; a implementação de qualquer rotina de exclusão automática é destrutiva e não foi codificada — carece de decisão explícita do responsável pelo produto antes de ligar qualquer expurgo automático.
 >

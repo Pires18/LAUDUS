@@ -1,16 +1,16 @@
 # Política de Privacidade — LAUD.US
 
-**Versão:** 2.0 · **Vigência a partir de:** 2026-07-06 · **Operadora:** Kist Serviços Médicos LTDA (CNPJ 46.706.765/0001-42)
+**Versão:** 3.0 · **Vigência a partir de:** 2026-07-06
 
-> ⚠️ **Rascunho técnico revisado — ainda requer validação jurídica final** antes de publicação definitiva, em especial quanto ao enquadramento de transferência internacional (§6) e à suficiência da base legal para uso de IA sobre dado de saúde (§4). O conteúdo reflete o tratamento de dados realmente implementado no sistema nesta versão.
+> ⚠️ **Rascunho técnico revisado — ainda requer validação jurídica final** antes de publicação definitiva, em especial quanto ao enquadramento de transferência internacional (§6) e à suficiência da base legal para uso de IA sobre dado de saúde (§4). **Nota:** a identificação formal da operadora (razão social/CNPJ) foi omitida por decisão do responsável durante a fase de testes restrita — será divulgada antes do início da operação comercial plena. O conteúdo reflete o tratamento de dados realmente implementado no sistema nesta versão.
 
 ## 1. Identificação da operadora e papéis (controlador/operador)
 
-Esta Política de Privacidade é publicada por **Kist Serviços Médicos LTDA**, CNPJ 46.706.765/0001-42 ("LAUD.US" ou "operadora"), fornecedora da plataforma de software descrita nos [Termos de Uso](TERMOS_DE_USO.md).
+Esta Política de Privacidade é publicada pelo **LAUD.US — Sistemas de Laudos Inteligentes** ("LAUD.US" ou "operadora"), fornecedor da plataforma de software descrita nos [Termos de Uso](TERMOS_DE_USO.md).
 
 - O **profissional de saúde ou clínica cadastrada** no LAUD.US é o **controlador** dos dados de pacientes inseridos na plataforma (LGPD, art. 5º, VI) — é quem decide coletar, tratar e reter o dado de saúde do paciente, no exercício da sua própria relação assistencial.
-- O **LAUD.US (Kist Serviços Médicos LTDA)** atua como **operador**, tratando os dados exclusivamente conforme as instruções do controlador e a finalidade contratada (fornecimento do software).
-- O **Google** (Firebase/Gemini) atua como **suboperador** da Kist Serviços Médicos LTDA, nos termos descritos na seção 6.
+- O **LAUD.US** atua como **operador**, tratando os dados exclusivamente conforme as instruções do controlador e a finalidade contratada (fornecimento do software).
+- O **Google** (Firebase/Gemini) atua como **suboperador** do LAUD.US, nos termos descritos na seção 6.
 
 **Encarregado de Dados (DPO), nos termos do art. 41 da LGPD:** contato **contato.laudus@gmail.com**.
 

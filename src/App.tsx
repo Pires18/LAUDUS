@@ -5,6 +5,7 @@ import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { useApp } from './store/app';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginScreen } from './components/LoginScreen';
+import { LandingScreen } from './components/LandingScreen';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
@@ -397,6 +398,16 @@ export default function App() {
   );
 }
 
+// Deslogado: landing institucional é a tela inicial; "Entrar"/"Cadastre-se"
+// revela o formulário dentro do mesmo app (mesmo domínio/deploy). Remonta do
+// zero sempre que `user` vira null (login OU logout), então sempre volta
+// para a landing por padrão — nunca fica "preso" na tela de login.
+function UnauthenticatedGate() {
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
+  if (authMode) return <LoginScreen initialMode={authMode} onBack={() => setAuthMode(null)} />;
+  return <LandingScreen onEnter={setAuthMode} />;
+}
+
 function AuthRouter() {
   const { user, setUser } = useApp();
   const [authChecked, setAuthChecked] = useState(false);
@@ -415,7 +426,7 @@ function AuthRouter() {
   }, [setUser]);
 
   if (!authChecked) return <LoadingScreen />;
-  if (!user) return <LoginScreen />;
+  if (!user) return <UnauthenticatedGate />;
   return (
     <UserAccessGate>
       <AuthenticatedApp />

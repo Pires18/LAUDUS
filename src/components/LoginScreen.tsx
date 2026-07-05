@@ -1,29 +1,21 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import {
-  Loader2, ShieldCheck, Sparkles,
-  Lock, CheckCircle, FileText, Layers,
-  Mail, KeyRound, Database, Calculator, CalendarDays, Building2, CreditCard
-} from 'lucide-react';
+import { Loader2, Lock, Mail, KeyRound } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
 import { PricingPlans } from './PricingPlans';
 import { LegalModal, LEGAL_TERMS_VERSION } from './LegalModal';
 import { storePendingTermsAcceptance } from '../lib/legalConsent';
 
-const LANDING_FEATURES = [
-  { icon: Sparkles,    label: 'Laudos com IA' },
-  { icon: Database,    label: 'PACS / DICOM' },
-  { icon: Calculator,  label: 'Calculadoras clínicas' },
-  { icon: CalendarDays,label: 'Agenda & Worklist' },
-  { icon: Building2,   label: 'Múltiplas clínicas' },
-  { icon: CreditCard,  label: 'Planos & assinatura' },
-];
+interface Props {
+  initialMode?: 'login' | 'signup';
+  onBack?: () => void;
+}
 
-export function LoginScreen() {
+export function LoginScreen({ initialMode = 'login', onBack }: Props) {
   const { signIn, signInWithEmail, signUpWithEmail, resetPassword, loading, error } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isRegister, setIsRegister] = useState(false);
+  const [isRegister, setIsRegister] = useState(initialMode === 'signup');
   const [showPricing, setShowPricing] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
@@ -58,111 +50,39 @@ export function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-ink-50 font-sans overflow-hidden relative select-none">
-      
-      {/* ── LEFT PANEL: Clean Branding & Value Prop ── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-16 bg-white border-r border-ink-200 select-none z-10">
-        
-        {/* Subtle grid lines background overlay */}
-        <div className="absolute inset-0 opacity-[0.4] z-0 pointer-events-none" 
-          style={{ backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', backgroundSize: '24px 24px' }} 
-        />
+    <div className="min-h-screen w-full flex items-center justify-center bg-ink-50 font-sans p-6">
+      <div className="w-full max-w-[420px] space-y-8">
 
-        {/* Brand Logo Row (Official System Style) */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm shrink-0 border border-ink-200 overflow-hidden">
-            <LogoIcon size={36} />
+        {onBack && (
+          <button type="button" onClick={onBack} className="text-[10px] font-black text-ink-400 hover:text-ink-700 uppercase tracking-widest transition-all">
+            ← Voltar
+          </button>
+        )}
+
+        <div className="flex flex-col items-center justify-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-sm shrink-0 border border-ink-200 overflow-hidden">
+            <LogoIcon size={48} />
           </div>
           <div className="flex items-center">
-            <span className="text-2xl font-black tracking-tighter text-ink-900">LAUD</span>
-            <span className="text-2xl font-black tracking-tighter text-brand-600">.US</span>
+            <span className="text-3xl font-black tracking-tighter text-ink-900">LAUD</span>
+            <span className="text-3xl font-black tracking-tighter text-brand-600">.US</span>
           </div>
         </div>
 
-        {/* Center: Value proposition + real feature map */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center items-start max-w-lg mt-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-brand-50 border border-brand-100 mb-6">
-            <Sparkles size={14} className="text-brand-500" />
-            <span className="text-[10px] font-black text-brand-700 uppercase tracking-widest">LAUD.IA · Powered by Google Gemini</span>
-          </div>
-
-          <h2 className="text-4xl xl:text-5xl font-black tracking-tight leading-[1.1] text-ink-900 mb-5">
-            Do agendamento ao laudo assinado — em minutos.
-          </h2>
-          <p className="text-ink-500 text-base leading-relaxed font-medium mb-8">
-            Plataforma completa de laudos ultrassonográficos com IA, PACS/DICOM integrado e gestão de clínica. Foque no diagnóstico; a LAUD.IA cuida do resto.
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-black text-ink-900 tracking-tight">
+            {forgotPassword ? 'Redefinir Senha' : isRegister ? 'Criar Conta' : 'Bem-vindo(a)'}
+          </h1>
+          <p className="text-ink-500 font-medium text-sm">
+            {forgotPassword
+              ? 'Informe seu e-mail para receber o link de redefinição.'
+              : isRegister ? 'Cadastre suas credenciais clínicas.' : 'Faça login para acessar seu workspace clínico.'}
           </p>
-
-          {/* Funcionalidades reais, mapeadas */}
-          <div className="grid grid-cols-2 gap-2.5 w-full">
-            {LANDING_FEATURES.map((f) => (
-              <div key={f.label} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-ink-50/70 border border-ink-100">
-                <div className="w-8 h-8 rounded-lg bg-white border border-ink-100 flex items-center justify-center text-brand-600 shrink-0">
-                  <f.icon size={15} />
-                </div>
-                <span className="text-xs font-bold text-ink-700">{f.label}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* Bottom: métricas + planos */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-ink-100">
-          <div className="flex flex-wrap items-center gap-8">
-            <div className="space-y-0.5">
-              <h5 className="text-xl font-black text-ink-900">90%</h5>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Mais ágil</p>
-            </div>
-            <div className="space-y-0.5">
-              <h5 className="text-xl font-black text-ink-900">Cloud</h5>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Sync nativo</p>
-            </div>
-            <div className="space-y-0.5">
-              <h5 className="text-xl font-black text-ink-900">LGPD</h5>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Conformidade</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowPricing(true)}
-            className="text-right group"
-          >
-            <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Conheça os</p>
-            <p className="text-lg font-black text-brand-600 group-hover:text-brand-700 transition-colors underline decoration-brand-200 underline-offset-4">Planos & Preços →</p>
-          </button>
-        </div>
-
-      </div>
-
-      {/* ── RIGHT PANEL: Clean Login Container ── */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden select-text z-10">
-        
-        <div className="w-full max-w-[400px] space-y-8">
-          
-          {/* Mobile Header (shown only on mobile) */}
-          <div className="lg:hidden flex flex-col items-center justify-center gap-4 mb-10">
-            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-sm shrink-0 border border-ink-200 overflow-hidden">
-              <LogoIcon size={48} />
-            </div>
-            <div className="flex items-center">
-              <span className="text-3xl font-black tracking-tighter text-ink-900">LAUD</span>
-              <span className="text-3xl font-black tracking-tighter text-brand-600">.US</span>
-            </div>
-          </div>
-
-          <div className="text-center lg:text-left space-y-2 mb-8">
-            <h1 className="text-3xl font-black text-ink-900 tracking-tight">
-              {forgotPassword ? 'Redefinir Senha' : isRegister ? 'Criar Conta' : 'Bem-vindo(a)'}
-            </h1>
-            <p className="text-ink-500 font-medium">
-              {forgotPassword
-                ? 'Informe seu e-mail para receber o link de redefinição.'
-                : isRegister ? 'Cadastre suas credenciais clínicas.' : 'Faça login para acessar seu workspace clínico.'}
-            </p>
-          </div>
-
-          {/* Auth error notification */}
+        <div className="bg-white rounded-3xl border border-ink-200 shadow-sm p-6 sm:p-8 space-y-5">
           {error && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 text-left mb-6">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-4 text-left">
               <p className="text-sm text-rose-600 font-semibold leading-normal">{error}</p>
             </div>
           )}
@@ -330,52 +250,29 @@ export function LoginScreen() {
               )}
             </div>
 
-            {/* Secure Notice */}
             <div className="bg-ink-100/50 p-4 rounded-xl border border-ink-200 flex gap-3 text-left">
               <Lock size={16} className="text-ink-400 shrink-0 mt-0.5" />
               <p className="text-[11px] text-ink-500 font-medium leading-relaxed">
-                Acesso restrito a profissionais de saúde autorizados. Conexão criptografada de ponta a ponta em conformidade com as normas HIPAA, LGPD e CFM.
+                Acesso restrito a profissionais de saúde autorizados. Ambiente em fase de testes — dados protegidos por autenticação e regras de acesso por usuário/clínica.
               </p>
             </div>
           </form>
           )}
+        </div>
 
-          {/* Compliance Icons Footer */}
-          <div className="mt-8 pt-8 border-t border-ink-200 space-y-4">
-            <div className="flex items-center justify-center lg:justify-start gap-4 text-[9px] uppercase tracking-widest font-bold">
-              <span className="flex items-center gap-1.5 text-ink-500">
-                <ShieldCheck size={14} className="text-emerald-500" /> HIPAA
-              </span>
-              <span className="flex items-center gap-1.5 text-ink-500">
-                <Layers size={14} className="text-brand-500" /> AES-256
-              </span>
-              <span className="flex items-center gap-1.5 text-ink-500">
-                <FileText size={14} className="text-ink-500" /> LGPD
-              </span>
-            </div>
-
-            <p className="text-[9px] font-bold text-ink-400 uppercase tracking-widest flex items-center justify-center lg:justify-start gap-1.5">
-              <CheckCircle size={12} className="text-emerald-500" /> SLA Clínico 99.99% Cloud
-            </p>
-          </div>
-
-          {/* Copyright Info */}
-          <div className="text-center lg:text-left mt-8 space-y-2">
-            <p className="text-ink-400 text-[10px] font-bold uppercase tracking-widest select-none">
-              © {new Date().getFullYear()} LAUD.US — PLATAFORMA DE LAUDOS
-            </p>
-            <p className="text-[10px] font-bold uppercase tracking-widest">
-              <button type="button" onClick={() => setLegalDoc('terms')} className="text-ink-400 hover:text-ink-700 underline underline-offset-2">Termos de Uso</button>
-              <span className="text-ink-300 mx-2">·</span>
-              <button type="button" onClick={() => setLegalDoc('privacy')} className="text-ink-400 hover:text-ink-700 underline underline-offset-2">Política de Privacidade</button>
-            </p>
-          </div>
-
+        <div className="text-center space-y-2">
+          <p className="text-ink-400 text-[10px] font-bold uppercase tracking-widest select-none">
+            © {new Date().getFullYear()} LAUD.US — Sistemas de Laudos Inteligentes
+          </p>
+          <p className="text-[10px] font-bold uppercase tracking-widest">
+            <button type="button" onClick={() => setLegalDoc('terms')} className="text-ink-400 hover:text-ink-700 underline underline-offset-2">Termos de Uso</button>
+            <span className="text-ink-300 mx-2">·</span>
+            <button type="button" onClick={() => setLegalDoc('privacy')} className="text-ink-400 hover:text-ink-700 underline underline-offset-2">Política de Privacidade</button>
+          </p>
         </div>
 
       </div>
 
-      {/* Vitrine pública de planos → cadastro */}
       <PricingPlans
         open={showPricing}
         onClose={() => setShowPricing(false)}
@@ -383,7 +280,6 @@ export function LoginScreen() {
       />
 
       <LegalModal open={legalDoc} onClose={() => setLegalDoc(null)} />
-
     </div>
   );
 }
