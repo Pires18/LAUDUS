@@ -170,7 +170,14 @@ export default async function handler(req: any, res: any) {
   if (shared) {
     const sharedUrl = process.env.PACS_SHARED_AGENT_URL;
     const sharedAdmin = process.env.PACS_ADMIN_SECRET;
-    // Sem config compartilhada (ou PACS_MOCK) → simulação (provider 'shared').
+    // Em produção (Vercel) sem a config compartilhada → ERRO CLARO (não simular,
+    // senão o tenant é falso e o diagnóstico falha com "tenantId inválido").
+    if (process.env.VERCEL && process.env.PACS_MOCK !== '1' && (!sharedUrl || !sharedAdmin)) {
+      res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'PACS compartilhado não configurado na Vercel. Defina PACS_SHARED_AGENT_URL e PACS_ADMIN_SECRET e faça Redeploy.' }));
+      return;
+    }
+    // Sem config compartilhada (dev/local) ou PACS_MOCK → simulação.
     if (mock || !sharedUrl || !sharedAdmin) {
       const id = rand(4);
       res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
