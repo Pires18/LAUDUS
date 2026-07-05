@@ -87,23 +87,17 @@ async function activateAddonInDb(db: any, userId: string, email: string, addon: 
   const subSnap = await subRef.get();
   const userSnap = await userRef.get();
 
-  let currentTokenLite = 0;
-  let currentTokenPro = 0;
   let currentReportsQuota = 100;
   let currentClinicsQuota = 5;
   let currentAddons: string[] = [];
 
   if (subSnap.exists) {
     const subData = subSnap.data();
-    currentTokenLite = subData?.tokenQuotaLite || 0;
-    currentTokenPro = subData?.tokenQuotaPro || 0;
     currentReportsQuota = subData?.reportsQuota || 100;
     currentClinicsQuota = subData?.clinicsQuota || 5;
     currentAddons = subData?.addons || [];
   } else if (userSnap.exists) {
     const userData = userSnap.data();
-    currentTokenLite = userData?.tokenQuotaLite || 0;
-    currentTokenPro = userData?.tokenQuotaPro || 0;
     currentReportsQuota = userData?.reportsQuota || 100;
     currentClinicsQuota = userData?.clinicsQuota || 5;
   }
@@ -129,20 +123,12 @@ async function activateAddonInDb(db: any, userId: string, email: string, addon: 
   if (addon === 'calculators' || addon === 'pacs' || addon === 'appointments' || addon === 'clinics') {
     if (!currentAddons.includes(addon)) currentAddons.push(addon);
     await subRef.set({ addons: currentAddons, updatedAt: now }, { merge: true });
-  } else if (addon === 'token_lite') {
-    const newQuota = currentTokenLite + bundleSize;
-    await subRef.set({ tokenQuotaLite: newQuota, updatedAt: now }, { merge: true });
-    await userRef.set({ tokenQuotaLite: newQuota, updatedAt: now }, { merge: true });
-  } else if (addon === 'token_pro') {
-    const newQuota = currentTokenPro + bundleSize;
-    await subRef.set({ tokenQuotaPro: newQuota, updatedAt: now }, { merge: true });
-    await userRef.set({ tokenQuotaPro: newQuota, updatedAt: now }, { merge: true });
-  } else if (addon === 'extra_reports') {
-    // Laudo extra: amplia a quota de laudos E credita 1 token Lite (conforme a oferta).
+  } else if (addon === 'token_lite' || addon === 'token_pro' || addon === 'extra_reports') {
+    // Cota ÚNICA do LAUD.IA: qualquer pacote/laudo extra amplia reportsQuota
+    // (usável no Lite ou Pro conforme o motor). Sem sub-cotas Lite/Pro.
     const newReports = currentReportsQuota + bundleSize;
-    const newTokenLite = currentTokenLite + bundleSize;
-    await subRef.set({ reportsQuota: newReports, tokenQuotaLite: newTokenLite, updatedAt: now }, { merge: true });
-    await userRef.set({ reportsQuota: newReports, tokenQuotaLite: newTokenLite, updatedAt: now }, { merge: true });
+    await subRef.set({ reportsQuota: newReports, updatedAt: now }, { merge: true });
+    await userRef.set({ reportsQuota: newReports, updatedAt: now }, { merge: true });
   } else if (addon === 'extra_clinic') {
     const newQuota = currentClinicsQuota + bundleSize;
     await subRef.set({ clinicsQuota: newQuota, updatedAt: now }, { merge: true });

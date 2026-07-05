@@ -40,8 +40,8 @@ const ADDONS_DEFAULT: AddonsConfig = {
   clinics:     { price: 49,    description: 'Módulo de clínicas para multi-unidades.',             enabled: true },
   extraReport: { price: 1.50,  description: 'Laudo extra além da quota (inclui 1 Token Lite/Pro).', enabled: true },
   extraClinic: { price: 29,    description: 'Clínica extra além da quota do plano.',              enabled: true },
-  tokenLite:   { price: 9.90,  bundleSize: 50,  description: 'Pacote de 50 laudos com Motor Lite.', enabled: true },
-  tokenPro:    { price: 24.90, bundleSize: 20,  description: 'Pacote de 20 laudos com Motor Pro.',  enabled: true },
+  tokenLite:   { price: 9.90,  bundleSize: 50,  description: 'Pacote de laudos adicionais do LAUD.IA (usável no Lite ou Pro).', enabled: true },
+  tokenPro:    { price: 24.90, bundleSize: 20,  description: 'Descontinuado — unificado no Pacote de Laudos LAUD.IA.',        enabled: false },
 };
 
 // Tiers de PACS (infra) — fallback caso o admin ainda não tenha publicado
@@ -383,16 +383,16 @@ export function SubscriptionCenter() {
                     <div className="space-y-2 border-t border-ink-50 pt-3 text-[11px] font-medium text-ink-600">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 size={12} className="text-indigo-600 shrink-0" />
-                        <span><strong>{p.reportsQuota === 0 ? 'Laudos Ilimitados' : `${p.reportsQuota} laudos`}</strong>/mês</span>
+                        <span><strong>{p.reportsQuota === 0 ? 'Laudos LAUD.IA ilimitados' : `${p.reportsQuota} laudos LAUD.IA`}</strong>/mês</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <CheckCircle2 size={12} className="text-indigo-600 shrink-0" />
                         <span>Até <strong>{p.clinicsQuota === 0 ? 'clínicas ilimitadas' : `${p.clinicsQuota} clínicas`}</strong></span>
                       </div>
-                      {p.motorProDefault && p.tokenQuotaPro > 0 && (
+                      {p.motorProDefault && (
                         <div className="flex items-center gap-2">
                           <CheckCircle2 size={12} className="text-violet-600 shrink-0" />
-                          <span>Motor Pro: <strong>{p.tokenQuotaPro} laudos Pro/mês</strong></span>
+                          <span><strong>Motor Pro</strong> incluído (cota usável no Lite ou Pro)</span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
@@ -716,30 +716,16 @@ export function SubscriptionCenter() {
         <SectionHeader icon={Plus} title="Recursos Adicionais (Consumíveis)" />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Pacote Laudos Lite */}
+          {/* Pacote de Laudos LAUD.IA (unificado — usável no Lite ou Pro) */}
           <AddonCard
-            icon={Zap} iconColor="violet"
-            title={`Pacote Laudos Lite (+${ac.tokenLite?.bundleSize ?? 50})`}
+            icon={Sparkles} iconColor="violet"
+            title={`Pacote de Laudos LAUD.IA (+${ac.tokenLite?.bundleSize ?? 50})`}
             description={ac.tokenLite?.description ?? ADDONS_DEFAULT.tokenLite!.description}
             price={`R$ ${(ac.tokenLite?.price ?? 9.90).toFixed(2).replace('.', ',')}/pacote`}
             active={false}
             actionLabel="Comprar Pacote"
             onAction={() => handleBuyAddon('token_lite')}
             loading={loadingAddon === 'token_lite'}
-          />
-
-          {/* Pacote Laudos Pro */}
-          <AddonCard
-            icon={Sparkles} iconColor="pink"
-            title={`Pacote Laudos Pro (+${ac.tokenPro?.bundleSize ?? 20})`}
-            description={ac.tokenPro?.description ?? ADDONS_DEFAULT.tokenPro!.description}
-            price={`R$ ${(ac.tokenPro?.price ?? 24.90).toFixed(2).replace('.', ',')}/pacote`}
-            active={false}
-            actionLabel="Comprar Pacote"
-            onAction={() => handleBuyAddon('token_pro')}
-            loading={loadingAddon === 'token_pro'}
-            disabled={!canUsePro}
-            disabledTip={!canUsePro ? 'Requer Motor Pro liberado pelo administrador' : undefined}
           />
 
           {/* Laudo Extra */}

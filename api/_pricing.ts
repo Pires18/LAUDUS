@@ -54,8 +54,8 @@ export const ADDON_NAMES: Record<string, string> = {
   pacs: 'Add-on PACS / DICOM Sync',
   appointments: 'Add-on Módulo de Agendamentos',
   clinics: 'Add-on Módulo de Clínicas',
-  token_lite: 'Pacote Laudos Lite',
-  token_pro: 'Pacote Laudos Pro',
+  token_lite: 'Pacote de Laudos LAUD.IA',
+  token_pro: 'Pacote de Laudos LAUD.IA',
   extra_reports: 'Laudos Extras',
   extra_clinic: 'Clínica Extra',
 };

@@ -63,8 +63,8 @@ const DEFAULT_EXTRAS: SaasAddonsConfig = {
   clinics:      { price: 49,    description: 'Módulo de clínicas para multi-unidades (centros).',                          enabled: true  },
   extraReport:  { price: 1.50,  description: 'Laudo extra além da quota — inclui geração de laudo e 1 Token (Lite ou Pro).', enabled: true  },
   extraClinic:  { price: 29,    description: 'Clínica adicional além da quota del plano.',                                  enabled: true  },
-  tokenLite:    { price: 9.90,  bundleSize: 50,  description: 'Pacote de 50 laudos adicionais com Motor Lite.',            enabled: true  },
-  tokenPro:     { price: 24.90, bundleSize: 20,  description: 'Pacote de 20 laudos adicionais com Motor Pro.',             enabled: true  },
+  tokenLite:    { price: 9.90,  bundleSize: 50,  description: 'Pacote de laudos adicionais do LAUD.IA (usável no Lite ou Pro).', enabled: true  },
+  tokenPro:     { price: 24.90, bundleSize: 20,  description: 'Descontinuado — unificado no Pacote de Laudos LAUD.IA.',        enabled: false },
 };
 
 // ─── AbacatePay config ───────────────────────────────────────────────────────
@@ -200,10 +200,10 @@ function PlansTab() {
         price: prices.month,
         interval: 'month' as const,
         category: 'subscription' as const,
-        // Laudos unificados em LAUD.IA: Lite não tem limite próprio (sai do total).
-        // A quota Pro só existe quando o Motor Pro está incluso no plano.
+        // Cota ÚNICA em reportsQuota (LAUD.IA). Sem sub-cotas Lite/Pro — o Motor
+        // Pro apenas habilita usar a mesma cota no Pro (motorProDefault).
         tokenQuotaLite: 0,
-        tokenQuotaPro: formData.motorProDefault ? formData.tokenQuotaPro : 0,
+        tokenQuotaPro: 0,
         updatedAt: Date.now(),
       };
       if (editingId) {
@@ -414,9 +414,6 @@ function PlanCard({ plan, selected, onToggleSelect, onEdit, onDelete }: { plan: 
       <div className="grid grid-cols-2 gap-1.5">
         <Pill label={plan.reportsQuota === 0 ? 'Laudos LAUD.IA ∞' : `${plan.reportsQuota} laudos LAUD.IA/mês`} on />
         <Pill label={plan.clinicsQuota === 0 ? 'Clínicas ∞' : `${plan.clinicsQuota} clínicas`}                on />
-        {plan.motorProDefault && (
-          <Pill label={plan.tokenQuotaPro === 0 ? 'Laudos Pro ∞' : `${plan.tokenQuotaPro} laudos Pro`} on />
-        )}
         <Pill label="Calculadoras" on={plan.includesCalculators} />
         <Pill label="PACS/DICOM"   on={plan.includesPacs} />
         <Pill label="Agendamentos" on={plan.includesAppointments ?? false} />
@@ -546,18 +543,13 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
         {/* Quotas */}
         <section className="space-y-3">
           <SectionTitle>Quotas e Limites</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <NumInput label="Laudos LAUD.IA / mês" hint="0 = ilimitado · total unificado (Lite + Pro)" value={form.reportsQuota} onChange={v => set('reportsQuota', v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <NumInput label="Laudos LAUD.IA / mês" hint="0 = ilimitado · cota única do LAUD.IA" value={form.reportsQuota} onChange={v => set('reportsQuota', v)} />
             <NumInput label="Clínicas"             hint="0 = ilimitado" value={form.clinicsQuota} onChange={v => set('clinicsQuota', v)} />
-            {form.motorProDefault && (
-              <NumInput label="Laudos Pro / mês" hint="0 = ilimitado · quantos do total podem usar o Motor Pro" value={form.tokenQuotaPro} onChange={v => set('tokenQuotaPro', v)} />
-            )}
           </div>
           <p className="text-[10px] text-ink-400 leading-relaxed flex items-start gap-1.5">
             <Info size={12} className="shrink-0 mt-0.5" />
-            {form.motorProDefault
-              ? 'Os laudos LAUD.IA são um total único (Lite + Pro). A quota "Laudos Pro" limita quantos desse total podem usar o Motor Pro.'
-              : 'Ative o Motor Pro (abaixo) para liberar uma quota específica de laudos Pro. Sem ele, todos os laudos usam o Motor Lite dentro do total LAUD.IA.'}
+            Cota única de laudos LAUD.IA. Cada laudo consome 1 da cota, seja gerado no Motor Lite ou Pro. Com o <strong>Motor Pro</strong> ligado (abaixo), o usuário pode usar essa mesma cota no Pro; sem ele, só no Lite.
           </p>
         </section>
 
@@ -608,10 +600,9 @@ const FEATURES_META = [
 ] as const;
 
 const RESOURCES_META = [
-  { key: 'extraReport' as const, label: 'Laudo Extra',           icon: FileText,     color: 'amber',   priceLabel: 'R$ por laudo (inclui 1 Token)', hasBundle: false },
-  { key: 'tokenLite'   as const, label: 'Pacote de Laudos Lite', icon: Zap,          color: 'violet',  priceLabel: 'R$ por pacote de laudos',       hasBundle: true  },
-  { key: 'tokenPro'    as const, label: 'Pacote de Laudos Pro',  icon: Sparkles,     color: 'pink',    priceLabel: 'R$ por pacote de laudos',       hasBundle: true  },
-  { key: 'extraClinic' as const, label: 'Clínica Extra',         icon: Building2,    color: 'teal',    priceLabel: 'R$/mês por clínica',            hasBundle: false },
+  { key: 'extraReport' as const, label: 'Laudo Extra',              icon: FileText,  color: 'amber',  priceLabel: 'R$ por laudo (avulso)',     hasBundle: false },
+  { key: 'tokenLite'   as const, label: 'Pacote de Laudos LAUD.IA', icon: Sparkles,  color: 'violet', priceLabel: 'R$ por pacote de laudos',   hasBundle: true  },
+  { key: 'extraClinic' as const, label: 'Clínica Extra',            icon: Building2, color: 'teal',   priceLabel: 'R$/mês por clínica',        hasBundle: false },
 ] as const;
 
 const COLOR_MAP: Record<string, string> = {

@@ -921,9 +921,6 @@ export function AdminUsersSubscriptions() {
                                   <MenuItem icon={CalendarDays} label={`${sub?.addons?.includes('appointments') ? 'Remover' : 'Ativar'} Agendamentos`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'appointments'); }} color="amber" />
                                   <MenuItem icon={Hospital}     label={`${sub?.addons?.includes('clinics') ? 'Remover' : 'Ativar'} Clínicas`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'clinics'); }} color="teal" />
                                   <MenuItem icon={Sparkles}     label={`${u.motorProEnabled ? 'Desativar' : 'Ativar'} Motor Pro`} onClick={() => handleToggleMotorPro(u)} color="violet" />
-                                  {u.motorProEnabled && (
-                                    <MenuItem icon={Edit2}      label="Editar quota Pro"       onClick={() => { setOpenMenu(null); handleEditQuota(u, 'tokenQuotaPro'); }} color="violet" />
-                                  )}
                                   <hr className="border-ink-100 my-1" />
                                   <MenuItem icon={Shield}       label="Alterar cargo"          onClick={() => { setOpenMenu(null); setRoleTarget(u); }} />
                                   <MenuItem icon={CheckCircle2} label={u.active !== false ? 'Desativar conta' : 'Ativar conta'} onClick={() => { setOpenMenu(null); setStatusTarget(u); }} />
@@ -1303,18 +1300,8 @@ function AssignSubModal({
                     </p>
                     <div className="flex flex-wrap gap-1">
                       <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">
-                        {p.reportsQuota === 0 ? '∞' : p.reportsQuota} laudos/mês
+                        {p.reportsQuota === 0 ? '∞' : p.reportsQuota} laudos LAUD.IA/mês
                       </span>
-                      {p.tokenQuotaLite > 0 && (
-                        <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                          <Zap size={8} /> {p.tokenQuotaLite} Lite
-                        </span>
-                      )}
-                      {p.tokenQuotaPro > 0 && (
-                        <span className="text-[9px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                          <Sparkles size={8} /> {p.tokenQuotaPro} Pro
-                        </span>
-                      )}
                       {p.includesCalculators && <span className="text-[9px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">Calc</span>}
                       {p.motorProDefault && <span className="text-[9px] bg-violet-50 text-violet-700 px-1.5 py-0.5 rounded font-bold">Motor Pro</span>}
                     </div>
@@ -1372,7 +1359,7 @@ function AssignSubModal({
               <div className="flex justify-between"><span className="text-ink-500">Status</span><span className="font-bold capitalize">{status}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Laudos LAUD.IA/mês</span><span className="font-bold">{plan.reportsQuota === 0 ? 'Ilimitado' : plan.reportsQuota}</span></div>
               {plan.motorProDefault && (
-                <div className="flex justify-between"><span className="text-ink-500">Laudos Pro/mês</span><span className="font-bold">{plan.tokenQuotaPro === 0 ? 'Ilimitado' : plan.tokenQuotaPro}</span></div>
+                <div className="flex justify-between"><span className="text-ink-500">Motor Pro</span><span className="font-bold text-violet-600">Incluído</span></div>
               )}
               <div className="flex justify-between"><span className="text-ink-500">Válido por</span><span className="font-bold">{lifetime ? 'Vitalício (∞)' : `${periodDays} dias`}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Vence em</span>
