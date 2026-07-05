@@ -121,17 +121,16 @@ export default async function handler(req: any, res: any) {
       || (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
       || 'http://localhost:5173';
 
-    // externalId DETERMINÍSTICO por (plano|add-on) × intervalo × preço. Inclui o
-    // preço para que uma mudança de valor gere um novo produto automaticamente.
+    // Produtos AVULSOS (pagamento único) — o `cycle` (assinatura recorrente)
+    // exige "PIX Automático" habilitado na loja, o que nem toda conta tem. Assim
+    // funciona com PIX/CARD comum em qualquer loja; a renovação é por período
+    // (o webhook concede o acesso a cada pagamento; o reset mensal cuida do fim).
+    // O sufixo "-ot" força um produto novo, distinto dos recorrentes antigos.
+    // externalId determinístico por (plano|add-on) × intervalo × preço: mudar o
+    // valor gera um produto novo automaticamente.
     const externalId = (abacatePayProductId
-      || `laudus-${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${planInterval}-${amount}`
+      || `laudus-${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${planInterval}-${amount}-ot`
     ).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-
-    // Ciclo de assinatura (produtos recorrentes). Consumível = avulso (sem cycle).
-    const cycle = addonIsOneTime ? null
-      : planInterval === 'year' ? 'ANNUALLY'
-      : planInterval === 'semester' ? 'SEMIANNUALLY'
-      : 'MONTHLY';
 
     const apiBase = 'https://api.abacatepay.com/v2';
     const authHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
@@ -153,7 +152,7 @@ export default async function handler(req: any, res: any) {
       const createRes = await fetch(`${apiBase}/products/create`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ externalId, name: productName, price: amount, currency: 'BRL', ...(cycle ? { cycle } : {}) }),
+        body: JSON.stringify({ externalId, name: productName, price: amount, currency: 'BRL' }),
       });
       const createJson = await createRes.json();
       productId = createJson?.data?.id || '';
