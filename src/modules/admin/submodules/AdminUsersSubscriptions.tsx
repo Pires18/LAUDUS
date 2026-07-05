@@ -78,6 +78,7 @@ interface SaasPlan {
 
 type StatusFilter = 'all' | 'active' | 'trialing' | 'past_due' | 'canceled';
 type AddonFilter  = 'all' | 'calculators' | 'pacs' | 'appointments' | 'clinics';
+type UsersTab     = 'overview' | 'users' | 'consumo';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -89,10 +90,12 @@ export function AdminUsersSubscriptions() {
   const { data: users,         loading: loadingUsers } = useCollection<SystemUser>('users',         { isGlobal: true });
   const { data: subscriptions, loading: loadingSubs  } = useCollection<any>       ('subscriptions', { isGlobal: true });
 
+  const [activeTab,    setActiveTab]    = useState<UsersTab>('overview');
   const [search,       setSearch]       = useState('');
   const [roleFilter,   setRoleFilter]   = useState<'all' | UserRole>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [addonFilter,  setAddonFilter]  = useState<AddonFilter>('all');
+  const [consumoSort,  setConsumoSort]  = useState<'usage' | 'reports' | 'tokens'>('usage');
 
   const [processing,  setProcessing]  = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -181,6 +184,33 @@ export function AdminUsersSubscriptions() {
     const matchAd = addonFilter === 'all' || sub?.addons?.includes(addonFilter);
     return matchTx && matchRo && matchSt && matchAd;
   });
+
+  // ─── Consumo por usuário ──────────────────────────────────────────────────────
+  // Agrega uso de laudos + tokens por usuário (dados já carregados de users/subscriptions).
+  const consumoRows = users
+    .filter(u => u.role !== 'admin')
+    .map(u => {
+      const sub = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
+      const reportsUsed  = u.reportsUsedThisMonth ?? sub?.reportsUsedThisMonth ?? 0;
+      const reportsQuota = u.reportsQuota ?? sub?.reportsQuota ?? 100;
+      const unlimited    = reportsQuota >= 9999;
+      const pct          = unlimited ? 0 : Math.min(100, Math.round((reportsUsed / Math.max(1, reportsQuota)) * 100));
+      const tokenLite    = u.tokenQuotaLite ?? sub?.tokenQuotaLite ?? 0;
+      const tokenPro     = u.tokenQuotaPro  ?? sub?.tokenQuotaPro  ?? 0;
+      return {
+        u, sub, reportsUsed, reportsQuota, unlimited, pct, tokenLite, tokenPro,
+        status: u.subscriptionStatus || (sub?.status ?? '—'),
+      };
+    })
+    .sort((a, b) => {
+      if (consumoSort === 'reports') return b.reportsUsed - a.reportsUsed;
+      if (consumoSort === 'tokens')  return (b.tokenLite + b.tokenPro) - (a.tokenLite + a.tokenPro);
+      return b.pct - a.pct; // usage (default)
+    });
+
+  const totalReportsUsed = consumoRows.reduce((acc, r) => acc + r.reportsUsed, 0);
+  const nearLimitCount   = consumoRows.filter(r => !r.unlimited && r.pct >= 80).length;
+  const exhaustedCount   = consumoRows.filter(r => !r.unlimited && r.reportsUsed >= r.reportsQuota).length;
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -392,8 +422,37 @@ export function AdminUsersSubscriptions() {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
+  const TABS: { id: UsersTab; label: string; icon: any; hint: string }[] = [
+    { id: 'overview', label: 'Visão Geral', icon: TrendingDown, hint: 'MRR, ARR, churn e status' },
+    { id: 'users',    label: 'Usuários',    icon: Users,        hint: 'Gestão, planos e add-ons' },
+    { id: 'consumo',  label: 'Consumo',     icon: Zap,          hint: 'Uso de laudos e tokens por usuário' },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
+
+      {/* ── TAB NAV ────────────────────────────────────────────────────── */}
+      <div className="flex gap-1.5 p-1 bg-ink-100/70 rounded-2xl w-fit">
+        {TABS.map(t => {
+          const on = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              title={t.hint}
+              className={classNames(
+                'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all',
+                on ? 'bg-white text-brand-600 shadow-sm' : 'text-ink-500 hover:text-ink-800',
+              )}
+            >
+              <t.icon size={15} />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'overview' && (<>
 
       {/* ── METRICS ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
@@ -449,6 +508,10 @@ export function AdminUsersSubscriptions() {
           </div>
         </div>
       )}
+
+      </>)}
+
+      {activeTab === 'users' && (<>
 
       {/* ── FILTER BAR ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-4 flex flex-col md:flex-row gap-3 items-start md:items-center flex-wrap">
@@ -826,6 +889,129 @@ export function AdminUsersSubscriptions() {
           </table>
         </div>
       </div>
+
+      </>)}
+
+      {activeTab === 'consumo' && (<>
+
+      {/* ── CONSUMO: MÉTRICAS ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Laudos usados (mês)', value: totalReportsUsed.toLocaleString('pt-BR'), icon: FileText,      color: 'text-brand-600',   bg: 'bg-brand-50'   },
+          { label: 'Usuários rastreados', value: consumoRows.length,                       icon: Users,         color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+          { label: 'Perto do limite (≥80%)', value: nearLimitCount,                        icon: AlertTriangle, color: 'text-amber-600',   bg: 'bg-amber-50'   },
+          { label: 'Cota esgotada',       value: exhaustedCount,                           icon: XCircle,       color: 'text-rose-600',    bg: 'bg-rose-50'    },
+        ].map(m => (
+          <div key={m.label} className="bg-white p-4 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-3">
+            <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', m.bg, m.color)}>
+              <m.icon size={17} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] font-black text-ink-500 uppercase tracking-wider truncate">{m.label}</div>
+              <div className="text-base font-black text-ink-950 truncate">{m.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── CONSUMO: ORDENAÇÃO ─────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] font-black text-ink-500 uppercase tracking-wider">Ordenar por</span>
+        {([
+          { id: 'usage',   label: '% da cota' },
+          { id: 'reports', label: 'Laudos usados' },
+          { id: 'tokens',  label: 'Tokens' },
+        ] as const).map(o => (
+          <button
+            key={o.id}
+            onClick={() => setConsumoSort(o.id)}
+            className={classNames(
+              'px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border',
+              consumoSort === o.id
+                ? 'bg-brand-500 text-white border-brand-500'
+                : 'bg-white text-ink-600 border-ink-200 hover:border-brand-300',
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── CONSUMO: TABELA ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-ink-100 text-[10px] font-black text-ink-500 uppercase tracking-wider">
+                <th className="text-left px-4 py-3">Usuário</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-left px-4 py-3 min-w-[180px]">Laudos (uso / cota)</th>
+                <th className="text-right px-4 py-3">Tokens Lite</th>
+                <th className="text-right px-4 py-3">Tokens Pro</th>
+                <th className="text-right px-4 py-3">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ink-50">
+              {consumoRows.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-400 font-medium">Nenhum usuário com consumo registrado.</td></tr>
+              )}
+              {consumoRows.map(({ u, reportsUsed, reportsQuota, unlimited, pct, tokenLite, tokenPro, status }) => {
+                const barColor = pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : 'bg-brand-500';
+                return (
+                  <tr key={u.id} className="hover:bg-ink-50/40">
+                    <td className="px-4 py-3">
+                      <p className="font-bold text-ink-950 truncate max-w-[160px]">{u.name || 'Médico'}</p>
+                      <p className="text-[10px] text-ink-500 font-medium truncate max-w-[160px]">{u.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={classNames(
+                        'inline-flex px-2 py-0.5 rounded-full text-[10px] font-black',
+                        status === 'active'   ? 'bg-emerald-50 text-emerald-700' :
+                        status === 'trialing' ? 'bg-amber-50 text-amber-700'    :
+                        status === 'past_due' ? 'bg-rose-50 text-rose-700'      :
+                        'bg-ink-100 text-ink-500',
+                      )}>{status}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {unlimited ? (
+                        <span className="text-[11px] font-bold text-emerald-600">♾️ Ilimitado</span>
+                      ) : (
+                        <div className="min-w-[160px]">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] font-bold text-ink-800">{reportsUsed} / {reportsQuota}</span>
+                            <span className={classNames('text-[10px] font-black', pct >= 100 ? 'text-rose-600' : pct >= 80 ? 'text-amber-600' : 'text-ink-400')}>{pct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-ink-100 rounded-full overflow-hidden">
+                            <div className={classNames('h-full rounded-full transition-all', barColor)} style={{ width: `${Math.max(2, pct)}%` }} />
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-ink-700">{tokenLite === 0 ? '∞' : tokenLite.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 text-right font-bold text-ink-700">{tokenPro === 0 ? '∞' : tokenPro.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-1">
+                        <button
+                          onClick={() => handleEditQuota(u, 'reportsQuota')}
+                          className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50"
+                          title="Editar cota de laudos"
+                        ><Edit2 size={14} /></button>
+                        <button
+                          onClick={() => setDetailTarget(u)}
+                          className="p-1.5 rounded-lg text-ink-400 hover:text-indigo-600 hover:bg-indigo-50"
+                          title="Ver detalhes 360º"
+                        ><Eye size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      </>)}
 
       {/* ── VISÃO 360º DO CLIENTE ──────────────────────────────────────── */}
       <AdminUserDetail user={detailTarget} onClose={() => setDetailTarget(null)} />
