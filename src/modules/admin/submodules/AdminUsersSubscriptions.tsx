@@ -422,31 +422,71 @@ export function AdminUsersSubscriptions() {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
-  const TABS: { id: UsersTab; label: string; icon: any; hint: string }[] = [
-    { id: 'overview', label: 'Visão Geral', icon: TrendingDown, hint: 'MRR, ARR, churn e status' },
-    { id: 'users',    label: 'Usuários',    icon: Users,        hint: 'Gestão, planos e add-ons' },
-    { id: 'consumo',  label: 'Consumo',     icon: Zap,          hint: 'Uso de laudos e tokens por usuário' },
+  const TABS: { id: UsersTab; label: string; icon: any; desc: string; count?: number; badge?: number }[] = [
+    { id: 'overview', label: 'Visão Geral', icon: TrendingDown, desc: 'Receita, churn e saúde da base' },
+    { id: 'users',    label: 'Usuários',    icon: Users,        desc: 'Gestão de planos e add-ons', count: users.length },
+    { id: 'consumo',  label: 'Consumo',     icon: Zap,          desc: 'Uso de laudos e tokens', count: consumoRows.length, badge: nearLimitCount },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
+
+      {/* ── PAGE HEADER ────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
+            <UserCheck size={22} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-ink-950 tracking-tight leading-none">Usuários & Planos</h2>
+            <p className="text-[11px] text-ink-500 font-medium mt-1">
+              {users.length} usuário(s) · {activeDisplay} ativo(s) · {trialCount} em trial
+            </p>
+          </div>
+        </div>
+        {legacyUsers.length > 0 && (
+          <button
+            onClick={() => setActiveTab('overview')}
+            className="flex items-center gap-2 h-9 px-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all"
+          >
+            <ShieldAlert size={13} /> {legacyUsers.length} conta(s) legada(s)
+          </button>
+        )}
+      </div>
 
       {/* ── TAB NAV ────────────────────────────────────────────────────── */}
-      <div className="flex gap-1.5 p-1 bg-ink-100/70 rounded-2xl w-fit">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         {TABS.map(t => {
           const on = activeTab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              title={t.hint}
               className={classNames(
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all',
-                on ? 'bg-white text-brand-600 shadow-sm' : 'text-ink-500 hover:text-ink-800',
+                'group flex items-center gap-3 p-3 rounded-2xl border text-left transition-all',
+                on
+                  ? 'bg-white border-brand-300 shadow-md ring-1 ring-brand-200/50'
+                  : 'bg-white/60 border-ink-100 hover:border-ink-200 hover:bg-white',
               )}
             >
-              <t.icon size={15} />
-              {t.label}
+              <div className={classNames(
+                'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors',
+                on ? 'bg-brand-500 text-white' : 'bg-ink-100 text-ink-500 group-hover:bg-ink-200',
+              )}>
+                <t.icon size={17} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className={classNames('text-xs font-black', on ? 'text-brand-700' : 'text-ink-800')}>{t.label}</span>
+                  {typeof t.count === 'number' && (
+                    <span className={classNames('text-[9px] font-black px-1.5 py-0.5 rounded-full', on ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500')}>{t.count}</span>
+                  )}
+                  {!!t.badge && t.badge > 0 && (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700" title="Perto do limite">{t.badge} ⚠</span>
+                  )}
+                </div>
+                <p className="text-[10px] text-ink-400 font-medium truncate">{t.desc}</p>
+              </div>
             </button>
           );
         })}
