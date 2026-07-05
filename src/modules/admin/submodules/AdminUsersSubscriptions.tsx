@@ -22,7 +22,7 @@ import {
   Users, DollarSign, AlertTriangle, TrendingDown, CheckCircle, Sparkles,
   Search, Shield, ChevronDown, Trash2, Filter, Edit2, Calculator, Database,
   MoreVertical, CheckCircle2, XCircle, Loader2, RefreshCw, ShieldAlert,
-  UserCheck, Zap, ChevronRight, ChevronUp, Plus, FileText, Check, CalendarDays, Hospital, Eye,
+  UserCheck, Zap, Plus, FileText, Check, CalendarDays, Hospital, Eye,
   TrendingUp,
 } from 'lucide-react';
 import { AdminUserDetail } from './AdminUserDetail';
@@ -99,7 +99,6 @@ export function AdminUsersSubscriptions() {
   const [consumoSort,  setConsumoSort]  = useState<'usage' | 'reports' | 'tokens'>('usage');
 
   const [processing,  setProcessing]  = useState<string | null>(null);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [openMenu,    setOpenMenu]    = useState<string | null>(null);
 
   // Plans from saas_plans/
@@ -736,7 +735,7 @@ export function AdminUsersSubscriptions() {
         </div>
       </div>
 
-      {/* ── USER TABLE ─────────────────────────────────────────────────── */}
+      {/* ── USER TABLE (enxuta e profissional) ─────────────────────────── */}
       <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -744,314 +743,157 @@ export function AdminUsersSubscriptions() {
               <tr className="bg-ink-50/50 border-b border-ink-100 text-[10px] font-black uppercase text-ink-400 tracking-wider">
                 <th className="px-5 py-3.5">Usuário</th>
                 <th className="px-5 py-3.5">Cargo</th>
-                <th className="px-5 py-3.5">Assinatura / Plano</th>
-                <th className="px-5 py-3.5">Laudos / mês</th>
-                <th className="px-5 py-3.5">Laudos Lite</th>
-                <th className="px-5 py-3.5">Laudos Pro</th>
-                <th className="px-5 py-3.5 text-center">Motor Pro</th>
-                <th className="px-5 py-3.5">Add-ons</th>
+                <th className="px-5 py-3.5">Plano &amp; Status</th>
+                <th className="px-5 py-3.5 min-w-[180px]">Consumo de laudos</th>
                 <th className="px-5 py-3.5 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-ink-400 text-sm">
+                  <td colSpan={5} className="text-center py-12 text-ink-400 text-sm">
                     Nenhum usuário encontrado para os filtros selecionados.
                   </td>
                 </tr>
               ) : filtered.map((u) => {
                 const sub    = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
-                const isExp  = expandedRow === u.id;
                 const isProc = processing === u.id;
+                const used   = u.reportsUsedThisMonth || 0;
+                const quota  = u.reportsQuota         || 100;
 
-                const used      = u.reportsUsedThisMonth || 0;
-                const quota     = u.reportsQuota         || 100;
-                const tQLite    = u.tokenQuotaLite        ?? 0;
-                const tQPro     = u.tokenQuotaPro         ?? 0;
+                // Direitos ativos (somente leitura aqui — edição fica no menu ⋯).
+                const ents = [
+                  { on: sub?.addons?.includes('calculators'),  icon: Calculator,   label: 'Calculadoras', cls: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+                  { on: sub?.addons?.includes('pacs'),         icon: Database,     label: 'PACS',         cls: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+                  { on: sub?.addons?.includes('appointments'), icon: CalendarDays, label: 'Agendamentos', cls: 'bg-amber-50 text-amber-600 border-amber-100' },
+                  { on: sub?.addons?.includes('clinics'),      icon: Hospital,     label: 'Clínicas',     cls: 'bg-teal-50 text-teal-600 border-teal-100' },
+                  { on: u.motorProEnabled,                     icon: Sparkles,     label: 'Motor Pro',    cls: 'bg-violet-50 text-violet-600 border-violet-100' },
+                ].filter(e => e.on);
 
                 return (
-                  <>
-                    <tr
-                      key={u.id}
-                      className="hover:bg-ink-50/30 transition-colors cursor-pointer group"
-                      onClick={() => setExpandedRow(isExp ? null : u.id)}
-                    >
-                      {/* Nome */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-black text-sm border border-brand-100 shrink-0">
-                            {(u.name || u.email || '?').charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-ink-900 group-hover:text-brand-700 transition-colors">{u.name || 'Sem nome'}</p>
-                            <p className="text-[10px] text-ink-400 font-medium">{u.email}</p>
-                          </div>
-                          {isExp ? <ChevronUp size={12} className="text-ink-300 ml-1" /> : <ChevronRight size={12} className="text-ink-200 ml-1" />}
+                  <tr
+                    key={u.id}
+                    className="hover:bg-ink-50/40 transition-colors cursor-pointer group"
+                    onClick={() => setDetailTarget(u)}
+                    title="Abrir visão 360º"
+                  >
+                    {/* Usuário */}
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={classNames(
+                          'w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm border shrink-0',
+                          u.active !== false ? 'bg-brand-50 text-brand-600 border-brand-100' : 'bg-ink-100 text-ink-400 border-ink-200'
+                        )}>
+                          {(u.name || u.email || '?').charAt(0).toUpperCase()}
                         </div>
-                      </td>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-ink-900 group-hover:text-brand-700 transition-colors truncate max-w-[200px]">{u.name || 'Sem nome'}</p>
+                          <p className="text-[10px] text-ink-400 font-medium truncate max-w-[200px]">{u.email}</p>
+                        </div>
+                        {u.active === false && (
+                          <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-50 text-rose-500 border border-rose-100 shrink-0">Inativa</span>
+                        )}
+                      </div>
+                    </td>
 
-                      {/* Cargo */}
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => setRoleTarget(u)}
-                          className={classNames(
-                            'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border transition-all',
-                            u.role === 'admin'   ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                            u.role === 'medico'  ? 'bg-brand-50 text-brand-700 border-brand-200' :
-                            'bg-ink-50 text-ink-600 border-ink-200'
-                          )}
-                        >
-                          <Shield size={10} /> {u.role} <ChevronDown size={9} />
-                        </button>
-                      </td>
+                    {/* Cargo */}
+                    <td className="px-5 py-4">
+                      <span className={classNames(
+                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border',
+                        u.role === 'admin'  ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                        u.role === 'medico' ? 'bg-brand-50 text-brand-700 border-brand-200' :
+                        'bg-ink-50 text-ink-600 border-ink-200'
+                      )}>
+                        <Shield size={10} /> {u.role}
+                      </span>
+                    </td>
 
-                      {/* Assinatura */}
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <div className="space-y-1">
-                          {subBadge(u.subscriptionStatus)}
-                          {sub?.plan && (
-                            <p className="text-[9px] font-bold text-ink-500 truncate max-w-[120px]">{sub.plan}</p>
-                          )}
-                          {!u.subscriptionStatus && (
-                            <button
-                              onClick={() => { setAssignIsLegacy(false); setAssignTarget(u); }}
-                              className="text-[9px] font-black uppercase flex items-center gap-0.5 text-brand-600 hover:text-brand-800 transition-colors"
-                            >
-                              <Plus size={9} /> Atribuir Plano
-                            </button>
-                          )}
+                    {/* Plano & Status */}
+                    <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {subBadge(u.subscriptionStatus)}
+                        {sub?.plan && <span className="text-[10px] font-bold text-ink-600 truncate max-w-[110px]">{sub.plan}</span>}
+                        {!u.subscriptionStatus && (
                           <button
-                            onClick={() => setStatusTarget(u)}
-                            className={classNames(
-                              'text-[9px] font-black uppercase flex items-center gap-0.5 transition-colors',
-                              u.active !== false ? 'text-emerald-600 hover:text-emerald-800' : 'text-rose-500 hover:text-rose-700'
-                            )}
+                            onClick={() => { setAssignIsLegacy(false); setAssignTarget(u); }}
+                            className="text-[9px] font-black uppercase flex items-center gap-0.5 text-brand-600 hover:text-brand-800 transition-colors"
                           >
-                            {u.active !== false ? <CheckCircle2 size={9} /> : <XCircle size={9} />}
-                            {u.active !== false ? 'Conta ativa' : 'Conta inativa'}
+                            <Plus size={9} /> Atribuir
                           </button>
-                        </div>
-                      </td>
-
-                      {/* Laudos */}
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5">
-                          {quotaBar(used, quota)}
-                          <button onClick={() => handleEditQuota(u, 'reportsQuota')} className="text-ink-300 hover:text-indigo-600 transition-colors">
-                            <Edit2 size={11} />
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Token Lite */}
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-bold text-indigo-700 flex items-center gap-0.5">
-                              <Zap size={9} /> {tQLite === 0 ? '∞' : tQLite.toLocaleString('pt-BR')}
+                        )}
+                      </div>
+                      {ents.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          {ents.map(e => (
+                            <span key={e.label} title={e.label} className={classNames('w-5 h-5 rounded-md border flex items-center justify-center', e.cls)}>
+                              <e.icon size={11} />
                             </span>
-                            <span className="text-[9px] text-ink-400">tokens / mês</span>
-                          </div>
-                          <button onClick={() => handleEditQuota(u, 'tokenQuotaLite')} className="text-ink-300 hover:text-indigo-600 transition-colors">
-                            <Edit2 size={11} />
-                          </button>
+                          ))}
                         </div>
-                      </td>
+                      )}
+                    </td>
 
-                      {/* Token Pro */}
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1.5">
-                          <div className="space-y-0.5">
-                            <span className="text-[10px] font-bold text-violet-700 flex items-center gap-0.5">
-                              <Sparkles size={9} /> {tQPro === 0 ? '∞' : tQPro.toLocaleString('pt-BR')}
-                            </span>
-                            <span className="text-[9px] text-ink-400">tokens / mês</span>
-                          </div>
-                          <button onClick={() => handleEditQuota(u, 'tokenQuotaPro')} className="text-ink-300 hover:text-violet-600 transition-colors">
-                            <Edit2 size={11} />
-                          </button>
-                        </div>
-                      </td>
+                    {/* Consumo */}
+                    <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                      {quotaBar(used, quota)}
+                    </td>
 
-                      {/* Motor Pro */}
-                      <td className="px-5 py-4 text-center" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleToggleMotorPro(u)}
-                          disabled={isProc}
-                          className={classNames('w-10 h-6 rounded-full relative transition-all cursor-pointer inline-block', u.motorProEnabled ? 'bg-indigo-600' : 'bg-ink-300')}
-                        >
-                          <div className={classNames('w-4 h-4 bg-white rounded-full absolute top-1 shadow-sm transition-all', u.motorProEnabled ? 'left-5' : 'left-1')} />
-                        </button>
-                      </td>
-
-                      {/* Add-ons */}
-                      <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                        <div className="flex gap-1.5">
+                    {/* Ações */}
+                    <td className="px-5 py-4 text-right" onClick={e => e.stopPropagation()}>
+                      {isProc ? (
+                        <Loader2 size={16} className="animate-spin text-brand-500 ml-auto" />
+                      ) : (
+                        <div className="inline-flex items-center gap-1">
                           <button
-                            onClick={() => handleToggleAddon(u, 'calculators')}
-                            disabled={isProc}
-                            title="Calculadoras"
-                            className={classNames(
-                              'p-1.5 rounded-lg border flex items-center justify-center transition-all',
-                              sub?.addons?.includes('calculators')
-                                ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
-                                : 'bg-white border-ink-200 text-ink-400 hover:border-ink-300'
-                            )}
+                            onClick={() => setDetailTarget(u)}
+                            title="Visão 360º"
+                            className="p-2 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
                           >
-                            <Calculator size={13} />
+                            <Eye size={16} />
                           </button>
-                          <button
-                            onClick={() => handleToggleAddon(u, 'pacs')}
-                            disabled={isProc}
-                            title="PACS / DICOM"
-                            className={classNames(
-                              'p-1.5 rounded-lg border flex items-center justify-center transition-all',
-                              sub?.addons?.includes('pacs')
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                                : 'bg-white border-ink-200 text-ink-400 hover:border-ink-300'
-                            )}
-                          >
-                            <Database size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleToggleAddon(u, 'appointments')}
-                            disabled={isProc}
-                            title="Agendamentos"
-                            className={classNames(
-                              'p-1.5 rounded-lg border flex items-center justify-center transition-all',
-                              sub?.addons?.includes('appointments')
-                                ? 'bg-amber-50 border-amber-200 text-amber-600'
-                                : 'bg-white border-ink-200 text-ink-400 hover:border-ink-300'
-                            )}
-                          >
-                            <CalendarDays size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleToggleAddon(u, 'clinics')}
-                            disabled={isProc}
-                            title="Clínicas"
-                            className={classNames(
-                              'p-1.5 rounded-lg border flex items-center justify-center transition-all',
-                              sub?.addons?.includes('clinics')
-                                ? 'bg-teal-50 border-teal-200 text-teal-600'
-                                : 'bg-white border-ink-200 text-ink-400 hover:border-ink-300'
-                            )}
-                          >
-                            <Hospital size={13} />
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Ações */}
-                      <td className="px-5 py-4 text-right" onClick={e => e.stopPropagation()}>
-                        {isProc ? (
-                          <Loader2 size={16} className="animate-spin text-brand-500 ml-auto" />
-                        ) : (
                           <div className="relative inline-block">
                             <button
                               onClick={() => setOpenMenu(openMenu === u.id ? null : u.id)}
-                              className="p-2 text-ink-400 hover:bg-ink-100 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                              title="Gerenciar"
+                              className="p-2 text-ink-400 hover:bg-ink-100 rounded-xl transition-all"
                             >
                               <MoreVertical size={16} />
                             </button>
                             {openMenu === u.id && (
                               <>
                                 <div className="fixed inset-0 z-40" onClick={() => setOpenMenu(null)} />
-                                <div className="absolute right-0 top-full z-50 bg-white rounded-xl border border-ink-200 shadow-xl mt-1 min-w-[220px] py-1 text-xs">
-                                  <MenuItem icon={Shield}     label="Alterar Cargo"         onClick={() => { setOpenMenu(null); setRoleTarget(u); }} />
-                                  <MenuItem icon={CheckCircle2} label={u.active !== false ? 'Desativar Conta' : 'Ativar Conta'} onClick={() => { setOpenMenu(null); setStatusTarget(u); }} />
-                                  <MenuItem icon={FileText}  label={u.subscriptionStatus ? 'Trocar Plano' : 'Atribuir Plano'} onClick={() => { setOpenMenu(null); setAssignIsLegacy(false); setAssignTarget(u); }} color="indigo" />
+                                <div className="absolute right-0 top-full z-50 bg-white rounded-xl border border-ink-200 shadow-xl mt-1 min-w-[230px] py-1 text-xs">
+                                  <MenuItem icon={Eye}          label="Ver visão 360º"        onClick={() => { setOpenMenu(null); setDetailTarget(u); }} color="indigo" />
+                                  <MenuItem icon={FileText}     label={u.subscriptionStatus ? 'Trocar Plano' : 'Atribuir Plano'} onClick={() => { setOpenMenu(null); setAssignIsLegacy(false); setAssignTarget(u); }} color="indigo" />
+                                  <MenuItem icon={Edit2}        label="Editar quota de laudos" onClick={() => { setOpenMenu(null); handleEditQuota(u, 'reportsQuota'); }} />
                                   <hr className="border-ink-100 my-1" />
-                                  <MenuItem icon={CalendarDays} label={`${sub?.addons?.includes('appointments') ? 'Desativar' : 'Ativar'} Agendamentos`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'appointments'); }} color="amber" />
-                                  <MenuItem icon={Hospital}     label={`${sub?.addons?.includes('clinics') ? 'Desativar' : 'Ativar'} Clínicas`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'clinics'); }} color="teal" />
-                                  <MenuItem icon={Sparkles}  label={`${u.motorProEnabled ? 'Desativar' : 'Ativar'} Motor Pro`} onClick={() => handleToggleMotorPro(u)} color="indigo" />
-                                  <MenuItem icon={Edit2}     label="Editar Quota Laudos"        onClick={() => handleEditQuota(u, 'reportsQuota')} />
-                                  <MenuItem icon={Zap}       label="Editar Tokens Lite"          onClick={() => handleEditQuota(u, 'tokenQuotaLite')} color="indigo" />
-                                  <MenuItem icon={Sparkles}  label="Editar Tokens Pro"           onClick={() => handleEditQuota(u, 'tokenQuotaPro')}  color="violet" />
+                                  <div className="px-3 py-1 text-[9px] font-black uppercase tracking-widest text-ink-300">Direitos</div>
+                                  <MenuItem icon={Calculator}   label={`${sub?.addons?.includes('calculators') ? 'Remover' : 'Ativar'} Calculadoras`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'calculators'); }} color="indigo" />
+                                  <MenuItem icon={Database}     label={`${sub?.addons?.includes('pacs') ? 'Remover' : 'Ativar'} PACS / DICOM`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'pacs'); }} color="emerald" />
+                                  <MenuItem icon={CalendarDays} label={`${sub?.addons?.includes('appointments') ? 'Remover' : 'Ativar'} Agendamentos`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'appointments'); }} color="amber" />
+                                  <MenuItem icon={Hospital}     label={`${sub?.addons?.includes('clinics') ? 'Remover' : 'Ativar'} Clínicas`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'clinics'); }} color="teal" />
+                                  <MenuItem icon={Sparkles}     label={`${u.motorProEnabled ? 'Desativar' : 'Ativar'} Motor Pro`} onClick={() => handleToggleMotorPro(u)} color="violet" />
+                                  {u.motorProEnabled && (
+                                    <MenuItem icon={Edit2}      label="Editar quota Pro"       onClick={() => { setOpenMenu(null); handleEditQuota(u, 'tokenQuotaPro'); }} color="violet" />
+                                  )}
                                   <hr className="border-ink-100 my-1" />
+                                  <MenuItem icon={Shield}       label="Alterar cargo"          onClick={() => { setOpenMenu(null); setRoleTarget(u); }} />
+                                  <MenuItem icon={CheckCircle2} label={u.active !== false ? 'Desativar conta' : 'Ativar conta'} onClick={() => { setOpenMenu(null); setStatusTarget(u); }} />
                                   {(u.subscriptionStatus === 'canceled' || u.subscriptionStatus === 'paused') ? (
-                                    <MenuItem icon={RefreshCw} label="Reativar Assinatura" onClick={() => handleReactivate(u)} color="emerald" />
+                                    <MenuItem icon={RefreshCw}  label="Reativar assinatura"    onClick={() => handleReactivate(u)} color="emerald" />
                                   ) : u.subscriptionStatus && u.subscriptionStatus !== 'canceled' ? (
-                                    <MenuItem icon={Trash2}    label="Cancelar Assinatura"  onClick={() => handleCancelSub(u)} color="rose" />
+                                    <MenuItem icon={Trash2}     label="Cancelar assinatura"    onClick={() => handleCancelSub(u)} color="rose" />
                                   ) : null}
                                   <hr className="border-ink-100 my-1" />
-                                  <MenuItem icon={Trash2}    label="Excluir Usuário"       onClick={() => { setOpenMenu(null); setDeleteTarget(u); }} color="rose" />
+                                  <MenuItem icon={Trash2}       label="Excluir usuário"        onClick={() => { setOpenMenu(null); setDeleteTarget(u); }} color="rose" />
                                 </div>
                               </>
                             )}
                           </div>
-                        )}
-                      </td>
-                    </tr>
-
-                    {/* Expanded detail row */}
-                    {isExp && (
-                      <tr key={`${u.id}-exp`} className="bg-ink-50/20">
-                        <td colSpan={9} className="px-5 py-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {/* Assinatura */}
-                            <DetailBox title="Assinatura">
-                              <DetailRow k="Status"  v={u.subscriptionStatus || '—'} />
-                              <DetailRow k="Plano"   v={sub?.plan || '—'} />
-                              <DetailRow k="Método"  v={sub?.paymentMethod || '—'} />
-                              {sub?.currentPeriodEnd && (
-                                <DetailRow k="Vence em" v={new Date(sub.currentPeriodEnd).toLocaleDateString('pt-BR')} />
-                              )}
-                              {sub?.id && <DetailRow k="Sub ID" v={sub.id} mono />}
-                            </DetailBox>
-
-                            {/* Tokens */}
-                            <DetailBox title="Tokens LAUD.IA">
-                              <div className="space-y-2">
-                                <div>
-                                  <div className="flex items-center justify-between text-[10px] mb-0.5">
-                                    <span className="text-indigo-600 font-black flex items-center gap-1"><Zap size={9} /> Token Lite</span>
-                                    <span className="font-bold text-ink-700">{tQLite === 0 ? 'Ilimitado' : `${tQLite.toLocaleString('pt-BR')} / mês`}</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="flex items-center justify-between text-[10px] mb-0.5">
-                                    <span className="text-violet-600 font-black flex items-center gap-1"><Sparkles size={9} /> Token Pro</span>
-                                    <span className="font-bold text-ink-700">{tQPro === 0 ? 'Ilimitado' : `${tQPro.toLocaleString('pt-BR')} / mês`}</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="flex items-center justify-between text-[10px]">
-                                    <span className="text-ink-500">Motor Pro</span>
-                                    <span className={classNames('font-bold', u.motorProEnabled ? 'text-indigo-600' : 'text-ink-400')}>
-                                      {u.motorProEnabled ? 'Habilitado' : 'Bloqueado'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </DetailBox>
-
-                            {/* Add-ons */}
-                            <DetailBox title="Add-ons">
-                              <div className="flex gap-2 flex-wrap">
-                                <AddonPill label="Calculadoras" icon={Calculator} active={sub?.addons?.includes('calculators')} />
-                                <AddonPill label="PACS / DICOM" icon={Database}   active={sub?.addons?.includes('pacs')} />
-                                <AddonPill label="Agendamentos" icon={CalendarDays} active={sub?.addons?.includes('appointments')} />
-                                <AddonPill label="Clínicas" icon={Hospital} active={sub?.addons?.includes('clinics')} />
-                              </div>
-                              <div className="mt-3 text-[10px] text-ink-500 font-medium">
-                                Último login: {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString('pt-BR') : '—'}
-                              </div>
-                            </DetailBox>
-                          </div>
-                          <div className="mt-3 flex justify-end">
-                            <button
-                              onClick={() => setDetailTarget(u)}
-                              className="inline-flex items-center gap-1.5 h-8 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
-                            >
-                              <Eye size={12} /> Ver visão 360º (pagamentos, uso, tickets)
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -1293,35 +1135,6 @@ function MenuItem({ icon: Icon, label, onClick, color = 'ink' }: {
   );
 }
 
-function DetailBox({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-xl border border-ink-100 p-4 space-y-2">
-      <div className="text-[9px] font-black uppercase text-ink-400 tracking-widest mb-2">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function DetailRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
-  return (
-    <div className="flex justify-between text-[10px]">
-      <span className="text-ink-500">{k}</span>
-      <span className={classNames('font-bold text-ink-800 max-w-[60%] text-right truncate', mono && 'font-mono')}>{v}</span>
-    </div>
-  );
-}
-
-function AddonPill({ label, icon: Icon, active }: { label: string; icon: typeof Calculator; active: boolean }) {
-  return (
-    <span className={classNames(
-      'flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase border',
-      active ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-ink-50 border-ink-200 text-ink-400'
-    )}>
-      <Icon size={11} /> {label}
-    </span>
-  );
-}
-
 // ─── AssignSubModal ───────────────────────────────────────────────────────────
 
 interface AssignOpts {
@@ -1487,9 +1300,10 @@ function AssignSubModal({
               <p className="text-[10px] font-black uppercase text-ink-400 tracking-widest mb-2">Resumo da Atribuição</p>
               <div className="flex justify-between"><span className="text-ink-500">Plano</span><span className="font-bold">{plan.name}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Status</span><span className="font-bold capitalize">{status}</span></div>
-              <div className="flex justify-between"><span className="text-ink-500">Laudos/mês</span><span className="font-bold">{plan.reportsQuota === 0 ? 'Ilimitado' : plan.reportsQuota}</span></div>
-              <div className="flex justify-between"><span className="text-ink-500">Laudos Lite/mês</span><span className="font-bold">{plan.tokenQuotaLite === 0 ? 'Ilimitado' : plan.tokenQuotaLite}</span></div>
-              <div className="flex justify-between"><span className="text-ink-500">Laudos Pro/mês</span><span className="font-bold">{plan.tokenQuotaPro === 0 ? 'Ilimitado' : plan.tokenQuotaPro}</span></div>
+              <div className="flex justify-between"><span className="text-ink-500">Laudos LAUD.IA/mês</span><span className="font-bold">{plan.reportsQuota === 0 ? 'Ilimitado' : plan.reportsQuota}</span></div>
+              {plan.motorProDefault && (
+                <div className="flex justify-between"><span className="text-ink-500">Laudos Pro/mês</span><span className="font-bold">{plan.tokenQuotaPro === 0 ? 'Ilimitado' : plan.tokenQuotaPro}</span></div>
+              )}
               <div className="flex justify-between"><span className="text-ink-500">Válido por</span><span className="font-bold">{lifetime ? 'Vitalício (∞)' : `${periodDays} dias`}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Vence em</span>
                 <span className="font-bold">{lifetime ? 'Nunca' : new Date(Date.now() + periodDays * 86400000).toLocaleDateString('pt-BR')}</span>
