@@ -33,7 +33,7 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
         const snap = await getDocs(query(collection(firestore, 'saas_plans'), where('active', '==', true)));
         if (!active) return;
         const list = snap.docs
-          .map(d => ({ id: d.id, ...d.data() } as Plan & { id: string }))
+          .map(d => ({ ...d.data(), id: d.id } as Plan & { id: string }))
           .filter(p => !p.id.startsWith('LICENSE_') && p.category !== 'pacs')
           .sort((a, b) => planPrices(a).month - planPrices(b).month);
         setPlans(list);

@@ -163,7 +163,9 @@ function PlansTab() {
   const loadPlans = useCallback(async () => {
     try {
       const snap = await getDocs(collection(firestore, 'saas_plans'));
-      setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+      // O id do DOCUMENTO é autoritativo — vem depois do spread para nunca ser
+      // sobrescrito por um campo `id` que tenha sido gravado nos dados por engano.
+      setPlans(snap.docs.map(d => ({ ...d.data(), id: d.id } as any)));
     } finally {
       setLoading(false);
     }
@@ -186,8 +188,11 @@ function PlansTab() {
     try {
       const prices = form.prices || { month: form.price || 0, semester: (form.price || 0) * 6, year: (form.price || 0) * 12 };
       // `price` (legado) espelha o mensal; `interval` fica 'month' — o plano cobre os 3.
+      // Nunca gravamos `id` nos dados (o id é do documento) para não corromper a
+      // identificação dos planos na listagem/seleção/exclusão.
+      const { id: _omitId, ...formData } = form as any;
       const data = {
-        ...form,
+        ...formData,
         prices,
         price: prices.month,
         interval: 'month' as const,

@@ -95,7 +95,7 @@ export function SubscriptionCenter() {
     const q = query(collection(firestore, 'saas_plans'), where('active', '==', true));
     getDocs(q)
       .then(snap => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const list = snap.docs.map(d => ({ ...d.data(), id: d.id }));
         list.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
         setPlansList(list);
       })

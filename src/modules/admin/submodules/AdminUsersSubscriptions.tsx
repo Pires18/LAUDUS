@@ -106,7 +106,7 @@ export function AdminUsersSubscriptions() {
   const [saasPlansList, setSaasPlansList] = useState<SaasPlan[]>([]);
   useEffect(() => {
     getDocs(collection(firestore, 'saas_plans'))
-      .then(snap => setSaasPlansList(snap.docs.map(d => ({ id: d.id, ...d.data() } as SaasPlan))))
+      .then(snap => setSaasPlansList(snap.docs.map(d => ({ ...d.data(), id: d.id } as SaasPlan))))
       .catch(() => {});
   }, []);
 
