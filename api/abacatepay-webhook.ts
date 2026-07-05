@@ -1,6 +1,6 @@
 import { getDb } from './_firebase.js';
 import { isProduction } from './_auth.js';
-import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom } from './_pricing.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom, planToAddons } from './_pricing.js';
 import { safeEqual } from './_secure.js';
 import crypto from 'crypto';
 
@@ -202,10 +202,7 @@ async function activateSubscription(
         tokenQuotaPro = planData.tokenQuotaPro ?? 0;
         motorProDefault = planData.motorProDefault || false;
         interval = planData.interval || interval;
-        if (planData.includesCalculators) addons.push('calculators');
-        if (planData.includesPacs) addons.push('pacs');
-        if (planData.includesAppointments) addons.push('appointments');
-        if (planData.includesClinics) addons.push('clinics');
+        addons.push(...planToAddons(planData));
       }
     }
   }

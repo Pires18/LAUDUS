@@ -4,6 +4,25 @@
  * `global_config/addons_config` existe no Firestore, ele tem prioridade.
  */
 
+/**
+ * Deriva a lista de add-ons de um plano a partir das flags `includesX`.
+ * Fonte única usada pelo webhook (concessão) e testável isoladamente.
+ */
+export function planToAddons(plan: {
+  includesCalculators?: boolean;
+  includesPacs?: boolean;
+  includesAppointments?: boolean;
+  includesClinics?: boolean;
+} | null | undefined): string[] {
+  const addons: string[] = [];
+  if (!plan) return addons;
+  if (plan.includesCalculators) addons.push('calculators');
+  if (plan.includesPacs) addons.push('pacs');
+  if (plan.includesAppointments) addons.push('appointments');
+  if (plan.includesClinics) addons.push('clinics');
+  return addons;
+}
+
 /** Mapeia a chave de add-on da API (snake_case) para a chave do Firestore (camelCase). */
 export function mapAddonKey(addon: string): string {
   const mapping: Record<string, string> = {

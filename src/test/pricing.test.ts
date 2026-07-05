@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, ADDON_DEFAULTS } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -47,6 +47,28 @@ describe('resolveAddon', () => {
     const r = resolveAddon('desconhecido', null);
     expect(r.priceCents).toBe(0);
     expect(r.bundleSize).toBe(1);
+  });
+});
+
+describe('planToAddons', () => {
+  it('deriva os add-ons das flags includesX do plano', () => {
+    expect(planToAddons({ includesCalculators: true, includesPacs: true })).toEqual(['calculators', 'pacs']);
+    expect(planToAddons({ includesAppointments: true, includesClinics: true })).toEqual(['appointments', 'clinics']);
+  });
+
+  it('plano completo → todos os add-ons na ordem canônica', () => {
+    expect(planToAddons({ includesCalculators: true, includesPacs: true, includesAppointments: true, includesClinics: true }))
+      .toEqual(['calculators', 'pacs', 'appointments', 'clinics']);
+  });
+
+  it('plano sem flags → lista vazia; null/undefined → vazio', () => {
+    expect(planToAddons({})).toEqual([]);
+    expect(planToAddons(null)).toEqual([]);
+    expect(planToAddons(undefined)).toEqual([]);
+  });
+
+  it('ignora flags falsas', () => {
+    expect(planToAddons({ includesCalculators: false, includesPacs: true })).toEqual(['pacs']);
   });
 });
 

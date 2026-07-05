@@ -1,4 +1,5 @@
 import { verifyAuthEdge } from './_edgeAuth.js';
+import { evaluateReportQuota } from './_quota.js';
 
 export const config = {
   runtime: 'edge',
@@ -53,24 +54,15 @@ async function checkReportQuota(uid: string, idToken: string): Promise<{ allowed
     };
     const str = (k: string): string => (f[k]?.stringValue || '');
 
-    if (str('role') === 'admin') return { allowed: true };
-
-    // Assinatura ativa? (mesma regra do cliente: active/past_due, ou dentro do trial de 14d)
-    const status = str('subscriptionStatus');
-    const createdAt = num('createdAt');
-    const inTrial = createdAt !== undefined && Date.now() < createdAt + 14 * 24 * 60 * 60 * 1000;
-    const hasActiveSub = status === 'active' || status === 'past_due' || inTrial;
-    if (!hasActiveSub) {
-      return { allowed: false, status: 402, error: 'Sua assinatura não está ativa. Reative o plano para gerar novos laudos.' };
-    }
-
-    // Cota mensal esgotada? (9999 = ilimitado, ex.: admin)
-    const quota = num('reportsQuota');
-    const used = num('reportsUsedThisMonth') ?? 0;
-    if (quota !== undefined && quota > 0 && quota !== 9999 && used >= quota) {
-      return { allowed: false, status: 402, error: 'Cota mensal de laudos atingida. Faça upgrade do plano ou aguarde a renovação.' };
-    }
-    return { allowed: true };
+    // Decisão pura e testável (ver api/_quota.ts).
+    const { allowed, error, status } = evaluateReportQuota({
+      role: str('role'),
+      subscriptionStatus: str('subscriptionStatus'),
+      createdAt: num('createdAt'),
+      reportsQuota: num('reportsQuota'),
+      reportsUsedThisMonth: num('reportsUsedThisMonth'),
+    });
+    return { allowed, error, status };
   } catch {
     return { allowed: true }; // fail-open
   }
