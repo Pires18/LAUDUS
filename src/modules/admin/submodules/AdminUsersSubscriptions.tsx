@@ -23,6 +23,7 @@ import {
   Search, Shield, ChevronDown, Trash2, Filter, Edit2, Calculator, Database,
   MoreVertical, CheckCircle2, XCircle, Loader2, RefreshCw, ShieldAlert,
   UserCheck, Zap, ChevronRight, ChevronUp, Plus, FileText, Check, CalendarDays, Hospital, Eye,
+  TrendingUp,
 } from 'lucide-react';
 import { AdminUserDetail } from './AdminUserDetail';
 
@@ -211,6 +212,40 @@ export function AdminUsersSubscriptions() {
   const totalReportsUsed = consumoRows.reduce((acc, r) => acc + r.reportsUsed, 0);
   const nearLimitCount   = consumoRows.filter(r => !r.unlimited && r.pct >= 80).length;
   const exhaustedCount   = consumoRows.filter(r => !r.unlimited && r.reportsUsed >= r.reportsQuota).length;
+  const avgUsagePct      = consumoRows.length ? Math.round(consumoRows.filter(r => !r.unlimited).reduce((a, r) => a + r.pct, 0) / Math.max(1, consumoRows.filter(r => !r.unlimited).length)) : 0;
+
+  // ─── Distribuições para o dashboard (Visão Geral) ─────────────────────────────
+  const noSubCount = users.filter(u => u.role !== 'admin' && !u.subscriptionStatus).length;
+  const lifetimeCount = subscriptions.filter((s: any) => s.lifetime === true).length;
+
+  const statusDist = [
+    { key: 'active',   label: 'Ativos',     value: activeCount,   color: 'bg-emerald-500', text: 'text-emerald-700' },
+    { key: 'trialing', label: 'Trial',      value: trialCount,    color: 'bg-amber-500',   text: 'text-amber-700'   },
+    { key: 'past_due', label: 'Em atraso',  value: pastDueCount,  color: 'bg-rose-500',    text: 'text-rose-700'    },
+    { key: 'canceled', label: 'Cancelados', value: canceledCount, color: 'bg-ink-400',     text: 'text-ink-500'     },
+    { key: 'none',     label: 'Sem plano',  value: noSubCount,    color: 'bg-ink-200',     text: 'text-ink-400'     },
+  ];
+  const statusTotal = Math.max(1, statusDist.reduce((a, s) => a + s.value, 0));
+
+  // Assinantes por plano (usa nome do saas_plans quando disponível)
+  const planCounts: Record<string, number> = {};
+  subscriptions.forEach((s: any) => {
+    if (s.status === 'canceled' || s.status === 'paused') return;
+    const plan = saasPlansList.find(p => p.id === s.planId);
+    const name = plan?.name || s.plan || 'Sem plano';
+    planCounts[name] = (planCounts[name] || 0) + 1;
+  });
+  const planDist = Object.entries(planCounts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  const planTotal = Math.max(1, planDist.reduce((a, p) => a + p.value, 0));
+
+  // Adoção de add-ons
+  const addonAdoption = [
+    { key: 'calculators',  label: 'Calculadoras', icon: Calculator },
+    { key: 'pacs',         label: 'PACS / DICOM', icon: Database },
+    { key: 'appointments', label: 'Agendamentos', icon: CalendarDays },
+    { key: 'clinics',      label: 'Clínicas',     icon: Hospital },
+  ].map(a => ({ ...a, value: subscriptions.filter((s: any) => s.addons?.includes(a.key)).length }));
+  const addonBase = Math.max(1, activeCount);
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -494,28 +529,122 @@ export function AdminUsersSubscriptions() {
 
       {activeTab === 'overview' && (<>
 
-      {/* ── METRICS ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      {/* ── HERO KPIs (receita) ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: summary ? 'MRR' : 'MRR (local)', value: `R$ ${mrrDisplay.toLocaleString('pt-BR')}`,  icon: DollarSign,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'ARR',             value: `R$ ${arr.toLocaleString('pt-BR')}`,  icon: DollarSign,    color: 'text-emerald-700', bg: 'bg-emerald-100/50' },
-          { label: 'ARPU',            value: `R$ ${arpu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-          { label: 'Churn Rate',      value: `${churnRate}%`,                       icon: TrendingDown,  color: 'text-pink-600',    bg: 'bg-pink-50'    },
-          { label: 'Ativos',          value: activeDisplay,                         icon: Users,         color: 'text-emerald-600', bg: 'bg-emerald-50'  },
-          { label: 'Trials',          value: trialCount,                            icon: Sparkles,      color: 'text-amber-600',   bg: 'bg-amber-50'   },
-          { label: 'Em Atraso',       value: pastDueCount,                          icon: AlertTriangle, color: 'text-rose-600',    bg: 'bg-rose-50'    },
-          { label: 'Total Usuários',  value: users.length,                          icon: Users,         color: 'text-teal-600',    bg: 'bg-teal-50'    },
+          { label: summary ? 'Receita Recorrente (MRR)' : 'MRR (estimado local)', value: `R$ ${mrrDisplay.toLocaleString('pt-BR')}`, sub: 'por mês',   icon: DollarSign,   grad: 'from-emerald-500 to-teal-600' },
+          { label: 'Receita Anual (ARR)', value: `R$ ${arr.toLocaleString('pt-BR')}`, sub: 'projeção 12m', icon: TrendingUp,   grad: 'from-brand-500 to-indigo-600' },
+          { label: 'Receita por Usuário', value: `R$ ${arpu.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, sub: 'ARPU', icon: Users, grad: 'from-violet-500 to-purple-600' },
+          { label: 'Taxa de Cancelamento', value: `${churnRate}%`, sub: `${canceledCount} cancelados`, icon: TrendingDown, grad: 'from-rose-500 to-pink-600' },
         ].map(m => (
-          <div key={m.label} className="bg-white p-4 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-3">
-            <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', m.bg, m.color)}>
-              <m.icon size={17} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[9px] font-black text-ink-500 uppercase tracking-wider truncate">{m.label}</div>
-              <div className="text-base font-black text-ink-950 truncate">{m.value}</div>
+          <div key={m.label} className={classNames('relative overflow-hidden rounded-2xl p-4 text-white shadow-md bg-gradient-to-br', m.grad)}>
+            <div className="flex items-start justify-between">
+              <div className="min-w-0">
+                <div className="text-[10px] font-black uppercase tracking-wider text-white/80 truncate">{m.label}</div>
+                <div className="text-2xl font-black mt-1 tracking-tight truncate">{m.value}</div>
+                <div className="text-[10px] font-bold text-white/70 mt-0.5">{m.sub}</div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <m.icon size={18} />
+              </div>
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── SECONDARY STATS ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          { label: 'Ativos',      value: activeDisplay,  icon: CheckCircle2,  color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Trials',      value: trialCount,     icon: Sparkles,      color: 'text-amber-600',   bg: 'bg-amber-50'   },
+          { label: 'Em Atraso',   value: pastDueCount,   icon: AlertTriangle, color: 'text-rose-600',    bg: 'bg-rose-50'    },
+          { label: 'Vitalícios',  value: lifetimeCount,  icon: Zap,           color: 'text-violet-600',  bg: 'bg-violet-50'  },
+          { label: 'Sem Plano',   value: noSubCount,     icon: XCircle,       color: 'text-ink-400',     bg: 'bg-ink-50'     },
+          { label: 'Total',       value: users.length,   icon: Users,         color: 'text-teal-600',    bg: 'bg-teal-50'    },
+        ].map(m => (
+          <div key={m.label} className="bg-white p-3.5 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-3">
+            <div className={classNames('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', m.bg, m.color)}>
+              <m.icon size={15} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] font-black text-ink-500 uppercase tracking-wider truncate">{m.label}</div>
+              <div className="text-lg font-black text-ink-950 truncate leading-none mt-0.5">{m.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── DISTRIBUIÇÕES ───────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Status da base */}
+        <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+          <h3 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-4">Distribuição da Base</h3>
+          <div className="flex h-2.5 rounded-full overflow-hidden mb-4 bg-ink-50">
+            {statusDist.filter(s => s.value > 0).map(s => (
+              <div key={s.key} className={s.color} style={{ width: `${(s.value / statusTotal) * 100}%` }} title={`${s.label}: ${s.value}`} />
+            ))}
+          </div>
+          <div className="space-y-2.5">
+            {statusDist.map(s => (
+              <div key={s.key} className="flex items-center gap-2 text-xs">
+                <span className={classNames('w-2.5 h-2.5 rounded-sm shrink-0', s.color)} />
+                <span className="text-ink-600 font-medium flex-1">{s.label}</span>
+                <span className="font-black text-ink-900 tabular-nums">{s.value}</span>
+                <span className="text-[10px] text-ink-400 font-bold tabular-nums w-9 text-right">{Math.round((s.value / statusTotal) * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Assinantes por plano */}
+        <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+          <h3 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-4">Assinantes por Plano</h3>
+          {planDist.length === 0 ? (
+            <p className="text-xs text-ink-400 font-medium py-6 text-center">Nenhuma assinatura ativa.</p>
+          ) : (
+            <div className="space-y-3">
+              {planDist.map((p, i) => (
+                <div key={p.name}>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-ink-700 font-bold truncate max-w-[140px]">{p.name}</span>
+                    <span className="font-black text-ink-900 tabular-nums">{p.value}</span>
+                  </div>
+                  <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                    <div className={classNames('h-full rounded-full', ['bg-brand-500', 'bg-indigo-500', 'bg-violet-500', 'bg-teal-500', 'bg-amber-500'][i % 5])} style={{ width: `${(p.value / planTotal) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Adoção de add-ons + consumo */}
+        <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+          <h3 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-4">Adoção de Add-ons</h3>
+          <div className="space-y-3">
+            {addonAdoption.map(a => (
+              <div key={a.key}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-ink-700 font-bold flex items-center gap-1.5"><a.icon size={12} className="text-ink-400" /> {a.label}</span>
+                  <span className="font-black text-ink-900 tabular-nums">{a.value}</span>
+                </div>
+                <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, (a.value / addonBase) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-ink-50">
+            <div className="text-center">
+              <div className="text-lg font-black text-ink-900">{avgUsagePct}%</div>
+              <div className="text-[9px] font-black text-ink-400 uppercase tracking-wider">Uso médio de laudos</div>
+            </div>
+            <div className="text-center">
+              <div className={classNames('text-lg font-black', nearLimitCount > 0 ? 'text-amber-600' : 'text-ink-900')}>{nearLimitCount}</div>
+              <div className="text-[9px] font-black text-ink-400 uppercase tracking-wider">Perto do limite</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── LEGACY MIGRATION ───────────────────────────────────────────── */}
