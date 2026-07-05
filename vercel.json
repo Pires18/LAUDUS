@@ -3,12 +3,11 @@
     "api/abacatepay-webhook.ts": { "maxDuration": 30 },
     "api/abacatepay-checkout.ts": { "maxDuration": 20 },
     "api/abacatepay-cancel.ts": { "maxDuration": 20 },
-    "api/abacatepay-test.ts": { "maxDuration": 15 },
     "api/reset-monthly-reports.ts": { "maxDuration": 60 },
     "api/cron-aggregate-metrics.ts": { "maxDuration": 60 },
     "api/promote-admin.ts": { "maxDuration": 15 },
     "api/clinic-invite.ts": { "maxDuration": 15 },
-    "api/pacs-deprovision.ts": { "maxDuration": 30 },
+    "api/pacs-provision.ts": { "maxDuration": 30 },
     "api/gemini.ts": { "maxDuration": 60 },
     "api/health.ts": { "maxDuration": 5 }
   },

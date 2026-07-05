@@ -906,13 +906,13 @@ function AbacatePayTab() {
     if (!config.apiKey) { showToast('Insira a API Key antes de testar.', 'error'); return; }
     setTesting(true);
     try {
-      const res = await fetch('/api/abacatepay-test', {
+      const res = await fetch('/api/abacatepay-checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${await getIdToken()}`,
         },
-        body: JSON.stringify({ apiKey: config.apiKey }),
+        body: JSON.stringify({ action: 'test-key', apiKey: config.apiKey }),
       });
       const data = await res.json();
       if (data.ok) {

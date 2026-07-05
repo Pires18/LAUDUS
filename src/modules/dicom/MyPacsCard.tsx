@@ -202,16 +202,19 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
     try {
       // Destrói de fato a VM/tenant na nuvem ANTES de limpar o Firestore — sem
       // isso, a infraestrutura ficava órfã (rodando e cobrando) mesmo depois de
-      // o usuário "remover" o PACS pelo app.
+      // o usuário "remover" o PACS pelo app. Sem PROVISION_ENDPOINT configurado
+      // (ambiente 100% mock), não há nada real para destruir.
       try {
-        const idToken = await getIdToken();
-        const res = await fetch('/api/pacs-deprovision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
-          body: JSON.stringify({ provider: inst.provider, instanceName: inst.instanceName, tenantId: inst.tenantId }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || 'Falha ao destruir a infraestrutura na nuvem.');
+        if (PROVISION_ENDPOINT && inst.provider && inst.provider !== 'mock' && inst.instanceName) {
+          const idToken = await getIdToken();
+          const res = await fetch(PROVISION_ENDPOINT, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+            body: JSON.stringify({ provider: inst.provider, instanceName: inst.instanceName, tenantId: inst.tenantId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'Falha ao destruir a infraestrutura na nuvem.');
+        }
       } catch (err: any) {
         showToast(err.message || 'Não foi possível destruir a infraestrutura na nuvem — as credenciais NÃO foram limpas, tente novamente.', 'error');
         setBusy(false);
