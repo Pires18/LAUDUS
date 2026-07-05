@@ -185,7 +185,7 @@ IDIOMA, TERMINOLOGIA E PADRÃO NUMÉRICO:
  * 4. Autocálculos            — executa volume, peso, IG, DPP, IP médio, RCP, Hadlock, AFI, NASCET
  * 5. Expansão Morfológica    — traduz jargões para terminologia técnica
  * 6. Cascata e Diplomacia    — classifica conduta N0→N4 e define linguagem
- * 7. Self-Audit              — verifica unidades órfãs, inventos, HTML, red flags, diferenciais
+ * 7. Self-Audit              — checklist ⑬ itens espelhando auditReportQuality (placeholders, cascata, classificação, decimal, alerta, obs, higiene HTML)
  *
  * @never_remove
  * - Fase 4 completa (fórmulas de elipsoide + conversão mm→cm + Hadlock)
@@ -514,8 +514,8 @@ FASE 7 — SELF-AUDIT OBRIGATÓRIO (antes de fechar </scratchpad>)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Execute a verificação final explícita no scratchpad, respondendo SIM ou NÃO a cada item:
 
-  ① Há unidades órfãs ou placeholders numéricos vazios ("____ cm", "___bpm") no laudo gerado?
-     → SIM: substituir por normalidade qualitativa (exceto Fetal/Vascular onde manter "(…)");
+  ① Há unidades órfãs, placeholders numéricos vazios ("____ cm", "___bpm") ou placeholders de máscara não preenchidos ("[__]", "[inserir]", "[listar…]") remanescentes no laudo gerado?
+     → SIM: substituir por normalidade qualitativa ou pelo valor real (exceto Fetal/Vascular onde manter "(…)"); nenhum "[__]"/"[inserir]"/"[listar…]" pode sobrar na saída não-fetal/vascular;
      → NÃO: prosseguir.
 
   ② Existe algum número no laudo que não foi explicitamente fornecido nas notas/anamnese/máscara?
@@ -527,12 +527,12 @@ Execute a verificação final explícita no scratchpad, respondendo SIM ou NÃO 
      → NÃO: corrigir antes de prosseguir;
      → SIM: prosseguir.
 
-  ④ Existe algum achado na ANÁLISE sem bullet correspondente na CONCLUSÃO?
-     → SIM: adicionar o bullet faltante;
+  ④ Existe algum achado na ANÁLISE sem bullet correspondente na CONCLUSÃO? E todo parágrafo de CONCLUSÃO começa com o marcador "• "?
+     → SIM (achado sem bullet) ou parágrafo sem "• ": adicionar o bullet faltante / prefixar com "• ";
      → NÃO: prosseguir.
 
-  ⑤ Existe algum bullet na CONCLUSÃO sem conduta correspondente nas RECOMENDAÇÕES?
-     → SIM: adicionar a conduta faltante;
+  ⑤ Existe algum bullet na CONCLUSÃO sem conduta correspondente nas RECOMENDAÇÕES? E todo parágrafo de RECOMENDAÇÕES começa com "• "?
+     → SIM (conduta faltante) ou parágrafo sem "• ": adicionar a conduta / prefixar com "• ";
      → NÃO: prosseguir.
 
   ⑥ Há algum achado que configura red flag (N4) sem ativação do formato ALERTA (R6)?
@@ -568,7 +568,11 @@ Execute a verificação final explícita no scratchpad, respondendo SIM ou NÃO 
      → SIM e a comparação temporal NÃO foi realizada na ANÁLISE: executar Protocolo de Evolução Temporal (Bloco 1) e mencionar evolução de cada achado relevante;
      → NÃO ou comparação já realizada: prosseguir.
 
-Somente após responder e corrigir TODOS os itens ① a ⑫, feche a tag </scratchpad> e inicie o HTML.`;
+  ⑬ Higiene de marcação: o HTML contém alguma tag proibida (<div>, <span>, <script>, <style>, <iframe>) ou markdown residual ("**negrito**", "## título")?
+     → SIM: remover — usar somente <h1>/<h2>/<p>/<strong>/<em>/<table>/<tr>/<td>/<ul>/<li> e converter ** em <strong>;
+     → NÃO: prosseguir.
+
+Somente após responder e corrigir TODOS os itens ① a ⑬, feche a tag </scratchpad> e inicie o HTML.`;
 
 // ═══════════════════════════════════════════════════════════════════════
 // BLOCO 3 — SKELETON / ARQUITETURA HTML OBRIGATÓRIA

@@ -50,7 +50,8 @@ const DEFAULT_STATE: SubscriptionState = {
 function deriveState(
   sub: Subscription | null,
   motorProEnabled: boolean,
-  isAdmin: boolean
+  isAdmin: boolean,
+  actualReportsUsed = 0
 ): Omit<SubscriptionState, 'loading' | 'subscription'> {
   const now = Date.now();
   const isTrialing = sub ? (sub.status === 'trialing' && !!sub.trialEndsAt && sub.trialEndsAt > now) : false;
@@ -69,9 +70,12 @@ function deriveState(
       hasClinics: true,
       motorProEnabled: true,
       motorOptions,
-      reportsUsed: 0,
+      // Admin tem cota ilimitada, mas a CONTAGEM precisa refletir o uso real
+      // (gravado em reportsUsedThisMonth a cada laudo gerado — engine.ts) em
+      // vez de ficar travada em 0.
+      reportsUsed: actualReportsUsed,
       reportsQuota: 9999,
-      reportsRemaining: 9999,
+      reportsRemaining: Math.max(0, 9999 - actualReportsUsed),
       canGenerateReport: true,
       clinicsQuota: 9999,
       trialDaysLeft: 0,
@@ -163,11 +167,13 @@ export function useSubscription(): SubscriptionState {
 
       const userData = userSnap.data();
 
+      const adminReportsUsed = userData.reportsUsedThisMonth ?? 0;
+
       if (userData.role === 'admin') {
         setState({
           ...DEFAULT_STATE,
           loading: false,
-          ...deriveState(null, true, true),
+          ...deriveState(null, true, true, adminReportsUsed),
         });
         return;
       }
@@ -176,7 +182,7 @@ export function useSubscription(): SubscriptionState {
         setState({
           ...DEFAULT_STATE,
           loading: false,
-          ...deriveState(null, true, true),
+          ...deriveState(null, true, true, adminReportsUsed),
         });
         return;
       }

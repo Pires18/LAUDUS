@@ -233,7 +233,7 @@ export function EditorHeader({
             <button
               onClick={onToggleViewer}
               className={classNames(
-                "h-9 w-9 lg:w-auto lg:px-3.5 rounded-xl transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0 border",
+                "h-9 w-9 rounded-xl transition-all flex items-center justify-center shrink-0 border",
                 viewerOpen
                   ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
                   : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
@@ -241,16 +241,14 @@ export function EditorHeader({
               title="Visualizador de Imagens DICOM"
             >
               <Play size={14} />
-              <span className="hidden lg:inline">Imagens</span>
             </button>
           ) : (
             <button
               disabled
-              className="h-9 w-9 lg:w-auto lg:px-3.5 rounded-xl bg-ink-50 text-ink-400 border border-ink-200 opacity-60 cursor-not-allowed flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+              className="h-9 w-9 rounded-xl bg-ink-50 text-ink-400 border border-ink-200 opacity-60 cursor-not-allowed flex items-center justify-center shrink-0"
               title="Nenhuma imagem disponível neste exame"
             >
               <ScanSearch size={14} />
-              <span className="hidden lg:inline">Imagens</span>
             </button>
           )
         )}
@@ -258,11 +256,10 @@ export function EditorHeader({
         {/* Ficha & Config */}
         <button
           onClick={onOpenAnamnesisConsent}
-          className="h-9 w-9 lg:w-auto lg:px-3.5 rounded-xl bg-white text-ink-600 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest shrink-0"
+          className="h-9 w-9 rounded-xl bg-white text-ink-600 hover:text-ink-900 hover:bg-ink-50 border border-ink-200 transition-all flex items-center justify-center shrink-0"
           title="Ficha do Exame, Anamnese e Configurações"
         >
           <Settings size={14} />
-          <span className="hidden lg:inline">Ficha & Config</span>
         </button>
 
         {/* Pré-visualizar (prévia realista do PDF) */}
@@ -270,10 +267,9 @@ export function EditorHeader({
           <button
             onClick={onPreview}
             title="Pré-visualizar o laudo como será impresso/PDF"
-            className="h-9 px-3 rounded-xl bg-white text-ink-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 border border-ink-200 shadow-sm flex items-center gap-1.5 active:scale-95"
+            className="h-9 w-9 rounded-xl bg-white text-ink-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all shrink-0 border border-ink-200 shadow-sm flex items-center justify-center active:scale-95"
           >
             <Eye size={13} />
-            <span className="hidden lg:inline">Pré-visualizar</span>
           </button>
         )}
 

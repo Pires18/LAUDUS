@@ -26,7 +26,10 @@ function TermsContent() {
       <p><strong className="text-ink-900">Planos e cobrança:</strong> o acesso é fornecido mediante assinatura, com trial gratuito inicial (condições diferenciadas podem se aplicar durante a fase de testes). Planos anuais são recorrentes; planos mensal/semestral são avulsos e não renovam automaticamente.</p>
       <p><strong className="text-ink-900">Propriedade intelectual:</strong> o software e sua marca pertencem ao LAUD.US. Os dados de pacientes e laudos permanecem de titularidade do usuário/instituição responsável.</p>
       <p><strong className="text-ink-900">Legislação aplicável:</strong> Lei Geral de Proteção de Dados (Lei nº 13.709/2018), Marco Civil da Internet e normas do Conselho Federal de Medicina para laudos e prontuários eletrônicos.</p>
-      <p className="text-ink-400 text-xs">Versão {LEGAL_TERMS_VERSION} · Texto completo em docs/legal/TERMOS_DE_USO.md do repositório.</p>
+      <p className="text-xs">
+        <span className="text-ink-400">Versão {LEGAL_TERMS_VERSION} · </span>
+        <a href="/termos" target="_blank" rel="noopener" className="text-brand-600 font-bold underline underline-offset-2 hover:text-brand-700">Ler o documento completo →</a>
+      </p>
     </div>
   );
 }
@@ -39,7 +42,10 @@ function PrivacyContent() {
       <p><strong className="text-ink-900">Terceiros envolvidos:</strong> Google (Firebase — hospedagem/autenticação; Gemini — geração de texto anonimizado, infraestrutura global que pode incluir processamento fora do Brasil), AbacatePay (pagamento da assinatura), Sentry (monitoramento técnico, com redação automática de PII).</p>
       <p><strong className="text-ink-900">Segurança:</strong> regras de acesso por usuário/clínica, trilha de auditoria de acesso a prontuários, criptografia de credenciais DICOM, cabeçalhos de segurança HTTP.</p>
       <p><strong className="text-ink-900">Direitos do titular (LGPD art. 18):</strong> confirmação, acesso, correção, anonimização, portabilidade e eliminação de dados. Solicitações sobre dados de paciente devem ser direcionadas ao profissional/clínica responsável (controlador); sobre dados do próprio usuário profissional, ao Encarregado de Dados em contato.laudus@gmail.com.</p>
-      <p className="text-ink-400 text-xs">Versão {LEGAL_TERMS_VERSION} · Texto completo em docs/legal/POLITICA_DE_PRIVACIDADE.md do repositório.</p>
+      <p className="text-xs">
+        <span className="text-ink-400">Versão {LEGAL_TERMS_VERSION} · </span>
+        <a href="/privacidade" target="_blank" rel="noopener" className="text-brand-600 font-bold underline underline-offset-2 hover:text-brand-700">Ler o documento completo →</a>
+      </p>
     </div>
   );
 }

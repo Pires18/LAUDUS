@@ -28,6 +28,7 @@ import { watchSystemTheme } from './utils/theme';
 import { useConfirmStore } from './hooks/useConfirm';
 import { useSubscription } from './hooks/useSubscription';
 import { consumePendingTermsAcceptance } from './lib/legalConsent';
+import { usePublicPath, getPublicPath } from './hooks/usePublicPath';
 import { useClinicMemberships } from './hooks/useClinicMemberships';
 import { useAllAccessibleClinics } from './hooks/useAllAccessibleClinics';
 import { ConfirmDialog } from './components/ConfirmDialog';
@@ -53,6 +54,8 @@ const Clinics = lazy(() => import('./modules/clinics/Clinics').then(m => ({ defa
 const ClinicDetail = lazy(() => import('./modules/clinics/ClinicDetail').then(m => ({ default: m.ClinicDetail })));
 const ClinicForm = lazy(() => import('./modules/clinics/ClinicForm').then(m => ({ default: m.ClinicForm })));
 const Admin = lazy(() => import('./modules/admin/Admin').then(m => ({ default: m.Admin })));
+// Páginas legais públicas (/termos, /privacidade) — compartilháveis sem login.
+const LegalPage = lazy(() => import('./components/legal/LegalPage').then(m => ({ default: m.LegalPage })));
 
 function LazyFallback() {
   return (
@@ -285,8 +288,10 @@ function UserAccessGate({ children }: { children: ReactNode }) {
             reportsUsedThisMonth: 0,
             reportsQuota: 100,
             clinicsQuota: 5,
-            // Google OAuth não passa pelo checkbox de cadastro (fluxo direto);
-            // só e-mail/senha grava aceite explícito registrado no LoginScreen.
+            // Aceite dos termos: e-mail/senha grava via checkbox de cadastro;
+            // Google OAuth grava via disclosure no LoginScreen (o aceite
+            // pendente é armazenado antes do popup e consumido só aqui, na
+            // criação de conta nova).
             ...(pendingTerms ? { termsAcceptedAt: pendingTerms.termsAcceptedAt, termsVersion: pendingTerms.termsVersion } : {}),
           };
           await setDoc(userRef, userData);
@@ -399,18 +404,21 @@ export default function App() {
 }
 
 // Deslogado: landing institucional é a tela inicial; "Entrar"/"Cadastre-se"
-// revela o formulário dentro do mesmo app (mesmo domínio/deploy). Remonta do
-// zero sempre que `user` vira null (login OU logout), então sempre volta
-// para a landing por padrão — nunca fica "preso" na tela de login.
+// navega para /login|/cadastro (URLs reais, com histórico do navegador).
+// Remonta do zero sempre que `user` vira null (login OU logout), então sempre
+// volta para a landing por padrão — nunca fica "preso" na tela de login.
 function UnauthenticatedGate() {
-  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
-  if (authMode) return <LoginScreen initialMode={authMode} onBack={() => setAuthMode(null)} />;
-  return <LandingScreen onEnter={setAuthMode} />;
+  const { path, navigate } = usePublicPath();
+  if (path === 'login' || path === 'signup') {
+    return <LoginScreen initialMode={path === 'signup' ? 'signup' : 'login'} onBack={() => navigate('landing')} />;
+  }
+  return <LandingScreen onEnter={(mode) => navigate(mode === 'signup' ? 'signup' : 'login')} />;
 }
 
 function AuthRouter() {
   const { user, setUser } = useApp();
   const [authChecked, setAuthChecked] = useState(false);
+  const { path } = usePublicPath();
 
   // Reage a mudanças do tema do SO quando a preferência é "system".
   useEffect(() => {
@@ -419,11 +427,27 @@ function AuthRouter() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      // Login concluído numa URL de auth → volta a raiz, para o app
+      // autenticado não renderizar "embaixo" de /login (e o botão Voltar
+      // não reabrir uma URL morta).
+      if (firebaseUser && ['login', 'signup'].includes(getPublicPath())) {
+        window.history.replaceState({}, '', '/');
+      }
       setUser(firebaseUser);
       setAuthChecked(true);
     });
     return unsubscribe;
   }, [setUser]);
+
+  // Páginas legais são públicas e compartilháveis: renderizam logado ou não,
+  // sem esperar a checagem de auth.
+  if (path === 'terms' || path === 'privacy') {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <LegalPage doc={path} />
+      </Suspense>
+    );
+  }
 
   if (!authChecked) return <LoadingScreen />;
   if (!user) return <UnauthenticatedGate />;

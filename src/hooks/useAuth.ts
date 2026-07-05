@@ -3,6 +3,7 @@ import { signInWithPopup, signOut as firebaseSignOut, GoogleAuthProvider, signIn
 import { auth, googleProvider } from '../lib/firebase';
 import { useApp } from '../store/app';
 import { storeGoogleAccessToken, clearGoogleAccessToken } from '../lib/googleAuth';
+import { mapAuthError } from '../lib/authErrors';
 
 /**
  * Hook de autenticação.
@@ -29,8 +30,8 @@ export function useAuth() {
         storeGoogleAccessToken(credential.accessToken);
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao entrar com Google';
-      setError(message);
+      const message = mapAuthError(err, 'Erro ao entrar com Google. Tente novamente.');
+      if (message) setError(message);
     } finally {
       setLoading(false);
     }
@@ -42,8 +43,8 @@ export function useAuth() {
       setError(null);
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao entrar com email e senha';
-      setError(message);
+      const message = mapAuthError(err, 'Erro ao entrar. Verifique e-mail e senha.');
+      if (message) setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -61,8 +62,8 @@ export function useAuth() {
         // não bloqueia o cadastro se o envio do e-mail de verificação falhar
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao criar conta';
-      setError(message);
+      const message = mapAuthError(err, 'Erro ao criar a conta. Tente novamente.');
+      if (message) setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -75,8 +76,8 @@ export function useAuth() {
       setError(null);
       await sendPasswordResetEmail(auth, email);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao enviar e-mail de redefinição de senha';
-      setError(message);
+      const message = mapAuthError(err, 'Erro ao enviar o e-mail de redefinição. Tente novamente.');
+      if (message) setError(message);
       throw err;
     } finally {
       setLoading(false);

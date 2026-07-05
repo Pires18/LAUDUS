@@ -43,6 +43,7 @@ function resolveGeminiModel(rawModel?: string): string {
   return 'gemini-3.5-flash';
 }
 import {
+  DEFAULT_TEMPLATE_GENERATION_PROMPT,
   DEFAULT_CUSTOM_FORM_PROMPT,
   DEFAULT_ANAMNESIS_PROMPT,
   DEFAULT_CONSENT_PROMPT
@@ -83,48 +84,7 @@ export async function generateTemplateStructure(
     'reumatologico': 'Articulações afetadas, sinovite OMERACT modo B + Power Doppler, erosões, enteses, depósitos de cristais.',
   };
 
-  const systemContext = `Você é um Médico Radiologista Sênior especialista em ultrassonografia. Crie uma Máscara de Laudo (Template) de MÁXIMA QUALIDADE CLÍNICA para o sistema LAUD.US.
-
-REGRAS PARA CADA CAMPO:
-
-1. title: Nome oficial do exame em CAIXA ALTA. Sem HTML. Ex: "ULTRASSONOGRAFIA DO ABDOME SUPERIOR".
-
-2. technique: Parágrafo técnico completo: equipamento, frequência do transdutor, janelas acústicas, planos de corte, uso de Doppler se relevante. Use <p> e <strong>. Mimetize o estilo do médico de referência.
-
-3. analysisTemplate: Descrição de um exame COMPLETAMENTE NORMAL. Regras:
-   - Use <p><strong>NOME DO ÓRGÃO:</strong> descrição normal detalhada.</p> para cada estrutura.
-   - Use "(…)" APENAS para campos de medidas numéricas que variam por paciente (ex: "medindo (…) x (…) x (…) cm" ou "medindo (…) x (…) x (…) mm" para a área de medicina-fetal).
-   - Para medidas numéricas padrão com unidade, utilize vírgula decimal e espaço entre número e unidade (ex: "3,50 cm").
-   - Para exames da área "medicina-fetal", TODAS as medidas anatômicas, biométricas e anexiais DEVEM ser obrigatoriamente padronizadas em milímetros (mm), sendo terminantemente proibido o uso de centímetros (cm).
-   - Para estruturas qualitativas normais, escreva a descrição completa (não use placeholder).
-   - Inclua TODAS as estruturas relevantes para este tipo de exame, na ordem anatômica lógica.
-   - Nível de detalhe: denso, técnico, equivalente a um laudo real de especialista.
-
-4. conclusionTemplate: Conclusão padrão de exame normal. Use <p>• [achado].</p> com marcador para cada item. Ex: <p>• Aspecto ultrassonográfico dentro dos limites da normalidade.</p>
-
-5. recommendationsTemplate: Recomendação padrão ou <p>• Seguimento clínico de rotina conforme protocolo da especialidade solicitante.</p>
-
-6. observationsTemplate: Observações adicionais ou notas clínicas. Se não houver observação padrão, use <p>(…)</p>.
-
-7. classificationTemplate: SE o exame envolver mama (BI-RADS), tireoide (TI-RADS), ovário (O-RADS), fígado em cirrótico (LI-RADS) ou cisto renal (BOSNIAK): inclua tabela HTML simples com a classificação padrão. Caso contrário, retorne string vazia "".
-
-DIRETRIZES DE QUALIDADE:
-- Terminologia CBR/SBUS/ISUOG/ACR conforme a área.
-- Frases declarativas completas, sem coloquialismos.
-- NÃO inclua títulos de seção (TÉCNICA, ANÁLISE, etc.) dentro dos campos — o sistema os insere automaticamente.
-- NÃO use markdown (##, **, ---).
-- HTML limpo: apenas <p>, <strong>, <em>, <table>, <tr>, <td>, <ul>, <li>.
-
-FORMATO DE SAÍDA — JSON PURO (sem markdown, sem \\\`\\\`\\\`):
-{
-  "title": "NOME EM CAIXA ALTA",
-  "technique": "HTML da técnica",
-  "analysisTemplate": "HTML da análise normal",
-  "conclusionTemplate": "HTML da conclusão",
-  "recommendationsTemplate": "HTML das recomendações",
-  "observationsTemplate": "HTML das observações ou string vazia",
-  "classificationTemplate": "HTML da classificação ou string vazia"
-}`;
+  const systemContext = settings.aiTemplateGenerationPrompt || DEFAULT_TEMPLATE_GENERATION_PROMPT;
 
   const userMessage = `EXAME ALVO:
 - Área: ${area}

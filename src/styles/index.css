@@ -284,6 +284,9 @@ html.dark [class*="bg-lime-50/"]{background-color:rgb(132 204 22/.13)!important}
 html.dark .ring-brand-100{--tw-ring-color:rgb(17 134 231/.28)!important}
 html.dark .ring-brand-200{--tw-ring-color:rgb(17 134 231/.4)!important}
 html.dark .ring-rose-200{--tw-ring-color:rgb(244 63 94/.4)!important}
+html.dark .ring-emerald-200{--tw-ring-color:rgb(16 185 129/.4)!important}
+html.dark .ring-violet-200{--tw-ring-color:rgb(139 92 246/.4)!important}
+html.dark .ring-indigo-300{--tw-ring-color:rgb(99 102 241/.45)!important}
 
 /* ════════════════════════════════════════════
    MODO ESCURO — EDITOR DE LAUDO (Tailwind Typography .prose)
@@ -312,6 +315,18 @@ html.dark .prose {
 }
 html.dark .prose :where(h1,h2,h3,h4,strong,b):not(:where([class~="not-prose"] *)) {
   color: rgb(var(--ink-900));
+}
+
+/* ── .report-doc (prévia "Idêntico ao PDF" e impressão do laudo) — é uma
+   folha de papel: precisa ficar SEMPRE clara, com o mesmo texto do PDF final,
+   independentemente do tema do app. Sem este reset, o overlay .bg-white e o
+   .prose acima escureciam o papel mas clareavam o texto (herdado do tema
+   escuro), resultando em texto quase ilegível na prévia. Mesmo reset já usado
+   em @media print (mais abaixo), aplicado também fora da impressão. */
+html.dark .report-doc.bg-white { background-color: #ffffff !important; }
+html.dark .report-doc .prose { color: #1a1a1a !important; }
+html.dark .report-doc .prose :where(h1, h2, h3, h4, strong, b):not(:where([class~="not-prose"] *)) {
+  color: #0f172a !important;
 }
 
 /* Texto colorido escuro (text-*-900, ex.: valores dos cards de calculadora)
@@ -392,6 +407,75 @@ html.dark .from-white {
 }
 html.dark .to-brand-50\/10 {
   --tw-gradient-to: rgb(17 134 231 / 0.06) var(--tw-gradient-to-position) !important;
+}
+html.dark .via-white {
+  --tw-gradient-via: rgb(var(--surface)) var(--tw-gradient-via-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+html.dark .to-white {
+  --tw-gradient-to: rgb(var(--surface)) var(--tw-gradient-to-position) !important;
+}
+html.dark .from-white\/80 {
+  --tw-gradient-from: rgb(var(--surface) / 0.8) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(var(--surface) / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .via-white\/40 {
+  --tw-gradient-via: rgb(var(--surface) / 0.4) var(--tw-gradient-via-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+html.dark .via-white\/10 {
+  --tw-gradient-via: rgb(var(--surface) / 0.1) var(--tw-gradient-via-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+
+/* ── Gradientes pastel (from-/via-/to-) — mesma lacuna dos bg-{cor}-NN com
+   opacidade: Tailwind gera --tw-gradient-from/via/to a partir de classes
+   próprias, não cobertas pelos overrides de background-color acima (ex.:
+   card "Proposta Pronta" do Copiloto usava from-brand-50 to-brand-100/40,
+   ambos sem override). ── */
+html.dark .from-brand-50 {
+  --tw-gradient-from: rgb(17 134 231 / 0.14) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(17 134 231 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .from-brand-50\/50 {
+  --tw-gradient-from: rgb(17 134 231 / 0.10) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(17 134 231 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .from-brand-100 {
+  --tw-gradient-from: rgb(17 134 231 / 0.24) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(17 134 231 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .to-brand-100 {
+  --tw-gradient-to: rgb(17 134 231 / 0.24) var(--tw-gradient-to-position) !important;
+}
+html.dark .to-brand-100\/40 {
+  --tw-gradient-to: rgb(17 134 231 / 0.10) var(--tw-gradient-to-position) !important;
+}
+html.dark .to-brand-200\/80 {
+  --tw-gradient-to: rgb(17 134 231 / 0.29) var(--tw-gradient-to-position) !important;
+}
+html.dark .from-indigo-50 {
+  --tw-gradient-from: rgb(99 102 241 / 0.14) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(99 102 241 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .to-indigo-50 {
+  --tw-gradient-to: rgb(99 102 241 / 0.14) var(--tw-gradient-to-position) !important;
+}
+html.dark .from-violet-50 {
+  --tw-gradient-from: rgb(139 92 246 / 0.14) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(139 92 246 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.dark .to-violet-50 {
+  --tw-gradient-to: rgb(139 92 246 / 0.14) var(--tw-gradient-to-position) !important;
+}
+html.dark .to-purple-50 {
+  --tw-gradient-to: rgb(168 85 247 / 0.14) var(--tw-gradient-to-position) !important;
 }
 
 /* ── .tab-item-active: precisa "saltar" sobre a trilha (bg-ink-100/80) do
