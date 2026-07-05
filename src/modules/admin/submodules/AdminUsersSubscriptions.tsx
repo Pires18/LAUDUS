@@ -116,6 +116,8 @@ export function AdminUsersSubscriptions() {
   const [deleteTarget,  setDeleteTarget] = useState<SystemUser | null>(null);
   const [assignTarget,  setAssignTarget] = useState<SystemUser | null>(null);
   const [assignIsLegacy, setAssignIsLegacy] = useState(false);
+  const [quotaTarget,   setQuotaTarget]  = useState<SystemUser | null>(null);
+  const [quotaValue,    setQuotaValue]   = useState('100');
 
   // Pricing for MRR
   const [pricing, setPricing] = useState<PricingConfig>({ basePlanPrice: 149, calculatorsAddonPrice: 49 });
@@ -341,23 +343,22 @@ export function AdminUsersSubscriptions() {
     });
   }
 
-  async function handleEditQuota(u: SystemUser, field: 'reportsQuota' | 'tokenQuotaLite' | 'tokenQuotaPro') {
-    const labels: Record<typeof field, string> = {
-      reportsQuota: 'quota de laudos mensais',
-      tokenQuotaLite: 'quota de Tokens Lite mensais (0 = ilimitado)',
-      tokenQuotaPro:  'quota de Tokens Pro mensais (0 = ilimitado)',
-    };
-    const current = (u as any)[field] ?? (field === 'reportsQuota' ? 100 : 0);
-    const val = window.prompt(`Nova ${labels[field]}:`, String(current));
-    if (val === null) return;
-    const n = parseInt(val, 10);
+  // Abre o editor de cota (modal). Cota única de laudos LAUD.IA (reportsQuota).
+  function handleEditQuota(u: SystemUser) {
+    setQuotaTarget(u);
+    setQuotaValue(String(u.reportsQuota ?? 100));
+  }
+
+  async function handleSaveQuota() {
+    if (!quotaTarget) return;
+    const n = parseInt(quotaValue, 10);
     if (isNaN(n) || n < 0) { showToast('Valor inválido.', 'error'); return; }
+    const u = quotaTarget;
+    setQuotaTarget(null);
     await run(u.id, async () => {
-      await updateDoc(doc(firestore, 'users', u.id), { [field]: n, updatedAt: Date.now() });
-      if (field === 'reportsQuota') {
-        await updateDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), { reportsQuota: n, updatedAt: Date.now() }).catch(() => {});
-      }
-      showToast('Quota atualizada.', 'success');
+      await updateDoc(doc(firestore, 'users', u.id), { reportsQuota: n, updatedAt: Date.now() });
+      await updateDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), { reportsQuota: n, updatedAt: Date.now() }).catch(() => {});
+      showToast('Cota de laudos atualizada.', 'success');
     });
   }
 
@@ -913,7 +914,7 @@ export function AdminUsersSubscriptions() {
                                 <div className="absolute right-0 top-full z-50 bg-white rounded-xl border border-ink-200 shadow-xl mt-1 min-w-[230px] py-1 text-xs">
                                   <MenuItem icon={Eye}          label="Ver visão 360º"        onClick={() => { setOpenMenu(null); setDetailTarget(u); }} color="indigo" />
                                   <MenuItem icon={FileText}     label={u.subscriptionStatus ? 'Trocar Plano' : 'Atribuir Plano'} onClick={() => { setOpenMenu(null); setAssignIsLegacy(false); setAssignTarget(u); }} color="indigo" />
-                                  <MenuItem icon={Edit2}        label="Editar quota de laudos" onClick={() => { setOpenMenu(null); handleEditQuota(u, 'reportsQuota'); }} />
+                                  <MenuItem icon={Edit2}        label="Editar cota de laudos" onClick={() => { setOpenMenu(null); handleEditQuota(u); }} />
                                   <hr className="border-ink-100 my-1" />
                                   <div className="px-3 py-1 text-[9px] font-black uppercase tracking-widest text-ink-300">Direitos</div>
                                   <MenuItem icon={Calculator}   label={`${sub?.addons?.includes('calculators') ? 'Remover' : 'Ativar'} Calculadoras`} onClick={() => { setOpenMenu(null); handleToggleAddon(u, 'calculators'); }} color="indigo" />
@@ -1067,7 +1068,7 @@ export function AdminUsersSubscriptions() {
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-1">
                         <button
-                          onClick={() => handleEditQuota(u, 'reportsQuota')}
+                          onClick={() => handleEditQuota(u)}
                           className="p-1.5 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50"
                           title="Editar cota de laudos"
                         ><Edit2 size={14} /></button>
@@ -1134,6 +1135,36 @@ export function AdminUsersSubscriptions() {
                   {roleTarget.role === role && <CheckCircle2 size={18} className="text-brand-600 shrink-0" />}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Editar cota de laudos LAUD.IA */}
+      <Modal open={quotaTarget !== null} onClose={() => setQuotaTarget(null)} title="Cota de Laudos LAUD.IA" size="sm">
+        {quotaTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-500">
+              Cota mensal de laudos de <strong>{quotaTarget.name || quotaTarget.email}</strong>. Vale para Lite e Pro (cota única).
+            </p>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-1">Laudos por mês</label>
+              <input
+                type="number"
+                min={0}
+                autoFocus
+                value={quotaValue}
+                onChange={e => setQuotaValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveQuota(); }}
+                className="input h-11 text-sm w-full font-black"
+              />
+              <p className="text-[10px] text-ink-400 mt-1">Use 0 para ilimitado. Atual: {quotaTarget.reportsQuota ?? 100}.</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setQuotaTarget(null)} className="h-10 px-4 rounded-xl border border-ink-200 text-ink-700 text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 transition-all">Cancelar</button>
+              <button onClick={handleSaveQuota} className="h-10 px-5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all">
+                <Check size={13} /> Salvar cota
+              </button>
             </div>
           </div>
         )}
