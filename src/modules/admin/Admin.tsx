@@ -6,7 +6,8 @@ import { useAdmin } from '../../hooks/useAdmin';
 import {
   ShieldCheck, Users, History,
   LifeBuoy, FileSignature, Sparkles, LayoutDashboard,
-  Megaphone, Trash2, Loader2, DollarSign, CreditCard, Activity
+  Megaphone, Trash2, Loader2, DollarSign, CreditCard, Activity,
+  AlertTriangle, ChevronRight
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { logger } from '../../utils/logger';
@@ -20,6 +21,7 @@ import { AdminMasks } from './submodules/AdminMasks';
 import { AdminFinanceiro } from './submodules/AdminFinanceiro';
 import { AdminAnalytics } from './submodules/AdminAnalytics';
 import { AdminHealth } from './submodules/AdminHealth';
+import { AdminLaudIAInsights } from './submodules/AdminLaudIAInsights';
 import { SharedLaudIA } from '../laud-ia/SharedLaudIA';
 
 type AdminTab = 'overview' | 'users' | 'financeiro' | 'audit' | 'support' | 'masks' | 'laud-ia' | 'health';
@@ -100,7 +102,7 @@ export function Admin() {
         {/* Content Area */}
         <div className="animate-fade-in-up">
           {activeTab === 'overview'    && <AdminOverview onNavigate={setActiveTab} />}
-          {activeTab === 'laud-ia'    && <SharedLaudIA />}
+          {activeTab === 'laud-ia'    && <><AdminLaudIAInsights /><SharedLaudIA /></>}
           {activeTab === 'users'      && <AdminUsersSubscriptions />}
           {activeTab === 'financeiro' && <AdminFinanceiro />}
           {activeTab === 'audit'      && <AdminAudit />}
@@ -121,7 +123,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
 
   // Métricas: contagem SERVER-SIDE (getCountFromServer) em vez de baixar as
   // coleções inteiras só para contar — barato e escalável.
-  const [counts, setCounts] = useState({ users: 0, activeSubs: 0, trials: 0, openTickets: 0, resolvedTickets: 0, activity24h: 0 });
+  const [counts, setCounts] = useState({ users: 0, activeSubs: 0, trials: 0, pastDue: 0, openTickets: 0, resolvedTickets: 0, activity24h: 0 });
 
   useEffect(() => {
     let active = true;
@@ -131,10 +133,11 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
         const ticketsCol = collection(firestore, 'support_tickets');
         const logsCol = collection(firestore, 'audit_logs');
         const cutoff = Date.now() - 86400000;
-        const [u, aSub, tr, ot, rt, act] = await Promise.all([
+        const [u, aSub, tr, pd, ot, rt, act] = await Promise.all([
           getCountFromServer(usersCol),
           getCountFromServer(query(usersCol, where('subscriptionStatus', '==', 'active'))),
           getCountFromServer(query(usersCol, where('subscriptionStatus', '==', 'trialing'))),
+          getCountFromServer(query(usersCol, where('subscriptionStatus', '==', 'past_due'))),
           getCountFromServer(query(ticketsCol, where('status', '==', 'open'))),
           getCountFromServer(query(ticketsCol, where('status', '==', 'resolved'))),
           getCountFromServer(query(logsCol, where('timestamp', '>', cutoff))),
@@ -144,6 +147,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           users: u.data().count,
           activeSubs: aSub.data().count,
           trials: tr.data().count,
+          pastDue: pd.data().count,
           openTickets: ot.data().count,
           resolvedTickets: rt.data().count,
           activity24h: act.data().count,
@@ -227,6 +231,33 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
           </button>
         ))}
       </div>
+
+      {/* Alertas operacionais — só aparece quando há algo a atender */}
+      {(() => {
+        const alerts = [
+          counts.pastDue > 0 && { k: 'pastDue', tone: 'rose' as const, label: `${counts.pastDue} assinatura(s) em atraso`, hint: 'Regularize ou entre em contato', tab: 'users' as AdminTab },
+          counts.openTickets > 0 && { k: 'tickets', tone: 'amber' as const, label: `${counts.openTickets} chamado(s) aguardando`, hint: 'Responda no Suporte', tab: 'support' as AdminTab },
+          counts.trials > 0 && { k: 'trials', tone: 'indigo' as const, label: `${counts.trials} trial(s) ativo(s)`, hint: 'Oportunidade de conversão', tab: 'users' as AdminTab },
+        ].filter(Boolean) as { k: string; tone: 'rose' | 'amber' | 'indigo'; label: string; hint: string; tab: AdminTab }[];
+        if (alerts.length === 0) return null;
+        const toneCls: Record<string, string> = {
+          rose: 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100',
+          amber: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100',
+          indigo: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100',
+        };
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-black uppercase tracking-widest text-ink-400 flex items-center gap-1.5"><AlertTriangle size={13} /> Requer atenção</span>
+            {alerts.map(a => (
+              <button key={a.k} onClick={() => onNavigate(a.tab)} title={a.hint}
+                className={classNames('flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all', toneCls[a.tone])}>
+                {a.label}
+                <ChevronRight size={13} />
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Analytics — séries reais (metrics_daily + finance_stats) */}
       <AdminAnalytics />
