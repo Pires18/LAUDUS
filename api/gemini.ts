@@ -162,6 +162,26 @@ export default async function handler(req: Request) {
       body,
     });
 
+    // Erros do Google (não-2xx) NÃO são transmitidos crus: traduzimos para uma
+    // mensagem acionável. O 401 "Expected OAuth 2 access token" só aparece se um
+    // cliente DESATUALIZADO (service worker antigo) chamar o Google direto, sem
+    // passar por este proxy — este proxy nunca envia Authorization ao Google.
+    if (!response.ok) {
+      const raw = await response.text();
+      let friendly = raw;
+      if (response.status === 401 || /OAuth 2 access token|invalid authentication/i.test(raw)) {
+        friendly = 'Autenticação da IA falhou. Provável cache antigo do app: atualize o sistema (clique em "Atualizar" no aviso, recarregue com Ctrl/Cmd+Shift+R ou limpe os dados do site) e tente de novo.';
+      } else if (response.status === 403 && /unregistered callers|PERMISSION_DENIED/i.test(raw)) {
+        friendly = 'Chave de IA do servidor ausente ou inválida. Configure GOOGLE_API_KEY no ambiente.';
+      } else if (response.status === 404) {
+        friendly = `Modelo de IA indisponível (${model}). Verifique a configuração dos motores.`;
+      }
+      return new Response(JSON.stringify({ error: friendly, status: response.status }), {
+        status: response.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(response.body, {
       status: response.status,
       headers: {
