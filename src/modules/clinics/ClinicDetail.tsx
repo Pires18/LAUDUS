@@ -10,7 +10,7 @@ import {
   FileText, ExternalLink, Activity,
   CheckCircle2, AlertCircle, Calendar
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
 interface Props {
@@ -18,8 +18,22 @@ interface Props {
 }
 
 export function ClinicDetail({ clinicId }: Props) {
-  const { setView, showToast } = useApp();
+  const { setView, showToast, selectedClinicId, setSelectedClinic, clinicOwnerMap } = useApp();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Só força a clínica ativa quando é COMPARTILHADA (dono != usuário atual):
+  // patients/exams/appointments sem filtro explícito de clínica resolvem a
+  // subárvore a consultar pela clínica ATIVA (ver store/clinicAccess.ts) —
+  // sem isto, abrir o detalhe de uma clínica compartilhada sem tê-la
+  // selecionado antes (ex.: pelo dropdown) consultaria a subárvore errada.
+  // Para clínicas PRÓPRIAS não mexe no contexto ativo (o filtro abaixo já usa
+  // o clinicId explícito, e mudar o contexto global aqui seria uma surpresa
+  // desnecessária para quem não usa equipe multiusuário).
+  useEffect(() => {
+    if (clinicOwnerMap[clinicId] && selectedClinicId !== clinicId) {
+      setSelectedClinic(clinicId);
+    }
+  }, [clinicId, clinicOwnerMap, selectedClinicId, setSelectedClinic]);
 
   const { data: clinic, loading } = useDocument<Clinic>('clinics', clinicId);
   const { data: exams } = useCollection<ExamRequest>('exams');

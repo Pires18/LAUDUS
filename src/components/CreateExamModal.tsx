@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../store/app';
 import { useCollection } from '../hooks/useFirestore';
+import { useAllAccessibleClinics } from '../hooks/useAllAccessibleClinics';
 import { addItemWithId, genId } from '../store/db';
 import { Patient, ReportTemplate, Clinic, ExamRequest, EXAM_AREAS, ExamArea } from '../types';
 import { 
@@ -23,7 +24,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const { setView, selectedClinicId, showToast, createExamDefaultPatient, setCreateExamDefaultPatient, settings } = useApp();
   const { data: patients } = useCollection<Patient>('patients');
   const { data: templates } = useCollection<ReportTemplate>('templates');
-  const { data: clinics } = useCollection<Clinic>('clinics');
+  const { data: clinics } = useAllAccessibleClinics();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);

@@ -12,13 +12,19 @@ import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
 import { resolveAdminUid } from '../store/db';
 import { useApp } from '../store/app';
+import { resolveOwnerUid } from '../store/clinicAccess';
 import { ReportTemplate } from '../types';
 
 // ─── Helper: user-scoped collection path ───
-function userPath(collectionName: string): string {
+// `explicitClinicId` só importa para `collectionName === 'clinics'` (ver
+// resolveOwnerUid): identifica QUAL clínica está sendo lida/editada, para
+// redirecionar à subárvore do dono quando é uma clínica compartilhada com o
+// usuário atual (não a lista de clínicas — essa nunca redireciona).
+function userPath(collectionName: string, explicitClinicId?: string): string {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Usuário não autenticado');
-  return `users/${uid}/${collectionName}`;
+  const ownerUid = resolveOwnerUid(collectionName, uid, explicitClinicId);
+  return `users/${ownerUid}/${collectionName}`;
 }
 
 // Cache local para a hook, inicialmente nulo
@@ -52,6 +58,11 @@ export function useCollection<T extends { id: string }>(
   // Curadoria pessoal de máscaras: quais padrão do sistema o usuário ativou.
   // `undefined` = legado (mescla todas as do admin); array = mescla só as ativadas.
   const enabledSystemMaskIds = useApp((s) => s.settings.enabledSystemMaskIds);
+  // Clínica ativa + mapa de memberships: o PATH físico (users/{uid}/...) muda
+  // quando a clínica selecionada pertence a outro dono (equipe multiusuário) —
+  // sem isto na dependência, trocar de clínica não resubscreve ao dono certo.
+  const selectedClinicId = useApp((s) => s.selectedClinicId);
+  const clinicOwnerKey = useApp((s) => JSON.stringify(s.clinicOwnerMap));
 
   // Serialize constraints for dependency array
   const constraintKey = JSON.stringify(constraints.map((c) => c.toString()));
@@ -154,7 +165,7 @@ export function useCollection<T extends { id: string }>(
       unsubscribeUser();
       if (unsubscribeAdmin) unsubscribeAdmin();
     };
-  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, adminUid, enabledMaskKey]);
+  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, adminUid, enabledMaskKey, selectedClinicId, clinicOwnerKey]);
 
   return { data, loading, error };
 }
@@ -216,6 +227,10 @@ export function useDocument<T extends { id: string }>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Ver comentário equivalente em useCollection: o mapa de memberships pode
+  // chegar depois do 1º render (listener assíncrono) — precisa resubscrever
+  // quando ele mudar, senão a leitura fica presa no owner errado/atrasado.
+  const clinicOwnerKey = useApp((s) => JSON.stringify(s.clinicOwnerMap));
 
   useEffect(() => {
     if (!documentId || !auth.currentUser) {
@@ -223,7 +238,7 @@ export function useDocument<T extends { id: string }>(
       return;
     }
 
-    const path = isGlobal ? collectionName : userPath(collectionName);
+    const path = isGlobal ? collectionName : userPath(collectionName, documentId);
     const docRef = doc(firestore, path, documentId);
     let unsubscribeAdmin: (() => void) | null = null;
 
@@ -284,7 +299,7 @@ export function useDocument<T extends { id: string }>(
       unsubscribeUser();
       if (unsubscribeAdmin) unsubscribeAdmin();
     };
-  }, [collectionName, documentId, isGlobal, auth.currentUser?.uid]);
+  }, [collectionName, documentId, isGlobal, auth.currentUser?.uid, clinicOwnerKey]);
 
   return { data, loading, error };
 }
@@ -305,6 +320,10 @@ export function usePaginatedCollection<T extends { id: string }>(
   // inútil ("[object Object]"), então o queryKey do chamador é o que torna a
   // chave sensível a filtros por valor (ex.: troca de clínica).
   const constraintKey = JSON.stringify(constraints.map((c) => c.toString())) + '|' + (queryKey ?? '');
+  // Mapa de memberships pode chegar depois do 1º render (listener assíncrono)
+  // — sem isto, uma clínica compartilhada já selecionada no queryKey não
+  // resubscreve para o dono certo assim que o mapa carrega.
+  const clinicOwnerKey = useApp((s) => JSON.stringify(s.clinicOwnerMap));
 
   // Ao mudar a query (ex.: trocar de clínica), reinicia a paginação na 1ª página.
   // Usa atualização funcional com bail-out p/ não re-subscrever à toa quando já
@@ -347,7 +366,7 @@ export function usePaginatedCollection<T extends { id: string }>(
     );
 
     return () => unsubscribe();
-  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, currentLimit]);
+  }, [collectionName, constraintKey, enabled, isGlobal, auth.currentUser?.uid, currentLimit, clinicOwnerKey]);
 
   const loadMore = () => {
     if (hasMore) {

@@ -28,6 +28,7 @@ import { AppSettings, SupportTicket, SupportMessage } from '../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_STRUCTURE_PROMPT, DEFAULT_RIGID_RULES } from '../modules/ai/prompts/general';
 import { ADMIN_UID, ADMIN_EMAIL } from '../config/constants';
 import { logger } from '../utils/logger';
+import { resolveOwnerUid } from './clinicAccess';
 import { encryptPassword, decryptPassword } from '../utils/crypto';
 import { getCachedIdToken, getIdToken } from '../lib/authToken';
 
@@ -67,10 +68,16 @@ let cachedAdminUid: string | null = null;
 
 // ─── Helpers ───
 
-function getUserPath(collectionName: string): string {
+// `explicitClinicId` permite a quem já sabe a clínica do documento (ex.: o
+// `clinicId` do payload sendo criado, ou o próprio id ao editar `clinics/{id}`)
+// direcionar a leitura/escrita para a subárvore do DONO da clínica, quando ela
+// for compartilhada com o usuário atual (equipe multiusuário) em vez da
+// clínica ativa "ambiente" (ver clinicAccess.ts).
+function getUserPath(collectionName: string, explicitClinicId?: string): string {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Usuário não autenticado. Realize o login novamente.');
-  return `users/${uid}/${collectionName}`;
+  const ownerUid = resolveOwnerUid(collectionName, uid, explicitClinicId);
+  return `users/${ownerUid}/${collectionName}`;
 }
 
 /**
@@ -93,16 +100,23 @@ function sanitize<T>(data: T): T {
   return result as T;
 }
 
-export function getCollectionRef(collectionName: string) {
-  return collection(firestore, getUserPath(collectionName));
+export function getCollectionRef(collectionName: string, explicitClinicId?: string) {
+  return collection(firestore, getUserPath(collectionName, explicitClinicId));
 }
 
 export function getGlobalCollectionRef(collectionName: string) {
   return collection(firestore, collectionName);
 }
 
-export function getDocRef(collectionName: string, docId: string) {
-  return doc(firestore, getUserPath(collectionName), docId);
+export function getDocRef(collectionName: string, docId: string, callerClinicId?: string) {
+  // Em `clinics`, o próprio docId JÁ é o clinicId (edição/leitura de UMA
+  // clínica específica). Nas demais coleções, docId é o id do documento
+  // (paciente/exame/agenda), não o clinicId — se o chamador souber o clinicId
+  // do próprio registro (`callerClinicId`, ex.: passado por updateItem/
+  // deleteItem), usa isso; senão a resolução cai para a clínica ativa
+  // "ambiente" dentro de getUserPath.
+  const explicitClinicId = collectionName === 'clinics' ? docId : callerClinicId;
+  return doc(firestore, getUserPath(collectionName, explicitClinicId), docId);
 }
 
 export function getGlobalDocRef(collectionName: string, docId: string) {
@@ -497,7 +511,11 @@ export async function addItem<T extends Record<string, unknown>>(
   collectionName: string,
   data: T
 ): Promise<string> {
-  const colRef = getCollectionRef(collectionName);
+  // Preferir o clinicId do próprio payload (mais confiável que a clínica
+  // ativa "ambiente" — cobre o caso de criar um registro para uma clínica
+  // diferente da selecionada no momento, ex. num modal com seletor próprio).
+  const explicitClinicId = typeof data.clinicId === 'string' ? data.clinicId : undefined;
+  const colRef = getCollectionRef(collectionName, explicitClinicId);
   const now = Date.now();
   const ref = await addDoc(colRef, sanitize({
     ...data,
@@ -556,9 +574,13 @@ export async function addItemGlobalWithId<T extends Record<string, unknown>>(
 export async function updateItem(
   collectionName: string,
   id: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  /** clinicId do próprio registro (opcional) — mais confiável que a clínica
+   *  ativa "ambiente" quando o item sendo editado pode não pertencer a ela
+   *  (ver clinicAccess.ts). Não obrigatório: sem isto, cai no ambiente. */
+  explicitClinicId?: string
 ): Promise<void> {
-  const docRef = getDocRef(collectionName, id);
+  const docRef = getDocRef(collectionName, id, explicitClinicId);
 
   // Versionamento Automático de Templates (Fase 3)
   if (collectionName === 'templates') {
@@ -597,9 +619,11 @@ export async function updateGlobalItem(
 
 export async function deleteItem(
   collectionName: string,
-  id: string
+  id: string,
+  /** Ver comentário equivalente em updateItem. */
+  explicitClinicId?: string
 ): Promise<void> {
-  const docRef = getDocRef(collectionName, id);
+  const docRef = getDocRef(collectionName, id, explicitClinicId);
   await deleteDoc(docRef);
 }
 

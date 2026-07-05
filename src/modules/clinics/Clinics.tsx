@@ -1,14 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useApp } from '../../store/app';
-import { useCollection } from '../../hooks/useFirestore';
+import { useAllAccessibleClinics } from '../../hooks/useAllAccessibleClinics';
 import { useSubscription } from '../../hooks/useSubscription';
 import { PageHeader } from '../../components/PageHeader';
 import { FeatureLocked } from '../../components/FeatureLocked';
-import { Clinic } from '../../types';
-import { 
-  Plus, Search, Building2, MapPin, Phone, 
-  ToggleLeft, ToggleRight, FileText, LayoutList, 
-  ChevronRight, CheckCircle2, RotateCcw, X
+import {
+  Plus, Search, Building2, MapPin, Phone,
+  ToggleLeft, ToggleRight, FileText, LayoutList,
+  ChevronRight, CheckCircle2, RotateCcw, X, Users
 } from 'lucide-react';
 import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
@@ -18,7 +17,7 @@ export function Clinics() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'todas' | 'ativas' | 'inativas'>('todas');
 
-  const { data: clinics, loading } = useCollection<Clinic>('clinics');
+  const { data: clinics, loading } = useAllAccessibleClinics();
 
   const filtered = useMemo(() => {
     return clinics.filter((c) => {
@@ -198,6 +197,11 @@ export function Clinics() {
                       </h3>
                       {!clinic.active && (
                         <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-ink-100 text-ink-500 uppercase tracking-widest border border-ink-200">Inativa</span>
+                      )}
+                      {clinic.shared && (
+                        <span className="inline-flex items-center gap-1 text-[8px] font-black px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-600 uppercase tracking-widest border border-violet-100">
+                          <Users size={9} /> {clinic.role === 'editor' ? 'Editor' : 'Leitura'}
+                        </span>
                       )}
                     </div>
                     

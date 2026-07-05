@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Building2, Check, Hospital, X } from 'lucide-react';
+import { Building2, Check, Hospital, Users, X } from 'lucide-react';
 import { Clinic } from '../types';
 import { classNames } from '../utils/format';
 
 interface Props {
-  clinics: Clinic[];
+  clinics: (Clinic & { shared?: boolean; role?: 'editor' | 'viewer' })[];
   onSelect: (clinicId: string | null, remember: boolean) => void;
 }
 
@@ -52,7 +52,14 @@ export function ClinicSessionModal({ clinics, onSelect }: Props) {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-ink-900 truncate">{clinic.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-black text-ink-900 truncate">{clinic.name}</p>
+                  {clinic.shared && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[9px] font-black uppercase tracking-wider shrink-0">
+                      <Users size={9} /> {clinic.role === 'editor' ? 'Editor' : 'Leitura'}
+                    </span>
+                  )}
+                </div>
                 {clinic.address?.city && (
                   <p className="text-[10px] text-ink-500 font-medium truncate mt-0.5">
                     {clinic.address.city}{clinic.address.state ? `/${clinic.address.state}` : ''}

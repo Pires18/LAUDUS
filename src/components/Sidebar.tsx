@@ -4,7 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useSubscription } from '../hooks/useSubscription';
 import { useCollection } from '../hooks/useFirestore';
-import { Clinic, ExamRequest } from '../types';
+import { useAllAccessibleClinics } from '../hooks/useAllAccessibleClinics';
+import { ExamRequest } from '../types';
 import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
   Calculator, Hospital, PanelLeftClose,
@@ -60,7 +61,7 @@ export function Sidebar() {
   const [clinicSearch, setClinicSearch] = useState('');
   const clinicDropdownRef = useRef<HTMLDivElement>(null);
 
-  const { data: clinics } = useCollection<Clinic>('clinics');
+  const { data: clinics } = useAllAccessibleClinics();
   const { data: exams } = useCollection<ExamRequest>('exams');
 
   const selectedClinic = clinics.find(c => c.id === selectedClinicId);
@@ -210,6 +211,9 @@ export function Sidebar() {
                       <span className="truncate">{c.name}</span>
                       {!c.active && (
                         <span className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded bg-ink-100 text-ink-500 shrink-0">Inativa</span>
+                      )}
+                      {c.shared && (
+                        <span className="text-[8px] font-black uppercase tracking-wider px-1 py-0.5 rounded bg-violet-50 text-violet-600 shrink-0">Compartilhada</span>
                       )}
                     </span>
                     {clinicPending > 0 && (

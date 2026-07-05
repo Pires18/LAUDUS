@@ -1,6 +1,4 @@
 import { useEffect, useState, useRef, ReactNode, lazy, Suspense } from 'react';
-import { useCollection } from './hooks/useFirestore';
-import { Clinic } from './types';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, firestore } from './lib/firebase';
 import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -29,6 +27,8 @@ import { watchSystemTheme } from './utils/theme';
 import { useConfirmStore } from './hooks/useConfirm';
 import { useSubscription } from './hooks/useSubscription';
 import { consumePendingTermsAcceptance } from './lib/legalConsent';
+import { useClinicMemberships } from './hooks/useClinicMemberships';
+import { useAllAccessibleClinics } from './hooks/useAllAccessibleClinics';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
 // ── Eager loads (critical path: Dashboard é a landing view) ──
@@ -110,6 +110,11 @@ function ViewRenderer() {
 function AuthenticatedApp() {
   const { showCreateExamModal, setShowCreateExamModal, view, loadSettings, setView } = useApp();
   const { isTrialing, isPastDue, trialDaysLeft } = useSubscription();
+  // Popula clinicOwnerMap (clínicas de outros donos compartilhadas via
+  // convite) — usado por toda a camada de dados para redirecionar
+  // leituras/escritas à subárvore do dono quando o usuário atual é membro,
+  // não dono. Ver src/store/clinicAccess.ts.
+  useClinicMemberships();
 
   useEffect(() => {
     loadSettings();
@@ -185,20 +190,30 @@ function AuthenticatedApp() {
 
 function ClinicSessionCheck() {
   const { selectedClinicId, setSelectedClinic, settings, updateSettings } = useApp();
-  const { data: clinics } = useCollection<Clinic>('clinics');
+  const { data: clinics, loading: clinicsLoading } = useAllAccessibleClinics();
   const [showModal, setShowModal] = useState(false);
   const checked = useRef(false);
 
   useEffect(() => {
-    if (checked.current || clinics.length < 2) return;
+    if (checked.current || clinicsLoading) return;
     const appState = useApp.getState();
-    if (!appState.selectedClinicId && !appState.settings.defaultClinicId) {
+    if (appState.selectedClinicId || appState.settings.defaultClinicId) {
+      checked.current = true;
+      return;
+    }
+    if (clinics.length >= 2) {
       checked.current = true;
       setShowModal(true);
+    } else if (clinics.length === 1 && clinics[0].shared) {
+      // Único acesso é uma clínica compartilhada (0 clínicas próprias) — sem
+      // seleção explícita, "todas as clínicas" (null) cairia na própria
+      // subárvore vazia do membro, não na do dono.
+      checked.current = true;
+      setSelectedClinic(clinics[0].id);
     } else {
       checked.current = true;
     }
-  }, [clinics]);
+  }, [clinics, clinicsLoading, setSelectedClinic]);
 
   function handleSelect(clinicId: string | null, remember: boolean) {
     setSelectedClinic(clinicId);

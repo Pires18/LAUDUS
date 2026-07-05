@@ -5,6 +5,7 @@ import { AppSettings, Patient, ExamStatus } from '../types';
 import { getSettings, saveSettings } from './db';
 import { logger } from '../utils/logger';
 import { setTheme } from '../utils/theme';
+import { ClinicOwnerInfo, setClinicOwnerMapMirror, setSelectedClinicIdMirror } from './clinicAccess';
 
 type View =
   | { name: 'dashboard' }
@@ -38,6 +39,10 @@ interface AppState {
   // ── Clinic context ──
   selectedClinicId: string | null; // null = todas as clínicas
   setSelectedClinic: (id: string | null) => void;
+  // Clínicas de OUTROS donos às quais este usuário foi convidado (equipe
+  // multiusuário) — populado por useClinicMemberships(). clinicId -> {ownerId, role}.
+  clinicOwnerMap: Record<string, ClinicOwnerInfo>;
+  setClinicOwnerMap: (map: Record<string, ClinicOwnerInfo>) => void;
 
   // ── Settings ──
   settings: AppSettings;
@@ -93,7 +98,15 @@ export const useApp = create<AppState>()(
 
   // ── Clinic context ──
   selectedClinicId: null,
-  setSelectedClinic: (id) => set({ selectedClinicId: id }),
+  setSelectedClinic: (id) => {
+    setSelectedClinicIdMirror(id);
+    set({ selectedClinicId: id });
+  },
+  clinicOwnerMap: {},
+  setClinicOwnerMap: (map) => {
+    setClinicOwnerMapMirror(map);
+    set({ clinicOwnerMap: map });
+  },
 
   // ── Settings ──
   settings: {
@@ -108,6 +121,7 @@ export const useApp = create<AppState>()(
       if (s.theme) setTheme(s.theme);
       // Se tem clínica padrão nas settings, seta como selecionada
       if (s.defaultClinicId) {
+        setSelectedClinicIdMirror(s.defaultClinicId);
         set({ selectedClinicId: s.defaultClinicId });
       }
     } catch (err) {
