@@ -138,7 +138,11 @@ export function DicomControlCenter() {
   // Testa a VISUALIZAÇÃO DE IMAGENS (REST do Orthanc via /system) de um servidor.
   async function testImages(isBackup: boolean): Promise<CapResult> {
     const baseUrl = getActivePacsUrl(draft, isBackup);
-    if (!baseUrl || baseUrl === 'http://localhost:8042') {
+    const agent = isBackup ? draft.dicomBackupLocalAgentUrl : draft.dicomLocalAgentUrl;
+    // No modelo de agente-proxy (nuvem), 'http://localhost:8042' é o valor CORRETO
+    // (o agente encaminha ao Orthanc na própria VM). Só é "não configurado" se não
+    // houver nem URL nem agente.
+    if (!baseUrl || (baseUrl === 'http://localhost:8042' && !agent)) {
       return { ok: false, msg: 'URL do servidor não configurada' };
     }
     const auth = getDicomAuthParams(draft, isBackup);
