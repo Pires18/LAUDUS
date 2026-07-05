@@ -231,6 +231,13 @@ export function useSubscription(): SubscriptionState {
         }
         const sub = { id: subSnap.id, ...subSnap.data() } as Subscription;
 
+        // O contador de uso do doc do USUÁRIO é a fonte de verdade (o espelho
+        // na assinatura é best-effort). Prefere o maior para nunca regredir.
+        const userUsed = userData.reportsUsedThisMonth;
+        if (typeof userUsed === 'number') {
+          sub.reportsUsedThisMonth = Math.max(userUsed, sub.reportsUsedThisMonth ?? 0);
+        }
+
         // Reset check
         const thirtyDays = 30 * 24 * 60 * 60 * 1000;
         if (sub.lastResetAt && Date.now() > sub.lastResetAt + thirtyDays) {

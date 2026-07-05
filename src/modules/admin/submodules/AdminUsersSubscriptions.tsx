@@ -142,12 +142,22 @@ export function AdminUsersSubscriptions() {
     try {
       const now = new Date();
       const startMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-      const snap = await getDocs(query(collectionGroup(firestore, 'ai_usage'), where('timestamp', '>=', startMs)));
+      // Sem where/orderBy → não exige índice composto (só a regra de leitura
+      // admin). Filtramos o mês corrente em memória. Fallback à consulta
+      // indexada caso o volume cresça e a bare falhe.
+      let snap;
+      try {
+        snap = await getDocs(collectionGroup(firestore, 'ai_usage'));
+      } catch {
+        snap = await getDocs(query(collectionGroup(firestore, 'ai_usage'), where('timestamp', '>=', startMs)));
+      }
       const map: Record<string, Usage> = {};
       snap.forEach((d: any) => {
+        const data = d.data() || {};
+        if (typeof data.timestamp === 'number' && data.timestamp < startMs) return;
         const uid = d.ref.parent?.parent?.id;
         if (!uid) return;
-        const isPro = /pro/i.test(String((d.data() || {}).model || ''));
+        const isPro = /pro/i.test(String(data.model || ''));
         const u = map[uid] || (map[uid] = { total: 0, lite: 0, pro: 0 });
         u.total += 1;
         isPro ? u.pro += 1 : u.lite += 1;
@@ -156,7 +166,9 @@ export function AdminUsersSubscriptions() {
     } catch (err: any) {
       setUsageError(err?.code === 'permission-denied'
         ? 'Publique as regras do Firestore (firebase deploy --only firestore:rules) para ver a contagem real de laudos por usuário.'
-        : (err?.message || 'Falha ao carregar a contagem de laudos.'));
+        : (err?.code === 'failed-precondition'
+          ? 'Falta o índice de ai_usage: rode firebase deploy --only firestore:indexes.'
+          : (err?.message || 'Falha ao carregar a contagem de laudos.')));
     } finally {
       setUsageLoading(false);
     }

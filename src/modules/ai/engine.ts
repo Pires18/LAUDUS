@@ -1,7 +1,7 @@
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
 import { getInitialReportContent, sectionTogglesFromSettings } from '../templates/utils';
-import { doc, getDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, updateDoc } from 'firebase/firestore';
 import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
@@ -888,6 +888,11 @@ async function resolveMotorConfigAndCheckQuota(
 }
 
 async function incrementReportUsage(uid: string) {
+  // O contador do doc do USUÁRIO é a fonte de verdade e é incrementado de forma
+  // isolada — assim uma eventual falha ao espelhar na assinatura (doc ausente,
+  // regra, userId divergente) NÃO impede a contagem de avançar.
+  let newUsed = 0;
+  let subscriptionId: string | undefined;
   try {
     const userRef = doc(firestore, 'users', uid);
     await runTransaction(firestore, async (transaction) => {
@@ -896,24 +901,25 @@ async function incrementReportUsage(uid: string) {
       const userData = userSnap.data();
       const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
       if (isAdmin) return;
-
-      const newUsed = (userData.reportsUsedThisMonth ?? 0) + 1;
-      transaction.update(userRef, {
-        reportsUsedThisMonth: newUsed,
-        updatedAt: Date.now()
-      });
-
-      const subscriptionId = userData.subscriptionId;
-      if (subscriptionId) {
-        const subRef = doc(firestore, 'subscriptions', subscriptionId);
-        transaction.update(subRef, {
-          reportsUsedThisMonth: newUsed,
-          updatedAt: Date.now()
-        });
-      }
+      subscriptionId = userData.subscriptionId;
+      newUsed = (userData.reportsUsedThisMonth ?? 0) + 1;
+      transaction.update(userRef, { reportsUsedThisMonth: newUsed, updatedAt: Date.now() });
     });
   } catch (err) {
-    logger.error('Erro ao incrementar uso de laudo:', err);
+    logger.error('Erro ao incrementar uso de laudo (usuário):', err);
+    return;
+  }
+
+  // Espelho best-effort na assinatura — falha aqui não afeta o contador acima.
+  if (subscriptionId && newUsed > 0) {
+    try {
+      await updateDoc(doc(firestore, 'subscriptions', subscriptionId), {
+        reportsUsedThisMonth: newUsed,
+        updatedAt: Date.now(),
+      });
+    } catch (err) {
+      logger.warn('Falha ao espelhar uso na assinatura (ignorado):', err);
+    }
   }
 }
 
