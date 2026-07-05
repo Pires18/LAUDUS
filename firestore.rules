@@ -120,7 +120,9 @@ service cloud.firestore {
 
     // ---- Catálogo de planos SaaS ------------------------------------------
     match /saas_plans/{planId} {
-      allow read: if isSignedIn();
+      // Catálogo público de preços — legível por qualquer visitante (vitrine de
+      // planos na tela de entrada, antes do login). Não contém dado sensível.
+      allow read: if true;
       allow write: if isAdmin();
     }
 

@@ -6,6 +6,7 @@ import {
   Mail, KeyRound, Database, Calculator, CalendarDays, Building2, CreditCard
 } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
+import { PricingPlans } from './PricingPlans';
 
 const LANDING_FEATURES = [
   { icon: Sparkles,    label: 'Laudos com IA' },
@@ -21,6 +22,7 @@ export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,10 +103,13 @@ export function LoginScreen() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-ink-400">Conformidade</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Planos a partir de</p>
-            <p className="text-lg font-black text-brand-600">assinatura mensal</p>
-          </div>
+          <button
+            onClick={() => setShowPricing(true)}
+            className="text-right group"
+          >
+            <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest">Conheça os</p>
+            <p className="text-lg font-black text-brand-600 group-hover:text-brand-700 transition-colors underline decoration-brand-200 underline-offset-4">Planos & Preços →</p>
+          </button>
         </div>
 
       </div>
@@ -208,13 +213,21 @@ export function LoginScreen() {
               <span className="text-xs font-black uppercase tracking-wider">Continuar com o Google</span>
             </button>
 
-            <div className="text-center pt-2">
+            <div className="flex items-center justify-center gap-4 pt-2">
               <button
                 type="button"
                 onClick={() => setIsRegister(!isRegister)}
                 className="text-[10px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-widest transition-all"
               >
                 {isRegister ? 'Já possui cadastro? Entre' : 'Não tem conta? Cadastre-se'}
+              </button>
+              <span className="w-px h-3 bg-ink-200" />
+              <button
+                type="button"
+                onClick={() => setShowPricing(true)}
+                className="text-[10px] font-black text-ink-500 hover:text-ink-800 uppercase tracking-widest transition-all"
+              >
+                Ver planos
               </button>
             </div>
 
@@ -254,6 +267,13 @@ export function LoginScreen() {
         </div>
 
       </div>
+
+      {/* Vitrine pública de planos → cadastro */}
+      <PricingPlans
+        open={showPricing}
+        onClose={() => setShowPricing(false)}
+        onChoose={() => { setShowPricing(false); setIsRegister(true); }}
+      />
 
     </div>
   );
