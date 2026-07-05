@@ -15,12 +15,17 @@ import {
 const PROVISION_ENDPOINT = (import.meta as any).env?.VITE_PACS_PROVISION_ENDPOINT || '';
 
 type Plan = 'starter' | 'pro' | 'dedicado';
+type PacsPlan = { label: string; price: number; interval: 'month' | 'semester' | 'year'; disk: number; model: string; badge?: string; active?: boolean };
+type PacsPlans = Record<Plan, PacsPlan>;
 
-const PLANS: Record<Plan, { label: string; price: string; disk: number; model: string; badge?: string }> = {
-  starter:  { label: 'Starter',  price: 'R$ 99',  disk: 100, model: 'Compartilhado isolado' },
-  pro:      { label: 'Pro',      price: 'R$ 149', disk: 300, model: 'Compartilhado isolado', badge: 'Popular' },
-  dedicado: { label: 'Dedicado', price: 'R$ 249', disk: 300, model: 'VM exclusiva' },
+// Defaults (retrocompat) — o admin sobrepõe em global_config/pacs_plans.
+const DEFAULT_PLANS: PacsPlans = {
+  starter:  { label: 'Starter',  price: 99,  interval: 'month', disk: 100, model: 'Compartilhado isolado' },
+  pro:      { label: 'Pro',      price: 149, interval: 'month', disk: 300, model: 'Compartilhado isolado', badge: 'Popular' },
+  dedicado: { label: 'Dedicado', price: 249, interval: 'month', disk: 300, model: 'VM exclusiva' },
 };
+
+const intervalShort = (i?: string) => (i === 'year' ? 'ano' : i === 'semester' ? 'sem' : 'mês');
 
 function randomHex(bytes: number): string {
   const arr = new Uint8Array(bytes);
@@ -48,6 +53,27 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
   const inst: PacsInstance = settings.pacsInstance || { status: 'none' };
   const [busy, setBusy] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>('pro');
+
+  // Planos de PACS gerenciados no Admin → Financeiro (global_config/pacs_plans);
+  // fallback para os defaults se o admin ainda não publicou.
+  const [plans, setPlans] = useState<PacsPlans>(DEFAULT_PLANS);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { firestore } = await import('../../lib/firebase');
+        const snap = await getDoc(doc(firestore, 'global_config', 'pacs_plans'));
+        if (snap.exists()) {
+          const d = snap.data() as Partial<PacsPlans>;
+          setPlans({
+            starter: { ...DEFAULT_PLANS.starter, ...(d.starter || {}) },
+            pro: { ...DEFAULT_PLANS.pro, ...(d.pro || {}) },
+            dedicado: { ...DEFAULT_PLANS.dedicado, ...(d.dedicado || {}) },
+          });
+        }
+      } catch { /* mantém defaults */ }
+    })();
+  }, []);
 
   // Uso de disco REAL (não o campo salvo no provisionamento, que fica parado em
   // 0) — consulta ao vivo o /statistics do Orthanc pelo mesmo proxy das imagens.
@@ -111,8 +137,8 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
         await new Promise((r) => setTimeout(r, 2600));
         const id = randomHex(4);
         result = shared
-          ? { provider: 'shared', instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 }
-          : { provider: 'mock', instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: PLANS[plan].disk, diskUsedGb: 0 };
+          ? { provider: 'shared', instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: plans[plan].disk, diskUsedGb: 0 }
+          : { provider: 'mock', instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: plans[plan].disk, diskUsedGb: 0 };
       }
 
       // Autoconfigura as settings DICOM (o usuário não digita nada).
@@ -133,7 +159,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
           tenantId: result.tenantId,
           agentUrl: result.agentUrl,
           orthancVersion: result.orthancVersion,
-          diskGb: result.diskGb ?? PLANS[plan].disk,
+          diskGb: result.diskGb ?? plans[plan].disk,
           diskUsedGb: result.diskUsedGb ?? 0,
           createdAt: inst.createdAt || Date.now(),
           updatedAt: Date.now(),
@@ -191,7 +217,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
 
   // ── Estado: PRONTO ──
   if (inst.status === 'ready') {
-    const diskGb = inst.diskGb ?? PLANS[(inst.plan as Plan) || 'pro'].disk;
+    const diskGb = inst.diskGb ?? plans[(inst.plan as Plan) || 'pro'].disk;
     const usedGb = liveDiskMB !== null ? liveDiskMB / 1024 : null;
     const usedPct = usedGb !== null && diskGb ? Math.min(100, Math.round((usedGb / diskGb) * 100)) : null;
     const version = liveVersion || inst.orthancVersion;
@@ -202,7 +228,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
           <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
           <p className="text-sm font-black text-emerald-800">PACS operacional</p>
           <span className="ml-auto text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700">
-            {PLANS[(inst.plan as Plan) || 'pro']?.label || inst.plan}
+            {plans[(inst.plan as Plan) || 'pro']?.label || inst.plan}
           </span>
         </div>
         <div className="grid grid-cols-2 gap-2.5 text-xs">
@@ -282,8 +308,8 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
         Crie seu <strong>PACS na nuvem</strong> em um clique. Nós provisionamos e configuramos tudo — você só precisa depois <strong>apontar o ultrassom</strong> (assistente) e, se quiser, ligar o backup local.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-        {(Object.keys(PLANS) as Plan[]).map((p) => {
-          const plan = PLANS[p];
+        {(Object.keys(plans) as Plan[]).filter((p) => plans[p].active !== false).map((p) => {
+          const plan = plans[p];
           const active = selectedPlan === p;
           return (
             <button
@@ -298,7 +324,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
                 <span className="absolute -top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-600 text-white">{plan.badge}</span>
               )}
               <p className="text-xs font-black text-ink-900">{plan.label}</p>
-              <p className="text-sm font-black text-emerald-700">{plan.price}<span className="text-[9px] text-ink-400 font-bold">/mês</span></p>
+              <p className="text-sm font-black text-emerald-700">R$ {plan.price}<span className="text-[9px] text-ink-400 font-bold">/{intervalShort(plan.interval)}</span></p>
               <p className="text-[10px] text-ink-500 mt-1">{plan.disk} GB · {plan.model}</p>
             </button>
           );
@@ -310,7 +336,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
         className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.99]"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-        Criar meu PACS ({PLANS[selectedPlan].label})
+        Criar meu PACS ({plans[selectedPlan].label})
       </button>
     </div>
   );
