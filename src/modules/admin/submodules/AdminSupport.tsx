@@ -14,12 +14,22 @@ import {
 import { classNames } from '../../../utils/format';
 import { useConfirm } from '../../../hooks/useConfirm';
 
+// Respostas rápidas para o atendimento — clicar preenche o campo de resposta.
+const QUICK_REPLIES: { label: string; text: string }[] = [
+  { label: 'Saudação', text: 'Olá! Obrigado por entrar em contato com o suporte LAUD.US. Vou verificar e já te retorno.' },
+  { label: 'Em análise', text: 'Estamos analisando o seu chamado com a equipe técnica e retornaremos em breve com uma solução.' },
+  { label: 'Pedir detalhes', text: 'Para agilizar, poderia nos enviar mais detalhes (prints, passos para reproduzir e o e-mail da conta)?' },
+  { label: 'PACS', text: 'Sobre o PACS/DICOM: já iniciamos a ativação do seu servidor. Assim que estiver pronto, você recebe a confirmação por aqui.' },
+  { label: 'Resolvido', text: 'Ficamos felizes em ajudar! Estamos encerrando este chamado como resolvido. Qualquer coisa, é só reabrir. 🙂' },
+];
+
 export function AdminSupport() {
   const { user: adminUser } = useAuth();
   const { showToast } = useApp();
   const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'pending' | 'resolved'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'ia_help' | 'billing' | 'pacs_setup' | 'technical_issue' | 'other'>('all');
   // Carrega apenas os tickets MAIS RECENTES (cap) — a coleção cresce sem limite.
   // Os contadores de status vêm do servidor (getCountFromServer), então as
   // métricas seguem exatas mesmo com a lista limitada.
@@ -79,11 +89,12 @@ export function AdminSupport() {
   }, [selectedTicketId, tickets]);
 
   const filtered = tickets.filter(t => {
-    const matchesSearch = 
-      t.subject.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch =
+      t.subject.toLowerCase().includes(search.toLowerCase()) ||
       t.userName.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
   });
 
   const selectedTicket = tickets.find(t => t.id === selectedTicketId);
@@ -249,12 +260,35 @@ export function AdminSupport() {
                     onClick={() => setStatusFilter(s)}
                     className={classNames(
                       "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border",
-                      statusFilter === s 
-                        ? "bg-ink-900 text-white border-ink-900 shadow-md" 
+                      statusFilter === s
+                        ? "bg-ink-900 text-white border-ink-900 shadow-md"
                         : "bg-white text-ink-400 border-ink-100 hover:border-brand-300"
                     )}
                   >
                     {s === 'all' ? 'Todos' : s}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+                {([
+                  { k: 'all',             label: 'Categorias' },
+                  { k: 'ia_help',         label: 'IA' },
+                  { k: 'billing',         label: 'Financeiro' },
+                  { k: 'pacs_setup',      label: 'PACS' },
+                  { k: 'technical_issue', label: 'Técnico' },
+                  { k: 'other',           label: 'Outro' },
+                ] as const).map(c => (
+                  <button
+                    key={c.k}
+                    onClick={() => setCategoryFilter(c.k)}
+                    className={classNames(
+                      "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap border",
+                      categoryFilter === c.k
+                        ? "bg-brand-600 text-white border-brand-600"
+                        : "bg-white text-ink-400 border-ink-100 hover:border-brand-300"
+                    )}
+                  >
+                    {c.label}
                   </button>
                 ))}
               </div>
@@ -416,6 +450,19 @@ export function AdminSupport() {
 
                {selectedTicket.status !== 'resolved' && (
                  <footer className="p-5 border-t border-ink-100 bg-white font-medium">
+                   {/* Respostas rápidas (canned) — clicar preenche o campo */}
+                   <div className="flex gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
+                     {QUICK_REPLIES.map(q => (
+                       <button
+                         key={q.label}
+                         onClick={() => setNewMessage(q.text)}
+                         title={q.text}
+                         className="shrink-0 px-3 py-1.5 rounded-lg bg-ink-50 hover:bg-brand-50 border border-ink-100 hover:border-brand-200 text-[10px] font-bold text-ink-600 hover:text-brand-700 transition-all"
+                       >
+                         {q.label}
+                       </button>
+                     ))}
+                   </div>
                    <div className="flex gap-4">
                      <div className="flex-1 relative">
                        <input 
