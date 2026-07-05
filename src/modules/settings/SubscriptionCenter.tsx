@@ -408,7 +408,9 @@ export function SubscriptionCenter() {
                     </span>
                   </div>
                   <p className="text-[11px] text-ink-400 font-medium mt-0.5">
-                    {isTrialing
+                    {subscription?.lifetime
+                      ? '♾️ Plano vitalício · sem expiração'
+                      : isTrialing
                       ? `Trial expira em ${trialDaysLeft} dias`
                       : nextReset
                       ? `Renova em ${nextReset}`
@@ -439,7 +441,12 @@ export function SubscriptionCenter() {
 
             {/* Action buttons */}
             <div className="flex gap-2 flex-wrap">
-              {!isCanceled && (
+              {subscription?.lifetime && (
+                <span className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-violet-50 border border-violet-100 text-violet-600 flex items-center gap-1.5">
+                  ♾️ Vitalício
+                </span>
+              )}
+              {!isCanceled && !subscription?.lifetime && (
                 <button
                   onClick={handleCancel}
                   className="h-9 px-4 rounded-xl text-xs font-black uppercase tracking-wider bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 transition-all flex items-center gap-1.5"
@@ -506,7 +513,7 @@ export function SubscriptionCenter() {
               <span>
                 <strong className="text-ink-700">1 laudo gerado = 1 Token Lite ou Pro</strong> (conforme motor usado no editor)
               </span>
-              {nextReset && (
+              {nextReset && !subscription?.lifetime && (
                 <span className="flex items-center gap-1 shrink-0 ml-3">
                   <Calendar size={10} /> Renova em {nextReset}
                 </span>

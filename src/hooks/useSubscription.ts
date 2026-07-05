@@ -99,9 +99,11 @@ function deriveState(
     };
   }
 
-  const isActive = sub.status === 'active' || isTrialing;
-  const isPastDue = sub.status === 'past_due';
-  const isCanceled = sub.status === 'canceled' || sub.status === 'paused';
+  // Plano vitalício: sempre ativo, nunca expira nem é cancelado por período.
+  const isLifetime = sub.lifetime === true;
+  const isActive = isLifetime || sub.status === 'active' || isTrialing;
+  const isPastDue = !isLifetime && sub.status === 'past_due';
+  const isCanceled = !isLifetime && (sub.status === 'canceled' || sub.status === 'paused');
 
   const addons: SubscriptionAddon[] = sub.addons || [];
   const hasCalculators = addons.includes('calculators');

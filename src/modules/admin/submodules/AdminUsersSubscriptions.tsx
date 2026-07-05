@@ -297,7 +297,7 @@ export function AdminUsersSubscriptions() {
   async function handleAssignSub(
     u: SystemUser,
     plan: SaasPlan,
-    opts: { status: string; paymentMethod: string; periodEndMs: number }
+    opts: { status: string; paymentMethod: string; periodEndMs: number; lifetime?: boolean }
   ) {
     const now   = Date.now();
     const subId = `sub_${u.id}`;
@@ -313,6 +313,8 @@ export function AdminUsersSubscriptions() {
         plan: plan.name, planId: plan.id,
         addons,
         status: opts.status,
+        lifetime: !!opts.lifetime,
+        autoRenew: !opts.lifetime,
         paymentMethod: opts.paymentMethod,
         currentPeriodStart: now,
         currentPeriodEnd: opts.periodEndMs,
@@ -971,7 +973,11 @@ interface AssignOpts {
   status: string;
   paymentMethod: string;
   periodEndMs: number;
+  lifetime?: boolean;
 }
+
+/** Fim de período "infinito" para planos vitalícios (~ano 2999). */
+const LIFETIME_END_MS = new Date('2999-12-31T23:59:59Z').getTime();
 
 function AssignSubModal({
   user, plans, isLegacy, onClose, onConfirm, loading,
@@ -988,15 +994,17 @@ function AssignSubModal({
   const [status, setStatus]                 = useState('active');
   const [paymentMethod, setPaymentMethod]   = useState('manual');
   const [periodDays, setPeriodDays]         = useState(30);
+  const [lifetime, setLifetime]             = useState(false);
 
   const plan = activePlans.find(p => p.id === selectedPlanId);
 
   const handleConfirm = () => {
     if (!plan) return;
     onConfirm(plan, {
-      status,
-      paymentMethod,
-      periodEndMs: Date.now() + periodDays * 24 * 60 * 60 * 1000,
+      status: lifetime ? 'active' : status,
+      paymentMethod: lifetime ? 'manual' : paymentMethod,
+      periodEndMs: lifetime ? LIFETIME_END_MS : Date.now() + periodDays * 24 * 60 * 60 * 1000,
+      lifetime,
     });
   };
 
@@ -1101,9 +1109,22 @@ function AssignSubModal({
               <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-1">Duração (dias)</label>
               <input type="number" min={1} max={365} value={periodDays}
                 onChange={e => setPeriodDays(parseInt(e.target.value) || 30)}
-                className="input h-10 text-sm w-full" />
+                disabled={lifetime}
+                className="input h-10 text-sm w-full disabled:opacity-40" />
             </div>
           </div>
+
+          {/* Plano vitalício */}
+          <label className={classNames(
+            'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all',
+            lifetime ? 'border-violet-400 bg-violet-50/60' : 'border-ink-150 bg-white hover:border-ink-300'
+          )}>
+            <input type="checkbox" checked={lifetime} onChange={e => setLifetime(e.target.checked)} className="shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-black text-ink-900">Plano vitalício (∞)</p>
+              <p className="text-[10px] text-ink-500 leading-relaxed">Acesso permanente: status Ativo, sem expiração e sem cobrança recorrente. Ignora a duração acima.</p>
+            </div>
+          </label>
 
           {/* Summary */}
           {plan && (
@@ -1114,9 +1135,9 @@ function AssignSubModal({
               <div className="flex justify-between"><span className="text-ink-500">Laudos/mês</span><span className="font-bold">{plan.reportsQuota === 0 ? 'Ilimitado' : plan.reportsQuota}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Laudos Lite/mês</span><span className="font-bold">{plan.tokenQuotaLite === 0 ? 'Ilimitado' : plan.tokenQuotaLite}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Laudos Pro/mês</span><span className="font-bold">{plan.tokenQuotaPro === 0 ? 'Ilimitado' : plan.tokenQuotaPro}</span></div>
-              <div className="flex justify-between"><span className="text-ink-500">Válido por</span><span className="font-bold">{periodDays} dias</span></div>
+              <div className="flex justify-between"><span className="text-ink-500">Válido por</span><span className="font-bold">{lifetime ? 'Vitalício (∞)' : `${periodDays} dias`}</span></div>
               <div className="flex justify-between"><span className="text-ink-500">Vence em</span>
-                <span className="font-bold">{new Date(Date.now() + periodDays * 86400000).toLocaleDateString('pt-BR')}</span>
+                <span className="font-bold">{lifetime ? 'Nunca' : new Date(Date.now() + periodDays * 86400000).toLocaleDateString('pt-BR')}</span>
               </div>
               {isLegacy && <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
                 Campos de licença legada serão removidos automaticamente.

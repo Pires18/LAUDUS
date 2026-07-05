@@ -462,6 +462,10 @@ export interface Subscription {
   abacatePaySubscriptionId?: string;
   currentPeriodStart: number;
   currentPeriodEnd: number;
+  /** Plano vitalício: sempre ativo, sem expiração/recorrência (definido pelo admin). */
+  lifetime?: boolean;
+  /** Auto-renova (recorrente). Falso em vitalício e em avulso. */
+  autoRenew?: boolean;
   trialEndsAt?: number;
   canceledAt?: number;
   reportsUsedThisMonth: number;
