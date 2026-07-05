@@ -192,6 +192,8 @@ export interface PacsInstance {
   provider?: 'mock' | 'gcp' | 'shared';
   /** ID do tenant quando provider = 'shared'. */
   tenantId?: string;
+  /** Porta DICOM exclusiva do tenant (ex: 43xx) — o aparelho aponta para ela. */
+  dicomPort?: number;
   /** Plano contratado (define modelo/quota). */
   plan?: 'starter' | 'pro' | 'dedicado';
   region?: string;
