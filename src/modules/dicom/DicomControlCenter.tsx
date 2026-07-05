@@ -245,7 +245,7 @@ export function DicomControlCenter() {
           // Segredo do agente: exigido pelo agente na VM (x-agent-secret).
           ...(secret ? { 'x-agent-secret': secret } : {})
         },
-        body: JSON.stringify({ ping: true, localAgentUrl: agent, outputDir: dir, agentSecret: secret })
+        body: JSON.stringify({ ping: true, localAgentUrl: agent, outputDir: dir, agentSecret: secret, tenantId: isBackup ? undefined : draft.dicomTenantId })
       });
       const data = await res.json().catch(() => ({ success: false, error: 'Resposta inválida do agente' }));
       if (data.success) {
