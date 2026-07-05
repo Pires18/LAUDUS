@@ -58,7 +58,7 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
 - Prompt hierárquico: Master → Área → Template → Instrução
 - Training mode: contexto dos últimos N laudos do médico
 - Configuração de modelo por modo (geração, refinamento, copiloto, template)
-- Suporte a Gemini e Anthropic Claude
+- Provedor de IA: Google Gemini (server-side, chave nunca exposta ao cliente)
 
 ### 5. Pacientes (`/src/modules/patients`)
 - CRUD completo: cadastro, histórico clínico, laudos anteriores

@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [Não versionado] — 2026-07-04
+
+### Removido
+- **Anthropic Claude** — provedor removido por completo (`api/anthropic.ts` excluído); a plataforma passa a usar exclusivamente **Google Gemini** como motor de IA. Corrige também IDs de modelo default e do copiloto que ainda apontavam para versões descontinuadas. As menções a "Anthropic/Claude" em versões anteriores deste changelog refletem o estado da época e não a versão atual.
+
+---
+
 ## [2.1.0] — 2026-06-24
 
 ### Adicionado

@@ -202,6 +202,8 @@ async function activateSubscription(
     abacatePaySubscriptionId: opts.gatewaySubId || '',
     currentPeriodStart: opts.periodStart,
     currentPeriodEnd: periodEnd,
+    interval,
+    price: opts.gatewayPrice ?? planPrice,
     reportsQuota,
     clinicsQuota,
     tokenQuotaLite,

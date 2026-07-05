@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { collection, collectionGroup, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { firestore } from '../../../../lib/firebase';
-import { getDailyMetrics, getMetricsSummary, type DailyMetric, type MetricsSummary } from '../../../../store/db';
+import { getDailyMetrics, getMetricsSummary, getAiCostByUser, type DailyMetric, type MetricsSummary } from '../../../../store/db';
+import { intervalMultiplier } from '../../../../../api/_pricing';
 import { logger } from '../../../../utils/logger';
 import { classNames } from '../../../../utils/format';
 import { Spinner } from './Spinner';
@@ -33,6 +34,7 @@ export function FinanceOverviewTab() {
   const [compCount, setCompCount] = useState(0);
   const [usdToBrl, setUsdToBrl] = useState(5.40);
   const [aggWarn, setAggWarn] = useState<string | null>(null);
+  const [lossyUsers, setLossyUsers] = useState<{ userId: string; email: string; revenueBrl: number; costBrl: number }[]>([]);
 
   const load = async () => {
     setAggWarn(null);
@@ -54,6 +56,31 @@ export function FinanceOverviewTab() {
 
       // Assinaturas de cortesia/vitalício (não geram receita) — visibilidade.
       setCompCount(subsSnap.docs.filter(s => { const x: any = s.data(); return x.comp || x.lifetime; }).length);
+
+      // Alerta de prejuízo: compara o custo real de IA do mês (por usuário)
+      // com a receita mensal-equivalente do plano dele. Assinaturas de
+      // cortesia/vitalício ficam de fora (não têm receita, dariam falso-positivo).
+      try {
+        const now2 = new Date();
+        const monthStart = new Date(now2.getFullYear(), now2.getMonth(), 1).getTime();
+        const rate = (typeof vc.usdToBrl === 'number' && vc.usdToBrl > 0) ? vc.usdToBrl : usdToBrl;
+        const costByUid = await getAiCostByUser(monthStart, Date.now());
+        const lossy: { userId: string; email: string; revenueBrl: number; costBrl: number }[] = [];
+        subsSnap.docs.forEach(s => {
+          const x: any = s.data();
+          if (x.comp || x.lifetime || x.status !== 'active') return;
+          const costUsd = costByUid[x.userId] || 0;
+          if (costUsd <= 0) return;
+          const costBrl = costUsd * rate;
+          const monthlyRevenue = (x.price || 0) / intervalMultiplier(x.interval);
+          if (costBrl > monthlyRevenue) {
+            lossy.push({ userId: x.userId, email: x.userEmail || x.userId, revenueBrl: monthlyRevenue, costBrl });
+          }
+        });
+        setLossyUsers(lossy.sort((a, b) => (b.costBrl - b.revenueBrl) - (a.costBrl - a.revenueBrl)));
+      } catch (err) {
+        logger.error('[FinanceOverview] falha ao calcular alerta de prejuízo:', err);
+      }
 
       // Custo de VMs: agrega instâncias PACS ativas (collection group settings).
       try {
@@ -105,6 +132,13 @@ export function FinanceOverviewTab() {
   const totalCost = vmCostBrl + iaCostBrl;
   const netMargin = mrr - totalCost;
   const marginPct = mrr > 0 ? Math.round((netMargin / mrr) * 100) : 0;
+
+  // Reconciliação: MRR é teórico (soma de preço x assinaturas ativas); revenue30
+  // é o que realmente entrou via transações pagas nos últimos 30 dias. Uma
+  // divergência grande sugere assinatura marcada "active" sem pagamento correspondente
+  // (falha de webhook, estorno não refletido, etc.).
+  const mrrDivergencePct = mrr > 0 ? Math.round(((mrr - revenue30) / mrr) * 100) : 0;
+  const showMrrWarning = mrr > 0 && Math.abs(mrrDivergencePct) >= 20;
 
   const kpis = [
     { label: 'Receita recorrente (MRR)', value: money(mrr),           sub: 'assinaturas ativas', icon: TrendingUp,  grad: 'from-emerald-500 to-teal-600' },
@@ -161,6 +195,45 @@ export function FinanceOverviewTab() {
       {aggWarn && (
         <div className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2.5">
           <AlertTriangle size={13} className="shrink-0 mt-0.5" /> <span>{aggWarn}</span>
+        </div>
+      )}
+
+      {showMrrWarning && (
+        <div className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2.5">
+          <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+          <span>
+            <strong>MRR teórico ({money(mrr)}) diverge {Math.abs(mrrDivergencePct)}% da receita real dos últimos 30 dias ({money(revenue30)})</strong> — pode haver assinatura marcada "active" sem pagamento correspondente registrado (falha de webhook, estorno não refletido, etc.). Vale conferir em Transações.
+          </span>
+        </div>
+      )}
+
+      {lossyUsers.length > 0 && (
+        <div className="bg-white rounded-2xl border border-rose-200 shadow-sm p-5">
+          <h4 className="text-[11px] font-black text-rose-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+            <AlertTriangle size={13} /> Alerta de prejuízo — custo de IA acima da receita do plano ({lossyUsers.length})
+          </h4>
+          <div className="overflow-x-auto rounded-xl border border-ink-100">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-ink-50/80 border-b border-ink-100 text-[9px] font-black uppercase text-ink-500 tracking-wider">
+                  <th className="px-4 py-3">Usuário</th>
+                  <th className="px-4 py-3 text-right">Receita mensal do plano</th>
+                  <th className="px-4 py-3 text-right">Custo de IA (mês)</th>
+                  <th className="px-4 py-3 text-right">Prejuízo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-50">
+                {lossyUsers.map(u => (
+                  <tr key={u.userId} className="hover:bg-rose-50/30">
+                    <td className="px-4 py-3 text-ink-700 font-medium truncate max-w-[220px]">{u.email}</td>
+                    <td className="px-4 py-3 text-right font-mono">{money(u.revenueBrl)}</td>
+                    <td className="px-4 py-3 text-right font-mono">{money(u.costBrl)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-rose-700 font-bold">-{money(u.costBrl - u.revenueBrl)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

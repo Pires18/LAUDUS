@@ -197,9 +197,27 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
 
   async function deprovision() {
     if (busy) return;
-    if (!window.confirm('Remover seu PACS na nuvem? As configurações do agente serão limpas. (No modo real, a VM é destruída — mantenha um backup antes.)')) return;
+    if (!window.confirm('Remover seu PACS na nuvem? As configurações do agente serão limpas e, no modo real, a VM/tenant é destruída de vez — mantenha um backup antes.')) return;
     setBusy(true);
     try {
+      // Destrói de fato a VM/tenant na nuvem ANTES de limpar o Firestore — sem
+      // isso, a infraestrutura ficava órfã (rodando e cobrando) mesmo depois de
+      // o usuário "remover" o PACS pelo app.
+      try {
+        const idToken = await getIdToken();
+        const res = await fetch('/api/pacs-deprovision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+          body: JSON.stringify({ provider: inst.provider, instanceName: inst.instanceName, tenantId: inst.tenantId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Falha ao destruir a infraestrutura na nuvem.');
+      } catch (err: any) {
+        showToast(err.message || 'Não foi possível destruir a infraestrutura na nuvem — as credenciais NÃO foram limpas, tente novamente.', 'error');
+        setBusy(false);
+        return;
+      }
+
       await updateSettings({
         dicomLocalAgentUrl: '',
         dicomAgentSecret: '',

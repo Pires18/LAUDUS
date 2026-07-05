@@ -3,7 +3,7 @@
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
 Versão do documento: 2026-07-04 (v2, aprofundada) · Ambiente: produção (Vercel + Firebase).
 
-**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Plano de Refinamento](PLANO_REFINAMENTO.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md).
+**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Auditoria Integrações/Financeiro](AUDITORIA_INTEGRACOES_FINANCEIRO_2026-07.md) · [Plano de Refinamento](PLANO_REFINAMENTO.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md).
 
 ---
 

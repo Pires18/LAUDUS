@@ -21,6 +21,7 @@ import {
   QueryConstraint,
   limit,
   getCountFromServer,
+  collectionGroup,
 } from 'firebase/firestore';
 import { firestore, auth } from '../lib/firebase';
 import { AppSettings, SupportTicket, SupportMessage } from '../types';
@@ -1191,6 +1192,8 @@ export interface AiUsageLog {
   costUsd: number;
   area: string;
   promptHash?: string;
+  /** Preenchido só quando o log vem de uma consulta collectionGroup (uid do dono via ref.parent.parent.id). */
+  uid?: string;
 }
 
 export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Promise<void> {
@@ -1205,6 +1208,12 @@ export async function logAiUsage(data: Omit<AiUsageLog, 'id' | 'timestamp'>): Pr
   }
 }
 
+/**
+ * Estatísticas de uso de IA do usuário ATUAL (sua própria subárvore) — usada
+ * pelas telas do usuário (Dashboard, Central de Assinatura, Copiloto). NÃO
+ * trocar para collection group aqui: as regras do Firestore só permitem
+ * `collectionGroup('ai_usage')` para admin — ver [[getAllUsersAiUsageStats]].
+ */
 export async function getAiUsageStats(startDateMs: number, endDateMs: number): Promise<AiUsageLog[]> {
   try {
     const colRef = getCollectionRef('ai_usage');
@@ -1219,6 +1228,42 @@ export async function getAiUsageStats(startDateMs: number, endDateMs: number): P
     logger.error('[DB] Erro ao buscar estatísticas de IA', err);
     return [];
   }
+}
+
+/**
+ * Estatísticas de uso de IA de TODOS os usuários (collection group
+ * `ai_usage`) — só admin (regra do Firestore exige role admin). Usada pelo
+ * painel "Custos de IA" para refletir o consumo real do sistema inteiro, não
+ * só do próprio admin.
+ */
+export async function getAllUsersAiUsageStats(startDateMs: number, endDateMs: number): Promise<AiUsageLog[]> {
+  try {
+    const q = query(
+      collectionGroup(firestore, 'ai_usage'),
+      where('timestamp', '>=', startDateMs),
+      where('timestamp', '<=', endDateMs)
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, uid: d.ref.parent?.parent?.id, ...d.data() } as AiUsageLog));
+  } catch (err) {
+    logger.error('[DB] Erro ao buscar estatísticas de IA (todos usuários)', err);
+    return [];
+  }
+}
+
+/**
+ * Custo de IA (USD) agregado por uid num período — mesma fonte que
+ * [[getAllUsersAiUsageStats]], só que já somado por usuário. Usado para
+ * comparar custo real de IA vs receita do plano (alerta de prejuízo).
+ */
+export async function getAiCostByUser(startDateMs: number, endDateMs: number): Promise<Record<string, number>> {
+  const logs = await getAllUsersAiUsageStats(startDateMs, endDateMs);
+  const byUser: Record<string, number> = {};
+  logs.forEach(l => {
+    if (!l.uid) return;
+    byUser[l.uid] = (byUser[l.uid] || 0) + (l.costUsd || 0);
+  });
+  return byUser;
 }
 
 /**

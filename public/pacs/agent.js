@@ -172,6 +172,39 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // DELETE /api/admin/tenant/:tenantId -> destrói de vez o tenant (container +
+  // dados, com backup em /opt/tenants-removed). Protegido por x-admin-secret,
+  // chamado pelo servidor (api/pacs-deprovision.ts) quando o usuário remove o
+  // PACS na nuvem pelo app.
+  if (req.method === 'DELETE' && pathname.startsWith('/api/admin/tenant/')) {
+    if (!ADMIN_SECRET || req.headers['x-admin-secret'] !== ADMIN_SECRET) {
+      res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: false, error: 'Admin não autorizado.' })); return;
+    }
+    const tid = safeTenantId(pathname.slice('/api/admin/tenant/'.length));
+    if (!tid) {
+      res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ success: false, error: 'tenantId inválido.' })); return;
+    }
+    const env = { ...process.env, TENANTS_DIR: TENANTS_DIR || '/opt/tenants' };
+    let p;
+    try { p = spawn('bash', [TENANT_SCRIPT, 'remove', tid], { env }); }
+    catch (e) { res.statusCode = 500; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ success: false, error: 'Falha ao executar script: ' + e.message })); return; }
+    let err = '';
+    p.stderr.on('data', d => { err += d; });
+    p.on('error', e => { res.statusCode = 500; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ success: false, error: 'Falha ao executar script: ' + e.message })); });
+    p.on('close', code => {
+      if (code === 0) {
+        res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ success: true }));
+      } else {
+        res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ success: false, error: (err.trim() || 'Falha ao remover tenant.').slice(-300) }));
+      }
+    });
+    return;
+  }
+
   // /api/orthanc-proxy -> proxy para o Orthanc (multi-tenant: para o Orthanc do tenant)
   if (pathname === '/api/orthanc-proxy') {
     const auth = checkAuth(req, res, u); if (!auth.ok) return;

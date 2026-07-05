@@ -14,7 +14,7 @@ import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { useApp } from '../../../store/app';
 import { useConfirm } from '../../../hooks/useConfirm';
-import { getAiUsageStats } from '../../../store/db';
+import { getAllUsersAiUsageStats } from '../../../store/db';
 import { classNames } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
 import { planPrices, addonPrices } from '../../../../api/_pricing';
@@ -1185,6 +1185,7 @@ function IACostsTab() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const [statsLogs, setStatsLogs]   = useState<any[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [userLabels, setUserLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -1217,7 +1218,7 @@ function IACostsTab() {
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const logs = await getAiUsageStats(startOfMonth, Date.now());
+      const logs = await getAllUsersAiUsageStats(startOfMonth, Date.now());
       setStatsLogs(logs);
     } finally { setLoadingStats(false); }
   }, [startOfMonth]);
@@ -1268,6 +1269,37 @@ function IACostsTab() {
     byModel[m].tokensOut+= l.outputTokens || 0;
     byModel[m].costUsd  += l.costUsd      || 0;
   });
+
+  // Ranking de consumo por usuário — usa o `uid` que getAiUsageStats agora
+  // preenche a partir do collection group (antes só refletia o próprio admin).
+  const byUser: Record<string, { calls: number; costUsd: number }> = {};
+  statsLogs.forEach(l => {
+    const uid = l.uid || 'desconhecido';
+    if (!byUser[uid]) byUser[uid] = { calls: 0, costUsd: 0 };
+    byUser[uid].calls   += 1;
+    byUser[uid].costUsd += l.costUsd || 0;
+  });
+  const topUsers = Object.entries(byUser)
+    .sort((a, b) => b[1].costUsd - a[1].costUsd)
+    .slice(0, 10);
+
+  useEffect(() => {
+    const missing = topUsers.map(([uid]) => uid).filter(uid => uid !== 'desconhecido' && !userLabels[uid]);
+    if (missing.length === 0) return;
+    (async () => {
+      const entries = await Promise.all(missing.map(async (uid) => {
+        try {
+          const snap = await getDoc(doc(firestore, 'users', uid));
+          const data = snap.exists() ? snap.data() : null;
+          return [uid, data?.email || data?.name || uid] as const;
+        } catch {
+          return [uid, uid] as const;
+        }
+      }));
+      setUserLabels(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsLogs]);
 
   return (
     <div className="space-y-5">
@@ -1414,6 +1446,36 @@ function IACostsTab() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {topUsers.length > 0 && (
+          <div className="mt-6">
+            <h4 className="text-[10px] font-black uppercase text-ink-500 tracking-widest mb-3">Top 10 consumidores de IA (mês atual)</h4>
+            <div className="overflow-x-auto rounded-xl border border-ink-100">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-ink-50/80 border-b border-ink-100 text-[9px] font-black uppercase text-ink-500 tracking-wider">
+                    <th className="px-4 py-3">Usuário</th>
+                    <th className="px-4 py-3 text-right">Laudos</th>
+                    <th className="px-4 py-3 text-right">Custo USD</th>
+                    <th className="px-4 py-3 text-right">Custo BRL</th>
+                    <th className="px-4 py-3 text-right">% do total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-50">
+                  {topUsers.map(([uid, data]) => (
+                    <tr key={uid} className="hover:bg-ink-50/30">
+                      <td className="px-4 py-3 text-ink-700 font-medium truncate max-w-[220px]">{userLabels[uid] || uid}</td>
+                      <td className="px-4 py-3 text-right font-bold">{data.calls}</td>
+                      <td className="px-4 py-3 text-right font-mono">${data.costUsd.toFixed(4)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-emerald-700">R$ {(data.costUsd * conversionRate).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-ink-500">{totalCostUsd > 0 ? ((data.costUsd / totalCostUsd) * 100).toFixed(1) : '0.0'}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
