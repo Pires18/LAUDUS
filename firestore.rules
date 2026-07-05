@@ -107,6 +107,14 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // ---- Collection group: ai_usage (contagem real de laudos por usuário) --
+    // Permite ao admin rodar collectionGroup('ai_usage') para a aba Consumo
+    // (laudos gerados no mês, split Lite/Pro por usuário). Só leitura, só admin.
+    // As escritas continuam regidas pela subárvore do usuário (dono grava a sua).
+    match /{path=**}/ai_usage/{usageId} {
+      allow read: if isAdmin();
+    }
+
     // ---- Assinaturas / planos do cliente ----------------------------------
     match /subscriptions/{subId} {
       // Dono lê a própria assinatura; admin lê/gerencia todas.

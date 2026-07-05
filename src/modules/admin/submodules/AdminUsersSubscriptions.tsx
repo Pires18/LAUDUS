@@ -12,7 +12,7 @@ import { addAuditLog, getMetricsSummary, type MetricsSummary } from '../../../st
 import { updateUserRole, setUserActiveStatus, deleteUserDocument } from '../../../store/adminUsers';
 import type { UserRole } from '../../../types';
 import {
-  collection, doc, updateDoc, setDoc, deleteField, getDoc, getDocs,
+  collection, collectionGroup, doc, updateDoc, setDoc, deleteField, getDoc, getDocs, query, where,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { classNames } from '../../../utils/format';
@@ -130,6 +130,39 @@ export function AdminUsersSubscriptions() {
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   useEffect(() => { getMetricsSummary().then(setSummary).catch(() => {}); }, []);
 
+  // Contagem REAL de laudos gerados no mês por usuário (collection group de
+  // ai_usage). Fonte da verdade dos "laudos gerados" e do split Lite/Pro.
+  type Usage = { total: number; lite: number; pro: number };
+  const [usageByUid, setUsageByUid] = useState<Record<string, Usage>>({});
+  const [usageError, setUsageError] = useState<string | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const loadUsage = async () => {
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      const now = new Date();
+      const startMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const snap = await getDocs(query(collectionGroup(firestore, 'ai_usage'), where('timestamp', '>=', startMs)));
+      const map: Record<string, Usage> = {};
+      snap.forEach((d: any) => {
+        const uid = d.ref.parent?.parent?.id;
+        if (!uid) return;
+        const isPro = /pro/i.test(String((d.data() || {}).model || ''));
+        const u = map[uid] || (map[uid] = { total: 0, lite: 0, pro: 0 });
+        u.total += 1;
+        isPro ? u.pro += 1 : u.lite += 1;
+      });
+      setUsageByUid(map);
+    } catch (err: any) {
+      setUsageError(err?.code === 'permission-denied'
+        ? 'Publique as regras do Firestore (firebase deploy --only firestore:rules) para ver a contagem real de laudos por usuário.'
+        : (err?.message || 'Falha ao carregar a contagem de laudos.'));
+    } finally {
+      setUsageLoading(false);
+    }
+  };
+  useEffect(() => { loadUsage(); }, []);
+
   if (loadingUsers || loadingSubs) {
     return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-brand-500" /></div>;
   }
@@ -186,7 +219,8 @@ export function AdminUsersSubscriptions() {
   });
 
   // ─── Consumo por usuário ──────────────────────────────────────────────────────
-  // Agrega uso de laudos + tokens por usuário (dados já carregados de users/subscriptions).
+  // reportsUsed/quota = contador de cota (reset a cada 30d); lite/pro/geradosMes
+  // = contagem REAL de laudos gerados no mês (collection group de ai_usage).
   const consumoRows = users
     .filter(u => u.role !== 'admin')
     .map(u => {
@@ -195,20 +229,22 @@ export function AdminUsersSubscriptions() {
       const reportsQuota = u.reportsQuota ?? sub?.reportsQuota ?? 100;
       const unlimited    = reportsQuota >= 9999;
       const pct          = unlimited ? 0 : Math.min(100, Math.round((reportsUsed / Math.max(1, reportsQuota)) * 100));
-      const tokenLite    = u.tokenQuotaLite ?? sub?.tokenQuotaLite ?? 0;
-      const tokenPro     = u.tokenQuotaPro  ?? sub?.tokenQuotaPro  ?? 0;
+      const usage        = usageByUid[u.id] || { total: 0, lite: 0, pro: 0 };
       return {
-        u, sub, reportsUsed, reportsQuota, unlimited, pct, tokenLite, tokenPro,
+        u, sub, reportsUsed, reportsQuota, unlimited, pct,
+        geradosMes: usage.total, liteUsed: usage.lite, proUsed: usage.pro,
         status: u.subscriptionStatus || (sub?.status ?? '—'),
       };
     })
     .sort((a, b) => {
-      if (consumoSort === 'reports') return b.reportsUsed - a.reportsUsed;
-      if (consumoSort === 'tokens')  return (b.tokenLite + b.tokenPro) - (a.tokenLite + a.tokenPro);
+      if (consumoSort === 'reports') return b.geradosMes - a.geradosMes;
+      if (consumoSort === 'tokens')  return b.proUsed - a.proUsed;
       return b.pct - a.pct; // usage (default)
     });
 
-  const totalReportsUsed = consumoRows.reduce((acc, r) => acc + r.reportsUsed, 0);
+  const totalGeradosMes  = consumoRows.reduce((acc, r) => acc + r.geradosMes, 0);
+  const totalLiteMes     = consumoRows.reduce((acc, r) => acc + r.liteUsed, 0);
+  const totalProMes      = consumoRows.reduce((acc, r) => acc + r.proUsed, 0);
   const nearLimitCount   = consumoRows.filter(r => !r.unlimited && r.pct >= 80).length;
   const exhaustedCount   = consumoRows.filter(r => !r.unlimited && r.reportsUsed >= r.reportsQuota).length;
   const avgUsagePct      = consumoRows.length ? Math.round(consumoRows.filter(r => !r.unlimited).reduce((a, r) => a + r.pct, 0) / Math.max(1, consumoRows.filter(r => !r.unlimited).length)) : 0;
@@ -905,33 +941,42 @@ export function AdminUsersSubscriptions() {
 
       {activeTab === 'consumo' && (<>
 
-      {/* ── CONSUMO: MÉTRICAS ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── CONSUMO: MÉTRICAS (contagem real de ai_usage) ──────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Laudos usados (mês)', value: totalReportsUsed.toLocaleString('pt-BR'), icon: FileText,      color: 'text-brand-600',   bg: 'bg-brand-50'   },
-          { label: 'Usuários rastreados', value: consumoRows.length,                       icon: Users,         color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
-          { label: 'Perto do limite (≥80%)', value: nearLimitCount,                        icon: AlertTriangle, color: 'text-amber-600',   bg: 'bg-amber-50'   },
-          { label: 'Cota esgotada',       value: exhaustedCount,                           icon: XCircle,       color: 'text-rose-600',    bg: 'bg-rose-50'    },
+          { label: 'Laudos gerados (mês)', value: totalGeradosMes.toLocaleString('pt-BR'), icon: FileText,      color: 'text-brand-600',   bg: 'bg-brand-50'   },
+          { label: 'Lite (mês)',           value: totalLiteMes.toLocaleString('pt-BR'),    icon: Zap,           color: 'text-indigo-600',  bg: 'bg-indigo-50'  },
+          { label: 'Pro (mês)',            value: totalProMes.toLocaleString('pt-BR'),     icon: Sparkles,      color: 'text-violet-600',  bg: 'bg-violet-50'  },
+          { label: 'Usuários rastreados',  value: consumoRows.length,                      icon: Users,         color: 'text-teal-600',    bg: 'bg-teal-50'    },
+          { label: 'Perto do limite',      value: nearLimitCount,                          icon: AlertTriangle, color: 'text-amber-600',   bg: 'bg-amber-50'   },
+          { label: 'Cota esgotada',        value: exhaustedCount,                          icon: XCircle,       color: 'text-rose-600',    bg: 'bg-rose-50'    },
         ].map(m => (
-          <div key={m.label} className="bg-white p-4 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-3">
-            <div className={classNames('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', m.bg, m.color)}>
-              <m.icon size={17} />
+          <div key={m.label} className="bg-white p-3.5 rounded-2xl border border-ink-100 shadow-sm flex items-center gap-3">
+            <div className={classNames('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', m.bg, m.color)}>
+              <m.icon size={15} />
             </div>
             <div className="min-w-0">
               <div className="text-[9px] font-black text-ink-500 uppercase tracking-wider truncate">{m.label}</div>
-              <div className="text-base font-black text-ink-950 truncate">{m.value}</div>
+              <div className="text-lg font-black text-ink-950 truncate leading-none mt-0.5">{m.value}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── CONSUMO: ORDENAÇÃO ─────────────────────────────────────────── */}
+      {usageError && (
+        <div className="bg-amber-50/60 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2 text-[11px]">
+          <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+          <span className="text-amber-800 font-medium">{usageError} A cota mensal continua exibida normalmente.</span>
+        </div>
+      )}
+
+      {/* ── CONSUMO: ORDENAÇÃO + REFRESH ───────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-[10px] font-black text-ink-500 uppercase tracking-wider">Ordenar por</span>
         {([
           { id: 'usage',   label: '% da cota' },
-          { id: 'reports', label: 'Laudos usados' },
-          { id: 'tokens',  label: 'Tokens' },
+          { id: 'reports', label: 'Laudos gerados' },
+          { id: 'tokens',  label: 'Laudos Pro' },
         ] as const).map(o => (
           <button
             key={o.id}
@@ -946,6 +991,14 @@ export function AdminUsersSubscriptions() {
             {o.label}
           </button>
         ))}
+        <div className="flex-1" />
+        <button
+          onClick={loadUsage}
+          disabled={usageLoading}
+          className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-ink-200 text-ink-600 text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 disabled:opacity-50 transition-all"
+        >
+          <RefreshCw size={12} className={usageLoading ? 'animate-spin' : ''} /> Atualizar contagem
+        </button>
       </div>
 
       {/* ── CONSUMO: TABELA ────────────────────────────────────────────── */}
@@ -956,17 +1009,18 @@ export function AdminUsersSubscriptions() {
               <tr className="border-b border-ink-100 text-[10px] font-black text-ink-500 uppercase tracking-wider">
                 <th className="text-left px-4 py-3">Usuário</th>
                 <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3 min-w-[180px]">Laudos (uso / cota)</th>
-                <th className="text-right px-4 py-3">Tokens Lite</th>
-                <th className="text-right px-4 py-3">Tokens Pro</th>
+                <th className="text-left px-4 py-3 min-w-[170px]">Cota de laudos (uso / cota)</th>
+                <th className="text-right px-4 py-3">Gerados (mês)</th>
+                <th className="text-right px-4 py-3">Lite</th>
+                <th className="text-right px-4 py-3">Pro</th>
                 <th className="text-right px-4 py-3">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">
               {consumoRows.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-ink-400 font-medium">Nenhum usuário com consumo registrado.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-400 font-medium">Nenhum usuário com consumo registrado.</td></tr>
               )}
-              {consumoRows.map(({ u, reportsUsed, reportsQuota, unlimited, pct, tokenLite, tokenPro, status }) => {
+              {consumoRows.map(({ u, reportsUsed, reportsQuota, unlimited, pct, geradosMes, liteUsed, proUsed, status }) => {
                 const barColor = pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : 'bg-brand-500';
                 return (
                   <tr key={u.id} className="hover:bg-ink-50/40">
@@ -987,7 +1041,7 @@ export function AdminUsersSubscriptions() {
                       {unlimited ? (
                         <span className="text-[11px] font-bold text-emerald-600">♾️ Ilimitado</span>
                       ) : (
-                        <div className="min-w-[160px]">
+                        <div className="min-w-[150px]">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[11px] font-bold text-ink-800">{reportsUsed} / {reportsQuota}</span>
                             <span className={classNames('text-[10px] font-black', pct >= 100 ? 'text-rose-600' : pct >= 80 ? 'text-amber-600' : 'text-ink-400')}>{pct}%</span>
@@ -998,8 +1052,9 @@ export function AdminUsersSubscriptions() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-ink-700">{tokenLite === 0 ? '∞' : tokenLite.toLocaleString('pt-BR')}</td>
-                    <td className="px-4 py-3 text-right font-bold text-ink-700">{tokenPro === 0 ? '∞' : tokenPro.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 text-right font-black text-ink-900">{geradosMes.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 text-right font-bold text-indigo-700">{liteUsed.toLocaleString('pt-BR')}</td>
+                    <td className="px-4 py-3 text-right font-bold text-violet-700">{proUsed.toLocaleString('pt-BR')}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-1">
                         <button
@@ -1019,6 +1074,9 @@ export function AdminUsersSubscriptions() {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="px-4 py-2.5 border-t border-ink-50 text-[10px] text-ink-400 font-medium flex items-center gap-1.5">
+          <FileText size={11} /> "Gerados/Lite/Pro" = contagem real de laudos deste mês (ai_usage). "Cota" = contador que reseta a cada 30 dias e rege o bloqueio.
         </div>
       </div>
 
