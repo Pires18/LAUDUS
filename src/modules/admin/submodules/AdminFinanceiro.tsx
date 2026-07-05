@@ -3,6 +3,7 @@ import { logger } from '../../../utils/logger';
 import { FormLabel, NumInput, BoolToggle, MiniToggle, TextField, PasswordField } from './components/FinanceFormControls';
 import { TransactionsTab } from './finance/TransactionsTab';
 import { PacsPlansTab } from './finance/PacsPlansTab';
+import { VmInfraTab } from './finance/VmInfraTab';
 import { Spinner } from './finance/Spinner';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
@@ -22,10 +23,10 @@ import {
   Info, BarChart3, Check, X, RefreshCw, Calculator, Database,
   FileText, Building2, Zap, Sparkles, Globe, Lock, Eye, EyeOff,
   Copy, CheckCheck, Terminal, Key, QrCode, CreditCard, ShieldCheck,
-  AlertTriangle, CalendarDays, Hospital,
+  AlertTriangle, CalendarDays, Hospital, Server,
 } from 'lucide-react';
 
-type FinTab = 'plans' | 'pacs-plans' | 'features' | 'extra-resources' | 'abacatepay' | 'ia-costs' | 'transactions';
+type FinTab = 'plans' | 'pacs-plans' | 'vm-infra' | 'features' | 'extra-resources' | 'abacatepay' | 'ia-costs' | 'transactions';
 
 // ─── Plan form ───────────────────────────────────────────────────────────────
 
@@ -101,6 +102,7 @@ export function AdminFinanceiro() {
   const tabs: { id: FinTab; label: string; icon: typeof DollarSign }[] = [
     { id: 'plans',           label: 'Planos',            icon: DollarSign },
     { id: 'pacs-plans',      label: 'Planos PACS',       icon: Database   },
+    { id: 'vm-infra',        label: 'VMs / Infra',       icon: Server     },
     { id: 'features',        label: 'Funcionalidades',   icon: Settings   },
     { id: 'extra-resources', label: 'Recursos Extras',   icon: Plus       },
     { id: 'abacatepay',      label: 'AbacatePay',        icon: Settings   },
@@ -131,6 +133,7 @@ export function AdminFinanceiro() {
 
       {activeTab === 'plans'            && <PlansTab />}
       {activeTab === 'pacs-plans'       && <PacsPlansTab />}
+      {activeTab === 'vm-infra'         && <VmInfraTab />}
       {activeTab === 'features'         && <FeaturesTab />}
       {activeTab === 'extra-resources'  && <ExtraResourcesTab />}
       {activeTab === 'abacatepay'       && <AbacatePayTab />}

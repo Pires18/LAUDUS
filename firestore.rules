@@ -99,6 +99,14 @@ service cloud.firestore {
       }
     }
 
+    // ---- Collection group: settings (agregação de VMs do PACS) -------------
+    // Permite ao admin rodar collectionGroup('settings') para o painel de
+    // controle financeiro das VMs. Só leitura, só admin. As escritas continuam
+    // regidas pela subárvore do usuário acima (dono ou admin).
+    match /{path=**}/settings/{settingsId} {
+      allow read: if isAdmin();
+    }
+
     // ---- Assinaturas / planos do cliente ----------------------------------
     match /subscriptions/{subId} {
       // Dono lê a própria assinatura; admin lê/gerencia todas.
