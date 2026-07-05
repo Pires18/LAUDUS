@@ -198,7 +198,8 @@ export function AdminUsersSubscriptions() {
 
   let mrr = 0;
   subscriptions.forEach((s: any) => {
-    if (s.status === 'active') {
+    // Gratuidade (cortesia) e vitalício não geram receita — excluídos do MRR.
+    if (s.status === 'active' && !s.comp && !s.lifetime) {
       const planPrice = planPrices[s.planId] || planPrices[(s.plan || '').toLowerCase()] || pricing.basePlanPrice;
       mrr += planPrice;
 
@@ -410,7 +411,7 @@ export function AdminUsersSubscriptions() {
   async function handleAssignSub(
     u: SystemUser,
     plan: SaasPlan,
-    opts: { status: string; paymentMethod: string; periodEndMs: number; lifetime?: boolean }
+    opts: { status: string; paymentMethod: string; periodEndMs: number; lifetime?: boolean; comp?: boolean }
   ) {
     const now   = Date.now();
     const subId = `sub_${u.id}`;
@@ -427,7 +428,9 @@ export function AdminUsersSubscriptions() {
         addons,
         status: opts.status,
         lifetime: !!opts.lifetime,
-        autoRenew: !opts.lifetime,
+        // Gratuidade/cortesia: acesso sem cobrança (não conta como receita).
+        comp: !!opts.comp || !!opts.lifetime,
+        autoRenew: !opts.lifetime && !opts.comp,
         paymentMethod: opts.paymentMethod,
         currentPeriodStart: now,
         currentPeriodEnd: opts.periodEndMs,
@@ -521,7 +524,7 @@ export function AdminUsersSubscriptions() {
             <UserCheck size={22} className="text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-ink-950 tracking-tight leading-none">Usuários & Planos</h2>
+            <h2 className="text-lg font-black text-ink-950 tracking-tight leading-none">Central de Usuários</h2>
             <p className="text-[11px] text-ink-500 font-medium mt-1">
               {users.length} usuário(s) · {activeDisplay} ativo(s) · {trialCount} em trial
             </p>
@@ -861,6 +864,8 @@ export function AdminUsersSubscriptions() {
                     <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-2 flex-wrap">
                         {subBadge(u.subscriptionStatus)}
+                        {sub?.lifetime && <span title="Vitalício" className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100">♾️ Vitalício</span>}
+                        {sub?.comp && !sub?.lifetime && <span title="Gratuidade / cortesia" className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">Cortesia</span>}
                         {sub?.plan && <span className="text-[10px] font-bold text-ink-600 truncate max-w-[110px]">{sub.plan}</span>}
                         {!u.subscriptionStatus && (
                           <button
@@ -1240,7 +1245,10 @@ interface AssignOpts {
   paymentMethod: string;
   periodEndMs: number;
   lifetime?: boolean;
+  comp?: boolean;
 }
+
+type BillingType = 'paid' | 'comp' | 'lifetime';
 
 /** Fim de período "infinito" para planos vitalícios (~ano 2999). */
 const LIFETIME_END_MS = new Date('2999-12-31T23:59:59Z').getTime();
@@ -1260,17 +1268,21 @@ function AssignSubModal({
   const [status, setStatus]                 = useState('active');
   const [paymentMethod, setPaymentMethod]   = useState('manual');
   const [periodDays, setPeriodDays]         = useState(30);
-  const [lifetime, setLifetime]             = useState(false);
+  const [billingType, setBillingType]       = useState<BillingType>('paid');
 
+  const lifetime = billingType === 'lifetime';
+  const comp     = billingType === 'comp';
   const plan = activePlans.find(p => p.id === selectedPlanId);
 
   const handleConfirm = () => {
     if (!plan) return;
     onConfirm(plan, {
-      status: lifetime ? 'active' : status,
-      paymentMethod: lifetime ? 'manual' : paymentMethod,
+      // Gratuidade/vitalício: sempre ativo e sem cobrança (cortesia).
+      status: (lifetime || comp) ? 'active' : status,
+      paymentMethod: (lifetime || comp) ? 'courtesy' : paymentMethod,
       periodEndMs: lifetime ? LIFETIME_END_MS : Date.now() + periodDays * 24 * 60 * 60 * 1000,
       lifetime,
+      comp,
     });
   };
 
@@ -1342,11 +1354,42 @@ function AssignSubModal({
             )}
           </div>
 
+          {/* Tipo de cobrança */}
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-2">Tipo de acesso</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { k: 'paid'     as const, label: 'Pago',       hint: 'cobrança normal',      cls: 'brand' },
+                { k: 'comp'     as const, label: 'Gratuidade', hint: 'cortesia, sem custo',  cls: 'emerald' },
+                { k: 'lifetime' as const, label: 'Vitalício',  hint: 'permanente, sem custo', cls: 'violet' },
+              ]).map(o => {
+                const on = billingType === o.k;
+                return (
+                  <button
+                    key={o.k}
+                    onClick={() => setBillingType(o.k)}
+                    className={classNames(
+                      'p-3 rounded-xl border text-left transition-all',
+                      on
+                        ? o.cls === 'emerald' ? 'border-emerald-400 bg-emerald-50/60 ring-1 ring-emerald-200'
+                          : o.cls === 'violet' ? 'border-violet-400 bg-violet-50/60 ring-1 ring-violet-200'
+                          : 'border-brand-400 bg-brand-50/60 ring-1 ring-brand-200'
+                        : 'border-ink-150 bg-white hover:border-ink-300'
+                    )}
+                  >
+                    <p className={classNames('text-xs font-black', on ? 'text-ink-900' : 'text-ink-700')}>{o.label}</p>
+                    <p className="text-[9px] text-ink-400 mt-0.5">{o.hint}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Status + Payment + Period */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-1">Status</label>
-              <select value={status} onChange={e => setStatus(e.target.value)} className="input h-10 text-sm w-full">
+              <select value={lifetime || comp ? 'active' : status} onChange={e => setStatus(e.target.value)} disabled={lifetime || comp} className="input h-10 text-sm w-full disabled:opacity-40">
                 <option value="active">Ativo</option>
                 <option value="trialing">Trial</option>
                 <option value="past_due">Em Atraso</option>
@@ -1355,7 +1398,8 @@ function AssignSubModal({
             </div>
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-1">Método Pagamento</label>
-              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className="input h-10 text-sm w-full">
+              <select value={lifetime || comp ? 'courtesy' : paymentMethod} onChange={e => setPaymentMethod(e.target.value)} disabled={lifetime || comp} className="input h-10 text-sm w-full disabled:opacity-40">
+                {(lifetime || comp) && <option value="courtesy">Cortesia (sem custo)</option>}
                 <option value="manual">Manual (Admin)</option>
                 <option value="pix">PIX</option>
                 <option value="credit_card">Cartão de Crédito</option>
@@ -1363,31 +1407,33 @@ function AssignSubModal({
             </div>
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-1">Duração (dias)</label>
-              <input type="number" min={1} max={365} value={periodDays}
+              <input type="number" min={1} max={365} value={lifetime ? 0 : periodDays}
                 onChange={e => setPeriodDays(parseInt(e.target.value) || 30)}
                 disabled={lifetime}
+                placeholder={lifetime ? '∞' : undefined}
                 className="input h-10 text-sm w-full disabled:opacity-40" />
             </div>
           </div>
 
-          {/* Plano vitalício */}
-          <label className={classNames(
-            'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all',
-            lifetime ? 'border-violet-400 bg-violet-50/60' : 'border-ink-150 bg-white hover:border-ink-300'
-          )}>
-            <input type="checkbox" checked={lifetime} onChange={e => setLifetime(e.target.checked)} className="shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs font-black text-ink-900">Plano vitalício (∞)</p>
-              <p className="text-[10px] text-ink-500 leading-relaxed">Acesso permanente: status Ativo, sem expiração e sem cobrança recorrente. Ignora a duração acima.</p>
-            </div>
-          </label>
+          {(comp || lifetime) && (
+            <p className="text-[10px] text-ink-500 leading-relaxed flex items-start gap-1.5">
+              <CheckCircle2 size={12} className={comp ? 'text-emerald-600 shrink-0 mt-0.5' : 'text-violet-600 shrink-0 mt-0.5'} />
+              {lifetime
+                ? 'Vitalício: acesso permanente (∞), status Ativo, sem cobrança e fora do MRR.'
+                : 'Gratuidade: acesso de cortesia pela duração definida, sem cobrança e fora do MRR.'}
+            </p>
+          )}
 
           {/* Summary */}
           {plan && (
             <div className="bg-ink-50 rounded-xl border border-ink-100 p-4 text-xs space-y-1.5">
               <p className="text-[10px] font-black uppercase text-ink-400 tracking-widest mb-2">Resumo da Atribuição</p>
               <div className="flex justify-between"><span className="text-ink-500">Plano</span><span className="font-bold">{plan.name}</span></div>
-              <div className="flex justify-between"><span className="text-ink-500">Status</span><span className="font-bold capitalize">{status}</span></div>
+              <div className="flex justify-between"><span className="text-ink-500">Tipo</span>
+                <span className={classNames('font-bold', comp ? 'text-emerald-600' : lifetime ? 'text-violet-600' : 'text-ink-900')}>
+                  {lifetime ? 'Vitalício (sem custo)' : comp ? 'Gratuidade (cortesia)' : 'Pago'}
+                </span>
+              </div>
               <div className="flex justify-between"><span className="text-ink-500">Laudos LAUD.IA/mês</span><span className="font-bold">{plan.reportsQuota === 0 ? 'Ilimitado' : plan.reportsQuota}</span></div>
               {plan.motorProDefault && (
                 <div className="flex justify-between"><span className="text-ink-500">Motor Pro</span><span className="font-bold text-violet-600">Incluído</span></div>

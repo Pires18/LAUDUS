@@ -51,7 +51,7 @@ export function Admin() {
   const tabs = [
     { id: 'overview',    label: 'Geral',              icon: LayoutDashboard },
     { id: 'laud-ia',    label: 'LAUD.IA',            icon: Sparkles        },
-    { id: 'users',      label: 'Usuários & Planos',  icon: Users           },
+    { id: 'users',      label: 'Central de Usuários', icon: Users           },
     { id: 'financeiro', label: 'Financeiro',          icon: DollarSign      },
     { id: 'audit',      label: 'Auditoria',           icon: History         },
     { id: 'support',    label: 'Suporte',             icon: LifeBuoy        },

@@ -467,6 +467,8 @@ export interface Subscription {
   currentPeriodEnd: number;
   /** Plano vitalício: sempre ativo, sem expiração/recorrência (definido pelo admin). */
   lifetime?: boolean;
+  /** Gratuidade/cortesia: acesso sem cobrança (não conta como receita/MRR). */
+  comp?: boolean;
   /** Auto-renova (recorrente). Falso em vitalício e em avulso. */
   autoRenew?: boolean;
   trialEndsAt?: number;
