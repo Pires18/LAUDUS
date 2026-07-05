@@ -1,8 +1,9 @@
 # 🔍 Auditoria Completa — LAUD.US
 
-**Data:** 2026-07-04 · **Versão do sistema:** produção (Vercel + Firebase) · **Escopo:** todos os módulos, funcionalidades, interfaces, segurança e sistema de planos.
+**Data:** 2026-07-04 (v2, aprofundada) · **Ambiente:** produção (Vercel + Firebase).
+**Escopo:** todos os módulos, funcionalidades, interfaces, segurança, sistema de planos e infraestrutura.
 
-> Esta auditoria reflete o estado **após** o endurecimento de segurança/PACS/admin/cobrança realizado nesta rodada. Itens já corrigidos estão marcados ✅; pendências têm severidade 🔴 alta / 🟡 média / 🟢 baixa.
+> Reflete o estado **após** o endurecimento desta rodada (segurança, PACS na nuvem, painel admin, planos/cobrança, marca/landing). ✅ = já corrigido · 🔴 alta · 🟡 média · 🟢 baixa.
 
 ---
 
@@ -10,154 +11,130 @@
 
 | Métrica | Valor |
 |---|---|
-| Arquivos-fonte | ~189 (104 `.tsx`, 85 `.ts`) |
+| Arquivos-fonte | ~191 (105 `.tsx`, 86 `.ts`) |
 | Linhas (src) | ~53.400 |
 | Módulos | 14 |
-| Endpoints serverless | 18 (`api/`) |
-| Testes | 188 (12 arquivos) — 100% passando |
-| Coleções Firestore (raiz) | users, subscriptions, saas_plans, transactions, support_tickets, audit_logs, metrics_daily, global_config, system |
-| Stack | React 18 + TS + Vite (PWA) · Firebase (Auth/Firestore/Storage) · Vercel serverless/edge · Gemini · AbacatePay |
+| Endpoints serverless | 12 funções + 6 helpers |
+| Testes | 188 (12 arquivos) — 100% ✓ |
+| Coleções raiz | users, subscriptions, saas_plans, transactions, support_tickets, audit_logs, metrics_daily, global_config, system |
+| Stack | React 18 + TS + Vite (PWA) · Firebase · Vercel serverless/edge · Gemini · AbacatePay · GCP/Tailscale (PACS) |
 
-### LOC por módulo
-`ai 9.230` · `editor 7.431` · `calculators 6.045` · `admin 4.871` · `appointments 3.897` · `laud-ia 2.690` · `settings 2.063` · `dicom 1.926` · `clinics 1.252` · `templates 984` · `patients 910` · `export 813` · `worklist 751` · `dashboard 649`
+**LOC por módulo:** `ai 9.230` · `editor 7.431` · `calculators 6.045` · `admin 4.871` · `appointments 3.897` · `laud-ia 2.690` · `settings 2.063` · `dicom 1.926` · `clinics 1.252` · `templates 984` · `patients 910` · `export 813` · `worklist 751` · `dashboard 649`.
 
 ---
 
-## 2. Auditoria por módulo (estrutural · funcional · interface · segurança)
+## 2. Auditoria por módulo
 
-### 2.1 Dashboard (`src/modules/dashboard`)
-- **Função:** visão inicial — atalhos, contadores, uso de laudos, status.
-- **Estado:** funcional. Lê `getAiUsageStats` do próprio usuário.
-- 🟢 Poderia consolidar KPIs com o resto; sem problemas de segurança.
+### 2.1 Dashboard — `dashboard/Dashboard.tsx`
+Início com atalhos, contadores e uso de laudos do mês (`getAiUsageStats` do próprio usuário). **Funcional.** 🟢 sem achados.
 
-### 2.2 Worklist (`src/modules/worklist`)
-- **Função:** lista de exames pendentes/em andamento/finalizados; cria/edita/exclui exame; sincroniza com o PACS (.wl).
-- **Estado:** funcional; remove `.wl` ao finalizar/excluir.
-- 🟢 Carrega a coleção do usuário (escopo próprio, ok).
+### 2.2 Worklist — `worklist/Worklist.tsx`
+Fila de exames; CRUD; remove `.wl` ao finalizar/excluir (`deleteWorklistEntry`). **Funcional.** 🟢 escopo próprio (ok).
 
-### 2.3 Pacientes (`src/modules/patients`)
-- **Função:** CRUD de pacientes, histórico, exames anteriores.
-- **Estado:** funcional. LGPD: acesso a paciente é auditado (`logPatientAccess`).
-- 🟢 Sem achados relevantes.
+### 2.3 Pacientes — `patients/Patients.tsx`, `PatientDetail.tsx`
+CRUD + histórico + exames anteriores. **LGPD:** `logPatientAccess`. 🟢 —
 
-### 2.4 Agendamentos (`src/modules/appointments`)
-- **Função:** agenda semanal, marcação de exames, envio de worklist ao aparelho.
-- **Estado:** funcional. ✅ **Agora bloqueado por add-on** (`hasAppointments` + `FeatureLocked`) — antes só sumia do menu.
-- 🟢 —
+### 2.4 Agendamentos — `appointments/*`
+Agenda semanal (`WeeklyCalendar`), marcação, worklist ao aparelho. ✅ **Agora bloqueado por add-on** (`hasAppointments` + `FeatureLocked`). 🟢 —
 
-### 2.5 Editor de Laudo (`src/modules/editor`) — núcleo
-- **Função:** editor Tiptap, geração/refino por IA, Copiloto, visualizador PACS embutido, export PDF das imagens, versões, consentimento/anamnese.
-- **Estado:** robusto. ✅ Corrigido nesta rodada: PDF/fullscreen do PACS na nuvem (auth completa no proxy); viewer externo escondido quando inacessível.
-- 🟡 `ExamEditor.tsx` (1.457 L) — candidato a refatoração por tamanho.
+### 2.5 Editor de Laudo — `editor/*` (núcleo, 7.431 L)
+`ExamEditor` + `RichEditor` (Tiptap) + `LaudCopilot` + 9 componentes + 5 hooks (`useExamActions`, `useDicomSync`, `useCopilotSuggestions`, `useGoogleDocs`, `useVoiceAnalyzer`). ✅ Corrigido: PDF/fullscreen do PACS na nuvem (auth completa no proxy); viewer externo escondido quando inacessível.
+- 🟡 `ExamEditor.tsx` (1.457 L), `LaudCopilot.tsx` (1.585 L) — refatorar.
 
-### 2.6 Templates/Máscaras (`src/modules/templates`)
-- **Função:** biblioteca de máscaras de laudo, catálogo do sistema, editor de template.
-- **Estado:** funcional; máscaras do sistema (subárvore admin) legíveis por todos.
-- 🟢 —
+### 2.6 Máscaras — `templates/*`
+Biblioteca + catálogo do sistema (subárvore admin legível por todos). Editor de template. 🟢 —
 
-### 2.7 Calculadoras (`src/modules/calculators`)
-- **Função:** 20+ calculadoras (biometria fetal, dopplers, volumes) — bem testadas.
-- **Estado:** ✅ único módulo com boa cobertura de testes; gate por add-on via `FeatureLocked`.
-- 🟢 —
+### 2.7 Calculadoras — `calculators/*` (6.045 L)
+20+ calculadoras (`formulas.ts`, `classifiers.ts`, `fetalReferences`). ✅ **Melhor cobertura de testes**; gate por add-on. 🟢 —
 
-### 2.8 Clínicas (`src/modules/clinics`)
-- **Função:** múltiplas clínicas, cabeçalhos de laudo por unidade.
-- **Estado:** ✅ **Agora bloqueado por add-on** (`hasClinics`).
-- 🟢 —
+### 2.8 Clínicas — `clinics/*`
+Múltiplas clínicas + cabeçalhos. ✅ **Agora bloqueado por add-on** (`hasClinics`). 🟢 —
 
-### 2.9 PACS/DICOM (`src/modules/dicom`)
-- **Função:** configuração do Orthanc (local/VM), guia, aba de armazenamento/exames.
-- **Estado:** ✅ reescrito nesta rodada (guia VM-first, aba de Armazenamento, presets). Enforcement de plano server-side.
-- 🟡 Migração para VM na nuvem (multi-tenant) em andamento (`api/pacs-provision.ts`, docs PACS_*).
+### 2.9 PACS/DICOM — `dicom/*`
+`DicomControlCenter` (config/guia/armazenamento) + **`MyPacsCard`/`UltrasoundSetupCard`** (provisão self-service). ✅ Reescrito (guia VM-first, aba Armazenamento, presets) + enforcement server-side.
+- 🟡 **Multi-tenant em produção** (`api/pacs-provision.ts`, VM compartilhada por `tenantId`) — validar robustez do provisionamento real (GCP+Tailscale) e a migração dos exames locais.
 
-### 2.10 Configurações/Assinatura (`src/modules/settings`)
-- **Função:** perfil, PACS, LAUD.IA, e o **SubscriptionCenter** (plano, add-ons, cota, compra, cancelamento, histórico de pagamentos).
-- **Estado:** ✅ nesta rodada: cancelamento via `ConfirmDialog`; fim do "portal AbacatePay" fake; histórico de pagamentos do usuário funcionando (regra owner-read).
-- 🟢 —
+### 2.10 Configurações/Assinatura — `settings/*`
+`Settings` + **`SubscriptionCenter`** (plano/add-ons/cota/compra/cancelamento/**histórico de pagamentos**) + `AuditDashboard`. ✅ Cancelamento via `ConfirmDialog`; fim do portal-fake; histórico de pagamentos do usuário (regra owner-read). 🟢 —
 
-### 2.11 Admin (`src/modules/admin`)
-- **Função:** dashboard executivo, usuários & planos, financeiro, auditoria, suporte, máscaras, saúde do sistema, LAUD.IA.
-- **Estado:** ✅ endurecido e ampliado (Fases 0–5 + A): guarda de acesso, telemetria persistente (`metrics_daily`), KPIs reais, visão 360º do cliente, MRR/ARR, export CSV, SLA de suporte, aba Saúde.
-- 🟡 Listas de *Usuários* e *Suporte* ainda carregam a coleção inteira (ok no volume atual; paginar no futuro).
+### 2.11 Admin — `admin/*` (4.871 L)
+9 submódulos: Overview/Analytics, Usuários & Planos, Financeiro, Auditoria, Suporte, Máscaras, **Saúde**, LAUD.IA, **UserDetail (360º)**. ✅ Endurecido e ampliado (guarda de acesso, telemetria persistente, KPIs reais, MRR/ARR, export CSV, SLA, aba Saúde).
+- 🟡 *Usuários*/*Suporte* ainda carregam a coleção inteira (paginar).
 
-### 2.12 IA (`src/modules/ai`)
-- **Função:** motor Gemini (Lite/Pro), prompts por área, treino/evals, telemetria.
-- **Estado:** ✅ Gemini-only (Anthropic removido); IDs de modelo centralizados; enforcement de cota server-side (fail-open).
-- 🟡 `prompts/areaPrompts.ts` (3.297 L) — arquivo gigante (dados, não lógica).
+### 2.12 IA — `ai/*` (9.230 L)
+Motor Gemini (Lite/Pro), prompts por área, **pipeline de treino/evals** (`training/*` — 18 arquivos). ✅ Gemini-only; IDs centralizados; cota server-side (fail-open); telemetria persistida.
+- 🟡 `prompts/areaPrompts.ts` (3.297 L) — dado grande em código.
 
-### 2.13 LAUD.IA (`src/modules/laud-ia`)
-- **Função:** UI de treino/configuração da IA (admin).
-- **Estado:** funcional; `SharedLaudIA.tsx` (1.745 L) grande.
+### 2.13 LAUD.IA — `laud-ia/SharedLaudIA.tsx` (1.745 L)
+UI de treino/config da IA (admin). 🟡 arquivo grande.
 
-### 2.14 Export (`src/modules/export`)
-- **Função:** geração do laudo em PDF (paged.js) e Google Docs; documento de imagens.
-- **Estado:** funcional. ✅ Observações metodológicas movidas para o corpo do laudo.
+### 2.14 Export — `export/*`
+PDF (paged.js) + Google Docs (`lib/googleDocs`/`googleDrive`/`googlePicker`). ✅ Observações metodológicas no corpo do laudo. 🟢 —
 
 ---
 
 ## 3. Auditoria de segurança
 
 ✅ **Sólido:**
-- **Firestore rules** (13 `match`, RBAC): impedem auto-promoção a admin, inflar cota, auto-conceder add-ons; contador de uso só cresce; `transactions` admin/owner-read; default-deny.
-- **Privilégio de admin** só por `profile.role` (campo protegido) — `useAdmin` não confia mais em `settings.currentRole`; `Admin.tsx` com guarda própria.
-- **Endpoints:** `promote-admin` (trava tripla), `abacatepay-test` (admin-only), webhook (`safeEqual` timing-safe), `orthanc-proxy`/`worklist` (auth + entitlement PACS), `gemini` (auth + rate-limit + cota).
-- **PACS por-usuário:** segredo do agente criptografado; anti-SSRF (`ALLOWED_HOSTS`).
-- **LGPD:** trilha de acesso a paciente; pseudonimização nos prompts (`scrubForGeneration`).
-- **Enforcement server-side:** add-on PACS (`_entitlements.ts`) e cota de laudos (Edge via Firestore REST), ambos **fail-open**.
-- **Monitoramento:** Sentry configurável.
+- **Firestore rules** (RBAC, 13 `match`): sem escalonamento de privilégio (campos protegidos), cota só cresce, add-ons só admin, `transactions`/`metrics_daily` restritos, default-deny, `saas_plans` público (catálogo).
+- **Admin** só por `profile.role` (autoritativo) + guarda em `Admin.tsx` + super-admin por e-mail.
+- **Endpoints:** JWKS (Edge/serverless), rate-limit (`gemini`), `safeEqual` (webhook/cron), entitlement PACS + cota (fail-open), `promote-admin` (trava tripla), `abacatepay-test` (admin-only).
+- **Segredos:** criptografia por-usuário (senhas PACS + agent secret), anti-SSRF no Agente, `.env` gitignored.
+- **LGPD:** trilha de acesso, pseudonimização (`scrubForGeneration`), consentimento.
 
 🟡 **Pendências:**
-- **`global_config` legível por qualquer usuário logado** (`allow read: if isSignedIn()`) — inclui `admin_settings`. Verificar se há segredo sensível ali (chaves de IA são server-side, mas confirmar). Considerar restringir docs sensíveis.
-- **Enforcement de cota** depende do cliente incrementar `reportsUsedThisMonth` (o servidor lê, não conta). Fecha o caso honesto/direto; não impede um cliente adulterado de não-incrementar. Contar server-side seria a blindagem total (custo/latência).
+1. **`global_config` legível por qualquer logado** (`allow read: if isSignedIn()`) — inclui `admin_settings`/`abacatepay_config`. Confirmar que não há segredo sensível exposto (chaves de pagamento/IA devem estar server-side); **restringir docs sensíveis**.
+2. **Cota contável no servidor**: hoje o servidor **lê** `reportsUsedThisMonth` (não conta). Um cliente adulterado poderia não incrementar. Blindagem total = incrementar server-side.
+3. **PACS provision** manipula credenciais GCP/Tailscale server-side — revisar tratamento de erro/segredos e permissões da service account.
 
 ---
 
-## 4. Sistema de planos — estado
+## 4. Sistema de planos & cobrança
 
-✅ **Coerente após esta rodada:**
-- Add-ons: `pacs`, `calculators`, `appointments`, `clinics` — **gating consistente** (paywall `FeatureLocked` em todos).
-- Cota de laudos (Lite/Pro) + quota de clínicas; trial de 14 dias.
-- **Enforcement:** UI (nav + paywall) + servidor (PACS + cota de laudos).
-- **AbacatePay:** checkout (plano/add-on) → webhook (concede + agrega receita) → cancelamento (dono ou admin). Sem portal fake.
-- **Admin:** atribuir plano (mapeia `includesX` → add-ons), editar cota, toggle Motor Pro, cancelar.
+✅ **Coerente:** add-ons (`pacs/calculators/appointments/clinics` + pacotes de token/extra) com **gating consistente** (nav + `FeatureLocked` + servidor); trial 14d; checkout→webhook→cancel; vitrine pública de preços (`PricingPlans`); admin atribui plano (mapeia `includesX`→add-ons).
 
 🟡 **Pendências:**
-- MRR/ARR dependem do CRON (diário no Hobby) + "Recalcular métricas" inicial.
-- Sem prorata/upgrade-downgrade automatizado (troca de plano é atribuição direta).
+- MRR/ARR dependem do CRON (diário no Hobby) + "Recalcular métricas".
+- Sem upgrade/downgrade com prorata (troca = atribuição direta).
+- Sem reconciliação automática `finance_stats` vs soma real.
 
 ---
 
-## 5. Qualidade & dívida técnica
+## 5. Interfaces & UX
+✅ Sem botões mortos; ações com toast + tratamento de erro; **confirmações padronizadas** (`ConfirmDialog`); estados loading/vazio/erro; `ErrorBoundary` por rota; **marca padronizada** (favicon+PWA) e **tela de entrada como landing** com vitrine de planos.
+🟢 Oportunidade: página pública de pricing dedicada (hoje é modal na entrada), FAQ, add-ons avulsos na vitrine.
+
+---
+
+## 6. Qualidade & dívida técnica
 
 | Indicador | Valor | Leitura |
 |---|---|---|
-| Testes | 188 ✓ | Bom, mas concentrado em IA/calculadoras/PACS-routing |
-| `any`/`as any` | 225 | Alto — tipagem frouxa em pontos |
-| TODO/FIXME | 60 | Moderado |
-| `@ts-ignore`/eslint-disable | 25 | Moderado |
-| `console.*` | 8 | Baixo (usa `logger`) |
-| Arquivos > 1.000 L | areaPrompts (3.297), SharedLaudIA (1.745), LaudCopilot (1.585), AdminFinanceiro (~1.550), ExamEditor (1.457), engine (1.274), db (1.290) | Refatoração recomendada |
-| Bundle `vendor-ui` | ~1 MB | Warning de build; code-split recomendado |
+| Testes | 188 ✓ | Bom; concentrado em IA/calculadoras/segurança/PACS-routing |
+| `any`/`as any` | ~225 | Alto |
+| TODO/FIXME | ~60 | Moderado |
+| `@ts-ignore`/eslint-disable | ~25 | Moderado |
+| Arquivos > 1.000 L | areaPrompts, SharedLaudIA, LaudCopilot, AdminFinanceiro, ExamEditor, engine, db | Refatorar |
+| Bundle `vendor-ui` | ~1 MB | Code-split |
 
 ---
 
-## 6. Achados priorizados (pendências)
+## 7. Achados priorizados
 
 **🔴 Alta**
-1. **Cobertura de testes** dos caminhos críticos ainda parcial — pagamentos (webhook), enforcement, editor e `store/db` merecem mais testes (há base sólida agora: security/pricing/dicom-routing).
+1. Ampliar **testes dos caminhos críticos** — webhook (pagamentos), `_entitlements`/cota, `store/db` (base sólida já existe).
 
 **🟡 Média**
-2. `global_config` legível por qualquer logado — revisar exposição.
-3. Cota de laudos contável no servidor (blindagem total) — hoje o servidor lê, não conta.
-4. Paginação server-side em *Usuários* e *Suporte* (escala).
-5. Refatorar arquivos gigantes (ExamEditor, SharedLaudIA, AdminFinanceiro, areaPrompts).
+2. Restringir `global_config` (exposição de docs sensíveis).
+3. Cota contável no servidor (blindagem total).
+4. Robustez do **PACS multi-tenant** (provisão real GCP + migração).
+5. Paginação server-side em *Usuários*/*Suporte*.
+6. Refatorar arquivos gigantes.
 
 **🟢 Baixa**
-6. Reduzir `any` (225) nos pontos quentes; limpar TODOs.
-7. Code-split do bundle `vendor-ui`.
-8. Multi-tenant PACS (em andamento) — finalizar/documentar.
+7. Reduzir `any`; limpar TODOs; code-split; página pública de pricing.
 
 ---
 
-## 7. Conclusão
-O LAUD.US está **funcional, seguro e coerente** após esta rodada de endurecimento. As pendências são de **maturidade** (testes, escala, refatoração) — não há falha crítica aberta conhecida. O [PLANO_REFINAMENTO.md](PLANO_REFINAMENTO.md) organiza as pendências em fases; a [DOCUMENTACAO_OFICIAL.md](DOCUMENTACAO_OFICIAL.md) descreve o sistema por completo.
+## 8. Conclusão
+O LAUD.US está **funcional, seguro, coerente e agora em produção atualizada**. As pendências são de **maturidade** (testes, escala, refatoração, robustez do PACS multi-tenant) — sem falha crítica aberta conhecida. Roadmap organizado em [PLANO_REFINAMENTO.md](PLANO_REFINAMENTO.md); sistema descrito por completo em [DOCUMENTACAO_OFICIAL.md](DOCUMENTACAO_OFICIAL.md).
