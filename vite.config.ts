@@ -487,10 +487,10 @@ export default defineConfig({
         manualChunks: {
           // Firebase separado (maior vendor)
           'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
-          // React core
-          'vendor-react': ['react', 'react-dom'],
-          // UI libs
-          'vendor-ui': ['framer-motion', 'lucide-react'],
+          // UI: animações e ícones separados (antes um único vendor-ui de ~1MB).
+          // Isolar lucide-react (centenas de ícones) melhora cache/paralelismo.
+          'vendor-motion': ['framer-motion'],
+          'vendor-icons': ['lucide-react'],
           // Editor Tiptap (ProseMirror = pesado)
           'vendor-editor': [
             '@tiptap/react',
@@ -500,8 +500,10 @@ export default defineConfig({
           ],
           // IA Gemini SDK
           'vendor-ai': ['@google/generative-ai'],
-          // Exportação DOCX
-          'vendor-export': ['docx', 'file-saver'],
+          // PDF (paged.js pesado, uso pontual no export)
+          'vendor-pdf': ['pagedjs'],
+          // Monitoramento de erros
+          'vendor-sentry': ['@sentry/react'],
         },
       },
     },
