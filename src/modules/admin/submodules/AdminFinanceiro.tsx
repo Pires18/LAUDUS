@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, ReactNode } from 'react';
 import { logger } from '../../../utils/logger';
 import { FormLabel, NumInput, BoolToggle, MiniToggle, TextField, PasswordField } from './components/FinanceFormControls';
 import { TransactionsTab } from './finance/TransactionsTab';
+import { PacsPlansTab } from './finance/PacsPlansTab';
 import { Spinner } from './finance/Spinner';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
@@ -23,7 +24,7 @@ import {
   AlertTriangle, CalendarDays, Hospital,
 } from 'lucide-react';
 
-type FinTab = 'plans' | 'features' | 'extra-resources' | 'abacatepay' | 'ia-costs' | 'transactions';
+type FinTab = 'plans' | 'pacs-plans' | 'features' | 'extra-resources' | 'abacatepay' | 'ia-costs' | 'transactions';
 
 // ─── Plan form ───────────────────────────────────────────────────────────────
 
@@ -97,6 +98,7 @@ export function AdminFinanceiro() {
 
   const tabs: { id: FinTab; label: string; icon: typeof DollarSign }[] = [
     { id: 'plans',           label: 'Planos',            icon: DollarSign },
+    { id: 'pacs-plans',      label: 'Planos PACS',       icon: Database   },
     { id: 'features',        label: 'Funcionalidades',   icon: Settings   },
     { id: 'extra-resources', label: 'Recursos Extras',   icon: Plus       },
     { id: 'abacatepay',      label: 'AbacatePay',        icon: Settings   },
@@ -126,6 +128,7 @@ export function AdminFinanceiro() {
       </div>
 
       {activeTab === 'plans'            && <PlansTab />}
+      {activeTab === 'pacs-plans'       && <PacsPlansTab />}
       {activeTab === 'features'         && <FeaturesTab />}
       {activeTab === 'extra-resources'  && <ExtraResourcesTab />}
       {activeTab === 'abacatepay'       && <AbacatePayTab />}
@@ -275,7 +278,7 @@ function PlanCard({ plan, onEdit, onDelete }: { plan: Plan & { id: string }; onE
 
       <div className="text-2xl font-black text-ink-950">
         R$ {plan.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-        <span className="text-xs font-medium text-ink-400">/{plan.interval === 'month' ? 'mês' : 'ano'}</span>
+        <span className="text-xs font-medium text-ink-400">/{plan.interval === 'year' ? 'ano' : plan.interval === 'semester' ? 'semestre' : 'mês'}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
@@ -381,10 +384,16 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
             </div>
             <div>
               <FormLabel>Periodicidade</FormLabel>
-              <select value={form.interval} onChange={e => set('interval', e.target.value as 'month' | 'year')} className="input h-10 text-sm w-full">
+              <select value={form.interval} onChange={e => set('interval', e.target.value as 'month' | 'semester' | 'year')} className="input h-10 text-sm w-full">
                 <option value="month">Mensal</option>
+                <option value="semester">Semestral</option>
                 <option value="year">Anual</option>
               </select>
+              <p className="text-[10px] text-ink-400 mt-1 leading-relaxed">
+                {form.interval === 'year'
+                  ? '↻ Anual = assinatura recorrente (auto-renova na AbacatePay).'
+                  : '• Pagamento único: vale pelo período e expira (o cliente re-compra).'}
+              </p>
             </div>
             <div>
               <FormLabel>ID Produto AbacatePay</FormLabel>
