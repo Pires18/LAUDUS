@@ -44,6 +44,26 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // ---- Membership de clínica (equipe multiusuário) -----------------------
+    // Doc id determinístico `${ownerId}_${clinicId}_${memberUid}` em
+    // clinic_memberships/ — permite `exists()`/`get()` sem precisar de query.
+    // Enquanto nenhum convite for emitido para uma clínica, estas funções
+    // retornam false para todo mundo exceto o dono/admin (comportamento
+    // idêntico ao anterior a esta mudança).
+    function clinicMembershipId(ownerId, clinicId) {
+      return ownerId + '_' + clinicId + '_' + request.auth.uid;
+    }
+
+    function hasClinicAccess(ownerId, clinicId) {
+      return isSignedIn() && clinicId is string && clinicId.size() > 0
+        && exists(/databases/$(database)/documents/clinic_memberships/$(clinicMembershipId(ownerId, clinicId)));
+    }
+
+    function hasClinicWriteAccess(ownerId, clinicId) {
+      return hasClinicAccess(ownerId, clinicId)
+        && get(/databases/$(database)/documents/clinic_memberships/$(clinicMembershipId(ownerId, clinicId))).data.role != 'viewer';
+    }
+
     // Campos que definem privilégio/cota/assinatura — SOMENTE admin (ou
     // Admin SDK no servidor) pode alterá-los. Impede que um usuário comum
     // se auto-promova a admin ou infle a própria cota.
@@ -93,10 +113,52 @@ service cloud.firestore {
         allow write: if isOwner(userId) || isAdmin();
       }
 
-      // Demais dados da subárvore do usuário: dono ou admin.
+      // Clínicas: dono/admin gerenciam; membro convidado (qualquer papel) só lê.
+      match /clinics/{clinicId} {
+        allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, clinicId);
+        allow write: if isOwner(userId) || isAdmin();
+      }
+
+      // Pacientes, exames e agenda: dono/admin têm acesso total; membro da
+      // clínica (papel != viewer) lê e escreve; viewer só lê. Documentos sem
+      // clinicId (registros antigos/"todas as clínicas") continuam
+      // acessíveis apenas ao dono/admin — hasClinicAccess retorna false.
+      match /patients/{patientId} {
+        allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
+        allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
+        allow update, delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+      }
+      match /exams/{examId} {
+        allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
+        allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
+        allow update, delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+      }
+      match /appointments/{apptId} {
+        allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
+        allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
+        allow update, delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+      }
+
+      // Demais dados da subárvore do usuário (settings, ai_usage, etc.):
+      // permanecem exclusivos do dono/admin — sem acesso de equipe.
       match /{document=**} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
+    }
+
+    // ---- Membros de clínica (equipe multiusuário) -------------------------
+    // Doc id: `${ownerId}_${clinicId}_${memberUid}`. A CRIAÇÃO do convite é
+    // feita pelo servidor (api/clinic-invite.ts, Admin SDK autenticado como o
+    // dono da clínica) — não pelo cliente diretamente — para poder resolver
+    // e-mail→uid e validar que quem convida é de fato dono/admin da clínica.
+    match /clinic_memberships/{membershipId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.memberUid == request.auth.uid));
+      // O dono pode remover um membro que ele mesmo convidou; o membro pode
+      // sair por conta própria. Criação continua exclusiva do servidor.
+      allow delete: if isAdmin()
+        || (isSignedIn() && (resource.data.ownerId == request.auth.uid || resource.data.memberUid == request.auth.uid));
+      allow create, update: if false;
     }
 
     // ---- Collection group: settings (agregação de VMs do PACS) -------------

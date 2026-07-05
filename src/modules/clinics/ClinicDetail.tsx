@@ -2,6 +2,7 @@ import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { deleteItem } from '../../store/db';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { ClinicTeamCard } from '../../components/ClinicTeamCard';
 import { Clinic, ExamRequest } from '../../types';
 import { 
   Building2, MapPin, Phone, Mail, 
@@ -266,6 +267,8 @@ export function ClinicDetail({ clinicId }: Props) {
                 </div>
               </div>
             )}
+
+            <ClinicTeamCard clinicId={clinicId} />
 
             {/* Address & Info */}
             <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 space-y-4">

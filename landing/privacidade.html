@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidade — LAUD.US</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .legal { max-width: 760px; margin: 0 auto; padding: 64px 24px 96px; }
+    .legal h1 { font-size: 32px; font-weight: 900; margin-bottom: 8px; }
+    .legal .meta { color: var(--ink-500); font-size: 13px; font-weight: 700; margin-bottom: 32px; }
+    .legal .warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 16px 20px; border-radius: 12px; font-size: 13px; margin-bottom: 32px; }
+    .legal h2 { font-size: 18px; font-weight: 800; margin-top: 32px; }
+    .legal p, .legal li { font-size: 15px; color: var(--ink-700); line-height: 1.7; }
+    .legal table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    .legal th, .legal td { text-align: left; padding: 10px; border-bottom: 1px solid var(--ink-100); }
+  </style>
+</head>
+<body>
+  <nav class="nav"><div class="container nav-inner"><a class="logo" href="index.html">LAUD<span>.US</span></a></div></nav>
+  <main class="legal">
+    <h1>Política de Privacidade</h1>
+    <p class="meta">Versão 1.0 · Vigência a partir de 2026-07-05</p>
+    <div class="warning">⚠️ Rascunho técnico — requer revisão jurídica antes de publicação definitiva.</div>
+
+    <h2>1. Controlador e operador</h2>
+    <p>O profissional de saúde ou clínica cadastrada no LAUD.US é o <strong>controlador</strong> dos dados de pacientes inseridos na plataforma (LGPD, art. 5º, VI). O LAUD.US atua como <strong>operador</strong>, processando os dados exclusivamente conforme as instruções do controlador.</p>
+
+    <h2>2. Dados coletados</h2>
+    <p><strong>Do profissional/usuário:</strong> nome, e-mail, CRM/RQE, telefone, dados de clínica(s), dados de pagamento (processados por terceiro).</p>
+    <p><strong>Do paciente (inseridos pelo profissional):</strong> nome, CPF/RG, data de nascimento, sexo, contato, histórico clínico, exames, imagens DICOM e laudos.</p>
+
+    <h2>3. Minimização de dados para IA</h2>
+    <p>Antes de qualquer chamada ao modelo de linguagem (Google Gemini), nome, CPF, RG, telefone e e-mail do paciente são removidos automaticamente; idade, sexo e medidas clínicas são preservados.</p>
+
+    <h2>4. Compartilhamento com terceiros</h2>
+    <table>
+      <tr><th>Terceiro</th><th>Finalidade</th></tr>
+      <tr><td>Google (Firebase)</td><td>Hospedagem de banco de dados, autenticação e armazenamento</td></tr>
+      <tr><td>Google (Gemini API)</td><td>Geração assistida de texto de laudo, com dados anonimizados</td></tr>
+      <tr><td>AbacatePay</td><td>Processamento de pagamentos da assinatura</td></tr>
+      <tr><td>Sentry</td><td>Monitoramento técnico de erros (com redação automática de PII)</td></tr>
+    </table>
+
+    <h2>5. Retenção de dados</h2>
+    <p>Os prazos de retenção seguem a política interna alinhada às recomendações do Conselho Federal de Medicina para guarda de prontuário médico.</p>
+
+    <h2>6. Direitos do titular (LGPD art. 18)</h2>
+    <p>Confirmação de tratamento, acesso, correção, anonimização, portabilidade, eliminação e informação sobre compartilhamento com terceiros. Solicitações devem ser direcionadas ao profissional/clínica responsável pelo prontuário.</p>
+
+    <h2>7. Contato</h2>
+    <p>Solicitações relacionadas a dados pessoais podem ser encaminhadas para <a href="mailto:contato@laudus.com.br">contato@laudus.com.br</a>.</p>
+  </main>
+</body>
+</html>

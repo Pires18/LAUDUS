@@ -31,6 +31,7 @@ function b64urlToBytes(value: string): Uint8Array<ArrayBuffer> {
 export interface EdgeAuthedUser {
   uid: string;
   email: string;
+  emailVerified: boolean;
 }
 
 export async function verifyFirebaseIdToken(token: string): Promise<EdgeAuthedUser | null> {
@@ -74,7 +75,7 @@ export async function verifyFirebaseIdToken(token: string): Promise<EdgeAuthedUs
     );
     if (!valid) return null;
 
-    return { uid: payload.sub, email: (payload.email || '').toLowerCase() };
+    return { uid: payload.sub, email: (payload.email || '').toLowerCase(), emailVerified: payload.email_verified === true };
   } catch {
     return null;
   }

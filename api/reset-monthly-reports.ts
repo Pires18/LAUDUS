@@ -1,5 +1,6 @@
 import { getDb, getAdminAuth } from './_firebase.js';
 import { safeEqual } from './_secure.js';
+import { isRecurringInterval } from './_pricing.js';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;
@@ -24,6 +25,7 @@ async function runCronBatch(req: any, res: any) {
 
   let resetCount = 0;
   let pastDueCount = 0;
+  let expiredCount = 0;
   const batch = db.batch();
 
   snap.docs.forEach((docSnap: any) => {
@@ -40,12 +42,17 @@ async function runCronBatch(req: any, res: any) {
       resetCount++;
     }
 
-    // Expiração de período → past_due (a renovação real virá pelo webhook).
-    if (sub.status === 'active' && sub.currentPeriodEnd && now > sub.currentPeriodEnd) {
-      updates.status = 'past_due';
-      pastDueCount++;
-      if (sub.userId) {
-        batch.set(db.collection('users').doc(sub.userId), { subscriptionStatus: 'past_due', updatedAt: now }, { merge: true });
+    // Expiração de período: recorrente (anual) vira past_due (aguarda retry/webhook da
+    // AbacatePay); avulso (mensal/semestral, sem cobrança futura) vira expired e perde acesso.
+    if ((sub.status === 'active' || sub.status === 'past_due') && sub.currentPeriodEnd && now > sub.currentPeriodEnd) {
+      const recurring = isRecurringInterval(sub.interval);
+      const nextStatus = recurring ? 'past_due' : 'expired';
+      if (sub.status !== nextStatus) {
+        updates.status = nextStatus;
+        if (recurring) pastDueCount++; else expiredCount++;
+        if (sub.userId) {
+          batch.set(db.collection('users').doc(sub.userId), { subscriptionStatus: nextStatus, updatedAt: now }, { merge: true });
+        }
       }
     }
 
@@ -73,8 +80,8 @@ async function runCronBatch(req: any, res: any) {
     console.warn('[CRON RESET] Falha ao limpar pending_checkouts:', cleanErr);
   }
 
-  console.log(`[CRON RESET] reset=${resetCount} pastDue=${pastDueCount} cleanedCheckouts=${cleanedCheckouts} de ${snap.size} assinaturas.`);
-  return res.status(200).json({ success: true, reset: resetCount, pastDue: pastDueCount, cleanedCheckouts, total: snap.size });
+  console.log(`[CRON RESET] reset=${resetCount} pastDue=${pastDueCount} expired=${expiredCount} cleanedCheckouts=${cleanedCheckouts} de ${snap.size} assinaturas.`);
+  return res.status(200).json({ success: true, reset: resetCount, pastDue: pastDueCount, expired: expiredCount, cleanedCheckouts, total: snap.size });
 }
 
 export default async function handler(req: any, res: any) {

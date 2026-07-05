@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
 import { PricingPlans } from './PricingPlans';
+import { LegalModal, LEGAL_TERMS_VERSION } from './LegalModal';
+import { storePendingTermsAcceptance } from '../lib/legalConsent';
 
 const LANDING_FEATURES = [
   { icon: Sparkles,    label: 'Laudos com IA' },
@@ -18,17 +20,34 @@ const LANDING_FEATURES = [
 ];
 
 export function LoginScreen() {
-  const { signIn, signInWithEmail, signUpWithEmail, loading, error } = useAuth();
+  const { signIn, signInWithEmail, signUpWithEmail, resetPassword, loading, error } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    try {
+      await resetPassword(email);
+      setResetSent(true);
+    } catch {
+      // erro já exposto via useAuth().error
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
+    if (isRegister && !acceptedTerms) return;
     try {
       if (isRegister) {
+        storePendingTermsAcceptance(LEGAL_TERMS_VERSION);
         await signUpWithEmail(email, password);
       } else {
         await signInWithEmail(email, password);
@@ -132,10 +151,12 @@ export function LoginScreen() {
 
           <div className="text-center lg:text-left space-y-2 mb-8">
             <h1 className="text-3xl font-black text-ink-900 tracking-tight">
-              {isRegister ? 'Criar Conta' : 'Bem-vindo(a)'}
+              {forgotPassword ? 'Redefinir Senha' : isRegister ? 'Criar Conta' : 'Bem-vindo(a)'}
             </h1>
             <p className="text-ink-500 font-medium">
-              {isRegister ? 'Cadastre suas credenciais clínicas.' : 'Faça login para acessar seu workspace clínico.'}
+              {forgotPassword
+                ? 'Informe seu e-mail para receber o link de redefinição.'
+                : isRegister ? 'Cadastre suas credenciais clínicas.' : 'Faça login para acessar seu workspace clínico.'}
             </p>
           </div>
 
@@ -146,7 +167,52 @@ export function LoginScreen() {
             </div>
           )}
 
-          {/* Main Action Form / Control */}
+          {forgotPassword ? (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              {resetSent ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4 text-left">
+                  <p className="text-sm text-emerald-700 font-semibold leading-normal">
+                    Se existir uma conta com este e-mail, enviamos um link de redefinição de senha. Verifique sua caixa de entrada.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">E-mail Profissional</label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="exemplo@laud.us"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full h-12 pl-12 pr-4 bg-white border-2 border-ink-100 rounded-2xl focus:border-brand-500 focus:ring-4 focus:ring-brand-500/5 outline-none transition-all text-sm font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {!resetSent && (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 bg-brand-600 text-white font-black text-xs uppercase tracking-widest hover:bg-brand-700 rounded-2xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin text-white" /> : 'Enviar Link de Redefinição'}
+                </button>
+              )}
+
+              <div className="flex items-center justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setForgotPassword(false); setResetSent(false); }}
+                  className="text-[10px] font-black text-brand-600 hover:text-brand-700 uppercase tracking-widest transition-all"
+                >
+                  ← Voltar ao login
+                </button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">E-mail Profissional</label>
@@ -178,9 +244,30 @@ export function LoginScreen() {
               </div>
             </div>
 
+            {isRegister && (
+              <label className="flex items-start gap-2.5 px-1 py-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-2 border-ink-300 text-brand-600 focus:ring-brand-500/30 shrink-0"
+                />
+                <span className="text-[11px] text-ink-500 font-medium leading-relaxed">
+                  Li e aceito os{' '}
+                  <button type="button" onClick={() => setLegalDoc('terms')} className="text-brand-600 font-bold underline underline-offset-2 hover:text-brand-700">
+                    Termos de Uso
+                  </button>{' '}
+                  e a{' '}
+                  <button type="button" onClick={() => setLegalDoc('privacy')} className="text-brand-600 font-bold underline underline-offset-2 hover:text-brand-700">
+                    Política de Privacidade
+                  </button>.
+                </span>
+              </label>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (isRegister && !acceptedTerms)}
               className="w-full h-12 bg-brand-600 text-white font-black text-xs uppercase tracking-widest hover:bg-brand-700 rounded-2xl transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -213,7 +300,7 @@ export function LoginScreen() {
               <span className="text-xs font-black uppercase tracking-wider">Continuar com o Google</span>
             </button>
 
-            <div className="flex items-center justify-center gap-4 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-2">
               <button
                 type="button"
                 onClick={() => setIsRegister(!isRegister)}
@@ -229,6 +316,18 @@ export function LoginScreen() {
               >
                 Ver planos
               </button>
+              {!isRegister && (
+                <>
+                  <span className="w-px h-3 bg-ink-200" />
+                  <button
+                    type="button"
+                    onClick={() => setForgotPassword(true)}
+                    className="text-[10px] font-black text-ink-500 hover:text-ink-800 uppercase tracking-widest transition-all"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Secure Notice */}
@@ -239,6 +338,7 @@ export function LoginScreen() {
               </p>
             </div>
           </form>
+          )}
 
           {/* Compliance Icons Footer */}
           <div className="mt-8 pt-8 border-t border-ink-200 space-y-4">
@@ -260,9 +360,16 @@ export function LoginScreen() {
           </div>
 
           {/* Copyright Info */}
-          <p className="text-center lg:text-left text-ink-400 text-[10px] font-bold uppercase tracking-widest select-none mt-8">
-            © {new Date().getFullYear()} LAUD.US — PLATAFORMA DE LAUDOS
-          </p>
+          <div className="text-center lg:text-left mt-8 space-y-2">
+            <p className="text-ink-400 text-[10px] font-bold uppercase tracking-widest select-none">
+              © {new Date().getFullYear()} LAUD.US — PLATAFORMA DE LAUDOS
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-widest">
+              <button type="button" onClick={() => setLegalDoc('terms')} className="text-ink-400 hover:text-ink-700 underline underline-offset-2">Termos de Uso</button>
+              <span className="text-ink-300 mx-2">·</span>
+              <button type="button" onClick={() => setLegalDoc('privacy')} className="text-ink-400 hover:text-ink-700 underline underline-offset-2">Política de Privacidade</button>
+            </p>
+          </div>
 
         </div>
 
@@ -274,6 +381,8 @@ export function LoginScreen() {
         onClose={() => setShowPricing(false)}
         onChoose={() => { setShowPricing(false); setIsRegister(true); }}
       />
+
+      <LegalModal open={legalDoc} onClose={() => setLegalDoc(null)} />
 
     </div>
   );

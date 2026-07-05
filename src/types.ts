@@ -413,6 +413,22 @@ export interface Clinic {
   updatedAt: number;
 }
 
+/** Papel de um membro de equipe convidado para uma clínica (não o dono). */
+export type ClinicMemberRole = 'editor' | 'viewer';
+
+/** Doc em clinic_memberships/ (coleção global), id = `${ownerId}_${clinicId}_${memberUid}`. */
+export interface ClinicMembership {
+  id: string;
+  ownerId: string;
+  clinicId: string;
+  memberUid: string;
+  memberEmail: string;
+  role: ClinicMemberRole;
+  invitedByUid: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /** Registro de agendamento de exames */
 export interface Appointment {
   id: string;

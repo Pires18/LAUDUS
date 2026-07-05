@@ -1,5 +1,6 @@
 import { verifyAuthEdge } from './_edgeAuth.js';
 import { evaluateReportQuota } from './_quota.js';
+import { checkRateLimit } from './_rateLimit.js';
 
 export const config = {
   runtime: 'edge',
@@ -7,20 +8,6 @@ export const config = {
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
-
-const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
-
-function checkRateLimit(uid: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(uid);
-  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
-    rateLimitMap.set(uid, { count: 1, windowStart: now });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
 
 /**
  * Enforcement de cota de laudos (server-side, FAIL-OPEN).
@@ -112,7 +99,7 @@ export default async function handler(req: Request) {
 
     // Rate limiting pelo uid VERIFICADO (não pelo header auto-declarado).
     const uid = authed.uid;
-    if (!checkRateLimit(uid)) {
+    if (!(await checkRateLimit(`gemini:${uid}`, RATE_LIMIT, RATE_WINDOW_MS))) {
       return new Response(
         JSON.stringify({ error: 'Rate limit exceeded. Tente novamente em instantes.' }),
         { status: 429, headers: { 'Retry-After': '60' } }
@@ -122,6 +109,16 @@ export default async function handler(req: Request) {
     // Enforcement de cota — SOMENTE na geração de laudo (não copiloto/refino/
     // template/embeddings). Fail-open: só bloqueia quando confirma sem cota.
     if (req.headers.get('x-gemini-mode') === 'generation') {
+      // Contas de e-mail/senha precisam confirmar o e-mail antes de gerar laudos com
+      // IA (mitiga abuso de contas descartáveis no trial). Contas Google já chegam
+      // com email_verified=true no token, então nunca são bloqueadas aqui.
+      if (!authed.emailVerified) {
+        return new Response(
+          JSON.stringify({ error: 'Confirme seu e-mail para gerar laudos com IA. Reenvie o e-mail de verificação e tente novamente.' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
       const authHeader = req.headers.get('authorization') || '';
       const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
       const quota = await checkReportQuota(uid, idToken);

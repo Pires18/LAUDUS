@@ -187,11 +187,20 @@ VITE_SENTRY_DSN=
 
 ## Versões
 
-| Versão | Data | Notas |
-|---|---|---|
-| v3.0.1 | Jun/2026 | Revisão final: responsividade, PACS, design system |
-| v3.0.0 | Mai/2026 | Lançamento do LAUD.IA Command Center |
-| v2.x | 2025 | Versão legada (descontinuada) |
+Histórico completo de versões em [CHANGELOG.md](CHANGELOG.md).
+
+---
+
+## Documentação
+
+- [Documentação Oficial](docs/DOCUMENTACAO_OFICIAL.md) — documento técnico mestre (arquitetura, módulos, IA, dados, segurança, API)
+- [Arquitetura do repositório](src/ARCHITECTURE.md)
+- [Auditoria Completa](docs/AUDITORIA_COMPLETA_2026-07.md) — estado de segurança/LGPD corrente
+- [Plano de Refinamento](docs/PLANO_REFINAMENTO.md) — board de execução ativo
+- [Plano Final de Produção](docs/PLANO_FINAL_PRODUCAO_2026-07.md) — docs, multi-usuário, landing, LGPD/CFM
+- `docs/roadmaps/` — specs prontas aguardando implementação
+- `docs/pacs/` — arquitetura e manuais de PACS/DICOM
+- `docs/archive/` — planos e auditorias históricas (já concluídos/superados)
 
 ---
 

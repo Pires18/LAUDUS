@@ -19,6 +19,7 @@ import { SupportCenterModal } from './components/SupportCenterModal';
 import { BroadcastBanner } from './components/BroadcastBanner';
 import { PWAUpdatePrompt } from './components/PWAUpdatePrompt';
 import { OfflineBanner } from './components/OfflineBanner';
+import { EmailVerificationBanner } from './components/EmailVerificationBanner';
 import { AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
@@ -27,6 +28,7 @@ import { logger } from './utils/logger';
 import { watchSystemTheme } from './utils/theme';
 import { useConfirmStore } from './hooks/useConfirm';
 import { useSubscription } from './hooks/useSubscription';
+import { consumePendingTermsAcceptance } from './lib/legalConsent';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
 // ── Eager loads (critical path: Dashboard é a landing view) ──
@@ -133,6 +135,7 @@ function AuthenticatedApp() {
       style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
       <OfflineBanner />
+      <EmailVerificationBanner />
       <BroadcastBanner />
       
       {isPastDue && (
@@ -254,6 +257,7 @@ function UserAccessGate({ children }: { children: ReactNode }) {
         if (!userData) {
           logger.info('[AUTH] Novo usuário detectado. Provisionando perfil de testes (Trial)...');
           const now = Date.now();
+          const pendingTerms = consumePendingTermsAcceptance();
           userData = {
             name: user.displayName || user.email?.split('@')[0] || 'Médico',
             email: user.email,
@@ -265,6 +269,9 @@ function UserAccessGate({ children }: { children: ReactNode }) {
             reportsUsedThisMonth: 0,
             reportsQuota: 100,
             clinicsQuota: 5,
+            // Google OAuth não passa pelo checkbox de cadastro (fluxo direto);
+            // só e-mail/senha grava aceite explícito registrado no LoginScreen.
+            ...(pendingTerms ? { termsAcceptedAt: pendingTerms.termsAcceptedAt, termsVersion: pendingTerms.termsVersion } : {}),
           };
           await setDoc(userRef, userData);
         } else if (isSuperAdminEmail && userData.role !== 'admin') {

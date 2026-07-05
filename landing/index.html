@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LAUD.US — Laudos ultrassonográficos com IA, PACS/DICOM e gestão de clínica</title>
+  <meta name="description" content="Plataforma completa de laudos ultrassonográficos com inteligência artificial, PACS/DICOM gerenciado, calculadoras clínicas, agenda e multi-clínica. Feito para o profissional de saúde brasileiro." />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Ajuste esta URL para o domínio real do app antes do deploy -->
+  <script>window.APP_URL = 'https://app.laudus.com.br';</script>
+
+  <nav class="nav">
+    <div class="container nav-inner">
+      <div class="logo">LAUD<span>.US</span></div>
+      <div class="nav-links">
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#planos">Planos</a>
+        <a href="#faq">Perguntas frequentes</a>
+      </div>
+      <div style="display:flex; gap:12px;">
+        <a class="btn btn-ghost" id="loginLink" href="#">Entrar</a>
+        <a class="btn btn-primary" id="signupLink" href="#">Começar grátis</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <span class="badge">★ LAUD.IA · Powered by Google Gemini</span>
+      <h1>Do agendamento ao laudo assinado — em minutos.</h1>
+      <p>Plataforma completa de laudos ultrassonográficos com IA, PACS/DICOM integrado e gestão de clínica. Foque no diagnóstico; a LAUD.IA cuida do resto.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" id="heroSignup" href="#" style="padding: 16px 32px;">Começar grátis agora</a>
+        <a class="btn btn-ghost" href="#planos" style="padding: 16px 32px;">Ver planos e preços</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="section" id="funcionalidades">
+    <div class="container">
+      <div class="section-title">
+        <h2>Tudo o que sua clínica precisa, em um só lugar</h2>
+        <p>Do primeiro agendamento à entrega do laudo assinado — sem trocar de sistema.</p>
+      </div>
+      <div class="grid-features">
+        <div class="card"><div class="card-icon">✦</div><h3>Laudos com IA</h3><p>Geração assistida de texto de laudo com IA, sempre sujeita à revisão e assinatura do profissional responsável.</p></div>
+        <div class="card"><div class="card-icon">▤</div><h3>PACS / DICOM</h3><p>Integração com equipamentos de ultrassom via PACS/DICOM gerenciado, sem infraestrutura complexa.</p></div>
+        <div class="card"><div class="card-icon">Σ</div><h3>Calculadoras clínicas</h3><p>Biometria fetal, Doppler, TI-RADS, BI-RADS, O-RADS e mais de 20 calculadoras validadas.</p></div>
+        <div class="card"><div class="card-icon">▦</div><h3>Agenda & Worklist</h3><p>Agendamento integrado que gera automaticamente o exame no worklist do equipamento.</p></div>
+        <div class="card"><div class="card-icon">⌂</div><h3>Múltiplas clínicas</h3><p>Gerencie várias unidades/clínicas em uma única conta, com dados isolados por clínica.</p></div>
+        <div class="card"><div class="card-icon">$</div><h3>Planos & assinatura</h3><p>Planos mensal, semestral e anual, com add-ons por módulo conforme a necessidade da clínica.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section plans-bg" id="planos">
+    <div class="container">
+      <div class="section-title">
+        <h2>Planos para todo tamanho de clínica</h2>
+        <p>Preços ilustrativos — os valores e condições vigentes estão disponíveis no cadastro.</p>
+      </div>
+      <div class="grid-plans">
+        <div class="plan">
+          <h3>Essencial</h3>
+          <div class="price">R$ 197<span>/mês</span></div>
+          <ul>
+            <li>1 clínica</li>
+            <li>Laudos com IA (cota mensal)</li>
+            <li>Calculadoras clínicas</li>
+            <li>Agenda & Worklist</li>
+          </ul>
+          <a class="btn btn-ghost" href="#" onclick="goSignup(event)">Começar grátis</a>
+        </div>
+        <div class="plan featured">
+          <h3>Profissional</h3>
+          <div class="price">R$ 397<span>/mês</span></div>
+          <ul>
+            <li>Até 5 clínicas</li>
+            <li>Laudos com IA (cota ampliada)</li>
+            <li>PACS/DICOM gerenciado</li>
+            <li>Suporte prioritário</li>
+          </ul>
+          <a class="btn btn-primary" href="#" onclick="goSignup(event)">Começar grátis</a>
+        </div>
+        <div class="plan">
+          <h3>Anual</h3>
+          <div class="price">R$ 3.970<span>/ano</span></div>
+          <ul>
+            <li>Tudo do Profissional</li>
+            <li>2 meses grátis (vs. mensal)</li>
+            <li>Renovação automática</li>
+            <li>Prioridade em novidades</li>
+          </ul>
+          <a class="btn btn-ghost" href="#" onclick="goSignup(event)">Começar grátis</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq">
+    <div class="container" style="max-width: 760px;">
+      <div class="section-title">
+        <h2>Perguntas frequentes</h2>
+      </div>
+      <div class="faq-item">
+        <h4>O laudo gerado pela IA tem validade sem revisão médica?</h4>
+        <p>Não. O texto gerado pela IA é uma sugestão de redação, sempre sujeita à revisão, edição e assinatura do médico responsável antes de qualquer uso clínico.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Os dados dos meus pacientes são enviados para a IA?</h4>
+        <p>Não com identificação. Nome, CPF, RG, telefone e e-mail do paciente são removidos automaticamente antes de qualquer chamada ao modelo de IA — apenas idade, sexo e medidas clínicas são utilizados.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Preciso de equipamento compatível para usar o PACS/DICOM?</h4>
+        <p>A integração funciona com a maioria dos aparelhos de ultrassom com saída DICOM padrão. O suporte auxilia na configuração inicial.</p>
+      </div>
+      <div class="faq-item">
+        <h4>Posso cancelar quando quiser?</h4>
+        <p>Sim. Planos anuais (recorrentes) podem ser cancelados a qualquer momento, deixando de renovar no próximo ciclo. Planos mensal/semestral são avulsos e não renovam automaticamente.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <h5>LAUD.US</h5>
+          <p style="font-size:13px; color: var(--ink-400); max-width: 260px; line-height:1.6;">Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e gestão de clínica.</p>
+        </div>
+        <div class="footer-col">
+          <h5>Produto</h5>
+          <a href="#funcionalidades">Funcionalidades</a>
+          <a href="#planos">Planos</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div class="footer-col">
+          <h5>Legal</h5>
+          <a href="termos.html">Termos de Uso</a>
+          <a href="privacidade.html">Política de Privacidade</a>
+        </div>
+        <div class="footer-col">
+          <h5>Contato</h5>
+          <a href="mailto:contato@laudus.com.br">contato@laudus.com.br</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> LAUD.US — Plataforma de Laudos</span>
+        <span>CNPJ: [preencher antes do deploy]</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    document.getElementById('loginLink').href = window.APP_URL;
+    document.getElementById('signupLink').href = window.APP_URL + '?action=signup';
+    document.getElementById('heroSignup').href = window.APP_URL + '?action=signup';
+    function goSignup(e) { e.preventDefault(); window.location.href = window.APP_URL + '?action=signup'; }
+  </script>
+</body>
+</html>

@@ -7,6 +7,7 @@
     "api/reset-monthly-reports.ts": { "maxDuration": 60 },
     "api/cron-aggregate-metrics.ts": { "maxDuration": 60 },
     "api/promote-admin.ts": { "maxDuration": 15 },
+    "api/clinic-invite.ts": { "maxDuration": 15 },
     "api/gemini.ts": { "maxDuration": 60 },
     "api/health.ts": { "maxDuration": 5 }
   },
