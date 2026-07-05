@@ -102,7 +102,12 @@ export default async function handler(req: any, res: any) {
       || (process.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')
       || 'http://localhost:5173';
 
-    const itemId = abacatePayProductId || `${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${Date.now()}`;
+    // ID de produto DETERMINÍSTICO por (plano|add-on) × intervalo. Se o admin
+    // configurou um abacatePayProductId, respeita; senão gera um estável — assim
+    // a AbacatePay reconhece cada assinatura recorrente sem cadastro manual.
+    const autoProductId = (abacatePayProductId
+      || `laudus-${type === 'addon' ? addon : (selectedPlanId || 'plano-base')}-${planInterval}`
+    ).toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const metadata = {
       userId,
       email,
@@ -112,14 +117,16 @@ export default async function handler(req: any, res: any) {
       interval: planInterval,
     };
     const payload = {
-      frequency: type === 'addon' ? 'ONE_TIME' : 'SUBSCRIPTION',
+      // Add-ons e planos são assinatura recorrente (SUBSCRIPTION) em todos os
+      // intervalos. A AbacatePay cobra na cadência do intervalo do item.
+      frequency: 'SUBSCRIPTION',
       methods: ['PIX', 'CARD'],
       items: [{
-        id: itemId,
+        id: autoProductId,
         name: productName,
         quantity: 1,
         price: amount,
-        ...(abacatePayProductId ? { externalId: abacatePayProductId } : {}),
+        externalId: autoProductId,
       }],
       returnUrl: `${returnBase}/#settings?tab=assinatura`,
       completionUrl: `${returnBase}/#settings?tab=assinatura`,
