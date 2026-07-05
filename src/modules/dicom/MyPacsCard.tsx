@@ -55,8 +55,22 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
   const { settings, updateSettings, showToast } = useApp();
   const inst: PacsInstance = settings.pacsInstance || { status: 'none' };
   const [busy, setBusy] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<Plan>('pro');
+  const [selectedPlan, setSelectedPlan] = useState<Plan>((settings.pacsSelectedPlan as Plan) || 'pro');
   const [pacsInterval, setPacsInterval] = useState<PacsInterval>('month');
+
+  // Escolha do tier fica salva em settings.pacsSelectedPlan e sincroniza com o
+  // seletor do Centro de Assinatura (mesma fonte de verdade).
+  useEffect(() => {
+    if (settings.pacsSelectedPlan && settings.pacsSelectedPlan !== selectedPlan) {
+      setSelectedPlan(settings.pacsSelectedPlan as Plan);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.pacsSelectedPlan]);
+
+  const choosePlan = (p: Plan) => {
+    setSelectedPlan(p);
+    if (settings.pacsSelectedPlan !== p) updateSettings({ pacsSelectedPlan: p }).catch(() => {});
+  };
 
   // Planos de PACS gerenciados no Admin → Financeiro (global_config/pacs_plans);
   // fallback para os defaults se o admin ainda não publicou.
@@ -342,7 +356,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
           return (
             <button
               key={p}
-              onClick={() => setSelectedPlan(p)}
+              onClick={() => choosePlan(p)}
               className={classNames(
                 'relative text-left p-3 rounded-xl border transition-all',
                 active ? 'border-emerald-400 bg-emerald-50/50 ring-2 ring-emerald-400/20' : 'border-ink-200 hover:border-ink-300 bg-white'

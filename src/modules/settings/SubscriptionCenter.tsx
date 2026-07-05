@@ -44,6 +44,15 @@ const ADDONS_DEFAULT: AddonsConfig = {
   tokenPro:    { price: 24.90, bundleSize: 20,  description: 'Pacote de 20 laudos com Motor Pro.',  enabled: true },
 };
 
+// Tiers de PACS (infra) — fallback caso o admin ainda não tenha publicado
+// global_config/pacs_plans. Espelha os defaults do MyPacsCard/PacsPlansTab.
+const PACS_TIERS_DEFAULT: Record<string, any> = {
+  starter:  { label: 'Starter',  prices: { month: 99,  semester: 534,  year: 950  }, disk: 100, model: 'Compartilhado isolado', active: true },
+  pro:      { label: 'Pro',      prices: { month: 149, semester: 804,  year: 1430 }, disk: 300, model: 'Compartilhado isolado', badge: 'Popular', active: true },
+  dedicado: { label: 'Dedicado', prices: { month: 249, semester: 1344, year: 2390 }, disk: 300, model: 'VM exclusiva', active: true },
+};
+const PACS_TIER_ORDER = ['starter', 'pro', 'dedicado'] as const;
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function SubscriptionCenter() {
@@ -53,7 +62,7 @@ export function SubscriptionCenter() {
     trialDaysLeft, motorProEnabled, motorOptions,
   } = useSubscription();
 
-  const { user, showToast, settings } = useApp();
+  const { user, showToast, settings, updateSettings } = useApp();
   const confirm = useConfirm();
 
   const [loadingAddon,      setLoadingAddon]      = useState<string | null>(null);
@@ -69,6 +78,8 @@ export function SubscriptionCenter() {
   };
   const [sendingPacsTicket, setSendingPacsTicket] = useState(false);
   const [pacsRequested,     setPacsRequested]     = useState(false);
+  const [pacsTiers,         setPacsTiers]         = useState<Record<string, any>>(PACS_TIERS_DEFAULT);
+  const [savingPacsTier,    setSavingPacsTier]    = useState(false);
   const [showHistory,       setShowHistory]       = useState(true);
   const [laudoStats,        setLaudoStats]        = useState<LaudoStats>({ liteCount: 0, proCount: 0 });
   const [loadingStats,      setLoadingStats]      = useState(false);
@@ -82,6 +93,13 @@ export function SubscriptionCenter() {
   useEffect(() => {
     getDoc(doc(firestore, 'global_config', 'addons_config'))
       .then(snap => { if (snap.exists()) setAddonsConfig({ ...ADDONS_DEFAULT, ...snap.data() }); })
+      .catch(() => {});
+  }, []);
+
+  // ── Load PACS tiers (starter/pro/dedicado) from admin config ──────────────
+  useEffect(() => {
+    getDoc(doc(firestore, 'global_config', 'pacs_plans'))
+      .then(snap => { if (snap.exists()) setPacsTiers({ ...PACS_TIERS_DEFAULT, ...(snap.data() as any) }); })
       .catch(() => {});
   }, []);
 
@@ -203,6 +221,19 @@ export function SubscriptionCenter() {
       showToast(err.message || 'Falha ao processar assinatura. Verifique se o AbacatePay está configurado no admin.', 'error');
       setLoadingAddon(null);
     }
+  };
+
+  // Escolha do tier de PACS do pacote — salva em settings.pacsSelectedPlan
+  // (mesma fonte de verdade do card 'Meu PACS na Nuvem' na área DICOM).
+  const handleChoosePacsTier = async (tier: 'starter' | 'pro' | 'dedicado') => {
+    if (settings.pacsSelectedPlan === tier) return;
+    setSavingPacsTier(true);
+    try {
+      await updateSettings({ pacsSelectedPlan: tier });
+      showToast(`Plano PACS ${pacsTiers[tier]?.label || tier} selecionado para o seu pacote.`, 'success');
+    } catch {
+      showToast('Não foi possível salvar o plano PACS escolhido.', 'error');
+    } finally { setSavingPacsTier(false); }
   };
 
   const handleRequestPacs = async () => {
@@ -590,19 +621,72 @@ export function SubscriptionCenter() {
             loading={loadingAddon === 'calculators'}
           />
 
-          {/* PACS */}
-          <AddonCard
-            icon={Database} iconColor="emerald"
-            title="PACS / DICOM Sync"
-            description={ac.pacs?.description ?? ADDONS_DEFAULT.pacs!.description}
-            price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : addonPriceMeta(ac.pacs, 0)}
-            active={hasPacs}
-            actionLabel={pacsRequested ? 'Solicitação Enviada' : 'Solicitar PACS'}
-            actionIcon={pacsRequested ? Clock : undefined}
-            onAction={pacsRequested ? undefined : handleRequestPacs}
-            loading={sendingPacsTicket}
-            disabled={pacsRequested}
-          />
+          {/* PACS — habilitado: escolha do tier do pacote; senão: solicitar */}
+          {hasPacs ? (
+            <div className="md:col-span-2 bg-white rounded-2xl border border-emerald-200 shadow-sm p-5">
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Database size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-ink-950">PACS / DICOM Sync</h4>
+                    <p className="text-[10px] text-ink-400 font-medium">Escolha o plano PACS que faz parte do seu pacote.</p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                  <CheckCircle2 size={11} /> Habilitado
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3">
+                {PACS_TIER_ORDER.filter(k => pacsTiers[k]?.active !== false).map(k => {
+                  const t = pacsTiers[k] || {};
+                  const selected = (settings.pacsSelectedPlan || '') === k;
+                  const priceBrl = planPriceBrl(t, addonInterval);
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => handleChoosePacsTier(k)}
+                      disabled={savingPacsTier}
+                      className={classNames(
+                        'relative text-left p-3 rounded-xl border transition-all disabled:opacity-60',
+                        selected ? 'border-emerald-400 bg-emerald-50/50 ring-2 ring-emerald-400/20' : 'border-ink-200 hover:border-ink-300 bg-white'
+                      )}
+                    >
+                      {t.badge && (
+                        <span className="absolute -top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-600 text-white">{t.badge}</span>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-black text-ink-900">{t.label || k}</p>
+                        {selected && <CheckCircle2 size={14} className="text-emerald-600" />}
+                      </div>
+                      <p className="text-sm font-black text-emerald-700 mt-0.5">R$ {Math.round(priceBrl).toLocaleString('pt-BR')}<span className="text-[9px] text-ink-400 font-bold">/{addonPer}</span></p>
+                      <p className="text-[10px] text-ink-500 mt-1">{t.disk ? `${t.disk} GB · ` : ''}{t.model || ''}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-[10px] text-ink-400 mt-3 flex items-start gap-1.5">
+                <ShieldCheck size={12} className="shrink-0 mt-0.5" />
+                O provisionamento do servidor (VM) é feito em <strong>1 clique</strong> na área <strong>PACS / DICOM</strong>, usando o tier escolhido aqui.
+              </p>
+            </div>
+          ) : (
+            <AddonCard
+              icon={Database} iconColor="emerald"
+              title="PACS / DICOM Sync"
+              description={ac.pacs?.description ?? ADDONS_DEFAULT.pacs!.description}
+              price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : addonPriceMeta(ac.pacs, 0)}
+              active={hasPacs}
+              actionLabel={pacsRequested ? 'Solicitação Enviada' : 'Solicitar PACS'}
+              actionIcon={pacsRequested ? Clock : undefined}
+              onAction={pacsRequested ? undefined : handleRequestPacs}
+              loading={sendingPacsTicket}
+              disabled={pacsRequested}
+            />
+          )}
 
           {/* Agendamentos */}
           <AddonCard
