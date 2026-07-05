@@ -20,6 +20,20 @@ export function UltrasoundSetupCard() {
   const deviceAe = settings.dicomModalityAETitle || 'MINDRAYMX7';
   const devices = settings.dicomDevices || [];
 
+  // AE Title do aparelho — editável (cada ultrassom tem o seu).
+  const [aeInput, setAeInput] = useState(deviceAe);
+  const [savingAe, setSavingAe] = useState(false);
+  async function saveDeviceAe() {
+    const v = aeInput.trim().toUpperCase();
+    if (!v) { showToast('Informe o AE Title do aparelho.', 'error'); return; }
+    setSavingAe(true);
+    try {
+      await updateSettings({ dicomModalityAETitle: v });
+      setAeInput(v);
+      showToast('AE Title do aparelho salvo.', 'success');
+    } finally { setSavingAe(false); }
+  }
+
   function copy(text: string, id: string) {
     navigator.clipboard.writeText(text);
     setCopied(id);
@@ -84,9 +98,42 @@ export function UltrasoundSetupCard() {
           <Network size={13} className="text-violet-500" />
           <p className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Passo 2 — digite estes valores no aparelho (Worklist e Storage)</p>
         </div>
-        <CopyRow label="Porta DICOM" value="4242" id="port" />
+        <CopyRow
+          label="Porta DICOM"
+          value={String(settings.pacsInstance?.dicomPort || 4242)}
+          id="port"
+          hint={settings.pacsInstance?.dicomPort ? 'Porta exclusiva do seu PACS na nuvem — use exatamente esta.' : undefined}
+        />
         <CopyRow label="AE Title do PACS (destino)" value={pacsAe} id="pacsae" hint="Onde o aparelho busca a fila e envia as imagens." />
-        <CopyRow label="AE Title do aparelho (origem)" value={deviceAe} id="devae" hint="Identidade do seu ultrassom na rede DICOM." />
+        <div className="p-3 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
+          <div>
+            <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">AE Title do aparelho (origem)</p>
+            <p className="text-[10px] text-ink-400">Identidade do seu ultrassom na rede DICOM — edite para o AE real do seu aparelho.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              className="input h-9 text-sm font-mono flex-1 uppercase"
+              value={aeInput}
+              onChange={(e) => setAeInput(e.target.value.toUpperCase())}
+              placeholder="Ex: MINDRAYMX7"
+              spellCheck={false}
+            />
+            <button
+              onClick={saveDeviceAe}
+              disabled={savingAe || !aeInput.trim() || aeInput.trim().toUpperCase() === deviceAe}
+              className="h-9 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-wider transition-all"
+            >
+              {savingAe ? '…' : 'Salvar'}
+            </button>
+            <button
+              onClick={() => copy(aeInput || deviceAe, 'devae')}
+              className="shrink-0 h-9 px-2.5 rounded-lg bg-white border border-ink-200 text-ink-500 hover:bg-ink-100 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider transition-all"
+              title="Copiar"
+            >
+              {copied === 'devae' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            </button>
+          </div>
+        </div>
         <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-100 flex gap-2 text-[11px] text-amber-800 leading-relaxed">
           <Info size={14} className="shrink-0 mt-0.5" />
           <span>O <strong>Endereço/IP</strong> a digitar é o do <strong>relé</strong> na sua rede (ex: <code>192.168.x.x</code>), não a URL da nuvem. Depois, no aparelho, rode <strong>C-ECHO / Verify</strong> — deve dar "Sucesso".</span>
