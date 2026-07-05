@@ -4,8 +4,9 @@ import { useCollection } from '../../../hooks/useFirestore';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { ReportTemplate, EXAM_AREAS, ExamArea, Clinic } from '../../../types';
 import { genId, addItemWithId, deleteItem, updateItem } from '../../../store/db';
-import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, Download, Upload, Sparkles } from 'lucide-react';
+import { Search, Plus, FileSignature, Trash2, Copy, LayoutGrid, Download, Upload, Sparkles, Eye } from 'lucide-react';
 import { AreaIcon } from '../../../components/AreaIcon';
+import { Modal } from '../../../components/Modal';
 import { classNames } from '../../../utils/format';
 
 export function AdminMasks() {
@@ -15,6 +16,7 @@ export function AdminMasks() {
   const [areaFilter, setAreaFilter] = useState<string>('todas');
   const [typeFilter, setTypeFilter] = useState<'all' | 'system' | 'clinics'>('all');
   const [importing, setImporting] = useState(false);
+  const [previewTarget, setPreviewTarget] = useState<ReportTemplate | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   const { data: allTemplates, loading } = useCollection<ReportTemplate>('templates');
@@ -273,6 +275,13 @@ export function AdminMasks() {
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
                   <button
+                    title="Pré-visualizar Máscara"
+                    className="p-1.5 text-ink-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    onClick={(e) => { e.stopPropagation(); setPreviewTarget(template); }}
+                  >
+                    <Eye size={14} />
+                  </button>
+                  <button
                     title="Duplicar Máscara"
                     className="p-1.5 text-ink-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
                     onClick={async (e) => {
@@ -348,6 +357,41 @@ export function AdminMasks() {
           </div>
         )}
       </div>
+
+      {/* Pré-visualização (read-only) da máscara */}
+      <Modal open={previewTarget !== null} onClose={() => setPreviewTarget(null)} title={previewTarget?.name || 'Máscara'} size="lg">
+        {previewTarget && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[9px] font-black uppercase tracking-widest bg-ink-100 text-ink-600 px-2 py-0.5 rounded">{previewTarget.area}</span>
+              {previewTarget.aiInstructions?.trim()
+                ? <span className="text-[9px] font-black uppercase tracking-widest bg-violet-50 text-violet-700 border border-violet-100 px-2 py-0.5 rounded flex items-center gap-1"><Sparkles size={9} /> Prompt IA</span>
+                : <span className="text-[9px] font-black uppercase tracking-widest bg-ink-50 text-ink-400 border border-ink-150 px-2 py-0.5 rounded">Cascata padrão</span>}
+            </div>
+            {([
+              { label: 'Título', v: previewTarget.title },
+              { label: 'Técnica', v: (previewTarget as any).technique },
+              { label: 'Análise', v: (previewTarget as any).analysisTemplate },
+              { label: 'Conclusão', v: (previewTarget as any).conclusionTemplate },
+              { label: 'Recomendações', v: (previewTarget as any).recommendationsTemplate },
+              { label: 'Instruções de IA', v: previewTarget.aiInstructions },
+            ] as { label: string; v?: string }[]).filter(s => s.v && String(s.v).trim()).map(s => (
+              <div key={s.label}>
+                <p className="text-[10px] font-black uppercase tracking-widest text-ink-400 mb-1">{s.label}</p>
+                <div className="text-xs text-ink-700 bg-ink-50 border border-ink-100 rounded-xl p-3 whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed">{String(s.v)}</div>
+              </div>
+            ))}
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => { const t = previewTarget; setPreviewTarget(null); setView({ name: 'template-editor', templateId: t.id }); }}
+                className="h-10 px-5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all"
+              >
+                <FileSignature size={13} /> Editar máscara
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
