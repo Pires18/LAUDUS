@@ -23,6 +23,17 @@ export function planToAddons(plan: {
   return addons;
 }
 
+/**
+ * Chave do contador de método de pagamento no agregado `finance_stats`.
+ * Usada pelo webhook (incremento) e pelo recálculo do admin.
+ */
+export function financeMethodKey(paymentMethod: string | undefined): 'pixCount' | 'ccCount' | 'manualCount' | 'otherCount' {
+  return paymentMethod === 'pix' ? 'pixCount'
+    : paymentMethod === 'credit_card' ? 'ccCount'
+      : paymentMethod === 'manual' ? 'manualCount'
+        : 'otherCount';
+}
+
 /** Mapeia a chave de add-on da API (snake_case) para a chave do Firestore (camelCase). */
 export function mapAddonKey(addon: string): string {
   const mapping: Record<string, string> = {

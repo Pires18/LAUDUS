@@ -1,6 +1,6 @@
 import { getDb } from './_firebase.js';
 import { isProduction } from './_auth.js';
-import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom, planToAddons } from './_pricing.js';
+import { mapAddonKey, ADDON_NAMES, resolveAddon, periodEndFrom, planToAddons, financeMethodKey } from './_pricing.js';
 import { safeEqual } from './_secure.js';
 import crypto from 'crypto';
 
@@ -67,11 +67,7 @@ function verifyWebhook(req: any, rawBody: string, secret: string): { ok: boolean
 async function bumpFinanceStats(db: any, amount: number, paymentMethod: string) {
   try {
     const { FieldValue } = await import('firebase-admin/firestore');
-    const methodKey =
-      paymentMethod === 'pix' ? 'pixCount'
-        : paymentMethod === 'credit_card' ? 'ccCount'
-          : paymentMethod === 'manual' ? 'manualCount'
-            : 'otherCount';
+    const methodKey = financeMethodKey(paymentMethod);
     await db.collection('global_config').doc('finance_stats').set({
       totalRevenue: FieldValue.increment(amount || 0),
       paidCount: FieldValue.increment(1),

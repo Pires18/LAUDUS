@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, ADDON_DEFAULTS } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -69,6 +69,18 @@ describe('planToAddons', () => {
 
   it('ignora flags falsas', () => {
     expect(planToAddons({ includesCalculators: false, includesPacs: true })).toEqual(['pacs']);
+  });
+});
+
+describe('financeMethodKey', () => {
+  it('mapeia o método para a chave do contador em finance_stats', () => {
+    expect(financeMethodKey('pix')).toBe('pixCount');
+    expect(financeMethodKey('credit_card')).toBe('ccCount');
+    expect(financeMethodKey('manual')).toBe('manualCount');
+  });
+  it('método desconhecido/ausente → otherCount', () => {
+    expect(financeMethodKey('boleto')).toBe('otherCount');
+    expect(financeMethodKey(undefined)).toBe('otherCount');
   });
 });
 
