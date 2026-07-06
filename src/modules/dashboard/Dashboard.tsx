@@ -577,13 +577,22 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                {/* Laudos por Motor (Lite / Pro) — sem custo, apenas contagem */}
+                {/* Laudos por Motor (Lite / Pro) — sem custo, apenas contagem.
+                    O total vem de `subscription.reportsUsed` (o mesmo contador
+                    oficial de todo o resto do app); o ai_usage (aiStats, janela
+                    de mês calendário) só fornece a PROPORÇÃO Lite/Pro, nunca o
+                    total — evita esta tela mostrar um número diferente do
+                    badge do editor/SubscriptionCenter/Admin para a mesma conta. */}
                 {aiStats === null ? (
                   <div className="flex items-center gap-2 text-ink-400 py-1">
                     <Loader2 size={11} className="animate-spin" />
                     <span className="text-[10px]">Carregando...</span>
                   </div>
-                ) : (
+                ) : (() => {
+                  const proShare = aiStats.totalCalls > 0 ? aiStats.proCount / aiStats.totalCalls : 0;
+                  const proUsed  = Math.round(subscription.reportsUsed * proShare);
+                  const liteUsed = subscription.reportsUsed - proUsed;
+                  return (
                   <div className="space-y-2">
                     <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Laudos gerados este mês</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -593,7 +602,7 @@ export function Dashboard() {
                           <span className="text-[8px] font-black text-indigo-600 uppercase tracking-widest">Lite</span>
                         </div>
                         <span className="text-sm font-black text-indigo-800">
-                          {aiStats.liteCount} laudos
+                          {liteUsed} laudos
                         </span>
                       </div>
                       <div className={classNames(
@@ -605,16 +614,17 @@ export function Dashboard() {
                           <span className={classNames('text-[8px] font-black uppercase tracking-widest', subscription.motorProEnabled ? 'text-violet-600' : 'text-ink-400')}>Pro</span>
                         </div>
                         <span className={classNames('text-sm font-black', subscription.motorProEnabled ? 'text-violet-800' : 'text-ink-400')}>
-                          {aiStats.proCount} laudos
+                          {proUsed} laudos
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between pt-1 border-t border-ink-100">
                       <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">Total este mês</span>
-                      <span className="text-sm font-black text-ink-800">{aiStats.totalCalls} laudos</span>
+                      <span className="text-sm font-black text-ink-800">{subscription.reportsUsed} laudos</span>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Quota esgotada */}
                 {!subscription.canGenerateReport && subscription.reportsQuota !== 9999 && (

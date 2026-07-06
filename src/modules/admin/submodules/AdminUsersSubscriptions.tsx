@@ -12,7 +12,7 @@ import { addAuditLog, getMetricsSummary, type MetricsSummary } from '../../../st
 import { updateUserRole, setUserActiveStatus, deleteUserDocument } from '../../../store/adminUsers';
 import type { UserRole } from '../../../types';
 import {
-  collection, collectionGroup, doc, updateDoc, setDoc, deleteField, getDoc, getDocs, query, where,
+  collection, collectionGroup, doc, updateDoc, setDoc, deleteField, getDoc, getDocs, query, where, writeBatch,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { classNames } from '../../../utils/format';
@@ -41,8 +41,6 @@ interface SystemUser {
   motorProEnabled?: boolean;
   reportsUsedThisMonth?: number;
   reportsQuota?: number;
-  tokenQuotaLite?: number;
-  tokenQuotaPro?: number;
   // Legacy
   licenseExpiresAt?: number;
   licensePlanName?: string;
@@ -64,8 +62,6 @@ interface SaasPlan {
   interval: 'month' | 'semester' | 'year';
   reportsQuota: number;
   clinicsQuota: number;
-  tokenQuotaLite: number;
-  tokenQuotaPro: number;
   trialDays: number;
   includesCalculators: boolean;
   includesPacs: boolean;
@@ -177,6 +173,35 @@ export function AdminUsersSubscriptions() {
   };
   useEffect(() => { loadUsage(); }, []);
 
+  // Reconcilia reportsUsedThisMonth (o contador que trava a cota e aparece
+  // nos badges do usuário) com a contagem REAL de ai_usage deste mês — cobre
+  // o histórico anterior à correção do engine.ts (que agora incrementa em
+  // toda chamada de IA, não só a geração inicial). Roda mesmo para contas
+  // ilimitadas: a cota é ilimitada, mas a contabilização mensal deve refletir
+  // o uso real de qualquer forma.
+  const [syncingUsage, setSyncingUsage] = useState(false);
+  const syncUsageCounters = async () => {
+    setSyncingUsage(true);
+    try {
+      const stale = users.filter(u => (u.reportsUsedThisMonth ?? 0) !== (usageByUid[u.id]?.total ?? 0));
+      for (let i = 0; i < stale.length; i += 400) {
+        const batch = writeBatch(firestore);
+        for (const u of stale.slice(i, i + 400)) {
+          batch.update(doc(firestore, 'users', u.id), {
+            reportsUsedThisMonth: usageByUid[u.id]?.total ?? 0,
+            updatedAt: Date.now(),
+          });
+        }
+        await batch.commit();
+      }
+      await loadUsage();
+    } catch (err: any) {
+      setUsageError(err?.message || 'Falha ao sincronizar a contagem mensal.');
+    } finally {
+      setSyncingUsage(false);
+    }
+  };
+
   if (loadingUsers || loadingSubs) {
     return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-brand-500" /></div>;
   }
@@ -234,20 +259,28 @@ export function AdminUsersSubscriptions() {
   });
 
   // ─── Consumo por usuário ──────────────────────────────────────────────────────
-  // reportsUsed/quota = contador de cota (reset a cada 30d); lite/pro/geradosMes
-  // = contagem REAL de laudos gerados no mês (collection group de ai_usage).
+  // `reportsUsed` (reportsUsedThisMonth) é a ÚNICA fonte de verdade do total —
+  // é o mesmo campo que trava a cota e aparece em todas as outras telas
+  // (badge do editor, SubscriptionCenter, Dashboard). O ai_usage (usageByUid)
+  // usa uma janela de "mês calendário" que NÃO bate com o ciclo real de cada
+  // usuário (reset a cada 30d a partir de lastResetAt) — usá-lo como total
+  // aqui fazia essa tela mostrar um número diferente de todas as outras para
+  // a mesma conta. Ele agora serve só para o split Lite/Pro, normalizado para
+  // somar exatamente `reportsUsed` (nunca diverge do total).
   const consumoRows = users
-    .filter(u => u.role !== 'admin')
     .map(u => {
       const sub = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
       const reportsUsed  = u.reportsUsedThisMonth ?? sub?.reportsUsedThisMonth ?? 0;
       const reportsQuota = u.reportsQuota ?? sub?.reportsQuota ?? 100;
-      const unlimited    = reportsQuota >= 9999;
+      const unlimited    = reportsQuota >= 9999 || reportsQuota === 0;
       const pct          = unlimited ? 0 : Math.min(100, Math.round((reportsUsed / Math.max(1, reportsQuota)) * 100));
       const usage        = usageByUid[u.id] || { total: 0, lite: 0, pro: 0 };
+      const proShare     = usage.total > 0 ? usage.pro / usage.total : 0;
+      const proUsed      = Math.round(reportsUsed * proShare);
+      const liteUsed     = reportsUsed - proUsed;
       return {
         u, sub, reportsUsed, reportsQuota, unlimited, pct,
-        geradosMes: usage.total, liteUsed: usage.lite, proUsed: usage.pro,
+        geradosMes: reportsUsed, liteUsed, proUsed,
         status: u.subscriptionStatus || (sub?.status ?? '—'),
       };
     })
@@ -437,8 +470,6 @@ export function AdminUsersSubscriptions() {
         reportsUsedThisMonth: 0,
         reportsQuota:   plan.reportsQuota,
         clinicsQuota:   plan.clinicsQuota,
-        tokenQuotaLite: plan.tokenQuotaLite,
-        tokenQuotaPro:  plan.tokenQuotaPro,
         lastResetAt: now, createdAt: now, updatedAt: now,
         ...(opts.status === 'trialing' && plan.trialDays > 0
           ? { trialEndsAt: now + plan.trialDays * 24 * 60 * 60 * 1000 }
@@ -450,8 +481,6 @@ export function AdminUsersSubscriptions() {
         subscriptionStatus: opts.status,
         motorProEnabled: plan.motorProDefault,
         reportsQuota: plan.reportsQuota,
-        tokenQuotaLite: plan.tokenQuotaLite,
-        tokenQuotaPro: plan.tokenQuotaPro,
         updatedAt: now,
       };
 
@@ -494,7 +523,8 @@ export function AdminUsersSubscriptions() {
   }
 
   function quotaBar(used: number, quota: number) {
-    if (quota === 0) return <span className="text-[10px] text-ink-400 font-semibold">{used} / ∞</span>;
+    // Mesma convenção de "ilimitado" usada na aba Consumo (0 ou ≥9999).
+    if (quota === 0 || quota >= 9999) return <span className="text-[10px] text-ink-400 font-semibold">{used} / ∞</span>;
     const pct = Math.min(100, Math.round((used / quota) * 100));
     return (
       <div className="space-y-0.5">
@@ -810,8 +840,11 @@ export function AdminUsersSubscriptions() {
               ) : filtered.map((u) => {
                 const sub    = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
                 const isProc = processing === u.id;
-                const used   = u.reportsUsedThisMonth || 0;
-                const quota  = u.reportsQuota         || 100;
+                const used   = u.reportsUsedThisMonth ?? 0;
+                // `??`, não `||`: reportsQuota === 0 é a convenção de "ilimitado"
+                // usada em todo o resto desta tela (linhas ~244, 1345, 1436) —
+                // `||` tratava esse 0 como falsy e mostrava "100" por engano.
+                const quota  = u.reportsQuota ?? 100;
 
                 // Direitos ativos (somente leitura aqui — edição fica no menu ⋯).
                 const ents = [
@@ -1007,6 +1040,14 @@ export function AdminUsersSubscriptions() {
           </button>
         ))}
         <div className="flex-1" />
+        <button
+          onClick={syncUsageCounters}
+          disabled={syncingUsage || usageLoading}
+          title="Grava reportsUsedThisMonth com o total real de ai_usage deste mês para todo usuário divergente — inclusive contas com cota ilimitada."
+          className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-brand-200 bg-brand-50 text-brand-700 text-[10px] font-black uppercase tracking-widest hover:bg-brand-100 disabled:opacity-50 transition-all"
+        >
+          <RefreshCw size={12} className={syncingUsage ? 'animate-spin' : ''} /> Sincronizar contagem mensal
+        </button>
         <button
           onClick={loadUsage}
           disabled={usageLoading}

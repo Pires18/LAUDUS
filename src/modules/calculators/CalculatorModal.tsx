@@ -20,9 +20,13 @@ interface Props {
   calculatorData?: Record<string, any>;
   onSaveCalculatorData?: (data: Record<string, any>) => void;
   initialCalcId?: string;
+  /** Quando definido, o modal está em modo "aplicar a um campo estruturado". */
+  structuredTargetLabel?: string;
+  /** Grava o resultado da calculadora de volta no campo da aba Estruturado. */
+  onApplyToField?: (result: { text: string; metrics: Record<string, any>; calcId?: string }) => void;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId }: Props) {
+export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId, structuredTargetLabel, onApplyToField }: Props) {
   const { setView } = useApp();
   const { hasCalculators } = useSubscription();
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
@@ -104,6 +108,15 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
     setSentCopilot(true);
     onSendToCopilot(buildTechnicalMessage());
     setTimeout(() => onClose(), 600);
+  };
+
+  /** Aplica o resultado a um campo da aba Estruturado (write-back). */
+  const handleApplyToField = () => {
+    if (!onApplyToField || !calcResult?._summary) return;
+    const metrics = Object.fromEntries(
+      Object.entries(calcResult).filter(([k, v]) => isDisplayableMetric(k, v))
+    );
+    onApplyToField({ text: String(calcResult._summary), metrics, calcId: selectedCalcId || undefined });
   };
 
   const escapeHtml = (s: string) =>
@@ -396,6 +409,20 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
 
                   {/* ── Action Buttons ─────────────────────────────── */}
                   <div className="p-4 pb-8 sm:pb-4 border-t border-ink-100 bg-white shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+                    {structuredTargetLabel && onApplyToField && (
+                      <button
+                        type="button"
+                        onClick={handleApplyToField}
+                        disabled={!hasResult}
+                        className={classNames(
+                          'w-full mb-2 h-11 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md',
+                          'bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white shadow-brand-500/25'
+                        )}
+                      >
+                        <Sparkles size={13} />
+                        Aplicar ao campo: {structuredTargetLabel}
+                      </button>
+                    )}
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"

@@ -123,7 +123,13 @@ export function EditorToolbar({
         <button
           onClick={onRefine}
           disabled={isGenerating || status === 'finalizado' || hasGoogleDoc}
-          title={hasGoogleDoc ? 'Refinamento desativado para laudos gerados no Google Docs' : refineLabel}
+          title={
+            hasGoogleDoc
+              ? 'Refinamento desativado para laudos gerados no Google Docs'
+              : isTemplateMask
+                ? 'Gera a primeira versão do laudo com IA a partir da máscara'
+                : 'Refina o texto atual do laudo com IA, preservando o que já foi editado'
+          }
           className={classNames(
             "h-9 px-5 rounded-xl text-xs font-black uppercase tracking-widest gap-2 shadow-sm transition-all flex items-center justify-center relative overflow-hidden border",
             isGenerating
@@ -303,8 +309,11 @@ export function EditorToolbar({
         )}
         {saveState === 'error' && (
           <>
-            <AlertCircle size={11} className="text-red-500" />
-            <span className="text-red-500 hidden sm:inline">Erro ao salvar</span>
+            <AlertCircle size={11} className="text-red-500 shrink-0" />
+            {/* Sempre visível (mesmo em telas estreitas) — falha ao salvar
+                pode significar perda de trabalho, não é um estado para
+                esconder atrás de só um ícone. */}
+            <span className="text-red-500 font-bold">Erro ao salvar</span>
           </>
         )}
 

@@ -842,11 +842,14 @@ async function resolveMotorConfigAndCheckQuota(
       const userData = userSnap.data();
       const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
 
-      // 1. Validar cota mensal antes da geração inicial
-      if (mode === 'generation' && !isAdmin) {
+      // 1. Validar cota mensal antes de QUALQUER chamada de IA (geração,
+      // refino ou copiloto) — toda chamada consome tokens/custo real, então
+      // toda chamada precisa respeitar a cota do plano (ver incrementReportUsage).
+      if (!isAdmin) {
         const reportsUsed = userData.reportsUsedThisMonth ?? 0;
         const reportsQuota = userData.reportsQuota ?? 100;
-        if (reportsUsed >= reportsQuota) {
+        const isUnlimited = reportsQuota === 0 || reportsQuota >= 9999;
+        if (!isUnlimited && reportsUsed >= reportsQuota) {
           throw new Error('Sua cota mensal de laudos foi atingida. Faça um upgrade ou aguarde o reset mensal.');
         }
       }
@@ -899,8 +902,6 @@ async function incrementReportUsage(uid: string) {
       const userSnap = await transaction.get(userRef);
       if (!userSnap.exists()) return;
       const userData = userSnap.data();
-      const isAdmin = userData.role === 'admin' || uid === 'dev-admin-uid';
-      if (isAdmin) return;
       subscriptionId = userData.subscriptionId;
       newUsed = (userData.reportsUsedThisMonth ?? 0) + 1;
       transaction.update(userRef, { reportsUsedThisMonth: newUsed, updatedAt: Date.now() });
@@ -971,7 +972,9 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
       promptHash: hashPrompt(built)
     });
 
-    if (mode === 'generation' && uid) {
+    // Toda chamada de IA (geração, refino ou copiloto) consome tokens/custo
+    // real e por isso conta para a cota do plano — não só a geração inicial.
+    if (uid) {
       await incrementReportUsage(uid);
     }
 
@@ -1043,7 +1046,9 @@ export async function generateReportStream(
       promptHash: hashPrompt(built)
     });
 
-    if (mode === 'generation' && uid) {
+    // Toda chamada de IA (geração, refino ou copiloto) consome tokens/custo
+    // real e por isso conta para a cota do plano — não só a geração inicial.
+    if (uid) {
       await incrementReportUsage(uid);
     }
 

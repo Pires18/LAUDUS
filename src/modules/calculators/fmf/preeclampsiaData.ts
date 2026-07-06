@@ -1,61 +1,62 @@
 // ═══════════════════════════════════════════════════════════════════════
 // DADOS CLÍNICOS — Rastreamento de pré-eclâmpsia (1º trimestre)
 // ═══════════════════════════════════════════════════════════════════════
-// Fatores maternos: coeficientes EXATOS de Wright D, Syngelaki A, Akolekar R,
-// Poon LC, Nicolaides KH. "Competing risks model in screening for preeclampsia
-// by maternal characteristics and medical history." AJOG 2015;213:62.e1-10
-// (Tabela 2). Referência: branca, nulípara, espontânea, 69 kg, 164 cm.
+// Fatores maternos: Wright D et al., AJOG 2015;213:62.e1-10 (Tabela 2) — EXATO.
+//   Referência: branca, nulípara, espontânea, 69 kg, 164 cm.
+// Biomarcadores (Bayes): O'Gorman N et al., AJOG 2016;214:103.e1-e12
+//   (Tabelas 2 e 3) — EXATO. Médias do log10 MoM vs IG do parto + covariância.
 //
-// ⚠️  AINDA `validated: false` — CONFERIR com o usuário e completar:
-//   • Sub-modelo de "parosa sem PE prévia" (polinômio fracionário de intervalo).
-//   • Biomarcadores (MAP/UtA-PI/PlGF): coeficientes de Tan MY et al., UOG 2018
-//     (doi 10.1002/uog.19112) — ainda APROXIMADOS abaixo.
-//   • Medianas Roche Cobas de MAP/UtA-PI/PlGF (fabricante/laboratório).
+// ⚠️  `validated: false` até conferir com casos-ouro. Pendente ainda:
+//   • Sub-modelo "parosa sem PE prévia" (polinômio de intervalo — Wright 2015).
 //   • Conduta AAS 150 mg: ASPRE — Rolnik DL et al., NEJM 2017.
 // ═══════════════════════════════════════════════════════════════════════
 
-import type { PeCoefficients } from './preeclampsia';
+import type { PeCoefficients, PeBiomarkerModel } from './preeclampsia';
 
 export const PROVISIONAL_PE_COEFFICIENTS: PeCoefficients = {
-  validated: false, // 🚫 não registrar a calculadora enquanto for false
-  version: 'pe-wright2015-maternal + biomarcadores-provisorios-v1',
+  validated: false, // 🚫 conferir com casos-ouro antes de liberar
+  version: 'pe-wright2015-maternal + ogorman2016-biomarkers-v2',
 
   intercept: 54.36,  // Wright 2015
   sigma: 6.8833,     // Wright 2015 (IC95% 6.67–7.10)
 
-  // ── Fatores maternos (Wright 2015, Tabela 2) ──────────────────────────
   agePerYearOver35: -0.207,
   heightPerCmOver164: 0.117,
-  racial: {
-    white: 0,
-    afroCaribbean: -2.68,
-    southAsian: -1.13,
-    eastAsian: 0,   // não significativo → referência
-    mixed: 0,       // não significativo → referência
-  },
-  conception: {
-    spontaneous: 0,
-    ovulationInduction: 0, // não significativo → referência
-    ivf: -1.63,
-  },
+  racial: { white: 0, afroCaribbean: -2.68, southAsian: -1.13, eastAsian: 0, mixed: 0 },
+  conception: { spontaneous: 0, ovulationInduction: 0, ivf: -1.63 },
   chronicHypertension: -7.29,
   sleOrAps: -3.05,
   parousPrevPE: -8.17,
-  parousPrevPeGaQuadCoef: 0.027, // × (IG_prévia − 24)²
-
-  // Só valem SEM HAS crônica:
+  parousPrevPeGaQuadCoef: 0.027,
   weightPerKgOver69_noHtn: -0.069,
   diabetes_noHtn: -3.39,
   familyHistoryPE_noHtn: -1.72,
+};
 
-  // ── Biomarcadores — APROXIMADO (VALIDAR: Tan 2018 + medianas Cobas) ─────
-  // O modelo FMF real combina os biomarcadores por Bayes (distribuições de
-  // log10 MoM cujas médias dependem da IG do parto), não por deslocamento
-  // linear de μ como aqui. Parâmetros de fontes abertas para a validação:
-  //   • SD log10 MoM (não-afetada): MAP 0.035 ; UtA-PI 0.12 ; PlGF ~0.15 (conferir).
-  //   • Mediana UtA-PI: ln(mediana) = 1.39 − 0.012·GA + 0.0000198·GA²  (GA em dias).
-  //   • Medianas de MAP/PlGF (Roche Cobas): pendentes do laboratório.
-  betaMapLog10: -30,   // MAP alto ⇒ μ menor
-  betaUtaPiLog10: -12, // UtA-PI alto ⇒ μ menor
-  betaPlgfLog10: 10,   // PlGF alto ⇒ μ maior (protetor)
+/**
+ * Modelo de biomarcadores (O'Gorman 2016, AJOG 214:103) — EXATO.
+ * reg: média do log10(MoM) = intercepto + inclinação × (IG do parto, semanas).
+ * sd/corr: pooled (Tabela 3).
+ */
+export const PE_BIOMARKER_MODEL: PeBiomarkerModel = {
+  reg: {
+    utaPi: { intercept: 0.54453, slope: -0.013143 },
+    map: { intercept: 0.095640, slope: -0.0018240 },
+    pappa: { intercept: -0.62165, slope: 0.014692 },
+    plgf: { intercept: -0.93687, slope: 0.021930 },
+  },
+  sd: {
+    utaPi: 0.12894,
+    map: 0.03724,
+    plgf: 0.17723,
+    pappa: 0.23539,
+  },
+  corr: {
+    utaPi_map: -0.05133,
+    utaPi_pappa: -0.15992,
+    utaPi_plgf: -0.15084,
+    map_pappa: -0.00497,
+    map_plgf: -0.02791,
+    pappa_plgf: 0.31983,
+  },
 };

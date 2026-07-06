@@ -139,6 +139,9 @@ export function ExamEditor({ examId }: Props) {
   // copiloto. Não passa pela caixa de texto (evita concatenação com rascunho
   // que impedia o disparo automático). Consumido e zerado após o envio.
   const [copilotInjection, setCopilotInjection] = useState<string | null>(null);
+  // Write-back da calculadora para um campo da aba Estruturado do copiloto.
+  const [calcTargetField, setCalcTargetField] = useState<{ fieldId: string; label: string } | null>(null);
+  const [structuredCalcResult, setStructuredCalcResult] = useState<{ fieldId: string; result: { text: string; metrics?: Record<string, any>; calcId?: string } } | null>(null);
   const [showSnippets, setShowSnippets] = useState(false);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
@@ -743,7 +746,7 @@ export function ExamEditor({ examId }: Props) {
                 examArea={exam.area || template?.area}
                 hasGoogleDoc={!!exam.googleDocId}
                 onCopy={handleCopy}
-                onShowCalculators={(calcId) => { setCalcModalInitialId(calcId || null); setShowCalculators(true); }}
+                onShowCalculators={(calcId) => { setCalcTargetField(null); setCalcModalInitialId(calcId || null); setShowCalculators(true); }}
                 onRefine={() => {
                   if (currentRole === 'recepcao') {
                     showToast('Acesso restrito: Secretárias não utilizam Laud.IA.', 'error');
@@ -1036,6 +1039,7 @@ export function ExamEditor({ examId }: Props) {
                   chatHistory={localChatHistory}
                   onChatUpdate={handleChatUpdate}
                   onShowCalculators={(id) => {
+                    setCalcTargetField(null);
                     setCalcModalInitialId(id || null);
                     setShowCalculators(true);
                   }}
@@ -1043,6 +1047,13 @@ export function ExamEditor({ examId }: Props) {
                   onChangePrompt={setCopilotPrompt}
                   injectedMessage={copilotInjection}
                   onInjectionConsumed={() => setCopilotInjection(null)}
+                  onOpenCalcForField={(calcId, fieldId, label) => {
+                    setCalcTargetField({ fieldId, label });
+                    setCalcModalInitialId(calcId || null);
+                    setShowCalculators(true);
+                  }}
+                  structuredCalcResult={structuredCalcResult}
+                  onStructuredResultConsumed={() => setStructuredCalcResult(null)}
                   isDocked={false}
                 />
               </div>
@@ -1254,10 +1265,20 @@ export function ExamEditor({ examId }: Props) {
             initialCalcId={calcModalInitialId || undefined}
             area={exam.area}
             examDateMs={exam.createdAt}
-            onClose={() => setShowCalculators(false)}
+            onClose={() => { setShowCalculators(false); setCalcTargetField(null); }}
+            structuredTargetLabel={calcTargetField?.label}
+            onApplyToField={(result) => {
+              if (calcTargetField) {
+                setStructuredCalcResult({ fieldId: calcTargetField.fieldId, result });
+              }
+              setShowCalculators(false);
+              setCalcTargetField(null);
+              if (!showCopilot) setShowCopilot(true);
+            }}
             onSendToCopilot={(text) => {
               setCopilotInjection(text);
               setShowCalculators(false);
+              setCalcTargetField(null);
               if (!showCopilot) setShowCopilot(true);
             }}
             onInsertToReport={(html) => {

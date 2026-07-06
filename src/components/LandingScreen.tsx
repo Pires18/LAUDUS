@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PricingPlans } from './PricingPlans';
+import { scrollToSection } from '../utils/scrollToSection';
 import { Nav } from './landing/Nav';
 import { Hero } from './landing/Hero';
 import { HowItWorks } from './landing/HowItWorks';
@@ -43,8 +44,15 @@ export function LandingScreen({ onEnter }: Props) {
     };
   }, []);
 
+  // Se a página abrir com um hash (ex.: /#faq vindo de um link externo),
+  // rola até a seção depois do primeiro paint.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) scrollToSection(hash, { updateHash: false });
+  }, []);
+
   return (
-    <div className="min-h-screen w-full bg-white font-sans">
+    <div className="h-full w-full overflow-y-auto bg-white font-sans">
       <Nav onEnter={onEnter} onShowPricing={() => setShowPricing(true)} />
       <Hero onEnter={onEnter} onShowPricing={() => setShowPricing(true)} />
       <HowItWorks />

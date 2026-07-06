@@ -17,6 +17,8 @@ import { PleuralEffusionCalculator } from './components/PleuralEffusionCalculato
 import { OrganReferenceCalculator } from './components/OrganReferenceCalculator';
 import { IvcIndexCalculator } from './components/IvcIndexCalculator';
 import { VenousCartographyCalculator } from './components/VenousCartographyCalculator';
+import { TrisomyRiskCalculator } from './components/TrisomyRiskCalculator';
+import { PreeclampsiaRiskCalculator } from './components/PreeclampsiaRiskCalculator';
 
 import { ExamArea } from '../../types';
 
@@ -222,6 +224,28 @@ export const CALCULATORS: CalculatorDef[] = [
     reference: {
       text: 'Hadlock FP, et al. Estimation of gestational age from mean gestational sac diameter (MSD). Radiology 1984.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/'
+    }
+  },
+  {
+    id: 'fmf-trisomy-risk',
+    name: 'Risco de Cromossomopatia (EM VALIDAÇÃO)',
+    description: 'Rastreamento combinado de 1º trimestre para T21/18/13 (idade, TN, bioquímica e marcadores). Coeficientes em validação.',
+    component: TrisomyRiskCalculator,
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'EM VALIDAÇÃO — apoio à decisão baseado em modelos publicados (Snijders/Nicolaides; Kagan et al., UOG 2008). NÃO é a calculadora oficial da Fetal Medicine Foundation; não usar para decisão clínica.',
+      link: 'https://obgyn.onlinelibrary.wiley.com/doi/10.1002/uog.5331'
+    }
+  },
+  {
+    id: 'fmf-preeclampsia-risk',
+    name: 'Risco de Pré-eclâmpsia (EM VALIDAÇÃO)',
+    description: 'Rastreamento de 1º trimestre por fatores maternos + MAP, IP uterinas e PlGF (modelo de riscos competitivos). Biomarcadores em validação.',
+    component: PreeclampsiaRiskCalculator,
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'EM VALIDAÇÃO — fatores maternos por Wright D et al. (AJOG 2015); biomarcadores por Tan et al. (UOG 2018); conduta AAS por ASPRE (Rolnik et al., NEJM 2017). NÃO é a calculadora oficial da FMF; não usar para decisão clínica.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/25724400/'
     }
   },
 

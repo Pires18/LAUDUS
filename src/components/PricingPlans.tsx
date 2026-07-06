@@ -81,7 +81,7 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
             const available: ('month' | 'semester' | 'year')[] = ['month', 'semester', 'year'];
             const activeIv = interval;
             const label: Record<string, string> = { month: 'Mensal', semester: 'Semestral', year: 'Anual' };
-            const savingHint: Record<string, string> = { month: '', semester: '−1 mês grátis', year: '−2 meses grátis' };
+            const savingHint: Record<string, string> = { month: '', semester: '', year: '' };
             return (
               <>
                 <div className="flex justify-center mb-7">

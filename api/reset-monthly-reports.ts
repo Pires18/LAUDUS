@@ -3,9 +3,50 @@ import { safeEqual } from './_secure.js';
 import { isRecurringInterval } from './_pricing.js';
 import { destroyPacsInstance } from './_pacsLifecycle.js';
 
-const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 const SEVEN_DAYS  =  7 * 24 * 60 * 60 * 1000;
 const PACS_GRACE_PERIOD_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Soma `months` meses a `baseMs` preservando o DIA do mês (ex.: dia 15 → dia
+ * 15 do próximo mês), com clamp para meses mais curtos (dia 31 + 1 mês em
+ * fevereiro → dia 28/29). Usa UTC para não depender do fuso do runtime.
+ */
+function addMonthsClamped(baseMs: number, months: number): number {
+  const d = new Date(baseMs);
+  const day = d.getUTCDate();
+  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1, d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()));
+  const daysInTargetMonth = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(day, daysInTargetMonth));
+  return target.getTime();
+}
+
+/**
+ * Próximo reset mensal de um usuário: mês calendário ancorado no DIA da
+ * assinatura (`currentPeriodStart` — a data real da última renovação do
+ * plano, atualizada pelo webhook a cada pagamento), não um contador fixo de
+ * 30 dias corridos. Isso evita o reset "andar" pelo mês ao longo do tempo
+ * (30 dias ≠ 1 mês civil) e mantém a contagem alinhada à renovação real —
+ * inclusive para planos semestral/anual, cujo `currentPeriodStart` só muda a
+ * cada renovação de verdade (o CRON cobre o "recarrega mensal" no meio do
+ * período longo, sempre no mesmo dia do mês em que o plano começou).
+ */
+function nextMonthlyReset(lastResetAt: number, anchorMs: number): number {
+  // Quantos meses já se passaram do anchor até o último reset registrado —
+  // garante que a próxima ocorrência do dia-âncora seja estritamente após
+  // lastResetAt, mesmo que lastResetAt não caia exatamente nesse dia.
+  const anchorDate = new Date(anchorMs);
+  let next = addMonthsClamped(anchorMs, 0);
+  if (next <= lastResetAt) {
+    const monthsBetween = Math.max(
+      1,
+      (new Date(lastResetAt).getUTCFullYear() - anchorDate.getUTCFullYear()) * 12
+        + (new Date(lastResetAt).getUTCMonth() - anchorDate.getUTCMonth())
+    );
+    next = addMonthsClamped(anchorMs, monthsBetween);
+    while (next <= lastResetAt) next = addMonthsClamped(next, 1);
+  }
+  return next;
+}
 
 /**
  * Modo CRON (GET): protegido por CRON_SECRET (Vercel envia `Authorization: Bearer <CRON_SECRET>`).
@@ -38,23 +79,34 @@ async function runCronBatch(req: any, res: any) {
     const updates: Record<string, any> = {};
     finalStatusByDocId.set(docSnap.id, sub.status);
 
-    // Reset de quota mensal vencida.
+    // Reset de quota mensal vencida — mês calendário ancorado no dia real da
+    // assinatura (currentPeriodStart), não em "30 dias corridos" desde o
+    // último reset (que desalinha do dia de renovação ao longo do tempo).
     const lastResetAt = sub.lastResetAt || 0;
-    if (lastResetAt && now > lastResetAt + THIRTY_DAYS) {
-      let nextResetAt = lastResetAt + THIRTY_DAYS;
-      if (now > nextResetAt + THIRTY_DAYS) nextResetAt = now;
-      updates.reportsUsedThisMonth = 0;
-      updates.lastResetAt = nextResetAt;
-      resetCount++;
+    const anchorMs = sub.currentPeriodStart || lastResetAt;
+    if (lastResetAt && anchorMs) {
+      const nextResetAt = nextMonthlyReset(lastResetAt, anchorMs);
+      if (now > nextResetAt) {
+        updates.reportsUsedThisMonth = 0;
+        updates.lastResetAt = nextResetAt;
+        resetCount++;
+        // Espelha no doc do usuário — é de lá que o app lê o contador (e o
+        // Math.max com o valor da assinatura, em useSubscription.ts, ignoraria
+        // silenciosamente este reset se o campo do usuário não zerasse junto).
+        if (sub.userId) {
+          batch.set(db.collection('users').doc(sub.userId), { reportsUsedThisMonth: 0, updatedAt: now }, { merge: true });
+        }
+      }
     }
 
-    // Expiração de período: recorrente (anual) vira past_due (aguarda retry/webhook da
-    // AbacatePay); avulso (mensal/semestral, sem cobrança futura) vira expired e perde acesso.
-    // `interval` ausente (assinaturas gravadas antes deste campo existir) é tratado como
-    // recorrente por padrão — mais seguro errar mantendo acesso do que cortar assinante
-    // anual pago por engano só porque o doc é antigo.
+    // Expiração de período: mensal e anual são recorrentes (vira past_due — aguarda
+    // renovação via webhook da AbacatePay ou fatura criada pelo CRON billing).
+    // Semestral é checkout avulso sem renovação automática — vira expired e perde acesso.
+    // `interval` ausente (docs antigos) é tratado como recorrente por padrão — mais
+    // seguro manter acesso do que cortar assinante pagador por campo ausente.
     if ((sub.status === 'active' || sub.status === 'past_due') && sub.currentPeriodEnd && now > sub.currentPeriodEnd) {
       const recurring = sub.interval ? isRecurringInterval(sub.interval) : true;
+      // Planos recorrentes (mensal) viram past_due; planos avulsos (semestral/anual) expiram.
       const nextStatus = recurring ? 'past_due' : 'expired';
       if (sub.status !== nextStatus) {
         updates.status = nextStatus;
@@ -192,14 +244,13 @@ export default async function handler(req: any, res: any) {
 
       const subData = subSnap.data() || {};
       const lastResetAt = subData.lastResetAt || 0;
+      const anchorMs = subData.currentPeriodStart || lastResetAt;
       const now = Date.now();
 
-      if (now <= lastResetAt + THIRTY_DAYS) {
-        return { reset: false, reason: 'Período de 30 dias ainda não se esgotou.' };
+      const nextResetAt = nextMonthlyReset(lastResetAt, anchorMs);
+      if (now <= nextResetAt) {
+        return { reset: false, reason: 'O ciclo mensal desta assinatura ainda não se esgotou.' };
       }
-
-      let nextResetAt = lastResetAt + THIRTY_DAYS;
-      if (now > nextResetAt + THIRTY_DAYS) nextResetAt = now;
 
       transaction.update(subRef,  { reportsUsedThisMonth: 0, lastResetAt: nextResetAt, updatedAt: now });
       transaction.update(userRef, { reportsUsedThisMonth: 0, updatedAt: now });

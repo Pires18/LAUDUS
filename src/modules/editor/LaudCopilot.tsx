@@ -2,13 +2,15 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Loader2, Sparkles, Bot, User, Mic, MicOff, Calculator,
   Lightbulb, Zap, ClipboardList, RotateCcw, CheckCircle2,
-  Trash2, StopCircle, Brain, Pencil, FileText, Lock, ShieldCheck, ShieldAlert,
+  Trash2, StopCircle, Brain, Pencil, FileText, Lock, ShieldCheck, ShieldAlert, LayoutGrid,
 } from 'lucide-react';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 import { useApp } from '../../store/app';
 import { updateItem, saveVersionSnapshot, getRecentFinalizedReports } from '../../store/db';
 import { logger } from '../../utils/logger';
-import { ExamRequest, Patient, ReportTemplate } from '../../types';
+import { ExamRequest, Patient, ReportTemplate, StructuredFieldValue } from '../../types';
+import { StructuredTab } from './components/StructuredTab';
+import { deriveStructuredSchema, summarizeStructured } from './structured/deriveSchema';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { routeMotor } from '../ai/router';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
@@ -108,6 +110,29 @@ const VASCULAR_FIELDS: StructuredField[] = [
   { id: 'veias', label: 'Veias', placeholder: 'ex: compressíveis, sem trombo' },
 ];
 
+/**
+ * Instrução de inserção padronizada por área — compartilhada pela aba
+ * Formulário (texto livre) e pela aba Estruturado (campos tipados).
+ */
+function buildAreaInstruction(area: string): string {
+  if (area === 'medicina-fetal') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA DE INSERÇÃO — MEDICINA FETAL:\nEstes são os dados biométricos, obstétricos e de vitalidade do exame. Você DEVE:\n1. Inserir cada dado fornecido no campo correspondente da ANÁLISE.\n2. Calcular automaticamente: RCP = IP ACM / IP umbilical; IG atual e DPP se DUM fornecida.\n3. Classificar o PFE: AIG/GIG/PIG/RCIU se fornecido.\n4. Substituir todos os placeholders pelos dados reais.\n5. NÃO inventar dados não fornecidos.\n6. Atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  if (area === 'ginecologia') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — GINECOLOGIA:\nInserir dados nos campos correspondentes, aplicar O-RADS/MUSA se indicado, substituir placeholders, não inventar dados ausentes, atualizar conclusão e recomendações.`;
+  }
+  if (area === 'vascular') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — VASCULAR:\nInserir valores Doppler nos campos correspondentes, substituir placeholders, não inventar dados, atualizar conclusão e recomendações.`;
+  }
+  if (area === 'mastologia') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — MASTOLOGIA:\nInserir densidade (ACR) e achados por mama, aplicar a categoria BI-RADS informada (e a conduta correspondente), substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  if (area === 'pequenas-partes') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — PEQUENAS PARTES:\nInserir dimensões/volumes e achados nos campos correspondentes; para nódulo tireoidiano aplicar a categoria ACR TI-RADS informada e a conduta (seguimento/PAAF); substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  return `\n\nINSTRUÇÃO OBRIGATÓRIA:\nInserir cada achado no campo correspondente da ANÁLISE, substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+}
+
 function StructuredFormField({ field, value, onChange }: { field: StructuredField; value: string; onChange: (v: string) => void }) {
   if (field.type === 'select') {
     return (
@@ -161,6 +186,11 @@ interface LaudCopilotProps {
    */
   injectedMessage?: string | null;
   onInjectionConsumed?: () => void;
+  /** Abre a calculadora `calcId` com alvo em um campo da aba Estruturado. */
+  onOpenCalcForField?: (calcId: string, fieldId: string, label: string) => void;
+  /** Resultado de calculadora a gravar num campo estruturado (write-back). */
+  structuredCalcResult?: { fieldId: string; result: { text: string; metrics?: Record<string, any>; calcId?: string } } | null;
+  onStructuredResultConsumed?: () => void;
   isDocked?: boolean;
 }
 
@@ -179,13 +209,17 @@ export function LaudCopilot({
   onChangePrompt,
   injectedMessage,
   onInjectionConsumed,
+  onOpenCalcForField,
+  structuredCalcResult,
+  onStructuredResultConsumed,
   isDocked
 }: LaudCopilotProps) {
   const { settings, updateSettings, showToast } = useApp();
   const confirm = useConfirm();
-  const [activeTab, setActiveTab] = useState<'chat' | 'form'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'form' | 'structured'>('chat');
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [anamnesisText, setAnamnesisText] = useState(exam.anamnesis ?? '');
+  const [structuredValues, setStructuredValues] = useState<Record<string, StructuredFieldValue>>(exam.structuredValue ?? {});
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
   const [refinePhase, setRefinePhase] = useState<'idle' | 'integrating' | 'refining'>('idle');
   const [genPhase, setGenPhase] = useState<'idle' | 'reasoning' | 'writing'>('idle');
@@ -219,6 +253,19 @@ export function LaudCopilot({
   const latestAnamnesisRef = useRef(anamnesisText);
   const isAnamnesisFocusedRef = useRef(false);
 
+  const structuredSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestStructuredRef = useRef(structuredValues);
+
+  // Esquema estruturado derivado da máscara/área (memoizado por exame).
+  const structuredSchema = useMemo(
+    () => deriveStructuredSchema(template, exam.area || template?.area || ''),
+    [template, exam.area]
+  );
+  const structuredSummary = useMemo(
+    () => summarizeStructured(structuredSchema, structuredValues),
+    [structuredSchema, structuredValues]
+  );
+
   const cancelActiveRequest = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -241,6 +288,9 @@ export function LaudCopilot({
       }
       if (anamnesisSaveTimerRef.current) {
         clearTimeout(anamnesisSaveTimerRef.current);
+      }
+      if (structuredSaveTimerRef.current) {
+        clearTimeout(structuredSaveTimerRef.current);
       }
     };
   }, []);
@@ -265,6 +315,14 @@ export function LaudCopilot({
       latestAnamnesisRef.current = anamVal;
       isAnamnesisDirtyRef.current = false;
 
+      if (structuredSaveTimerRef.current) {
+        clearTimeout(structuredSaveTimerRef.current);
+        structuredSaveTimerRef.current = null;
+      }
+      const structVal = exam.structuredValue ?? {};
+      setStructuredValues(structVal);
+      latestStructuredRef.current = structVal;
+
       prevExamIdRef.current = exam.id;
     } else {
       if (!isDirtyRef.current && !isFormFocusedRef.current) {
@@ -277,8 +335,14 @@ export function LaudCopilot({
         setAnamnesisText(anamVal);
         latestAnamnesisRef.current = anamVal;
       }
+      // Sincroniza estruturado só quando não há edição local pendente.
+      if (!structuredSaveTimerRef.current) {
+        const structVal = exam.structuredValue ?? {};
+        latestStructuredRef.current = structVal;
+        setStructuredValues(structVal);
+      }
     }
-  }, [exam.id, exam.customFormValue, exam.anamnesis, template?.customForm]);
+  }, [exam.id, exam.customFormValue, exam.anamnesis, exam.structuredValue, template?.customForm]);
 
 
 
@@ -903,18 +967,7 @@ export function LaudCopilot({
     const templateName = template?.name || exam.examType || 'Formulário';
     const area = exam.area || template?.area || '';
 
-    let areaInstruction = '';
-    if (area === 'medicina-fetal') {
-      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA DE INSERÇÃO — MEDICINA FETAL:\nEstes são os dados biométricos, obstétricos e de vitalidade do exame coletados via formulário. Você DEVE:\n1. Inserir cada dado fornecido no campo correspondente da ANÁLISE.\n2. Calcular automaticamente: RCP = IP ACM / IP umbilical; IG atual e DPP se DUM fornecida.\n3. Classificar o PFE: AIG/GIG/PIG/RCIU se fornecido.\n4. Substituir todos os placeholders pelos dados reais.\n5. NÃO inventar dados não fornecidos.\n6. Atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
-    } else if (area === 'ginecologia') {
-      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA — GINECOLOGIA:\nInserir dados nos campos correspondentes, aplicar O-RADS/MUSA se indicado, substituir placeholders, não inventar dados ausentes, atualizar conclusão e recomendações.`;
-    } else if (area === 'vascular') {
-      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA — VASCULAR:\nInserir valores Doppler nos campos correspondentes, substituir placeholders, não inventar dados, atualizar conclusão e recomendações.`;
-    } else {
-      areaInstruction = `\n\nINSTRUÇÃO OBRIGATÓRIA:\nInserir cada achado no campo correspondente da ANÁLISE, substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
-    }
-
-    let findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${areaInstruction}`;
+    let findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${buildAreaInstruction(area)}`;
     if (anamnesisText.trim()) {
       findingsSummary += `\n\nANAMNESE DO PACIENTE:\n${anamnesisText.trim()}`;
     }
@@ -924,6 +977,90 @@ export function LaudCopilot({
 
     setActiveTab('chat');
     handleSend(findingsSummary);
+  };
+
+  // ── Aba Estruturado: persistência, write-back de calculadora e compilação ──
+  const persistStructured = (next: Record<string, StructuredFieldValue>) => {
+    latestStructuredRef.current = next;
+    if (structuredSaveTimerRef.current) clearTimeout(structuredSaveTimerRef.current);
+    structuredSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await updateItem('exams', exam.id, { structuredValue: next });
+      } catch (err) {
+        logger.error('Erro ao salvar structuredValue', err);
+      } finally {
+        structuredSaveTimerRef.current = null;
+      }
+    }, 800);
+  };
+
+  const handleStructuredChange = (fieldId: string, value: StructuredFieldValue) => {
+    const next = { ...latestStructuredRef.current, [fieldId]: value };
+    setStructuredValues(next);
+    persistStructured(next);
+  };
+
+  const handleOpenCalcForField = (calcId: string, fieldId: string, label: string) => {
+    onOpenCalcForField?.(calcId, fieldId, label);
+  };
+
+  // Resolve o campo-alvo quando o cálculo veio do atalho de uma seção inteira.
+  const resolveTargetFieldId = (rawFieldId: string, calcId?: string): string => {
+    if (!rawFieldId.endsWith('__section')) return rawFieldId;
+    const sectionId = rawFieldId.replace(/__section$/, '');
+    const section = structuredSchema.sections.find((s) => s.id === sectionId);
+    if (!section) return rawFieldId;
+    const byCalc = section.fields.find((f) => f.calcId && f.calcId === calcId);
+    if (byCalc) return byCalc.id;
+    const calcField = section.fields.find((f) => f.kind === 'calc');
+    return calcField?.id || section.fields[0]?.id || rawFieldId;
+  };
+
+  const lastCalcResultRef = useRef<typeof structuredCalcResult>(null);
+  useEffect(() => {
+    if (!structuredCalcResult) {
+      lastCalcResultRef.current = null;
+      return;
+    }
+    if (structuredCalcResult === lastCalcResultRef.current) return;
+    lastCalcResultRef.current = structuredCalcResult;
+    const { fieldId, result } = structuredCalcResult;
+    const targetId = resolveTargetFieldId(fieldId, result.calcId);
+    handleStructuredChange(targetId, { text: result.text, metrics: result.metrics, calcId: result.calcId });
+    onStructuredResultConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structuredCalcResult]);
+
+  const handleCompileStructured = () => {
+    const { lines, filledCount } = structuredSummary;
+    if (filledCount === 0) {
+      showToast('Preencha ao menos um campo estruturado antes de processar.', 'info');
+      return;
+    }
+
+    if (structuredSaveTimerRef.current) {
+      clearTimeout(structuredSaveTimerRef.current);
+      structuredSaveTimerRef.current = null;
+      updateItem('exams', exam.id, { structuredValue: latestStructuredRef.current });
+    }
+    if (anamnesisSaveTimerRef.current) {
+      clearTimeout(anamnesisSaveTimerRef.current);
+      anamnesisSaveTimerRef.current = null;
+      isAnamnesisDirtyRef.current = false;
+      updateItem('exams', exam.id, { anamnesis: anamnesisText });
+    }
+
+    const templateName = template?.name || exam.examType || 'Exame';
+    const area = exam.area || template?.area || '';
+
+    let msg = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName} — Estruturado]${buildAreaInstruction(area)}`;
+    if (anamnesisText.trim()) {
+      msg += `\n\nANAMNESE DO PACIENTE:\n${anamnesisText.trim()}`;
+    }
+    msg += `\n\nDADOS DO FORMULÁRIO:\n${lines.join('\n')}`;
+
+    setActiveTab('chat');
+    handleSend(msg);
   };
 
   const phaseLabel = genPhase === 'reasoning'
@@ -971,6 +1108,27 @@ export function LaudCopilot({
           <ClipboardList size={12} className={activeTab === 'form' ? "text-brand-500" : ""} />
           Formulário
           {activeTab === 'form' && (
+            <motion.div
+              layoutId="copilot-tab-indicator"
+              className="absolute bottom-0 left-4 right-4 h-0.5 bg-brand-600 rounded-full"
+            />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('structured')}
+          className={classNames(
+            "flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-[11px] font-black uppercase tracking-widest transition-all relative",
+            activeTab === 'structured' ? "text-brand-700" : "text-ink-400 hover:text-ink-700"
+          )}
+        >
+          <LayoutGrid size={12} className={activeTab === 'structured' ? "text-brand-500" : ""} />
+          Estruturado
+          {structuredSummary.filledCount > 0 && (
+            <span className="w-4 h-4 bg-brand-500 text-white text-[8px] font-black rounded-full flex items-center justify-center ml-0.5">
+              {structuredSummary.filledCount}
+            </span>
+          )}
+          {activeTab === 'structured' && (
             <motion.div
               layoutId="copilot-tab-indicator"
               className="absolute bottom-0 left-4 right-4 h-0.5 bg-brand-600 rounded-full"
@@ -1579,6 +1737,18 @@ export function LaudCopilot({
             </button>
           </div>
         </div>
+      )}
+
+      {activeTab === 'structured' && (
+        <StructuredTab
+          schema={structuredSchema}
+          values={structuredValues}
+          onChange={handleStructuredChange}
+          onOpenCalc={handleOpenCalcForField}
+          onCompile={handleCompileStructured}
+          isGenerating={isGenerating}
+          filledCount={structuredSummary.filledCount}
+        />
       )}
     </div>
   );

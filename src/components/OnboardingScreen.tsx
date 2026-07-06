@@ -2,22 +2,24 @@ import { useState, useEffect } from 'react';
 import { logger } from '../utils/logger';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../store/app';
+import { planPriceBrl } from '../../api/_pricing';
 import {
   Sparkles, CheckCircle2, CreditCard, QrCode, LogOut, Loader2,
   ShieldCheck, Zap, Clock, BarChart3, Building2, Calculator,
-  Stethoscope, ChevronRight,
+  Stethoscope, ChevronRight, AlertTriangle, Wallet,
 } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { firestore } from '../lib/firebase';
+import { firestore, auth } from '../lib/firebase';
 
 export function OnboardingScreen() {
   const { signOut } = useAuth();
-  const { user, showToast } = useApp();
+  const { profile, user, showToast } = useApp();
   const [loading, setLoading] = useState(false);
 
   const [plans, setPlans]           = useState<any[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [planInterval, setPlanInterval]     = useState<'month' | 'semester' | 'year'>('month');
   const [loadingPlans, setLoadingPlans]     = useState(true);
 
   // Detect return from AbacatePay / mock redirect
@@ -56,21 +58,26 @@ export function OnboardingScreen() {
     if (!user) return;
     setLoading(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/abacatepay-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+        },
         body: JSON.stringify({
           userId: user.uid,
           email: user.email,
           type: 'subscription',
           planId: selectedPlanId,
+          interval: planInterval,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao processar assinatura.');
 
       if (data.mock) {
-        showToast('Simulando pagamento (modo dev)... aguarde o redirecionamento.', 'info');
+        showToast('Simulando pagamento (modo dev)... abrindo sandbox de testes.', 'info');
       }
       window.location.href = data.url;
     } catch (err: any) {
@@ -150,11 +157,18 @@ export function OnboardingScreen() {
               </div>
             </div>
 
-            {/* Trial badge */}
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-5">
-              <Clock size={11} />
-              <span className="text-[9px] font-black uppercase tracking-widest">14 Dias de Avaliação Gratuita Inclusos</span>
-            </div>
+            {/* Trial / Expired badge */}
+            {profile?.subscriptionStatus === 'expired' || profile?.subscriptionStatus === 'canceled' ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 mb-5">
+                <AlertTriangle size={11} />
+                <span className="text-[9px] font-black uppercase tracking-widest">Acesso Clínico Suspenso</span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mb-5">
+                <Clock size={11} />
+                <span className="text-[9px] font-black uppercase tracking-widest">14 Dias de Avaliação Gratuita Inclusos</span>
+              </div>
+            )}
 
             <h1 className="text-2xl md:text-3xl font-black tracking-tight leading-tight text-white mb-2">
               Laudos estruturados com IA, do jeito que você precisa.
@@ -187,10 +201,10 @@ export function OnboardingScreen() {
         {/* Right: Checkout CTA */}
         <div className="w-full md:w-[320px] p-8 md:p-10 bg-[#16161c] flex flex-col justify-between items-center text-center gap-6">
 
-          <div className="w-full flex-1 flex flex-col justify-center">
+          <div className="w-full flex-1 flex flex-col justify-center animate-fade-in">
             {/* Plan selector */}
             {plans.length > 1 && (
-              <div className="flex gap-1 bg-[#1c1c24] p-1 rounded-xl border border-white/6 mb-5">
+              <div className="flex gap-1 bg-[#1c1c24] p-1 rounded-xl border border-white/6 mb-3">
                 {plans.map(p => (
                   <button
                     key={p.id}
@@ -206,17 +220,45 @@ export function OnboardingScreen() {
               </div>
             )}
 
-            {/* Trial info box */}
-            <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-2xl p-4 mb-5 text-left">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock size={13} className="text-emerald-400" />
-                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Período de Avaliação</span>
-              </div>
-              <p className="text-[11px] text-ink-300 leading-relaxed font-medium">
-                Ao criar sua conta, você tem <strong className="text-emerald-400">14 dias de acesso completo gratuito</strong> — sem cartão, sem compromisso.
-                Assine antes do trial expirar para não perder acesso.
-              </p>
+            {/* Interval selector */}
+            <div className="flex gap-1 bg-[#1c1c24] p-1 rounded-xl border border-white/6 mb-5">
+              {(['month', 'semester', 'year'] as const).map(iv => (
+                <button
+                  key={iv}
+                  type="button"
+                  onClick={() => setPlanInterval(iv)}
+                  className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                    planInterval === iv ? 'bg-brand-600 text-white shadow' : 'text-ink-400 hover:text-white'
+                  }`}
+                >
+                  {iv === 'month' ? 'Mensal' : iv === 'semester' ? 'Semestral' : 'Anual'}
+                </button>
+              ))}
             </div>
+
+            {/* Trial vs Expired info box */}
+            {profile?.subscriptionStatus === 'expired' || profile?.subscriptionStatus === 'canceled' ? (
+              <div className="bg-amber-500/8 border border-amber-500/20 rounded-2xl p-4 mb-5 text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle size={13} className="text-amber-400" />
+                  <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Assinatura Expirada</span>
+                </div>
+                <p className="text-[11px] text-ink-300 leading-relaxed font-medium">
+                  Seu período de acesso ao LAUD.US terminou. Escolha um plano e realize a assinatura para reativar seu acesso instantaneamente.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-2xl p-4 mb-5 text-left">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock size={13} className="text-emerald-400" />
+                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Período de Avaliação</span>
+                </div>
+                <p className="text-[11px] text-ink-300 leading-relaxed font-medium">
+                  Ao criar sua conta, você tem <strong className="text-emerald-400">14 dias de acesso completo gratuito</strong> — sem cartão, sem compromisso.
+                  Assine antes do trial expirar para não perder acesso.
+                </p>
+              </div>
+            )}
 
             {/* Price display */}
             <div className="mb-5">
@@ -225,18 +267,33 @@ export function OnboardingScreen() {
               ) : (
                 <>
                   <span className="text-ink-500 text-[9px] font-black uppercase tracking-widest">
-                    {selectedPlan?.name ? `Plano ${selectedPlan.name}` : 'Plano Base'}
+                    {selectedPlan?.name ? (selectedPlan.name.toLowerCase().startsWith('plano') ? selectedPlan.name : `Plano ${selectedPlan.name}`) : 'Plano Base'}
                   </span>
-                  <div className="flex items-baseline justify-center gap-1 mt-1.5">
-                    <span className="text-base font-black text-ink-400">R$</span>
-                    <span className="text-5xl font-black tracking-tighter text-white">
-                      {Math.floor(selectedPlan?.price || 149)}
-                    </span>
-                    <span className="text-xs font-bold text-ink-500">
-                      ,{String(Math.round(((selectedPlan?.price || 149) % 1) * 100)).padStart(2, '0')}/{selectedPlan?.interval === 'year' ? 'ano' : selectedPlan?.interval === 'semester' ? 'semestre' : 'mês'}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-ink-500 font-medium mt-1.5">
+                  {(() => {
+                    const pv = selectedPlan ? planPriceBrl(selectedPlan, planInterval) : 149;
+                    const installments = planInterval === 'year' ? 12 : planInterval === 'semester' ? 6 : 1;
+                    const monthlyEquivalent = pv / installments;
+                    const cents = Math.round((monthlyEquivalent % 1) * 100).toString().padStart(2, '0');
+                    return (
+                      <div className="mt-1">
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className="text-base font-black text-ink-400">R$</span>
+                          <span className="text-5xl font-black tracking-tighter text-white">
+                            {Math.floor(monthlyEquivalent)}
+                          </span>
+                          <span className="text-xs font-bold text-ink-500">
+                            ,{cents}/mês
+                          </span>
+                        </div>
+                        {planInterval !== 'month' && (
+                          <div className="text-[9px] text-ink-400 font-semibold mt-1.5">
+                            Cobrado como R$ {pv.toFixed(2).replace('.', ',')} por {planInterval === 'year' ? 'ano' : 'semestre'}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <p className="text-[10px] text-ink-500 font-medium mt-2">
                     {selectedPlan?.reportsQuota === 0
                       ? 'Laudos ilimitados'
                       : `${selectedPlan?.reportsQuota || 100} laudos/mês`}
@@ -265,10 +322,22 @@ export function OnboardingScreen() {
                 )}
               </button>
 
-              <p className="flex items-center justify-center gap-1.5 text-[10px] font-medium text-ink-500">
-                <CreditCard size={11} />
-                Cobrança recorrente — cancele quando quiser
-              </p>
+              {planInterval === 'month' ? (
+                <p className="flex items-center justify-center gap-1.5 text-[10px] font-medium text-ink-500">
+                  <CreditCard size={11} />
+                  Cobrança recorrente — cancele quando quiser
+                </p>
+              ) : (() => {
+                const installments = planInterval === 'year' ? 12 : 6;
+                const pv = selectedPlan ? planPriceBrl(selectedPlan, planInterval) : 149;
+                const installmentVal = (pv / installments).toFixed(2).replace('.', ',');
+                return (
+                  <p className="flex items-center justify-center gap-1.5 text-[10px] font-medium text-ink-500">
+                    <CreditCard size={11} />
+                    Disponível em até {installments}× R$ {installmentVal} no cartão
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Highlights row */}

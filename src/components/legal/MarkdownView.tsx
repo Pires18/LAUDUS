@@ -20,6 +20,16 @@ interface Props {
   onNavigateInternal?: (path: string) => void;
 }
 
+/** Slug estável a partir do texto do heading — usado para âncoras do índice. */
+export function slugify(text: string): string {
+  return text
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+}
+
 /** Links relativos entre documentos .md → rotas públicas do app. */
 const INTERNAL_LINKS: Record<string, string> = {
   'TERMOS_DE_USO.md': '/termos',
@@ -111,7 +121,12 @@ export function MarkdownView({ markdown, onNavigateInternal }: Props) {
       continue;
     }
     if (line.startsWith('## ')) {
-      blocks.push(<h2 key={k++} className="text-lg font-black text-ink-900 mt-10 mb-3 pb-2 border-b border-ink-100 tracking-tight">{renderInline(line.slice(3), k, onNavigateInternal)}</h2>);
+      const text = line.slice(3);
+      blocks.push(
+        <h2 key={k++} id={slugify(text)} className="text-lg font-black text-ink-900 mt-10 mb-3 pb-2 border-b border-ink-100 tracking-tight scroll-mt-24">
+          {renderInline(text, k, onNavigateInternal)}
+        </h2>
+      );
       continue;
     }
     if (line.startsWith('# ')) {

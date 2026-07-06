@@ -115,15 +115,26 @@ export function ResultCard({ label, value, points, recommendation, variant = 'br
   );
 }
 
-export function CalculatorInput({ label, value, onChange, placeholder, type = 'text', suffix }: any) {
+export function CalculatorInput({ label, value, onChange, placeholder, type = 'text', suffix, min }: any) {
+  // Medidas clínicas (mm/cm/semanas etc.) nunca são negativas. O atributo
+  // HTML `min` sozinho não bloqueia a digitação de "-"; por isso também
+  // rejeitamos no onChange — sem isso, qualquer calculadora que use este
+  // input compartilhado aceitava negativos silenciosamente.
+  const numericMin = type === 'number' ? (min ?? 0) : undefined;
   return (
     <div className="space-y-1.5">
       <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">{label}</label>
       <div className="relative">
         <input
           type={type}
+          min={numericMin}
+          step={type === 'number' ? 'any' : undefined}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (numericMin !== undefined && v !== '' && v !== '-' && Number(v) < numericMin) return;
+            onChange(v);
+          }}
           placeholder={placeholder}
           className="w-full h-12 px-4 bg-white border-2 border-ink-100 rounded-2xl focus:border-brand-500 focus:ring-4 focus:ring-brand-500/5 outline-none transition-all text-sm font-bold"
         />

@@ -1,15 +1,17 @@
 {
   "functions": {
-    "api/abacatepay-webhook.ts": { "maxDuration": 30 },
-    "api/abacatepay-checkout.ts": { "maxDuration": 20 },
-    "api/abacatepay-cancel.ts": { "maxDuration": 20 },
-    "api/reset-monthly-reports.ts": { "maxDuration": 60 },
-    "api/cron-aggregate-metrics.ts": { "maxDuration": 60 },
-    "api/promote-admin.ts": { "maxDuration": 15 },
-    "api/clinic-invite.ts": { "maxDuration": 15 },
+    "api/abacatepay-webhook.ts":   { "maxDuration": 30 },
+    "api/abacatepay-checkout.ts":  { "maxDuration": 20 },
+    "api/abacatepay-cancel.ts":    { "maxDuration": 20 },
+    "api/abacatepay-mock-gateway.ts":  { "maxDuration": 15 },
+    "api/reset-monthly-reports.ts":    { "maxDuration": 60 },
+    "api/cron-aggregate-metrics.ts":   { "maxDuration": 60 },
+    "api/cron-monthly-billing.ts":     { "maxDuration": 60 },
+    "api/promote-admin.ts":  { "maxDuration": 15 },
+    "api/clinic-invite.ts":  { "maxDuration": 15 },
     "api/pacs-provision.ts": { "maxDuration": 30 },
-    "api/gemini.ts": { "maxDuration": 60 },
-    "api/health.ts": { "maxDuration": 5 }
+    "api/gemini.ts":         { "maxDuration": 60 },
+    "api/health.ts":         { "maxDuration": 5 }
   },
   "crons": [
     {
@@ -19,6 +21,10 @@
     {
       "path": "/api/cron-aggregate-metrics",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron-monthly-billing",
+      "schedule": "45 3 * * *"
     }
   ],
   "headers": [

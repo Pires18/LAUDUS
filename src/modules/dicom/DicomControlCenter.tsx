@@ -636,7 +636,15 @@ export function DicomControlCenter() {
                     </div>
 
                     <div>
-                      <label className="label">AE Title do Servidor (Orthanc)</label>
+                      <label className="label flex items-center gap-1.5 relative">
+                        AE Title do Servidor (Orthanc)
+                        <span className="group relative cursor-help">
+                          <Info size={12} className="text-ink-400 hover:text-emerald-600 transition-colors inline-block" />
+                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-ink-900 text-white text-[10px] normal-case tracking-normal rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-normal font-bold text-center">
+                            É o "nome" que identifica o servidor PACS na rede DICOM — precisa ser o mesmo valor configurado no aparelho de ultrassom. Se não souber, pergunte ao suporte técnico do fabricante do aparelho.
+                          </span>
+                        </span>
+                      </label>
                       <input
                         className="input h-11 text-sm font-mono"
                         value={draft.dicomOrthancAETitle || ''}

@@ -125,7 +125,56 @@ export interface ExamRequest {
   }>;
   /** Dados salvos das calculadoras para este exame */
   calculatorData?: Record<string, any>;
+  /** Valores preenchidos na aba "Estruturado" do Copiloto (por fieldId) */
+  structuredValue?: Record<string, StructuredFieldValue>;
 }
+
+/**
+ * Formulário Estruturado (aba "Estruturado" do Copiloto) — campos tipados
+ * derivados da máscara, integrados às calculadoras, compilados numa instrução
+ * padronizada `[DADOS ESTRUTURADOS]` para a IA inserir nos compartimentos.
+ */
+export type StructuredFieldKind = 'measure' | 'triplet' | 'text' | 'select' | 'toggle' | 'calc';
+
+export interface StructuredFieldDef {
+  id: string;
+  label: string;
+  kind: StructuredFieldKind;
+  /** Unidade exibida/anexada ao valor (ex: 'mm', 'cm', 'bpm', 'cm/s') */
+  unit?: string;
+  /** Opções para kind='select' */
+  options?: string[];
+  /** Calculadora ligada (kind='calc' ou campo com atalho de cálculo) */
+  calcId?: string;
+  /** Dica curta exibida abaixo do campo (thresholds, referência) */
+  hint?: string;
+  /** Placeholder do input */
+  placeholder?: string;
+}
+
+export interface StructuredSection {
+  id: string;
+  label: string;
+  fields: StructuredFieldDef[];
+  /** Calculadora aplicável à seção inteira (atalho no cabeçalho) */
+  calcId?: string;
+}
+
+export interface StructuredSchema {
+  area: ExamArea | string;
+  examName?: string;
+  sections: StructuredSection[];
+}
+
+/** Valor de um campo estruturado. Objeto para 'triplet'/'calc' (com métricas). */
+export type StructuredFieldValue = string | {
+  /** Texto compilável exibido/injetado (ex: resumo da calculadora, "8,2 x 5,1 x 4,8 cm") */
+  text?: string;
+  /** Métricas cruas quando veio de calculadora */
+  metrics?: Record<string, any>;
+  /** id da calculadora de origem, se aplicável */
+  calcId?: string;
+};
 
 /** Estrutura de uma máscara (template) de laudo */
 export interface ReportTemplate {
@@ -485,6 +534,18 @@ export interface Subscription {
   paymentMethod: 'pix' | 'credit_card' | 'manual';
   abacatePayCustomerId?: string;
   abacatePaySubscriptionId?: string;
+  price?: number;
+  interval?: 'month' | 'semester' | 'year';
+  installments?: number;
+  /**
+   * Modo de cobrança para planos mensais:
+   * 'subscription' = AbacatePay gerencia PIX Automático ou Cartão recorrente.
+   * 'invoice'      = CRON cria faturas mensais automaticamente (fallback).
+   * Ausente em planos semestrais/anuais (checkouts avulsos).
+   */
+  billingMode?: 'subscription' | 'invoice';
+  /** Valor (R$) da última fatura — usado pelo CRON para criar a próxima. */
+  lastInvoiceAmount?: number;
   currentPeriodStart: number;
   currentPeriodEnd: number;
   /** Plano vitalício: sempre ativo, sem expiração/recorrência (definido pelo admin). */
@@ -498,8 +559,6 @@ export interface Subscription {
   reportsUsedThisMonth: number;
   reportsQuota: number;
   clinicsQuota: number;
-  tokenQuotaLite: number;
-  tokenQuotaPro: number;
   lastResetAt: number;
   createdAt: number;
   updatedAt: number;
@@ -592,8 +651,6 @@ export interface Plan {
   // Quotas
   reportsQuota: number;       // 0 = ilimitado
   clinicsQuota: number;       // 0 = ilimitado
-  tokenQuotaLite: number;     // 0 = ilimitado (tokens Lite/mês)
-  tokenQuotaPro: number;      // 0 = ilimitado (tokens Pro/mês)
   trialDays: number;
 
   // Funcionalidades incluídas

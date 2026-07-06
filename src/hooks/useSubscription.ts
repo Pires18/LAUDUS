@@ -109,16 +109,23 @@ function deriveState(
   const isPastDue = !isLifetime && sub.status === 'past_due';
   const isCanceled = !isLifetime && (sub.status === 'canceled' || sub.status === 'paused');
 
+  // Add-ons só valem com assinatura ativa (ou em past_due, mesma tolerância
+  // usada em canGenerateReport abaixo) — sem essa checagem, uma assinatura
+  // CANCELADA mantinha acesso aos módulos de add-on para sempre, porque
+  // `addons` só é limpo no cancelamento (ver api/abacatepay-cancel.ts) como
+  // higiene de dados, não como o mecanismo de bloqueio em si.
+  const addonsUsable = isActive || isPastDue;
   const addons: SubscriptionAddon[] = sub.addons || [];
-  const hasCalculators = addons.includes('calculators');
-  const hasPacs = addons.includes('pacs');
-  const hasAppointments = addons.includes('appointments');
-  const hasClinics = addons.includes('clinics');
+  const hasCalculators = addonsUsable && addons.includes('calculators');
+  const hasPacs = addonsUsable && addons.includes('pacs');
+  const hasAppointments = addonsUsable && addons.includes('appointments');
+  const hasClinics = addonsUsable && addons.includes('clinics');
 
   const reportsUsed = sub.reportsUsedThisMonth ?? 0;
   const reportsQuota = sub.reportsQuota ?? 100;
-  const reportsRemaining = Math.max(0, reportsQuota - reportsUsed);
-  const canGenerateReport = (isActive || isPastDue) && reportsRemaining > 0;
+  const isUnlimited = reportsQuota === 0 || reportsQuota >= 9999;
+  const reportsRemaining = isUnlimited ? 999999 : Math.max(0, reportsQuota - reportsUsed);
+  const canGenerateReport = (isActive || isPastDue) && (isUnlimited || reportsRemaining > 0);
 
   const trialDaysLeft = isTrialing && sub.trialEndsAt
     ? Math.max(0, Math.ceil((sub.trialEndsAt - now) / (1000 * 60 * 60 * 24)))
@@ -169,28 +176,39 @@ export function useSubscription(): SubscriptionState {
 
       const adminReportsUsed = userData.reportsUsedThisMonth ?? 0;
 
-      if (userData.role === 'admin') {
-        setState({
-          ...DEFAULT_STATE,
-          loading: false,
-          ...deriveState(null, true, true, adminReportsUsed),
-        });
-        return;
-      }
-
-      if (isAdmin) {
-        setState({
-          ...DEFAULT_STATE,
-          loading: false,
-          ...deriveState(null, true, true, adminReportsUsed),
-        });
-        return;
-      }
-
+      const isUserAdmin = userData.role === 'admin' || isAdmin;
       const motorProEnabled = userData.motorProEnabled === true;
       const subscriptionId = userData.subscriptionId as string | undefined;
 
       if (!subscriptionId) {
+        // Se for admin, geramos um objeto de assinatura vitalícia virtual para ele ver o card vitalício no perfil
+        if (isUserAdmin) {
+          const virtualSub: Subscription = {
+            id: 'admin_lifetime',
+            userId: uid,
+            userEmail: email,
+            plan: 'base',
+            addons: [],
+            status: 'active',
+            lifetime: true,
+            paymentMethod: 'manual',
+            currentPeriodStart: Date.now(),
+            currentPeriodEnd: Date.now() + 100 * 365 * 24 * 60 * 60 * 1000, // 100 anos
+            reportsUsedThisMonth: adminReportsUsed,
+            reportsQuota: 9999,
+            clinicsQuota: 9999,
+            lastResetAt: Date.now(),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          setState({
+            loading: false,
+            subscription: virtualSub,
+            ...deriveState(virtualSub, true, true, adminReportsUsed),
+          });
+          return;
+        }
+
         // Verifica se ainda está no trial (14 dias a partir da criação da conta)
         const createdAt = userData.createdAt as number | undefined;
         if (createdAt) {
@@ -210,8 +228,6 @@ export function useSubscription(): SubscriptionState {
               reportsUsedThisMonth: userData.reportsUsedThisMonth ?? 0,
               reportsQuota: 100,
               clinicsQuota: 5,
-              tokenQuotaLite: 0,
-              tokenQuotaPro: 0,
               lastResetAt: createdAt,
               createdAt,
               updatedAt: createdAt,
@@ -256,10 +272,12 @@ export function useSubscription(): SubscriptionState {
           ).catch((err) => logger.error('Erro ao resetar laudos mensais:', err));
         }
 
+        const finalSub = isUserAdmin ? { ...sub, lifetime: true } : sub;
+
         setState({
           loading: false,
-          subscription: sub,
-          ...deriveState(sub, motorProEnabled, false),
+          subscription: finalSub,
+          ...deriveState(finalSub, motorProEnabled, isUserAdmin, finalSub.reportsUsedThisMonth),
         });
       } catch {
         setState({ ...DEFAULT_STATE, loading: false });

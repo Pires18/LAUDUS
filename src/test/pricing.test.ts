@@ -162,9 +162,9 @@ describe('periodEndFrom', () => {
 });
 
 describe('isRecurringInterval', () => {
-  it('só o anual é recorrente', () => {
-    expect(isRecurringInterval('year')).toBe(true);
-    expect(isRecurringInterval('month')).toBe(false);
+  it('só o mensal é recorrente', () => {
+    expect(isRecurringInterval('month')).toBe(true);
+    expect(isRecurringInterval('year')).toBe(false);
     expect(isRecurringInterval('semester')).toBe(false);
     expect(isRecurringInterval(undefined)).toBe(false);
   });

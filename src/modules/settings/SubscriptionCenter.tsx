@@ -10,7 +10,7 @@ import { classNames } from '../../utils/format';
 import { planPriceBrl, addonPriceBrl } from '../../../api/_pricing';
 import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
-  AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText,
+  AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText, Wallet,
   Building2, RefreshCw, ChevronDown, ChevronUp,
   Package, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus,
 } from 'lucide-react';
@@ -162,14 +162,21 @@ export function SubscriptionCenter() {
     setLoadingStats(true);
     try {
       const now   = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      // Filtra o consumo a partir do início do ciclo mensal da assinatura (lastResetAt)
+      let start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      if (subscription?.lastResetAt) {
+        start = subscription.lastResetAt;
+      } else if (subscription?.currentPeriodStart) {
+        start = subscription.currentPeriodStart;
+      }
+      
       const logs  = await getAiUsageStats(start, Date.now());
       setLaudoStats({
         liteCount: logs.filter(l => (l.model || '').toLowerCase().includes('flash')).length,
         proCount:  logs.filter(l => (l.model || '').toLowerCase().includes('pro')).length,
       });
     } finally { setLoadingStats(false); }
-  }, []);
+  }, [subscription]);
 
   useEffect(() => { fetchLaudoStats(); }, [fetchLaudoStats]);
 
@@ -292,10 +299,15 @@ export function SubscriptionCenter() {
   const reportsPercent  = reportsQuota > 0 ? Math.min(100, Math.round((reportsUsed  / reportsQuota)  * 100)) : 0;
   const isHighUsage     = reportsPercent >= 85;
 
-  const tokenQuotaLite = subscription?.tokenQuotaLite ?? 0;
-  const tokenQuotaPro  = subscription?.tokenQuotaPro  ?? 0;
-  const litePct = tokenQuotaLite > 0 ? Math.min(100, Math.round((laudoStats.liteCount / tokenQuotaLite) * 100)) : -1;
-  const proPct  = tokenQuotaPro  > 0 ? Math.min(100, Math.round((laudoStats.proCount  / tokenQuotaPro)  * 100)) : -1;
+  // O split Lite/Pro vem do ai_usage (janela de mês calendário), que pode não
+  // bater com `reportsUsed` (o contador oficial, que trava a cota e aparece
+  // em todo o resto do app — badge do editor, Dashboard, Admin). Normaliza a
+  // proporção Lite/Pro do ai_usage sobre o total real, para que "Total este
+  // mês" aqui NUNCA divirja do número mostrado em qualquer outra tela.
+  const laudoStatsTotal = laudoStats.liteCount + laudoStats.proCount;
+  const proShare  = laudoStatsTotal > 0 ? laudoStats.proCount / laudoStatsTotal : 0;
+  const proUsed   = Math.round(reportsUsed * proShare);
+  const liteUsed  = reportsUsed - proUsed;
 
   const displayPlanName = planName || subscription?.plan || 'Base';
   const nextReset = subscription?.currentPeriodEnd
@@ -325,9 +337,9 @@ export function SubscriptionCenter() {
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-1 bg-ink-100 p-1 rounded-2xl border border-ink-200">
               {([
-                { iv: 'month'    as const, label: 'Mensal',    hint: '' },
-                { iv: 'semester' as const, label: 'Semestral', hint: '−1 mês' },
-                { iv: 'year'     as const, label: 'Anual',     hint: '−2 meses' },
+                { iv: 'month'    as const, label: 'Mensal',    hint: '↻ Recorrente' },
+                { iv: 'semester' as const, label: 'Semestral', hint: '' },
+                { iv: 'year'     as const, label: 'Anual',     hint: '' },
               ]).map(o => (
                 <button
                   key={o.iv}
@@ -338,7 +350,7 @@ export function SubscriptionCenter() {
                   )}
                 >
                   {o.label}
-                  {o.hint && <span className={classNames('text-[8px] font-black px-1 rounded', planInterval === o.iv ? 'bg-white/20' : 'text-emerald-600')}>{o.hint}</span>}
+                  {o.hint && <span className={classNames('text-[8px] font-black px-1 rounded', planInterval === o.iv ? 'bg-white/20' : o.iv === 'month' ? 'text-indigo-500' : 'text-emerald-600')}>{o.hint}</span>}
                 </button>
               ))}
             </div>
@@ -369,13 +381,47 @@ export function SubscriptionCenter() {
 
                     {(() => {
                       const pv = planPriceBrl(p, planInterval);
-                      const per = planInterval === 'year' ? 'ano' : planInterval === 'semester' ? 'semestre' : 'mês';
-                      const cents = Math.round((pv % 1) * 100).toString().padStart(2, '0');
+                      const installments = planInterval === 'year' ? 12 : planInterval === 'semester' ? 6 : 1;
+                      const monthlyEquivalent = pv / installments;
+                      const cents = Math.round((monthlyEquivalent % 1) * 100).toString().padStart(2, '0');
                       return (
-                        <div className="flex items-baseline gap-0.5 my-4">
-                          <span className="text-xs font-bold text-ink-400">R$</span>
-                          <span className="text-3xl font-black text-ink-950 tracking-tight">{Math.floor(pv)}</span>
-                          <span className="text-[10px] font-bold text-ink-400">,{cents}/{per}</span>
+                        <div className="my-3">
+                          <div className="flex items-baseline gap-0.5">
+                            <span className="text-xs font-bold text-ink-400">R$</span>
+                            <span className="text-3xl font-black text-ink-950 tracking-tight">{Math.floor(monthlyEquivalent)}</span>
+                            <span className="text-[10px] font-bold text-ink-400">,{cents}/mês</span>
+                          </div>
+                          {planInterval !== 'month' && (
+                            <div className="text-[9px] text-ink-400 font-semibold mt-1">
+                              Cobrado como R$ {pv.toFixed(2).replace('.', ',')} por {planInterval === 'year' ? 'ano' : 'semestre'}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Badges de método de pagamento por intervalo ── */}
+                    {planInterval === 'month' ? (
+                      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-[8px] font-black text-indigo-700 uppercase tracking-wide">
+                          <RefreshCw size={7} /> PIX Recorrente
+                        </span>
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-[8px] font-black text-indigo-700 uppercase tracking-wide">
+                          <RefreshCw size={7} /> Cartão Recorrente
+                        </span>
+                      </div>
+                    ) : (() => {
+                      const installments = planInterval === 'year' ? 12 : 6;
+                      const pv = planPriceBrl(p, planInterval);
+                      const installmentVal = (pv / installments).toFixed(2).replace('.', ',');
+                      return (
+                        <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-100 text-[8px] font-black text-emerald-700 uppercase tracking-wide">
+                            <QrCode size={7} /> PIX à vista
+                          </span>
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-ink-100 border border-ink-200 text-[8px] font-black text-ink-600 uppercase tracking-wide">
+                            <CreditCard size={7} /> {installments}× R$ {installmentVal} *
+                          </span>
                         </div>
                       );
                     })()}
@@ -409,6 +455,11 @@ export function SubscriptionCenter() {
                           <span>{f}</span>
                         </div>
                       ))}
+                      {planInterval !== 'month' && (
+                        <p className="text-[9px] text-ink-400 font-medium pt-1">
+                          * Parcelamento no cartão sujeito a taxas repassadas ao cliente.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -424,11 +475,12 @@ export function SubscriptionCenter() {
                   >
                     {loadingAddon === p.id ? (
                       <Loader2 size={12} className="animate-spin" />
+                    ) : planInterval === 'month' ? (
+                      <><RefreshCw size={12} /> Assinar Mensal</>
+                    ) : planInterval === 'semester' ? (
+                      <><QrCode size={12} /> Assinar Semestral</>
                     ) : (
-                      <>
-                        <QrCode size={12} />
-                        Assinar Plano
-                      </>
+                      <><QrCode size={12} /> Assinar Anual</>
                     )}
                   </button>
                 </div>
@@ -502,6 +554,31 @@ export function SubscriptionCenter() {
               />
             </div>
 
+            {/* Detalhes de Pagamento do Plano Ativo */}
+            {!subscription?.lifetime && (
+              <div className="flex items-center gap-2 flex-wrap mb-5">
+                <span className="h-9 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-ink-50 border border-ink-150 text-ink-700 flex items-center gap-1.5 shadow-sm">
+                  Valor: R$ {(subscription?.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} / {subscription?.interval === 'year' ? 'ano' : subscription?.interval === 'semester' ? 'semestre' : 'mês'}
+                </span>
+                {subscription?.paymentMethod && (
+                  <span className="h-9 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center gap-1.5 shadow-sm">
+                    {subscription.paymentMethod === 'pix' ? (
+                      <><QrCode size={12} /> Pago via PIX</>
+                    ) : subscription.paymentMethod === 'credit_card' ? (
+                      <><CreditCard size={12} /> Pago via Cartão {subscription.installments && subscription.installments > 1 ? `(${subscription.installments}x)` : ''}</>
+                    ) : (
+                      <><Wallet size={12} /> Ativação Manual</>
+                    )}
+                  </span>
+                )}
+                {subscription?.billingMode === 'invoice' && (
+                  <span className="h-9 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-50 border border-amber-100 text-amber-700 flex items-center gap-1.5 shadow-sm">
+                    <Clock size={12} /> Modo Fatura Mensal
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex gap-2 flex-wrap">
               {subscription?.lifetime && (
@@ -569,8 +646,8 @@ export function SubscriptionCenter() {
             {/* Breakdown — laudos LAUD.IA unificados; a quota Pro só aparece
                 quando o Motor Pro está disponível para o usuário. */}
             <div className={classNames('grid gap-3 pt-2 border-t border-ink-50', canUsePro ? 'grid-cols-2' : 'grid-cols-1')}>
-              <LaudoBar tier="lite" used={laudoStats.liteCount} quota={tokenQuotaLite} percent={litePct} />
-              {canUsePro && <LaudoBar tier="pro" used={laudoStats.proCount} quota={tokenQuotaPro} percent={proPct} />}
+              <LaudoBar tier="lite" used={liteUsed} />
+              {canUsePro && <LaudoBar tier="pro" used={proUsed} />}
             </div>
 
             <div className="flex items-center justify-between text-[10px] text-ink-400 pt-1">
@@ -621,71 +698,80 @@ export function SubscriptionCenter() {
             loading={loadingAddon === 'calculators'}
           />
 
-          {/* PACS — habilitado: escolha do tier do pacote; senão: solicitar */}
+          {/* PACS — habilitado: escolha do tier do pacote; senão: contratar ou solicitar */}
           {hasPacs ? (
-            <div className="md:col-span-2 bg-white rounded-2xl border border-emerald-200 shadow-sm p-5">
-              <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="md:col-span-2 bg-gradient-to-br from-white to-emerald-50/10 rounded-2xl border border-emerald-300 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-ink-100 flex-wrap">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Database size={18} />
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20">
+                    <Database size={20} />
                   </div>
                   <div>
                     <h4 className="text-sm font-black text-ink-950">PACS / DICOM Sync</h4>
-                    <p className="text-[10px] text-ink-400 font-medium">Escolha o plano PACS que faz parte do seu pacote.</p>
+                    <p className="text-[10px] text-emerald-600 font-bold">Módulo Habilitado na Assinatura</p>
                   </div>
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                  <CheckCircle2 size={11} /> Habilitado
+                <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-emerald-500 text-white flex items-center gap-1 shadow-sm">
+                  <CheckCircle2 size={11} /> Ativo no Pacote
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3">
-                {PACS_TIER_ORDER.filter(k => pacsTiers[k]?.active !== false).map(k => {
-                  const t = pacsTiers[k] || {};
-                  const selected = (settings.pacsSelectedPlan || '') === k;
-                  const priceBrl = planPriceBrl(t, addonInterval);
-                  return (
-                    <button
-                      key={k}
-                      onClick={() => handleChoosePacsTier(k)}
-                      disabled={savingPacsTier}
-                      className={classNames(
-                        'relative text-left p-3 rounded-xl border transition-all disabled:opacity-60',
-                        selected ? 'border-emerald-400 bg-emerald-50/50 ring-2 ring-emerald-400/20' : 'border-ink-200 hover:border-ink-300 bg-white'
-                      )}
-                    >
-                      {t.badge && (
-                        <span className="absolute -top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-600 text-white">{t.badge}</span>
-                      )}
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-black text-ink-900">{t.label || k}</p>
-                        {selected && <CheckCircle2 size={14} className="text-emerald-600" />}
-                      </div>
-                      <p className="text-sm font-black text-emerald-700 mt-0.5">R$ {Math.round(priceBrl).toLocaleString('pt-BR')}<span className="text-[9px] text-ink-400 font-bold">/{addonPer}</span></p>
-                      <p className="text-[10px] text-ink-500 mt-1">{t.disk ? `${t.disk} GB · ` : ''}{t.model || ''}</p>
-                    </button>
-                  );
-                })}
+              <div>
+                <p className="text-[11px] font-bold text-ink-700 mb-2.5">Escolha o plano de PACS para provisionamento da sua VM:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {PACS_TIER_ORDER.filter(k => pacsTiers[k]?.active !== false).map(k => {
+                    const t = pacsTiers[k] || {};
+                    const selected = (settings.pacsSelectedPlan || '') === k;
+                    const priceBrl = planPriceBrl(t, addonInterval);
+                    return (
+                      <button
+                        key={k}
+                        onClick={() => handleChoosePacsTier(k)}
+                        disabled={savingPacsTier}
+                        className={classNames(
+                          'relative text-left p-3.5 rounded-xl border transition-all disabled:opacity-60 cursor-pointer',
+                          selected ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-500/10' : 'border-ink-200 hover:border-ink-300 bg-white shadow-sm'
+                        )}
+                      >
+                        {t.badge && (
+                          <span className="absolute -top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-600 text-white shadow-sm">{t.badge}</span>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-black text-ink-900">{t.label || k}</p>
+                          {selected && <CheckCircle2 size={14} className="text-emerald-600" />}
+                        </div>
+                        <p className="text-sm font-black text-emerald-700 mt-1">R$ {Math.round(priceBrl).toLocaleString('pt-BR')}<span className="text-[9px] text-ink-400 font-bold">/{addonPer}</span></p>
+                        <p className="text-[10px] text-ink-500 mt-1.5 leading-relaxed">{t.disk ? `${t.disk} GB · ` : ''}{t.model || ''}</p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <p className="text-[10px] text-ink-400 mt-3 flex items-start gap-1.5">
-                <ShieldCheck size={12} className="shrink-0 mt-0.5" />
+              <p className="text-[10px] text-ink-400 pt-1.5 flex items-start gap-1.5">
+                <ShieldCheck size={12} className="shrink-0 mt-0.5 text-emerald-600" />
                 O provisionamento do servidor (VM) é feito em <strong>1 clique</strong> na área <strong>PACS / DICOM</strong>, usando o tier escolhido aqui.
               </p>
             </div>
           ) : (
-            <AddonCard
-              icon={Database} iconColor="emerald"
-              title="PACS / DICOM Sync"
-              description={ac.pacs?.description ?? ADDONS_DEFAULT.pacs!.description}
-              price={(ac.pacs?.price ?? 0) === 0 ? 'Sob Consulta' : addonPriceMeta(ac.pacs, 0)}
-              active={hasPacs}
-              actionLabel={pacsRequested ? 'Solicitação Enviada' : 'Solicitar PACS'}
-              actionIcon={pacsRequested ? Clock : undefined}
-              onAction={pacsRequested ? undefined : handleRequestPacs}
-              loading={sendingPacsTicket}
-              disabled={pacsRequested}
-            />
+            (() => {
+              const pacsPrice = ac.pacs?.price ?? 0;
+              const hasPrice = pacsPrice > 0;
+              return (
+                <AddonCard
+                  icon={Database} iconColor="emerald"
+                  title="PACS / DICOM Sync"
+                  description={ac.pacs?.description ?? ADDONS_DEFAULT.pacs!.description}
+                  price={hasPrice ? addonPriceMeta(ac.pacs, 0) : 'Sob Consulta'}
+                  active={hasPacs}
+                  actionLabel={hasPrice ? "Assinar Módulo" : pacsRequested ? 'Solicitação Enviada' : 'Solicitar PACS'}
+                  actionIcon={!hasPrice && pacsRequested ? Clock : undefined}
+                  onAction={hasPrice ? () => handleBuyAddon('pacs') : (pacsRequested ? undefined : handleRequestPacs)}
+                  loading={loadingAddon === 'pacs' || (!hasPrice && sendingPacsTicket)}
+                  disabled={!hasPrice && pacsRequested}
+                />
+              );
+            })()
           )}
 
           {/* Agendamentos */}
@@ -896,12 +982,8 @@ function FeaturePill({ label, active, color = 'emerald' }: { label: string; acti
   );
 }
 
-function LaudoBar({ tier, used, quota, percent }: {
-  tier: 'lite' | 'pro'; used: number; quota: number; percent: number;
-}) {
-  const isLite   = tier === 'lite';
-  const hasQuota = percent >= 0;
-  const isHigh   = percent >= 85;
+function LaudoBar({ tier, used }: { tier: 'lite' | 'pro'; used: number }) {
+  const isLite = tier === 'lite';
 
   return (
     <div className={classNames('p-4 rounded-xl border space-y-2', isLite ? 'bg-indigo-50/50 border-indigo-100' : 'bg-violet-50/50 border-violet-100')}>
@@ -910,27 +992,10 @@ function LaudoBar({ tier, used, quota, percent }: {
           {isLite ? <Zap size={9} /> : <Sparkles size={9} />}
           Laudos {isLite ? 'Lite' : 'Pro'}
         </div>
-        {!hasQuota && <span className="text-[9px] text-ink-400 font-bold">∞ ilimitado</span>}
       </div>
 
       <div className="text-2xl font-black text-ink-900">{used.toLocaleString('pt-BR')}</div>
-
-      {hasQuota ? (
-        <>
-          <div className="text-[10px] text-ink-500 font-medium">de {quota.toLocaleString('pt-BR')} laudos disponíveis</div>
-          <div className="w-full h-2 bg-white/70 rounded-full overflow-hidden border border-ink-100">
-            <div
-              className={classNames('h-full rounded-full transition-all', isHigh ? 'bg-rose-400' : isLite ? 'bg-indigo-500' : 'bg-violet-500')}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-          <p className={classNames('text-[9px] font-bold', isHigh ? 'text-rose-500' : 'text-ink-400')}>
-            {percent}% utilizado{isHigh ? ' · Atenção!' : ''}
-          </p>
-        </>
-      ) : (
-        <div className="text-[10px] text-ink-400 font-medium">laudos {isLite ? 'Lite' : 'Pro'} gerados este mês</div>
-      )}
+      <div className="text-[10px] text-ink-400 font-medium">laudos {isLite ? 'Lite' : 'Pro'} gerados este mês</div>
     </div>
   );
 }

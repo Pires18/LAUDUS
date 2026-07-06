@@ -44,6 +44,15 @@ export const FIELD_LABELS: Record<string, string> = {
   selected: 'Órgão', measure: 'Medida', status: 'Situação',
   // CCN / DMSG
   crl: 'CCN (mm)', msd: 'DMSG (mm)',
+  // FMF — Cromossomopatia
+  crlMm: 'CCN (mm)', igSemanas: 'IG (CCN)',
+  ntMm: 'TN (mm)', ntMoM: 'TN (MoM)', bhcgMoM: 'β-hCG livre (MoM)', pappaMoM: 'PAPP-A (MoM)',
+  riscoT21: 'Risco T21', riscoT18: 'Risco T18', riscoT13: 'Risco T13',
+  // FMF — Pré-eclâmpsia
+  weightKg: 'Peso (kg)', heightCm: 'Altura (cm)', previousPeGaWeeks: 'IG PE prévia (sem)',
+  mapMmHg: 'MAP (mmHg)', mapMoM: 'MAP (MoM)', utaPiRaw: 'IP Uterinas', utaPiMoM: 'IP Uterinas (MoM)',
+  plgfRaw: 'PlGF (pg/mL)', plgfMoM: 'PlGF (MoM)',
+  riscoPePretermo: 'Risco PE pré-termo', riscoPeTermo: 'Risco PE a termo',
 };
 
 /**
@@ -63,6 +72,10 @@ export const HIDDEN_METRIC_KEYS = new Set<string>([
   'selected',      // rótulo do órgão — redundante com a conclusão
   'sex',           // male/female/unknown (enum não localizado)
   'referenceDate', // data-base interna do cálculo
+  // FMF — entradas categóricas/booleanas cruas (já refletidas na conclusão):
+  'racialOrigin', 'conception', 'parity', 'diabetes', 'analyzer',
+  'nasalBone', 'ductusVenosus', 'tricuspid',
+  'chronicHypertension', 'sleOrAps', 'familyHistoryPE', 'smoker',
 ]);
 
 /**

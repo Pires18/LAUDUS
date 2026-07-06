@@ -8,7 +8,7 @@ import { FinanceOverviewTab } from './finance/FinanceOverviewTab';
 import { Spinner } from './finance/Spinner';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  deleteDoc, updateDoc, query, orderBy,
+  deleteDoc, updateDoc, query, orderBy, where,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
@@ -43,8 +43,6 @@ const EMPTY_PLAN: PlanForm = {
   featured: false,
   reportsQuota: 100,
   clinicsQuota: 5,
-  tokenQuotaLite: 0,
-  tokenQuotaPro: 0,
   trialDays: 14,
   includesCalculators: false,
   includesPacs: false,
@@ -75,13 +73,25 @@ interface AbacatePayConfig {
   webhookSecret: string;
   pixEnabled: boolean;
   creditCardEnabled: boolean;
+  sandboxMode: boolean;
+  passCardFees: boolean;
+  cardFeePercent: number;
+  cardFeeFixedBrl: number;
+  passPixFees: boolean;
+  pixFeePercent: number;
 }
 
 const DEFAULT_ABACATE: AbacatePayConfig = {
   apiKey: '',
   webhookSecret: '',
   pixEnabled: true,
-  creditCardEnabled: false,
+  creditCardEnabled: true,
+  sandboxMode: false,
+  passCardFees: true,
+  cardFeePercent: 3.5,
+  cardFeeFixedBrl: 0.60,
+  passPixFees: false,
+  pixFeePercent: 0.99,
 };
 
 // ─── Gemini pricing reference table ──────────────────────────────────────────
@@ -203,15 +213,39 @@ function PlansTab() {
         price: prices.month,
         interval: 'month' as const,
         category: 'subscription' as const,
-        // Cota ÚNICA em reportsQuota (LAUD.IA). Sem sub-cotas Lite/Pro — o Motor
-        // Pro apenas habilita usar a mesma cota no Pro (motorProDefault).
-        tokenQuotaLite: 0,
-        tokenQuotaPro: 0,
         updatedAt: Date.now(),
       };
       if (editingId) {
         await updateDoc(doc(firestore, 'saas_plans', editingId), data);
-        showToast('Plano atualizado!', 'success');
+
+        // Propaga assincronamente as cotas para os usuários que assinam esse plano atualmente
+        try {
+          const subsSnap = await getDocs(query(collection(firestore, 'subscriptions'), where('planId', '==', editingId)));
+          const batchPromises = subsSnap.docs.map(async (subDoc) => {
+            const subData = subDoc.data();
+            const userId = subData.userId;
+            if (!userId) return;
+
+            // Atualiza o documento da assinatura
+            await updateDoc(subDoc.ref, {
+              reportsQuota: data.reportsQuota,
+              clinicsQuota: data.clinicsQuota,
+              updatedAt: Date.now(),
+            });
+
+            // Atualiza o documento do usuário
+            await updateDoc(doc(firestore, 'users', userId), {
+              reportsQuota: data.reportsQuota,
+              clinicsQuota: data.clinicsQuota,
+              updatedAt: Date.now(),
+            });
+          });
+          await Promise.all(batchPromises);
+        } catch (propagateErr) {
+          logger.error('[PLAN_PROPAGATION] Erro ao propagar cotas:', propagateErr);
+        }
+
+        showToast('Plano atualizado e cotas dos assinantes propagadas!', 'success');
       } else {
         await addDoc(collection(firestore, 'saas_plans'), { ...data, createdAt: Date.now() });
         showToast('Plano criado!', 'success');
@@ -1100,9 +1134,21 @@ function AbacatePayTab() {
           </p>
         </div>
 
+        {/* Sandbox Mode Toggle */}
+        <div className="pt-2 border-t border-ink-100 space-y-3">
+          <FormLabel>Ambiente de Execução</FormLabel>
+          <div className="flex items-center justify-between p-3 bg-brand-50/10 border border-brand-100 rounded-xl">
+            <div className="space-y-0.5">
+              <div className="text-[11px] font-black text-brand-900 uppercase tracking-wide">Forçar Modo Simulado (Sandbox)</div>
+              <p className="text-[9px] text-ink-400">Redireciona todos os checkouts para o mock-gateway de homologação local (útil para testes).</p>
+            </div>
+            <MiniToggle value={config.sandboxMode} onChange={v => setConfig(c => ({ ...c, sandboxMode: v }))} />
+          </div>
+        </div>
+
         {/* Payment methods */}
         <div className="pt-2 border-t border-ink-100">
-          <FormLabel>Métodos de Pagamento</FormLabel>
+          <FormLabel>Métodos de Pagamento Habilitados</FormLabel>
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div className="flex items-center justify-between p-3 bg-ink-50 rounded-xl border border-ink-100">
               <div className="flex items-center gap-2">
@@ -1118,6 +1164,62 @@ function AbacatePayTab() {
               </div>
               <MiniToggle value={config.creditCardEnabled} onChange={v => setConfig(c => ({ ...c, creditCardEnabled: v }))} />
             </div>
+          </div>
+        </div>
+
+        {/* Taxas & Repasses Parametrizáveis */}
+        <div className="pt-2 border-t border-ink-100 space-y-4">
+          <FormLabel>Tarifas e Repasse de Taxas</FormLabel>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* Cartão de Crédito */}
+            <div className="p-4 bg-ink-50 rounded-xl border border-ink-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-ink-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard size={11} className="text-indigo-600" /> Cartão de Crédito
+                </span>
+                <MiniToggle value={config.passCardFees} onChange={v => setConfig(c => ({ ...c, passCardFees: v }))} />
+              </div>
+              <p className="text-[9px] text-ink-400">Repassar taxas de intermediação e juros de parcelamento ao cliente final</p>
+              
+              {config.passCardFees && (
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-ink-100">
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-ink-400">Taxa Base (%)</label>
+                    <input type="number" min={0} max={100} step={0.1} value={config.cardFeePercent}
+                      onChange={e => setConfig(c => ({ ...c, cardFeePercent: parseFloat(e.target.value) || 0 }))}
+                      className="input h-8 text-[11px] w-full mt-1 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-black uppercase text-ink-400">Taxa Fixa (R$)</label>
+                    <input type="number" min={0} step={0.05} value={config.cardFeeFixedBrl}
+                      onChange={e => setConfig(c => ({ ...c, cardFeeFixedBrl: parseFloat(e.target.value) || 0 }))}
+                      className="input h-8 text-[11px] w-full mt-1 bg-white" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pix */}
+            <div className="p-4 bg-ink-50 rounded-xl border border-ink-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-ink-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <QrCode size={11} className="text-emerald-600" /> Pix à vista
+                </span>
+                <MiniToggle value={config.passPixFees} onChange={v => setConfig(c => ({ ...c, passPixFees: v }))} />
+              </div>
+              <p className="text-[9px] text-ink-400">Repassar taxa de intermediação Pix ao cliente final</p>
+
+              {config.passPixFees && (
+                <div className="pt-2 border-t border-ink-100">
+                  <label className="text-[8px] font-black uppercase text-ink-400">Taxa Pix (%)</label>
+                  <input type="number" min={0} max={100} step={0.1} value={config.pixFeePercent}
+                    onChange={e => setConfig(c => ({ ...c, pixFeePercent: parseFloat(e.target.value) || 0 }))}
+                    className="input h-8 text-[11px] w-full mt-1 bg-white" />
+                </div>
+              )}
+            </div>
+            
           </div>
         </div>
 
@@ -1244,7 +1346,10 @@ function IACostsTab() {
   };
 
   const setMotor = (tier: 'lite' | 'pro', field: string, value: any) =>
-    setMotorConfigState(prev => ({ ...prev, [tier]: { ...prev[tier], [field]: value } }));
+    setMotorConfigState(prev => {
+      const current = prev[tier] || DEFAULT_MOTOR[tier];
+      return { ...prev, [tier]: { ...current, [field]: value } };
+    });
 
   if (loadingConfig) return <Spinner />;
 
@@ -1489,7 +1594,11 @@ function IACostsTab() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {(['lite', 'pro'] as const).map(tier => {
-            const m = motorConfig[tier];
+            const m = {
+              model: motorConfig[tier]?.model || DEFAULT_MOTOR[tier].model,
+              tokensPerReport: motorConfig[tier]?.tokensPerReport ?? DEFAULT_MOTOR[tier].tokensPerReport,
+              costPerThousandTokens: motorConfig[tier]?.costPerThousandTokens ?? DEFAULT_MOTOR[tier].costPerThousandTokens,
+            };
             const modelList = tier === 'lite' ? LITE_MODELS : PRO_MODELS;
             const costBrl = (m.costPerThousandTokens || 0) * (m.tokensPerReport || 0) / 1000 * conversionRate;
             return (

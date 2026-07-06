@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { LogoIcon } from '../LogoIcon';
+import { scrollToSection } from '../../utils/scrollToSection';
 
 interface Props {
   onEnter: (mode: 'login' | 'signup') => void;
@@ -10,13 +11,19 @@ interface Props {
 export function Nav({ onEnter, onShowPricing }: Props) {
   const [mobileMenu, setMobileMenu] = useState(false);
 
+  const goTo = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    scrollToSection(id);
+    setMobileMenu(false);
+  };
+
   const links = (
     <>
-      <a href="#como-funciona" onClick={() => setMobileMenu(false)} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Como funciona</a>
-      <a href="#funcionalidades" onClick={() => setMobileMenu(false)} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Funcionalidades</a>
-      <a href="#seguranca" onClick={() => setMobileMenu(false)} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Segurança</a>
+      <a href="#como-funciona" onClick={goTo('como-funciona')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Como funciona</a>
+      <a href="#funcionalidades" onClick={goTo('funcionalidades')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Funcionalidades</a>
+      <a href="#seguranca" onClick={goTo('seguranca')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Segurança</a>
       <button onClick={() => { onShowPricing(); setMobileMenu(false); }} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors text-left">Planos</button>
-      <a href="#faq" onClick={() => setMobileMenu(false)} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">FAQ</a>
+      <a href="#faq" onClick={goTo('faq')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">FAQ</a>
     </>
   );
 

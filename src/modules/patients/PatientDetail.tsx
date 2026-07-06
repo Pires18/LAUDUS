@@ -387,10 +387,10 @@ export function PatientDetail({ patientId }: Props) {
                         setModalTab('metadata');
                       }}
                       className="h-8 px-2.5 rounded-lg border border-ink-200 bg-white hover:bg-brand-50 hover:text-brand-600 text-ink-600 transition-all flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
-                      title="Ficha & Configurações"
+                      title="Configurações do Exame"
                     >
                       <Settings size={12} />
-                      <span className="hidden sm:inline">Ficha</span>
+                      <span className="hidden sm:inline">Config. Exame</span>
                     </button>
                     <button
                       onClick={() => {

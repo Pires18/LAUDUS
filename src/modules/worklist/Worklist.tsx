@@ -147,6 +147,12 @@ export function Worklist() {
   // lista exibida corresponda às contagens reais — sem isso, ao clicar em
   // "Finalizado" a lista mostraria só os finalizados da 1ª página de 100.
   const shouldLoadAll = secondaryFilterActive || statusFilter !== 'todos';
+  const clearAllFilters = () => {
+    setStatusFilter('todos');
+    setAreaFilter('todas');
+    setDateFilter('todos');
+    setSearch('');
+  };
   useEffect(() => {
     if (shouldLoadAll && hasMoreFromServer) loadMore();
   }, [shouldLoadAll, hasMoreFromServer, exams.length]);
@@ -435,7 +441,12 @@ export function Worklist() {
               <tr>
                 <td colSpan={6} className="px-4 xl:px-5 py-20 text-center">
                   <LayoutList size={28} className="mx-auto text-ink-200 mb-3" />
-                  <p className="text-sm font-bold text-ink-400">Nenhum exame nos filtros ativos.</p>
+                  <p className="text-sm font-bold text-ink-400">Nenhum exame com os filtros combinados atuais.</p>
+                  {shouldLoadAll && (
+                    <button onClick={clearAllFilters} className="mt-3 text-xs font-bold text-brand-600 hover:underline">
+                      Limpar filtros
+                    </button>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -570,7 +581,12 @@ export function Worklist() {
           ) : filtered.length === 0 ? (
             <div className="px-6 py-14 text-center">
               <LayoutList size={28} className="mx-auto text-ink-200 mb-3" />
-              <p className="text-sm font-bold text-ink-400">Nenhum exame nos filtros ativos.</p>
+              <p className="text-sm font-bold text-ink-400">Nenhum exame com os filtros combinados atuais.</p>
+              {shouldLoadAll && (
+                <button onClick={clearAllFilters} className="mt-3 text-xs font-bold text-brand-600 hover:underline">
+                  Limpar filtros
+                </button>
+              )}
             </div>
           ) : (
             visibleExams.map(exam => {
@@ -627,7 +643,7 @@ export function Worklist() {
                       <Building2 size={11} className="shrink-0" />
                       <span className="truncate max-w-[120px] font-medium">{clinic?.name || 'Geral'}</span>
                     </div>
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       {exam.googleDocUrl && (
                         <a href={exam.googleDocUrl} target="_blank" rel="noopener noreferrer"
                           className="p-2 rounded-lg text-blue-500 hover:bg-blue-50 transition-colors">
@@ -742,7 +758,7 @@ export function Worklist() {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
         title="Excluir Registro de Exame"
-        message="Deseja realmente excluir este exame do histórico? Esta operação expurgará permanentemente o relatório clínico."
+        message="Deseja excluir permanentemente este exame? O laudo e seus dados não poderão ser recuperados depois."
         confirmLabel="Sim, Excluir"
         variant="danger"
       />

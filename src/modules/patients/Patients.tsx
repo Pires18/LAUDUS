@@ -173,12 +173,14 @@ export function Patients() {
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className={classNames(
-                              "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border",
-                              p.gender === 'F' ? 'bg-pink-50 text-pink-700 border-pink-100' :
-                              p.gender === 'M' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                              'bg-ink-100 text-ink-700 border-ink-200'
-                            )}>
+                            <div
+                              title={p.gender === 'F' ? 'Feminino' : p.gender === 'M' ? 'Masculino' : 'Não informado'}
+                              className={classNames(
+                                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border",
+                                p.gender === 'F' ? 'bg-pink-50 text-pink-700 border-pink-100' :
+                                p.gender === 'M' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                'bg-ink-100 text-ink-700 border-ink-200'
+                              )}>
                               {p.name?.charAt(0)?.toUpperCase() || '?'}
                             </div>
                             <span className="font-semibold text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px] text-sm">{p.name}</span>
@@ -219,12 +221,14 @@ export function Patients() {
                     onClick={() => setView({ name: 'patient-detail', patientId: p.id })}
                     className="p-4 active:bg-ink-50 transition-colors flex items-center gap-3"
                   >
-                    <div className={classNames(
-                      "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border",
-                      p.gender === 'F' ? 'bg-pink-50 text-pink-700 border-pink-100' :
-                      p.gender === 'M' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                      'bg-ink-100 text-ink-700 border-ink-200'
-                    )}>
+                    <div
+                      title={p.gender === 'F' ? 'Feminino' : p.gender === 'M' ? 'Masculino' : 'Não informado'}
+                      className={classNames(
+                        "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border",
+                        p.gender === 'F' ? 'bg-pink-50 text-pink-700 border-pink-100' :
+                        p.gender === 'M' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                        'bg-ink-100 text-ink-700 border-ink-200'
+                      )}>
                       {p.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
                     <div className="flex-1 min-w-0">

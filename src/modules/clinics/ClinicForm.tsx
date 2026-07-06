@@ -1,6 +1,8 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useApp } from '../../store/app';
 import { useDocument } from '../../hooks/useFirestore';
+import { useAllAccessibleClinics } from '../../hooks/useAllAccessibleClinics';
+import { useSubscription } from '../../hooks/useSubscription';
 import { addItemWithId, updateItem, generateStandardId } from '../../store/db';
 import { Clinic } from '../../types';
 import {
@@ -47,6 +49,15 @@ export function ClinicForm({ clinicId }: Props) {
   const isEditing = !!clinicId;
 
   const { data: existing, loading: loadingExisting } = useDocument<Clinic>('clinics', clinicId);
+
+  // Cota de clínicas do plano: só clínicas PRÓPRIAS contam (as compartilhadas
+  // pertencem à cota de quem convidou). 0/≥9999 = ilimitado, mesma convenção
+  // usada em toda a cota de laudos.
+  const { clinicsQuota } = useSubscription();
+  const { data: allClinics } = useAllAccessibleClinics();
+  const ownedClinicsCount = allClinics.filter(c => !c.shared).length;
+  const clinicsUnlimited = clinicsQuota === 0 || clinicsQuota >= 9999;
+  const clinicsAtLimit = !isEditing && !clinicsUnlimited && ownedClinicsCount >= clinicsQuota;
 
   const [draft, setDraft] = useState<Omit<Clinic, 'id' | 'createdAt' | 'updatedAt'>>({ ...emptyClinic });
   const [uploading, setUploading] = useState(false);
@@ -245,6 +256,10 @@ export function ClinicForm({ clinicId }: Props) {
       showToast('Nome da clínica é obrigatório', 'error');
       return;
     }
+    if (clinicsAtLimit) {
+      showToast(`Limite de ${clinicsQuota} clínica(s) do seu plano atingido. Faça upgrade para cadastrar mais unidades.`, 'error');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -305,10 +320,11 @@ export function ClinicForm({ clinicId }: Props) {
                 Cancelar
               </button>
               <button
-                type="submit"
+                type="button"
                 onClick={handleSave}
-                disabled={isSaving}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                disabled={isSaving || clinicsAtLimit}
+                title={clinicsAtLimit ? `Limite de ${clinicsQuota} clínica(s) do seu plano atingido` : undefined}
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
                 Salvar
@@ -316,6 +332,15 @@ export function ClinicForm({ clinicId }: Props) {
             </div>
           </div>
         </div>
+
+        {clinicsAtLimit && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+            <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[13px] text-amber-800 font-medium leading-relaxed">
+              Seu plano permite até <strong>{clinicsQuota} clínica{clinicsQuota > 1 ? 's' : ''}</strong> e esse limite já foi atingido ({ownedClinicsCount} cadastradas). Faça upgrade do plano em Configurações → Assinatura para cadastrar mais unidades.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Left Column: Data */}

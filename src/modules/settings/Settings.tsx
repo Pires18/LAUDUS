@@ -23,6 +23,10 @@ import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db'
 
 type SettingsTab = 'perfil' | 'laudia' | 'pdf' | 'audit' | 'assinatura';
 
+// Limite de tamanho para upload de foto de perfil/assinatura — sem isso, um
+// arquivo grande travava a UI em "Enviando..." sem explicar o motivo.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+
 // ── Dados de amostra da prévia do Centro de PDF (WYSIWYG do laudo real) ──
 const PDF_PREVIEW_DATE = Date.UTC(2025, 2, 14);
 const PDF_PREVIEW_PATIENT: Patient = {
@@ -112,6 +116,10 @@ export function Settings() {
       showToast('Selecione uma imagem válida', 'error');
       return;
     }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      showToast('Imagem muito grande (máx. 5 MB). Escolha um arquivo menor.', 'error');
+      return;
+    }
     setIsUploadingProfile(true);
     try {
       const path = `users/${user.uid}/profile-picture/${Date.now()}_${file.name}`;
@@ -141,6 +149,10 @@ export function Settings() {
     if (!user) return;
     if (!file.type.startsWith('image/')) {
       showToast('Selecione uma imagem válida', 'error');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      showToast('Imagem muito grande (máx. 5 MB). Escolha um arquivo menor.', 'error');
       return;
     }
     setIsUploadingSignature(true);

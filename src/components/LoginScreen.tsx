@@ -45,6 +45,23 @@ export function LoginScreen({ initialMode = 'login', onBack }: Props) {
     return () => { document.title = prev; };
   }, [isRegister]);
 
+  // Superfície pré-auth light-only (coerente com a landing): suspende o tema
+  // escuro do dispositivo enquanto a tela estiver montada e restaura ao sair.
+  useEffect(() => {
+    const root = document.documentElement;
+    const wasDark = root.classList.contains('dark');
+    if (wasDark) {
+      root.classList.remove('dark');
+      root.style.colorScheme = 'light';
+    }
+    return () => {
+      if (wasDark) {
+        root.classList.add('dark');
+        root.style.colorScheme = 'dark';
+      }
+    };
+  }, []);
+
   const switchMode = (register: boolean) => {
     setIsRegister(register);
     // URL linkável sem poluir o histórico (replace, não push).
@@ -88,13 +105,16 @@ export function LoginScreen({ initialMode = 'login', onBack }: Props) {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-ink-50 font-sans">
+    <div className="h-full w-full flex overflow-y-auto bg-ink-50 font-sans">
 
       {/* ══ Painel de marca (desktop) ══ */}
       <div className="hidden lg:flex lg:w-[44%] xl:w-[40%] relative flex-col justify-between p-12 xl:p-16 bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 text-white overflow-hidden select-none">
-        {/* brilho decorativo */}
+        {/* textura + brilhos decorativos */}
+        <div className="absolute inset-0 opacity-[0.07] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
         <div className="absolute -top-32 -right-32 w-[420px] h-[420px] rounded-full bg-white/10 blur-[120px] pointer-events-none" />
         <div className="absolute -bottom-40 -left-24 w-[380px] h-[380px] rounded-full bg-sky-300/10 blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] rounded-full border border-white/[0.06] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[680px] h-[680px] rounded-full border border-white/[0.04] pointer-events-none" />
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
@@ -113,8 +133,8 @@ export function LoginScreen({ initialMode = 'login', onBack }: Props) {
           </h2>
           <ul className="space-y-5">
             {VALUE_POINTS.map((p) => (
-              <li key={p.title} className="flex items-start gap-3.5">
-                <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 mt-0.5">
+              <li key={p.title} className="flex items-start gap-3.5 group">
+                <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-white/15 group-hover:border-white/25 transition-colors">
                   <p.icon size={16} className="text-sky-200" />
                 </div>
                 <div>
@@ -127,7 +147,7 @@ export function LoginScreen({ initialMode = 'login', onBack }: Props) {
         </div>
 
         {/* Badge de fase */}
-        <div className="relative z-10 flex items-center gap-2.5 text-brand-100/90">
+        <div className="relative z-10 flex items-center gap-2.5 text-brand-100/90 border-t border-white/10 pt-6">
           <FlaskConical size={14} className="shrink-0" />
           <p className="text-[11px] font-bold uppercase tracking-widest">Programa de testes restrito · acesso por convite</p>
         </div>

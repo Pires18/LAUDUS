@@ -1,4 +1,5 @@
 import { ShieldCheck } from 'lucide-react';
+import { scrollToSection } from '../../utils/scrollToSection';
 
 interface Props {
   onShowPricing: () => void;
@@ -20,11 +21,11 @@ export function Footer({ onShowPricing, onNavigateLegal }: Props) {
           <div>
             <h5 className="text-[11px] font-black uppercase tracking-widest text-white mb-3">Produto</h5>
             <div className="flex flex-col gap-2 text-xs font-semibold">
-              <a href="#como-funciona" className="text-ink-400 hover:text-white transition-colors">Como funciona</a>
-              <a href="#funcionalidades" className="text-ink-400 hover:text-white transition-colors">Funcionalidades</a>
-              <a href="#seguranca" className="text-ink-400 hover:text-white transition-colors">Segurança</a>
+              <a href="#como-funciona" onClick={(e) => { e.preventDefault(); scrollToSection('como-funciona'); }} className="text-ink-400 hover:text-white transition-colors">Como funciona</a>
+              <a href="#funcionalidades" onClick={(e) => { e.preventDefault(); scrollToSection('funcionalidades'); }} className="text-ink-400 hover:text-white transition-colors">Funcionalidades</a>
+              <a href="#seguranca" onClick={(e) => { e.preventDefault(); scrollToSection('seguranca'); }} className="text-ink-400 hover:text-white transition-colors">Segurança</a>
               <button onClick={onShowPricing} className="text-ink-400 hover:text-white transition-colors text-left">Planos</button>
-              <a href="#faq" className="text-ink-400 hover:text-white transition-colors">FAQ</a>
+              <a href="#faq" onClick={(e) => { e.preventDefault(); scrollToSection('faq'); }} className="text-ink-400 hover:text-white transition-colors">FAQ</a>
             </div>
           </div>
           <div>

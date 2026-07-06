@@ -155,7 +155,7 @@ async function activateSubscription(
   userId: string,
   email: string,
   planId: string,
-  opts: { isRenewal: boolean; periodStart: number; interval?: string; paymentMethod: string; gatewaySubId?: string; gatewayPrice?: number },
+  opts: { isRenewal: boolean; periodStart: number; interval?: string; paymentMethod: string; gatewaySubId?: string; gatewayPrice?: number; billingMode?: string; amount?: number; installments?: number },
 ) {
   const now = Date.now();
   const userRef = db.collection('users').doc(userId);
@@ -165,8 +165,6 @@ async function activateSubscription(
   let planPrice = 149;
   let reportsQuota = 100;
   let clinicsQuota = 5;
-  let tokenQuotaLite = 0;
-  let tokenQuotaPro = 0;
   let motorProDefault = false;
   let interval = opts.interval || 'month';
   const addons: string[] = [];
@@ -180,8 +178,6 @@ async function activateSubscription(
         planPrice = planData.price || 149;
         reportsQuota = planData.reportsQuota ?? 100;
         clinicsQuota = planData.clinicsQuota ?? 5;
-        tokenQuotaLite = planData.tokenQuotaLite ?? 0;
-        tokenQuotaPro = planData.tokenQuotaPro ?? 0;
         motorProDefault = planData.motorProDefault || false;
         interval = planData.interval || interval;
         addons.push(...planToAddons(planData));
@@ -206,8 +202,6 @@ async function activateSubscription(
     price: opts.gatewayPrice ?? planPrice,
     reportsQuota,
     clinicsQuota,
-    tokenQuotaLite,
-    tokenQuotaPro,
     reportsUsedThisMonth: 0,
     lastResetAt: opts.periodStart,
     updatedAt: now,
@@ -216,6 +210,11 @@ async function activateSubscription(
     subData.addons = addons;
     subData.createdAt = now;
   }
+  // Persiste o modo de cobrança para o CRON de renovação mensal:
+  // 'subscription' = AbacatePay gerencia (PIX Aut. ou Cartão recorrente)
+  // 'invoice'      = CRON cria novas faturas mensalmente antes do vencimento
+  if (opts.billingMode) subData.billingMode = opts.billingMode;
+  if (opts.amount)      subData.lastInvoiceAmount = opts.amount;
 
   await subRef.set(subData, { merge: true });
 
@@ -225,8 +224,6 @@ async function activateSubscription(
     reportsUsedThisMonth: 0,
     reportsQuota,
     clinicsQuota,
-    tokenQuotaLite,
-    tokenQuotaPro,
     motorProEnabled: motorProDefault,
     updatedAt: now,
   }, { merge: true });
@@ -240,6 +237,8 @@ async function activateSubscription(
     amount: opts.gatewayPrice ?? planPrice,
     status: 'paid',
     paymentMethod: opts.paymentMethod,
+    interval,
+    installments: opts.installments || 1,
     timestamp: now,
   });
   await bumpFinanceStats(db, opts.gatewayPrice ?? planPrice, opts.paymentMethod);
@@ -263,23 +262,49 @@ export default async function handler(req: any, res: any) {
     if (isProduction()) {
       return res.status(403).send('Mock desabilitado em produção.');
     }
-    const { userId, type, addon, planId } = req.query;
+    const { userId, type, addon, planId, interval: qInterval, billingMode: qBillingMode, installments: qInstalls, checkoutId: qCheckoutId, paymentMethod: qMethod } = req.query;
     if (!userId) return res.status(400).send('userId is required for mock checkout.');
 
+    const mockInterval    = (qInterval as string) || 'month';
+    const mockBillingMode = (qBillingMode as string) || 'subscription';
+    const mockInstalls    = parseInt(qInstalls as string) || 1;
+    const paymentMethod   = (qMethod as string) === 'credit_card' ? 'credit_card' : 'pix';
+
     try {
-      const userRef = db.collection('users').doc(userId as string);
+      const userRef  = db.collection('users').doc(userId as string);
       const userSnap = await userRef.get();
       const userEmail = userSnap.exists ? (userSnap.data()?.email || 'medico@laud.us') : 'medico@laud.us';
 
+      const logTag = `[MOCK 🧪] ${mockInterval} | ${mockBillingMode} | ${paymentMethod} | ${mockInstalls}x parcelas`;
+
       if (type === 'addon' && addon) {
-        await activateAddonInDb(db, userId as string, userEmail, addon as string, `tx_mock_${Date.now()}`, 'pix');
-        console.log(`[MOCK WEBHOOK] Addon ${addon} ativado para ${userId}`);
+        await activateAddonInDb(db, userId as string, userEmail, addon as string, `tx_mock_${Date.now()}`, paymentMethod);
+        console.log(`${logTag} → Addon ${addon} ativado para ${userId}`);
       } else {
+        // Subscription mensal → billingMode persiste como 'subscription' ou 'invoice'
+        // Semestral/anual → checkout avulso (one_time), acesso pelo período do intervalo
         await activateSubscription(db, userId as string, userEmail, (planId as string) || '', {
-          isRenewal: false, periodStart: Date.now(), paymentMethod: 'pix',
+          isRenewal:     false,
+          periodStart:   Date.now(),
+          paymentMethod: paymentMethod,
+          interval:      mockInterval,
+          billingMode:   mockBillingMode === 'one_time' ? undefined : mockBillingMode,
+          amount:        undefined,
+          installments:  mockInstalls,
         });
-        console.log(`[MOCK WEBHOOK] Assinatura ativada para ${userId}`);
+
+        // Limpa o pending_checkout de mock
+        if (qCheckoutId) {
+          try { await db.collection('pending_checkouts').doc(String(qCheckoutId)).delete(); } catch { /* ignora */ }
+        }
+
+        console.log(`${logTag} → Assinatura ativada para ${userId} (${userEmail})`);
+        console.log(`${logTag}   periodEnd em ${mockInterval === 'year' ? '365d' : mockInterval === 'semester' ? '182d' : '30d'}`);
+        if (mockInstalls > 1) {
+          console.log(`${logTag}   Parcelamento simulado: ${mockInstalls}x — registrado nas transações de mock`);
+        }
       }
+
       res.writeHead(302, { Location: `${origin}/#settings?tab=assinatura` });
       return res.end();
     } catch (err: any) {
@@ -380,6 +405,8 @@ export default async function handler(req: any, res: any) {
           paymentMethod,
           gatewaySubId: data.id || '',
           gatewayPrice,
+          billingMode: metadata.billingMode || 'subscription',
+          amount: gatewayPrice,
         });
         break;
       }

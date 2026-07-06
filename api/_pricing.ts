@@ -83,17 +83,38 @@ export function periodEndFrom(start: number, interval?: string): number {
 }
 
 /**
- * Só o intervalo ANUAL é assinatura recorrente (auto-renova na AbacatePay).
- * Mensal e semestral são pagamentos avulsos (pagou → vale pelo período → expira).
+ * O intervalo MENSAL é assinatura recorrente (subscription na AbacatePay).
+ * Semestral e anual são checkouts avulsos pagos de uma vez (com parcelamento no cartão).
  * Fonte única usada por checkout, webhook e UI.
  */
 export function isRecurringInterval(interval?: string): boolean {
-  return interval === 'year';
+  return interval === 'month';
 }
 
 /** Rótulo curto do intervalo para a UI. */
 export function intervalLabel(interval?: string): string {
   return interval === 'year' ? 'ano' : interval === 'semester' ? 'semestre' : 'mês';
+}
+
+/**
+ * Número máximo de parcelas no cartão por intervalo.
+ * Mensal é recorrente (subscription) — sem parcelamento de parcela única.
+ * Semestral = 6x | Anual = 12x.
+ */
+export function getMaxInstallments(interval?: string): number {
+  if (interval === 'year')     return 12;
+  if (interval === 'semester') return 6;
+  return 1; // month: subscription recorrente, não se aplica parcelamento
+}
+
+/**
+ * Ciclo da AbacatePay para produtos de subscription recorrente.
+ * Usado ao criar produtos com frequency configurada.
+ */
+export function getAbacatePayCycle(interval?: string): string {
+  if (interval === 'semester') return 'SEMIANNUALLY';
+  if (interval === 'year')     return 'ANNUALLY';
+  return 'MONTHLY';
 }
 
 /**

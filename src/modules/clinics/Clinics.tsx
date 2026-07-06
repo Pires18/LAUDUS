@@ -13,11 +13,17 @@ import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
 
 export function Clinics() {
   const { setView, selectedClinicId, setSelectedClinic } = useApp();
-  const { hasClinics } = useSubscription();
+  const { hasClinics, clinicsQuota } = useSubscription();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'todas' | 'ativas' | 'inativas'>('todas');
 
   const { data: clinics, loading } = useAllAccessibleClinics();
+
+  // Só clínicas PRÓPRIAS contam para a cota do plano (compartilhadas são de
+  // quem convidou). 0/≥9999 = ilimitado, mesma convenção da cota de laudos.
+  const ownedClinicsCount = clinics.filter(c => !c.shared).length;
+  const clinicsUnlimited = clinicsQuota === 0 || clinicsQuota >= 9999;
+  const clinicsAtLimit = !clinicsUnlimited && ownedClinicsCount >= clinicsQuota;
 
   const filtered = useMemo(() => {
     return clinics.filter((c) => {
@@ -65,13 +71,24 @@ export function Clinics() {
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setView({ name: 'clinic-form' })}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                disabled={clinicsAtLimit}
+                title={clinicsAtLimit ? `Limite de ${clinicsQuota} clínica(s) do seu plano atingido` : undefined}
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600"
               >
                 <Plus size={11} />
                 Nova Unidade
               </button>
             </div>
           </div>
+          {clinicsAtLimit && (
+            <div className="px-5 pb-4 -mt-1">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+                <span className="text-[11px] text-amber-800 font-medium">
+                  Limite de <strong>{clinicsQuota} clínica{clinicsQuota > 1 ? 's' : ''}</strong> do seu plano atingido. Faça upgrade em Configurações → Assinatura para cadastrar mais unidades.
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ─── PILL TAB BAR ─── */}
@@ -153,9 +170,11 @@ export function Clinics() {
                 <Building2 size={20} className="text-ink-300" />
               </div>
               <p className="text-sm font-bold text-ink-400">Nenhuma clínica encontrada.</p>
-              <button onClick={() => setView({ name: 'clinic-form' })} className="mt-4 text-brand-600 font-bold hover:underline text-sm">
-                Cadastrar nova unidade
-              </button>
+              {!clinicsAtLimit && (
+                <button onClick={() => setView({ name: 'clinic-form' })} className="mt-4 text-brand-600 font-bold hover:underline text-sm">
+                  Cadastrar nova unidade
+                </button>
+              )}
             </div>
           ) : (
             filtered.map((clinic) => {

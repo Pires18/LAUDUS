@@ -1,31 +1,26 @@
 // ═══════════════════════════════════════════════════════════════════════
 // MOTOR — Rastreamento de pré-eclâmpsia (1º trimestre), riscos competitivos
 // ═══════════════════════════════════════════════════════════════════════
-// Modelo FMF (Wright/Nicolaides/Tan):
+// Modelo FMF completo (Bayes) — Wright 2015 + O'Gorman 2016 (AJOG 214:103):
 //
-//   μ  = intercepto + Σ(contribuições maternas, em semanas) + Σ(biomarcadores)
-//        → μ é a média da Gaussiana da "idade gestacional no parto com PE"
-//   risco(PE antes de X sem) = Φ( (X − μ) / σ )
+//   prior:      t = IG no parto com PE ~ Normal(μ, σ)   (μ = fatores maternos)
+//   verossim.:  log10(MoM) dos biomarcadores ~ Normal multivariada com
+//               média m(t) = intercepto + inclinação·t (truncada em 0) e
+//               covariância comum Σ (Tabela 3).
+//   posterior ∝ prior × verossimilhança  → integra-se numericamente.
+//   risco(PE antes de g) = ∫_{t<g} posterior / ∫ posterior
 //
-// Contribuições NEGATIVAS deslocam a Gaussiana para a esquerda (PE mais
-// precoce) → aumentam o risco de PE pré-termo.
+// FATORES MATERNOS: Wright 2015 (Tabela 2). BIOMARCADORES: O'Gorman 2016.
+// MoM dos biomarcadores é calculado com medianas por analisador (Cobas) —
+// ver `medians.ts`.
 //
-// FATORES MATERNOS: coeficientes exatos de Wright D et al., AJOG 2015
-// (competing risks model; Tabela 2). Grupo de referência: raça branca,
-// nulípara, concepção espontânea, peso 69 kg, altura 164 cm.
-//
-// ⚠️  SEGURANÇA CLÍNICA (ver `preeclampsiaData.ts`, validated:false):
-//   • Fatores maternos: transcritos de Wright 2015 — CONFERIR com o usuário.
-//   • Parte de biomarcadores (MAP/UtA-PI/PlGF): ainda APROXIMADA — coeficientes
-//     de Tan 2018 e medianas Roche Cobas pendentes de validação.
-//   • Sub-modelo de "parosa sem PE prévia" (polinômio fracionário de intervalo)
-//     ainda SIMPLIFICADO (tratado como referência) — VALIDAR.
-//   • Apoio à decisão baseado em modelos publicados — NÃO é a calculadora
-//     oficial da Fetal Medicine Foundation.
+// ⚠️ `validated: false` até conferir com casos-ouro. NÃO é a calculadora
+//    oficial da FMF; apoio à decisão baseado em modelos publicados.
 // ═══════════════════════════════════════════════════════════════════════
 
 export type RacialOrigin = 'white' | 'afroCaribbean' | 'southAsian' | 'eastAsian' | 'mixed';
 export type Conception = 'spontaneous' | 'ovulationInduction' | 'ivf';
+export type BiomarkerKey = 'map' | 'utaPi' | 'plgf' | 'pappa';
 
 export interface PeMaternalFactors {
   ageYears: number;
@@ -36,55 +31,50 @@ export interface PeMaternalFactors {
   chronicHypertension: boolean;
   diabetesType1: boolean;
   diabetesType2: boolean;
-  sleOrAps: boolean;          // LES / SAAF
-  familyHistoryPE: boolean;   // mãe com PE
-  nulliparous: boolean;       // referência do modelo
-  previousPE: boolean;        // se parosa
-  /** IG (semanas) do parto na gestação com PE prévia (para o termo quadrático). */
+  sleOrAps: boolean;
+  familyHistoryPE: boolean;
+  nulliparous: boolean;
+  previousPE: boolean;
   previousPeGaWeeks?: number;
 }
 
 export interface PeBiomarkers {
-  mapMoM?: number;    // pressão arterial média
-  utaPiMoM?: number;  // IP médio das uterinas
-  plgfMoM?: number;   // PlGF
+  mapMoM?: number;
+  utaPiMoM?: number;
+  plgfMoM?: number;
+  pappaMoM?: number;
 }
 
 export interface PeCoefficients {
-  /** Trava de segurança: só liberar em produção quando validado. */
   validated: boolean;
   version: string;
-
-  /** μ base (semanas) do grupo de referência e DP fixo da Gaussiana. */
   intercept: number;
   sigma: number;
-
-  // ── Contribuições maternas (semanas), SINALIZADAS. Negativo ⇒ risco maior.
-  // Wright 2015, Tabela 2.
-  agePerYearOver35: number;        // −0.207 (só idade > 35)
-  heightPerCmOver164: number;      // +0.117
+  agePerYearOver35: number;
+  heightPerCmOver164: number;
   racial: Record<RacialOrigin, number>;
   conception: Record<Conception, number>;
-  chronicHypertension: number;     // −7.29
-  sleOrAps: number;                // −3.05
-  parousPrevPE: number;            // −8.17
-  parousPrevPeGaQuadCoef: number;  // +0.027 × (IG_prévia − 24)²
+  chronicHypertension: number;
+  sleOrAps: number;
+  parousPrevPE: number;
+  parousPrevPeGaQuadCoef: number;
+  weightPerKgOver69_noHtn: number;
+  diabetes_noHtn: number;
+  familyHistoryPE_noHtn: number;
+}
 
-  // Fatores que só valem em mulheres SEM HAS crônica (interação):
-  weightPerKgOver69_noHtn: number; // −0.069
-  diabetes_noHtn: number;          // −3.39
-  familyHistoryPE_noHtn: number;   // −1.72
-
-  // ── Biomarcadores: contribuição = beta × log10(MoM). APROXIMADO (VALIDAR).
-  betaMapLog10: number;    // < 0 (MAP alto ⇒ μ menor)
-  betaUtaPiLog10: number;  // < 0
-  betaPlgfLog10: number;   // > 0 (PlGF alto ⇒ μ maior, protetor)
+/** Modelo de biomarcadores (O'Gorman 2016): regressão da média + covariância. */
+export interface PeBiomarkerModel {
+  reg: Record<BiomarkerKey, { intercept: number; slope: number }>;
+  sd: Record<BiomarkerKey, number>;
+  /** correlações por par "a_b" (ordem: map,utaPi,plgf,pappa). */
+  corr: Record<string, number>;
 }
 
 export interface PeThresholds {
-  pretermGa: number;           // define PE pré-termo (padrão 37)
-  termGa: number;              // define PE a termo (padrão 42)
-  aspirinCutoffOneInN: number; // risco pré-termo p/ indicar AAS (padrão 1:100)
+  pretermGa: number;
+  termGa: number;
+  aspirinCutoffOneInN: number;
 }
 
 export const DEFAULT_PE_THRESHOLDS: PeThresholds = {
@@ -102,7 +92,6 @@ export interface PeRisk {
 
 // ───────────────────────────── Estatística ──────────────────────────────
 
-/** Aproximação da função erro (Abramowitz & Stegun 7.1.26). */
 function erf(x: number): number {
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
   const s = x < 0 ? -1 : 1;
@@ -119,46 +108,59 @@ export function peRiskBefore(gaTarget: number, mu: number, sigma: number): numbe
   return normalCdf((gaTarget - mu) / sigma);
 }
 
+/** Inversa de matriz simétrica pequena (Gauss-Jordan). */
+function invertMatrix(m: number[][]): number[][] {
+  const n = m.length;
+  const a = m.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))]);
+  for (let col = 0; col < n; col++) {
+    let piv = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(a[r][col]) > Math.abs(a[piv][col])) piv = r;
+    [a[col], a[piv]] = [a[piv], a[col]];
+    const d = a[col][col];
+    for (let j = 0; j < 2 * n; j++) a[col][j] /= d;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = a[r][col];
+      for (let j = 0; j < 2 * n; j++) a[r][j] -= f * a[col][j];
+    }
+  }
+  return a.map(row => row.slice(n));
+}
+
 // ───────────────────────────── Média materna ────────────────────────────
 
-/** Calcula μ (semanas) a partir dos fatores maternos (Wright 2015). */
 export function maternalMeanGa(f: PeMaternalFactors, c: PeCoefficients): number {
   let mu = c.intercept;
-
   if (f.ageYears > 35) mu += c.agePerYearOver35 * (f.ageYears - 35);
   mu += c.heightPerCmOver164 * (f.heightCm - 164);
   mu += c.racial[f.racialOrigin] ?? 0;
   mu += c.conception[f.conception] ?? 0;
-
   if (f.chronicHypertension) {
     mu += c.chronicHypertension;
   } else {
-    // Peso, diabetes e história familiar só entram SEM HAS crônica.
     if (f.weightKg > 69) mu += c.weightPerKgOver69_noHtn * (f.weightKg - 69);
     if (f.diabetesType1 || f.diabetesType2) mu += c.diabetes_noHtn;
     if (f.familyHistoryPE) mu += c.familyHistoryPE_noHtn;
   }
-
   if (f.sleOrAps) mu += c.sleOrAps;
-
-  // Paridade: nulípara = referência (0). Parosa com PE prévia = fator forte.
   if (!f.nulliparous && f.previousPE) {
-    const prevGa = f.previousPeGaWeeks ?? 32; // default plausível se não informado
+    const prevGa = f.previousPeGaWeeks ?? 32;
     mu += c.parousPrevPE + c.parousPrevPeGaQuadCoef * Math.pow(prevGa - 24, 2);
   }
-  // Parosa sem PE prévia: efeito protetor via polinômio de intervalo —
-  // SIMPLIFICADO como referência (0). VALIDAR (Wright 2015, Tabela 2).
-
   return mu;
 }
 
-/** Aplica o deslocamento de μ pelos biomarcadores (log10 MoM). APROXIMADO. */
-export function applyBiomarkers(mu: number, b: PeBiomarkers, c: PeCoefficients): number {
-  let out = mu;
-  if (b.mapMoM && b.mapMoM > 0) out += c.betaMapLog10 * Math.log10(b.mapMoM);
-  if (b.utaPiMoM && b.utaPiMoM > 0) out += c.betaUtaPiLog10 * Math.log10(b.utaPiMoM);
-  if (b.plgfMoM && b.plgfMoM > 0) out += c.betaPlgfLog10 * Math.log10(b.plgfMoM);
-  return out;
+// ───────────────────────────── Verossimilhança ──────────────────────────
+
+/** Média do log10(MoM) do marcador na IG de parto t (semanas), truncada em 0. */
+function markerMean(reg: { intercept: number; slope: number }, t: number): number {
+  const m = reg.intercept + reg.slope * t;
+  return reg.intercept > 0 ? Math.max(0, m) : Math.min(0, m);
+}
+
+function corr(model: PeBiomarkerModel, a: BiomarkerKey, b: BiomarkerKey): number {
+  if (a === b) return 1;
+  return model.corr[`${a}_${b}`] ?? model.corr[`${b}_${a}`] ?? 0;
 }
 
 // ───────────────────────────── Orquestração ─────────────────────────────
@@ -167,18 +169,59 @@ export function computePreeclampsiaRisk(
   factors: PeMaternalFactors,
   biomarkers: PeBiomarkers,
   coeffs: PeCoefficients,
+  model: PeBiomarkerModel,
   thresholds: PeThresholds = DEFAULT_PE_THRESHOLDS,
 ): PeRisk {
-  const mu = applyBiomarkers(maternalMeanGa(factors, coeffs), biomarkers, coeffs);
+  const mu = maternalMeanGa(factors, coeffs);
+  const sigma = coeffs.sigma;
 
-  const pPreterm = peRiskBefore(thresholds.pretermGa, mu, coeffs.sigma);
-  const pTerm = peRiskBefore(thresholds.termGa, mu, coeffs.sigma);
-  const oneInN = (p: number) => (p > 0 ? Math.round(1 / p) : Infinity);
+  // Marcadores presentes (MoM válido).
+  const momByKey: Record<BiomarkerKey, number | undefined> = {
+    map: biomarkers.mapMoM, utaPi: biomarkers.utaPiMoM, plgf: biomarkers.plgfMoM, pappa: biomarkers.pappaMoM,
+  };
+  const present = (['map', 'utaPi', 'plgf', 'pappa'] as BiomarkerKey[]).filter(k => momByKey[k] && momByKey[k]! > 0);
 
+  const oneInN = (p: number) => (p > 0 && isFinite(p) ? Math.round(1 / p) : Infinity);
+
+  // Sem biomarcadores: risco = prior (competing-risks só com fatores maternos).
+  if (present.length === 0) {
+    const pPre = peRiskBefore(thresholds.pretermGa, mu, sigma);
+    const pTerm = peRiskBefore(thresholds.termGa, mu, sigma);
+    return {
+      mu,
+      pretermPE: { prob: pPre, oneInN: oneInN(pPre) },
+      termPE: { prob: pTerm, oneInN: oneInN(pTerm) },
+      aspirinRecommended: pPre >= 1 / thresholds.aspirinCutoffOneInN,
+    };
+  }
+
+  // Vetor observado y (log10 MoM) e precisão Σ⁻¹ dos marcadores presentes.
+  const y = present.map(k => Math.log10(momByKey[k]!));
+  const cov = present.map(a => present.map(b => corr(model, a, b) * model.sd[a] * model.sd[b]));
+  const prec = invertMatrix(cov);
+
+  // Integração numérica do posterior sobre t (IG de parto), 20–60 semanas.
+  const T_MIN = 20, T_MAX = 60, STEP = 0.05;
+  let total = 0, cumPreterm = 0, cumTerm = 0;
+  for (let t = T_MIN; t <= T_MAX; t += STEP) {
+    const zp = (t - mu) / sigma;
+    const priorLog = -0.5 * zp * zp;
+    const resid = present.map((k, i) => y[i] - markerMean(model.reg[k], t));
+    let quad = 0;
+    for (let i = 0; i < resid.length; i++)
+      for (let j = 0; j < resid.length; j++) quad += resid[i] * prec[i][j] * resid[j];
+    const f = Math.exp(priorLog - 0.5 * quad);
+    total += f;
+    if (t < thresholds.pretermGa) cumPreterm += f;
+    if (t < thresholds.termGa) cumTerm += f;
+  }
+
+  const pPre = total > 0 ? cumPreterm / total : 0;
+  const pTerm = total > 0 ? cumTerm / total : 0;
   return {
     mu,
-    pretermPE: { prob: pPreterm, oneInN: oneInN(pPreterm) },
+    pretermPE: { prob: pPre, oneInN: oneInN(pPre) },
     termPE: { prob: pTerm, oneInN: oneInN(pTerm) },
-    aspirinRecommended: pPreterm >= 1 / thresholds.aspirinCutoffOneInN,
+    aspirinRecommended: pPre >= 1 / thresholds.aspirinCutoffOneInN,
   };
 }

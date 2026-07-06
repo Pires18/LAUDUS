@@ -10,7 +10,7 @@ import {
   LayoutDashboard, ClipboardList, UserCircle, FileSignature,
   Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
-  Users, LogOut, CalendarDays, Database, Search, X, Sun, Moon, Monitor
+  Users, LogOut, CalendarDays, Database, Search, X, Sun, Moon, Monitor, Plus
 } from 'lucide-react';
 import { classNames } from '../utils/format';
 import { LogoIcon } from './LogoIcon';
@@ -223,6 +223,14 @@ export function Sidebar() {
                   );
                 })}
               </div>
+              {hasClinics && (
+                <button
+                  onClick={() => { setShowClinicDropdown(false); setClinicSearch(''); setView({ name: 'clinic-form' }); }}
+                  className="w-full text-left px-3 py-2.5 text-xs font-bold text-brand-600 hover:bg-brand-50 transition-colors flex items-center gap-2 border-t border-ink-100"
+                >
+                  <Plus size={14} /> Nova Clínica
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -49,6 +49,9 @@ export function Templates() {
     if (enabledMaskIds !== undefined) return;
     if (systemLoading) return;
     updateSettings({ enabledSystemMaskIds: systemTemplates.map((t) => t.id) });
+    if (systemTemplates.length > 0) {
+      showToast(`${systemTemplates.length} máscara(s) padrão do sistema adicionada(s) à sua biblioteca`, 'info');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, enabledMaskIds, systemLoading, systemTemplates.length]);
 
@@ -200,7 +203,7 @@ export function Templates() {
             )}
             {context === 'minhas' && isLinked && (
               <>
-                <button onClick={(e) => handlePersonalize(template, e)} className="p-1.5 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors" title="Personalizar (criar cópia editável)">
+                <button onClick={(e) => handlePersonalize(template, e)} className="p-1.5 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors" title="Criar cópia própria e editável — deixa de receber atualizações automáticas do sistema">
                   <Copy size={14} />
                 </button>
                 <button onClick={(e) => handleDeactivate(template.id, e)} className="p-1.5 rounded-xl text-ink-400 hover:text-amber-600 hover:bg-amber-50 transition-colors" title="Remover da minha lista">
@@ -251,7 +254,7 @@ export function Templates() {
               <button
                 onClick={(e) => handlePersonalize(template, e)}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-ink-50 text-ink-600 border border-ink-200 hover:bg-ink-100 transition-colors"
-                title="Copiar para personalizar"
+                title="Criar cópia própria e editável — não recebe atualizações automáticas do sistema (diferente de 'Usar')"
               >
                 <Copy size={11} /> Copiar
               </button>

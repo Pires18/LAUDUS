@@ -43,6 +43,9 @@ export default async function handler(req: any, res: any) {
       if (configSnap.exists && configSnap.data()?.apiKey) apiKey = configSnap.data()!.apiKey.trim();
     } catch { /* usa env */ }
 
+    // Apenas planos mensais (subscription recorrente) têm abacatePaySubscriptionId.
+    // Planos semestrais/anuais são checkouts avulsos — gatewaySubId será vazio
+    // e o bloco abaixo é naturalmente ignorado, sem necessidade de tratar separado.
     let gatewayCancelPending = false;
     if (gatewaySubId && apiKey) {
       try {
@@ -63,7 +66,11 @@ export default async function handler(req: any, res: any) {
     }
 
     const now = Date.now();
-    await subRef.set({ status: 'canceled', canceledAt: now, gatewayCancelPending, updatedAt: now }, { merge: true });
+    // Zera `addons` no cancelamento — sem isso, uma reativação manual
+    // (admin) reaproveitaria add-ons antigos sem decisão explícita. O
+    // bloqueio de acesso em si já é feito via status/subscriptionStatus
+    // (useSubscription.ts só considera add-ons com assinatura ativa).
+    await subRef.set({ status: 'canceled', canceledAt: now, gatewayCancelPending, addons: [], updatedAt: now }, { merge: true });
     await db.collection('users').doc(userId).set({ subscriptionStatus: 'canceled', updatedAt: now }, { merge: true });
 
     return res.status(200).json({ success: true, gatewayCancelPending });
