@@ -140,6 +140,9 @@ export interface ExamRequest {
  */
 export type StructuredFieldKind = 'measure' | 'triplet' | 'text' | 'select' | 'toggle' | 'calc';
 
+/** Chave de descritor para escore inline (ex.: ACR TI-RADS). */
+export type StructuredScoreKey = 'composition' | 'echogenicity' | 'shape' | 'margin' | 'foci';
+
 export interface StructuredFieldDef {
   id: string;
   label: string;
@@ -154,6 +157,10 @@ export interface StructuredFieldDef {
   hint?: string;
   /** Placeholder do input */
   placeholder?: string;
+  /** Marca este select como descritor de um escore inline (TI-RADS). */
+  scoreKey?: StructuredScoreKey;
+  /** Ocupa a linha inteira no grid. */
+  fullWidth?: boolean;
 }
 
 export interface StructuredSection {
@@ -162,6 +169,16 @@ export interface StructuredSection {
   fields: StructuredFieldDef[];
   /** Calculadora aplicável à seção inteira (atalho no cabeçalho) */
   calcId?: string;
+  /** Mostra toggle Normal/Alterado; campos só aparecem quando 'Alterado'. */
+  normalable?: boolean;
+  /** Texto compilado quando a seção está 'Normal'. */
+  normalText?: string;
+  /** Seção com múltiplas instâncias (nódulos, lesões, linfonodos). */
+  repeatable?: boolean;
+  /** Rótulo de cada item repetível (ex: 'Nódulo'). */
+  itemLabel?: string;
+  /** Escore/sugestão inline a partir dos descritores desta seção. */
+  score?: 'tirads' | 'birads' | 'orads';
 }
 
 export interface StructuredSchema {

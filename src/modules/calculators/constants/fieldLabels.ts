@@ -47,7 +47,9 @@ export const FIELD_LABELS: Record<string, string> = {
   // FMF — Cromossomopatia
   crlMm: 'CCN (mm)', igSemanas: 'IG (CCN)',
   ntMm: 'TN (mm)', ntMoM: 'TN (MoM)', bhcgMoM: 'β-hCG livre (MoM)', pappaMoM: 'PAPP-A (MoM)',
-  riscoT21: 'Risco T21', riscoT18: 'Risco T18', riscoT13: 'Risco T13',
+  riscoBasalT21: 'Risco Basal T21', riscoT21: 'Risco T21 (corrigido)',
+  riscoBasalT18: 'Risco Basal T18', riscoT18: 'Risco T18 (corrigido)',
+  riscoBasalT13: 'Risco Basal T13', riscoT13: 'Risco T13 (corrigido)',
   // FMF — Pré-eclâmpsia
   weightKg: 'Peso (kg)', heightCm: 'Altura (cm)', previousPeGaWeeks: 'IG PE prévia (sem)',
   mapMmHg: 'MAP (mmHg)', mapMoM: 'MAP (MoM)', utaPiRaw: 'IP Uterinas', utaPiMoM: 'IP Uterinas (MoM)',

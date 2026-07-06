@@ -1,17 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CalculatorProps } from '../registry';
-import { Dna, AlertTriangle, Info } from 'lucide-react';
-import { CalculatorInput, ResultCard } from './CalculatorUI';
+import { Dna, AlertTriangle, Info, ArrowRight } from 'lucide-react';
+import { CalculatorInput } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
-import { computeTrisomyRisk, probToOneInN, ntExpectedMedianMm, type MarkerState, type Trisomy } from '../fmf/trisomy';
+import {
+  computeTrisomyRisk, ntExpectedMedianMm,
+  type MarkerState, type Trisomy, type TrisomyFactorBreakdown,
+} from '../fmf/trisomy';
 import { ageRelatedRisk, PROVISIONAL_TRISOMY_PARAMS } from '../fmf/trisomyData';
-import { momPlausible, crlToGaWeeks, crlInWindow, formatGa, CRL_MIN_MM, CRL_MAX_MM } from '../fmf/qc';
+import { momPlausible, crlToGaWeeks, crlInWindow, formatGa, formatOneInN, CRL_MIN_MM, CRL_MAX_MM } from '../fmf/qc';
 
 const MARKER_OPTIONS: { label: string; value: MarkerState }[] = [
   { label: 'Não avaliado', value: 'notAssessed' },
   { label: 'Normal', value: 'normal' },
   { label: 'Alterado', value: 'abnormal' },
 ];
+
+const FACTOR_LABEL: Record<keyof TrisomyFactorBreakdown, string> = {
+  nt: 'TN', biochem: 'Bioquímica', nasalBone: 'Osso Nasal',
+  ductusVenosus: 'Ducto Venoso', tricuspid: 'Regurg. Tricúspide',
+};
 
 /** Faixa de risco a partir do "1 : N" (cutoff de rastreamento). */
 function riskBand(oneInN: number): { label: string; variant: 'red' | 'amber' | 'emerald' } {
@@ -20,7 +28,7 @@ function riskBand(oneInN: number): { label: string; variant: 'red' | 'amber' | '
   return { label: 'Baixo risco', variant: 'emerald' };
 }
 
-/** Conduta sugerida pela faixa de risco do T21 (triagem). */
+/** Conduta sugerida pela faixa de risco (mesmo protocolo vale p/ T21/18/13). */
 function triage(oneInN: number): string {
   if (oneInN <= 100) return 'Alto risco: aconselhamento para teste diagnóstico (biópsia de vilo/amniocentese).';
   if (oneInN <= 1000) return 'Risco intermediário: considerar NIPT (cfDNA) ou marcadores adicionais.';
@@ -55,6 +63,62 @@ function MarkerSelector({ label, current, onSelect }: { label: string; current: 
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Cartão "jornada de risco": basal (idade) → corrigido (após TN/bioquímica/marcadores). */
+function RiskJourneyCard({
+  trisomyLabel, priorOneInN, finalOneInN, factors,
+}: {
+  trisomyLabel: string;
+  priorOneInN: number;
+  finalOneInN: number;
+  factors: TrisomyFactorBreakdown;
+}) {
+  const band = riskBand(finalOneInN);
+  const chips = (Object.keys(factors) as (keyof TrisomyFactorBreakdown)[])
+    .filter((k) => factors[k] !== undefined)
+    .map((k) => ({ key: k, label: FACTOR_LABEL[k], lr: factors[k]! }));
+
+  const styles = {
+    red: 'bg-red-50 border-red-200 text-red-900',
+    amber: 'bg-amber-50 border-amber-200 text-amber-900',
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+  }[band.variant];
+
+  return (
+    <div className={classNames('rounded-2xl border-2 p-5 space-y-4 shadow-sm', styles)}>
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-black uppercase tracking-widest">{trisomyLabel}</span>
+        <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-white/70">
+          {band.label}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1 text-center py-2">
+          <span className="text-[9px] font-black uppercase tracking-widest opacity-60 block mb-1">Basal (idade/IG)</span>
+          <span className="text-lg font-black opacity-80">{formatOneInN(priorOneInN)}</span>
+        </div>
+        <ArrowRight size={20} className="opacity-40 shrink-0" />
+        <div className="flex-1 text-center py-2 bg-white/50 rounded-xl">
+          <span className="text-[9px] font-black uppercase tracking-widest opacity-60 block mb-1">Corrigido (final)</span>
+          <span className="text-2xl font-black">{formatOneInN(finalOneInN)}</span>
+        </div>
+      </div>
+
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-3 border-t border-current/10">
+          {chips.map((c) => (
+            <span key={c.key} className="text-[9px] font-black px-2.5 py-1.5 rounded-lg bg-white/70 border border-current/10">
+              {c.label} {c.lr >= 1 ? `×${c.lr.toFixed(1)}` : `÷${(1 / c.lr).toFixed(1)}`}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[10px] font-bold leading-relaxed pt-1">{triage(finalOneInN)}</p>
     </div>
   );
 }
@@ -95,13 +159,12 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
     return w;
   }, [crlMm, ntMm, ntMoM, bhcgMoM, pappaMoM]);
 
-  // ── Cálculo único (a priori + posterior) ─────────────────────────────
-  const result = useMemo(() => {
+  // ── Cálculo único (basal + corrigido) ─────────────────────────────
+  const risk = useMemo(() => {
     if (!hasResult) return null;
-    const prior = ageRelatedRisk(ageNum);
-    const risk = computeTrisomyRisk(
+    return computeTrisomyRisk(
       {
-        priorRisk: prior,
+        priorRisk: ageRelatedRisk(ageNum),
         ntMm: ntMm ? Number(ntMm) : undefined,
         crlMm: crlMm ? Number(crlMm) : undefined,
         gestDays: gaWeeks ? Math.round(gaWeeks * 7) : undefined,
@@ -111,24 +174,23 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
       },
       PROVISIONAL_TRISOMY_PARAMS,
     );
-    return { risk, priorT21OneInN: probToOneInN(prior.t21) };
   }, [hasResult, ageNum, ntMm, crlMm, gaWeeks, bhcgMoM, pappaMoM, nasalBone, ductusVenosus, tricuspid]);
 
   useEffect(() => {
-    if (!result) {
+    if (!risk) {
       // Preserva todos os campos digitados mesmo sem resultado (evita perda ao fechar).
       onChange({ age, crlMm, ntMm, bhcgMoM, pappaMoM, nasalBone, ductusVenosus, tricuspid, _summary: null });
       return;
     }
-    const { risk } = result;
-    const fmt = (n: number) => (isFinite(n) ? `1:${n}` : '—');
+    const fmt = formatOneInN;
     const disclaimer = validated ? '' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
     const gaStr = gaWeeks ? ` IG (CCN): ${formatGa(gaWeeks)}.` : '';
     const ntStr = ntMm && ntMoM ? `, TN ${ntMm}mm (${ntMoM.toFixed(2)} MoM)` : '';
     const summary =
       `${disclaimer}Risco combinado 1º trimestre — ` +
-      `T21 ${fmt(risk.oneInN.t21)} (${riskBand(risk.oneInN.t21).label}); ` +
-      `T18 ${fmt(risk.oneInN.t18)}; T13 ${fmt(risk.oneInN.t13)}. ` +
+      `T21: basal ${fmt(risk.priorOneInN.t21)} → corrigido ${fmt(risk.oneInN.t21)} (${riskBand(risk.oneInN.t21).label}); ` +
+      `T18: basal ${fmt(risk.priorOneInN.t18)} → corrigido ${fmt(risk.oneInN.t18)}; ` +
+      `T13: basal ${fmt(risk.priorOneInN.t13)} → corrigido ${fmt(risk.oneInN.t13)}. ` +
       `Idade ${ageNum}a${ntStr}` +
       (bhcgMoM ? `, β-hCG ${bhcgMoM} MoM` : '') +
       (pappaMoM ? `, PAPP-A ${pappaMoM} MoM` : '') + `.${gaStr} ${triage(risk.oneInN.t21)}`;
@@ -137,13 +199,13 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
       age, crlMm, igSemanas: gaWeeks ? formatGa(gaWeeks) : '',
       ntMm, ntMoM: ntMoM ? Number(ntMoM.toFixed(3)) : '',
       bhcgMoM, pappaMoM, nasalBone, ductusVenosus, tricuspid,
-      riscoT21: fmt(risk.oneInN.t21),
-      riscoT18: fmt(risk.oneInN.t18),
-      riscoT13: fmt(risk.oneInN.t13),
+      riscoBasalT21: fmt(risk.priorOneInN.t21), riscoT21: fmt(risk.oneInN.t21),
+      riscoBasalT18: fmt(risk.priorOneInN.t18), riscoT18: fmt(risk.oneInN.t18),
+      riscoBasalT13: fmt(risk.priorOneInN.t13), riscoT13: fmt(risk.oneInN.t13),
       _summary: summary,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, gaWeeks, ntMm, ntMoM]);
+  }, [risk, gaWeeks, ntMm, ntMoM]);
 
   return (
     <div className="space-y-7">
@@ -213,23 +275,24 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
         <MarkerSelector label="Regurgitação Tricúspide (alterado = presente)" current={tricuspid} onSelect={setTricuspid} />
       </div>
 
-      {result ? (
-        <div className="flex flex-col gap-3">
-          {(['t21', 't18', 't13'] as Trisomy[]).map((t) => {
-            const n = result.risk.oneInN[t];
-            const band = riskBand(n);
-            return (
-              <ResultCard
-                key={t}
-                label={TRISOMY_LABEL[t]}
-                value={isFinite(n) ? `1 : ${n}` : '—'}
-                recommendation={t === 't21' ? triage(n) : undefined}
-                variant={t === 't21' ? band.variant : 'brand'}
-              />
-            );
-          })}
-          <p className="text-[10px] text-ink-400 text-center font-medium">
-            T21 — risco a priori (só idade): 1 : {result.priorT21OneInN} → ajustado: 1 : {result.risk.oneInN.t21}
+      {risk ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <div className="w-1 h-3 bg-brand-500 rounded-full" />
+            <label className="text-[10px] font-black text-ink-900 uppercase tracking-widest">Basal → Corrigido, por trissomia</label>
+          </div>
+          {(['t21', 't18', 't13'] as Trisomy[]).map((t) => (
+            <RiskJourneyCard
+              key={t}
+              trisomyLabel={TRISOMY_LABEL[t]}
+              priorOneInN={risk.priorOneInN[t]}
+              finalOneInN={risk.oneInN[t]}
+              factors={risk.factors[t]}
+            />
+          ))}
+          <p className="text-[9px] text-ink-400 text-center font-medium pt-1">
+            Basal = risco a priori por idade materna, corrigido para a idade gestacional do rastreamento (~12 sem).
+            Corrigido = basal combinado com TN, bioquímica e marcadores ecográficos avaliados.
           </p>
         </div>
       ) : (

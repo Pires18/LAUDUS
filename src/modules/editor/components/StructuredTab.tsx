@@ -1,4 +1,4 @@
-import { Calculator, Sparkles, Loader2, RotateCcw, LayoutGrid } from 'lucide-react';
+import { Calculator, Sparkles, Loader2, RotateCcw, LayoutGrid, Zap, CheckCircle2, Plus, X } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import {
   StructuredSchema,
@@ -6,6 +6,8 @@ import {
   StructuredFieldValue,
 } from '../../../types';
 import { fieldValueToText } from '../structured/deriveSchema';
+import { Derivation } from '../structured/liveCompute';
+import { sectionState, itemCount, itemFieldId, normalKey } from '../structured/structuredKeys';
 
 interface StructuredTabProps {
   schema: StructuredSchema;
@@ -13,6 +15,10 @@ interface StructuredTabProps {
   onChange: (fieldId: string, value: StructuredFieldValue) => void;
   onOpenCalc: (calcId: string, fieldId: string, label: string) => void;
   onCompile: () => void;
+  onSectionNormal: (sectionId: string) => void;
+  onAddItem: (sectionId: string) => void;
+  onRemoveItem: (sectionId: string, index: number) => void;
+  derivations: Derivation[];
   isGenerating: boolean;
   filledCount: number;
 }
@@ -160,9 +166,33 @@ export function StructuredTab({
   onChange,
   onOpenCalc,
   onCompile,
+  onSectionNormal,
+  onAddItem,
+  onRemoveItem,
+  derivations,
   isGenerating,
   filledCount,
 }: StructuredTabProps) {
+  const derivBySection = derivations.reduce<Record<string, Derivation[]>>((acc, d) => {
+    (acc[d.sectionId] = acc[d.sectionId] || []).push(d);
+    return acc;
+  }, {});
+
+  /** Grade de campos usando um mapeador de id de armazenamento (identidade ou instância). */
+  const renderGrid = (fields: StructuredFieldDef[], keyFor: (fieldId: string) => string) => (
+    <div className="grid grid-cols-2 gap-2.5">
+      {fields.map((field) => (
+        <div key={field.id} className={classNames(field.kind === 'triplet' || field.kind === 'calc' || field.fullWidth ? 'col-span-2' : '')}>
+          <FieldRenderer
+            field={field}
+            value={values[keyFor(field.id)]}
+            onChange={(v) => onChange(keyFor(field.id), v)}
+            onOpenCalc={(cid, _fid, label) => onOpenCalc(cid, keyFor(field.id), label)}
+          />
+        </div>
+      ))}
+    </div>
+  );
   if (!schema.sections.length) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
@@ -179,35 +209,113 @@ export function StructuredTab({
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
-        {schema.sections.map((section) => (
+        {schema.sections.map((section) => {
+          const isNormal = section.normalable && sectionState(values, section.id) === 'normal';
+          const count = section.repeatable ? itemCount(values, section.id) : 1;
+          return (
           <div key={section.id} className="rounded-2xl border border-ink-200 bg-white overflow-hidden shadow-sm">
             <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-ink-100">
               <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">{section.label}</span>
-              {section.calcId && (
+              <div className="flex items-center gap-1.5">
+                {section.normalable ? (
+                  <div className="flex items-center rounded-lg border border-ink-200 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => onChange(normalKey(section.id), 'normal')}
+                      className={classNames('px-2 py-1 text-[9px] font-black uppercase tracking-wide transition-colors', isNormal ? 'bg-emerald-500 text-white' : 'bg-white text-ink-500 hover:bg-ink-50')}
+                    >
+                      Normal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onChange(normalKey(section.id), 'altered')}
+                      className={classNames('px-2 py-1 text-[9px] font-black uppercase tracking-wide transition-colors', !isNormal ? 'bg-amber-500 text-white' : 'bg-white text-ink-500 hover:bg-ink-50')}
+                    >
+                      Alterado
+                    </button>
+                  </div>
+                ) : !section.repeatable ? (
+                  <button
+                    type="button"
+                    onClick={() => onSectionNormal(section.id)}
+                    title="Preencher campos vazios como normais"
+                    className="h-6 px-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1 active:scale-95"
+                  >
+                    <CheckCircle2 size={10} />
+                    Normal
+                  </button>
+                ) : null}
+                {section.calcId && !isNormal && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCalc(section.calcId!, `${section.id}__section`, section.label)}
+                    className="h-6 px-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 active:scale-95"
+                  >
+                    <Calculator size={10} />
+                    Calc.
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {isNormal ? (
+              <div className="px-3.5 py-2.5 text-[11px] font-semibold text-emerald-700/80 flex items-center gap-1.5">
+                <CheckCircle2 size={12} className="text-emerald-500" /> Sem alterações{section.normalText ? ` — ${section.normalText}` : ''}.
+              </div>
+            ) : section.repeatable ? (
+              <div className="p-3 space-y-2.5">
+                {Array.from({ length: count }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-ink-100 bg-ink-50/40 p-2.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">{section.itemLabel || 'Item'} {i + 1}</span>
+                      {count > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveItem(section.id, i)}
+                          className="w-5 h-5 rounded-md text-ink-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
+                          title="Remover"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                    {renderGrid(section.fields, (fid) => itemFieldId(section.id, i, fid))}
+                    {derivBySection[section.id]?.filter((d) => d.id.includes(`@${i}`) || d.id.includes(`${section.id}@${i}`)).map((d) => (
+                      <div key={d.id} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50/70 border border-emerald-200/70 px-2.5 py-1.5">
+                        <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wide">{d.label}</span>
+                        <span className={classNames('text-[11px] font-black', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
                 <button
                   type="button"
-                  onClick={() => onOpenCalc(section.calcId!, `${section.id}__section`, section.label)}
-                  className="h-6 px-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold hover:bg-amber-100 transition-colors flex items-center gap-1 active:scale-95"
+                  onClick={() => onAddItem(section.id)}
+                  className="w-full h-9 rounded-xl border border-dashed border-brand-300 text-brand-600 hover:bg-brand-50 text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
                 >
-                  <Calculator size={10} />
-                  Calc.
+                  <Plus size={13} /> Adicionar {section.itemLabel || 'item'}
                 </button>
-              )}
-            </div>
-            <div className="p-3 grid grid-cols-2 gap-2.5">
-              {section.fields.map((field) => (
-                <div key={field.id} className={classNames(field.kind === 'triplet' || field.kind === 'calc' ? 'col-span-2' : '')}>
-                  <FieldRenderer
-                    field={field}
-                    value={values[field.id]}
-                    onChange={(v) => onChange(field.id, v)}
-                    onOpenCalc={onOpenCalc}
-                  />
+              </div>
+            ) : (
+              <div className="p-3">{renderGrid(section.fields, (fid) => fid)}</div>
+            )}
+
+            {!section.repeatable && !isNormal && derivBySection[section.id]?.length > 0 && (
+              <div className="mx-3 mb-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70 px-3 py-2 space-y-1">
+                <div className="flex items-center gap-1 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
+                  <Zap size={9} /> Cálculo automático
                 </div>
-              ))}
-            </div>
+                {derivBySection[section.id].map((d) => (
+                  <div key={d.id} className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold text-emerald-800/80">{d.label}</span>
+                    <span className={classNames('text-[11px] font-black tabular-nums', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="p-3 pb-4 bg-white border-t border-ink-100 shrink-0">

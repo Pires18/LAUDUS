@@ -11,6 +11,8 @@ import { logger } from '../../utils/logger';
 import { ExamRequest, Patient, ReportTemplate, StructuredFieldValue } from '../../types';
 import { StructuredTab } from './components/StructuredTab';
 import { deriveStructuredSchema, summarizeStructured } from './structured/deriveSchema';
+import { computeDerivations, derivationsToLines } from './structured/liveCompute';
+import { itemCount, itemFieldId, countKey } from './structured/structuredKeys';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { routeMotor } from '../ai/router';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
@@ -129,6 +131,18 @@ function buildAreaInstruction(area: string): string {
   }
   if (area === 'pequenas-partes') {
     return `\n\nINSTRUÇÃO OBRIGATÓRIA — PEQUENAS PARTES:\nInserir dimensões/volumes e achados nos campos correspondentes; para nódulo tireoidiano aplicar a categoria ACR TI-RADS informada e a conduta (seguimento/PAAF); substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  if (area === 'musculoesqueletico') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — MUSCULOESQUELÉTICO:\nInserir tendões/articulação/bursas/nervos nos campos correspondentes; graduar derrame e sinovite (OMERACT quando aplicável); substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  if (area === 'reumatologico') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — REUMATOLÓGICO:\nAplicar os escores semiquantitativos GSUS e PDUS (0–3, EULAR-OMERACT) por articulação/região, registrar erosões e ênteses; substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  if (area === 'pediatria') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — PEDIATRIA:\nInserir medidas e achados adequados à faixa etária; para displasia do quadril aplicar ângulos e o tipo de Graf informados; para hidronefrose usar a graduação SFU; substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
+  }
+  if (area === 'procedimentos') {
+    return `\n\nINSTRUÇÃO OBRIGATÓRIA — PROCEDIMENTOS:\nDescrever alvo, técnica (agulha/via/passagens), material coletado e controle pós-procedimento com intercorrências; aplicar TI-RADS/BI-RADS ao alvo quando informado; substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
   }
   return `\n\nINSTRUÇÃO OBRIGATÓRIA:\nInserir cada achado no campo correspondente da ANÁLISE, substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
 }
@@ -264,6 +278,11 @@ export function LaudCopilot({
   const structuredSummary = useMemo(
     () => summarizeStructured(structuredSchema, structuredValues),
     [structuredSchema, structuredValues]
+  );
+  // Cálculo em tempo real (volume, RCP, IG/DPP, índices Doppler…) sem abrir modal.
+  const structuredDerivations = useMemo(
+    () => computeDerivations(structuredSchema, structuredValues, exam.examDate || exam.createdAt),
+    [structuredSchema, structuredValues, exam.examDate, exam.createdAt]
   );
 
   const cancelActiveRequest = () => {
@@ -1000,8 +1019,59 @@ export function LaudCopilot({
     persistStructured(next);
   };
 
+  // Polimento: preenche os campos VAZIOS de uma seção como normais (texto →
+  // frase-placeholder; select → 1ª opção, que por convenção é a normal).
+  const handleSectionNormal = (sectionId: string) => {
+    const section = structuredSchema.sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const next = { ...latestStructuredRef.current };
+    let changed = false;
+    for (const field of section.fields) {
+      const cur = next[field.id];
+      const hasVal = !!(typeof cur === 'string' ? cur.trim() : cur?.text);
+      if (hasVal) continue;
+      if (field.kind === 'text') {
+        next[field.id] = field.placeholder || 'sem alterações';
+        changed = true;
+      } else if (field.kind === 'select' && field.options?.length) {
+        next[field.id] = field.options[0];
+        changed = true;
+      }
+    }
+    if (changed) {
+      setStructuredValues(next);
+      persistStructured(next);
+    }
+  };
+
   const handleOpenCalcForField = (calcId: string, fieldId: string, label: string) => {
     onOpenCalcForField?.(calcId, fieldId, label);
+  };
+
+  // Itens repetíveis (múltiplos nódulos/lesões/linfonodos).
+  const handleAddItem = (sectionId: string) => {
+    const n = itemCount(latestStructuredRef.current, sectionId);
+    handleStructuredChange(countKey(sectionId), String(Math.min(n + 1, 20)));
+  };
+
+  const handleRemoveItem = (sectionId: string, index: number) => {
+    const section = structuredSchema.sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const n = itemCount(latestStructuredRef.current, sectionId);
+    const next = { ...latestStructuredRef.current };
+    // Reindexa: desloca as instâncias acima do índice removido uma posição p/ baixo.
+    for (let i = index; i < n - 1; i++) {
+      for (const f of section.fields) {
+        const from = itemFieldId(sectionId, i + 1, f.id);
+        const to = itemFieldId(sectionId, i, f.id);
+        if (from in next) next[to] = next[from];
+        else delete next[to];
+      }
+    }
+    for (const f of section.fields) delete next[itemFieldId(sectionId, n - 1, f.id)];
+    next[countKey(sectionId)] = String(Math.max(1, n - 1));
+    setStructuredValues(next);
+    persistStructured(next);
   };
 
   // Resolve o campo-alvo quando o cálculo veio do atalho de uma seção inteira.
@@ -1058,6 +1128,10 @@ export function LaudCopilot({
       msg += `\n\nANAMNESE DO PACIENTE:\n${anamnesisText.trim()}`;
     }
     msg += `\n\nDADOS DO FORMULÁRIO:\n${lines.join('\n')}`;
+    const derivLines = derivationsToLines(structuredDerivations);
+    if (derivLines.length) {
+      msg += `\n\nCÁLCULOS AUTOMÁTICOS (já calculados a partir dos dados — use exatamente estes valores, não recalcule):\n${derivLines.join('\n')}`;
+    }
 
     setActiveTab('chat');
     handleSend(msg);
@@ -1746,6 +1820,10 @@ export function LaudCopilot({
           onChange={handleStructuredChange}
           onOpenCalc={handleOpenCalcForField}
           onCompile={handleCompileStructured}
+          onSectionNormal={handleSectionNormal}
+          onAddItem={handleAddItem}
+          onRemoveItem={handleRemoveItem}
+          derivations={structuredDerivations}
           isGenerating={isGenerating}
           filledCount={structuredSummary.filledCount}
         />

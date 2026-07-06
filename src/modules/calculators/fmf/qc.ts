@@ -47,3 +47,25 @@ export function formatGa(gaWeeks: number): string {
   const d = totalDays % 7;
   return `${w}s ${d}d`;
 }
+
+/**
+ * Teto de exibição do denominador de risco "1:N" — mesma convenção da
+ * calculadora oficial da FMF, que também trava em 10.000. Risco muito baixo
+ * (N grande) não muda a conduta clínica além desse ponto, então exibir
+ * denominadores astronômicos (ex.: "1:2.847.392") só adiciona falsa precisão.
+ *
+ * Aplicado apenas na EXIBIÇÃO — o valor numérico bruto (não travado) segue
+ * usado internamente para banda de risco, ordenação e testes.
+ */
+export const MAX_DISPLAYED_ONE_IN_N = 10000;
+
+/**
+ * Formata um risco "1:N" com separador de milhar (pt-BR) e teto em
+ * MAX_DISPLAYED_ONE_IN_N — acima do teto, exibe ">1:10.000" em vez do
+ * denominador real. `n` não finito/≤0 vira "—".
+ */
+export function formatOneInN(n: number, max: number = MAX_DISPLAYED_ONE_IN_N): string {
+  if (!isFinite(n) || n <= 0) return '—';
+  if (n >= max) return `>1:${max.toLocaleString('pt-BR')}`;
+  return `1:${Math.round(n).toLocaleString('pt-BR')}`;
+}

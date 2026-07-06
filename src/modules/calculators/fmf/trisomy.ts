@@ -69,10 +69,24 @@ export interface TrisomyInputs {
   tricuspid?: MarkerState;
 }
 
+/** LR individual de cada evidência aplicada (ausente = fator não avaliado). */
+export interface TrisomyFactorBreakdown {
+  nt?: number;
+  biochem?: number;
+  nasalBone?: number;
+  ductusVenosus?: number;
+  tricuspid?: number;
+}
+
 export interface TrisomyRisk {
   posterior: Record<Trisomy, number>;
   oneInN: Record<Trisomy, number>;
   lr: Record<Trisomy, number>;
+  /** Risco BASAL (a priori, só idade/IG) em "1:N", por trissomia. */
+  priorOneInN: Record<Trisomy, number>;
+  /** Detalhamento das LRs individuais que compõem `lr` — para exibir a
+   *  "jornada" basal → corrigido fator a fator. */
+  factors: Record<Trisomy, TrisomyFactorBreakdown>;
 }
 
 // ───────────────────────────── Probabilidade ────────────────────────────
@@ -152,28 +166,49 @@ export function computeTrisomyRisk(inputs: TrisomyInputs, params: TrisomyModelPa
   const posterior = {} as Record<Trisomy, number>;
   const oneInN = {} as Record<Trisomy, number>;
   const lrOut = {} as Record<Trisomy, number>;
+  const priorOneInN = {} as Record<Trisomy, number>;
+  const factors = {} as Record<Trisomy, TrisomyFactorBreakdown>;
 
   const gestDays = inputs.gestDays ?? 89; // ~12+5 semanas
 
   for (const t of trisomies) {
     let lr = 1;
+    const factorLRs: TrisomyFactorBreakdown = {};
 
     if (inputs.ntMm && inputs.crlMm) {
-      lr *= ntMixtureLR(inputs.ntMm, inputs.crlMm, params.nt, t);
+      const ntLr = ntMixtureLR(inputs.ntMm, inputs.crlMm, params.nt, t);
+      factorLRs.nt = ntLr;
+      lr *= ntLr;
     }
     if (inputs.freeBhcgMoM !== undefined && inputs.pappaMoM !== undefined) {
-      lr *= biochemLR(inputs.freeBhcgMoM, inputs.pappaMoM, gestDays, params.biochem, t);
+      const bioLr = biochemLR(inputs.freeBhcgMoM, inputs.pappaMoM, gestDays, params.biochem, t);
+      factorLRs.biochem = bioLr;
+      lr *= bioLr;
     }
-    lr *= markerLR(inputs.nasalBone, params.markers.nasalBone, t);
-    lr *= markerLR(inputs.ductusVenosus, params.markers.ductusVenosus, t);
-    lr *= markerLR(inputs.tricuspid, params.markers.tricuspid, t);
+    if (inputs.nasalBone && inputs.nasalBone !== 'notAssessed') {
+      const nbLr = markerLR(inputs.nasalBone, params.markers.nasalBone, t);
+      factorLRs.nasalBone = nbLr;
+      lr *= nbLr;
+    }
+    if (inputs.ductusVenosus && inputs.ductusVenosus !== 'notAssessed') {
+      const dvLr = markerLR(inputs.ductusVenosus, params.markers.ductusVenosus, t);
+      factorLRs.ductusVenosus = dvLr;
+      lr *= dvLr;
+    }
+    if (inputs.tricuspid && inputs.tricuspid !== 'notAssessed') {
+      const trLr = markerLR(inputs.tricuspid, params.markers.tricuspid, t);
+      factorLRs.tricuspid = trLr;
+      lr *= trLr;
+    }
 
     const postOdds = probToOdds(inputs.priorRisk[t]) * lr;
     const p = oddsToProb(postOdds);
     posterior[t] = p;
     oneInN[t] = probToOneInN(p);
     lrOut[t] = lr;
+    priorOneInN[t] = probToOneInN(inputs.priorRisk[t]);
+    factors[t] = factorLRs;
   }
 
-  return { posterior, oneInN, lr: lrOut };
+  return { posterior, oneInN, lr: lrOut, priorOneInN, factors };
 }

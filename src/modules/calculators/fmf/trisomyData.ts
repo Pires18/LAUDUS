@@ -3,12 +3,40 @@
 // ═══════════════════════════════════════════════════════════════════════
 // TN (mistura): Wright D et al., UOG 2008; 31:376-383 (Tabela 2) — EXATO.
 // Bioquímica T21: Kagan KO et al., UOG 2008; 31:493-502 (Tab.3 + regressões) — EXATO.
+// Bioquímica T18: Kagan KO et al., UOG 2008; 32:488-492 (uog.6123, Tabela 2) — EXATO.
+// Bioquímica T13: Kagan KO et al., Hum Reprod 2008; 23:1968-1975 (Tabela III) — EXATO.
+// LRs de marcadores: prevalências publicadas (Kagan/Maiz 2009), derivação crua.
 // Risco por idade: aproximação de Snijders & Nicolaides 1999 — VALIDAR.
 //
-// Bioquímica T18: Kagan uog.6123; T13: Kagan Hum Reprod 2008; 23:1968 — EXATO.
-// LRs de marcadores: prevalências publicadas (Kagan/Maiz 2009), crus.
-// ⚠️  `validated: false` até conferir com casos-ouro. Correção de IG do risco
-//     a priori por idade ainda pendente (Snijders).
+// ═══ AUDITORIA (jul/2026) ═══════════════════════════════════════════════
+// Todos os coeficientes abaixo foram conferidos DÍGITO A DÍGITO contra as
+// tabelas originais dos 5 papers-fonte (PDFs fornecidos pelo usuário) — zero
+// divergências encontradas. Adicionalmente, `fmfTrisomy.test.ts` reproduz
+// FATOS NUMÉRICOS declarados explicitamente nos abstracts/textos dos papers
+// (medianas de TN: 2,0/3,4/5,5/4,0 mm; medianas de MoM bioquímico: 2,0/0,5,
+// 0,2/0,2) a partir destes mesmos coeficientes — todos batem dentro de
+// tolerância clínica. Isso confirma a FIDELIDADE da transcrição e da lógica
+// do modelo (mistura da TN, bivariada da bioquímica, LRs de marcadores).
+//
+// O que ISSO NÃO substitui: comparação caso-a-caso contra a calculadora
+// oficial da FMF (bloqueada por indisponibilidade da extensão do navegador
+// nesta sessão). Por isso `validated` permanece `false` — é o gate de uso
+// clínico, não de correção de transcrição.
+//
+// ⚠️  Lacunas conhecidas e NÃO estimadas (sem fonte primária exata — não
+//     inventamos números para preenchê-las):
+//   • Correção de IG do risco a priori: IMPLEMENTADA (ver GA_PRIOR_CORRECTION_
+//     FACTOR abaixo) usando a taxa de perda fetal, mas fixa em ~12 semanas
+//     (ponto médio da janela 11–13+6) — não varia semana a semana dentro da
+//     janela por falta de dado granular em fonte aberta.
+//   • T18/T13 como frações fixas de T21 (1/10, 1/30) e correção de IG
+//     herdada do T21: aproximação de ordem de grandeza — a perda fetal
+//     intrauterina de T18/T13 é conhecidamente MAIOR que a de T21, então o
+//     fator real para essas duas trissomias é provavelmente MAIOR que o
+//     usado aqui (nosso risco tende a ficar um pouco CONSERVADOR/subestimado
+//     para T18/T13 especificamente).
+//   • LRs de marcadores "cruas" (prevalência/prevalência): o FMF usa LRs
+//     ajustadas por correlação com a TN, tipicamente um pouco MENORES.
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { Trisomy, TrisomyModelParams } from './trisomy';
@@ -40,15 +68,44 @@ export function t21TermRisk(ageYears: number): number {
   return 1 / tbl[tbl.length - 1][1];
 }
 
-/** Risco a priori por trissomia (ao termo — correção de IG é item de validação). */
+/**
+ * Correção de idade gestacional do risco a priori (basal → 1º trimestre).
+ *
+ * Fonte: Nicolaides KH, "Screening for fetal aneuploidies at 11 to 13 weeks",
+ * Prenat Diagn 2011;31:7-15 (revisão citando Snijders et al., UOG 1999;13:167):
+ * "the rate of fetal death between 12 weeks and term is about 30% for
+ * trisomy 21. The rate of fetal death in euploid fetuses is only 1 to 2%."
+ * Exemplo verificado no mesmo texto: mulher de 20 anos tem risco de T21
+ * ≈1:1000 às 12 semanas vs ≈1:1500 ao termo.
+ *
+ * Derivação: se uma fração L de fetos T21 vivos às 12 sem morre até o termo,
+ * e uma fração e de fetos euploides morre no mesmo período, então (como o
+ * numerador de T21 é desprezível no denominador populacional):
+ *   risco(12 sem) = risco(termo) × (1 − e) / (1 − L)
+ * Com L=0,30 e e=0,015 (ponto médio de 1–2%): fator ≈ 0,985/0,70 ≈ 1,407 —
+ * consistente com o exemplo citado (1/1450 [nossa tabela p/ 20 anos] × 1,407
+ * ≈ 1/1031, próximo do "≈1:1000" declarado).
+ *
+ * ⚠️ Fator fixo, verificado especificamente para ~12 semanas (ponto médio da
+ * janela de rastreamento); aplicado uniformemente em 11–13+6 por falta de
+ * curva semana-a-semana em fonte aberta. Aplicado somente ao T21 (fonte
+ * específica) — T18/T13 herdam o mesmo fator por serem frações do T21 já
+ * corrigido, o que tende a subestimar levemente essas duas (ver cabeçalho).
+ */
+export const T21_FETAL_LOSS_RATE_12WK_TO_TERM = 0.30;
+export const EUPLOID_FETAL_LOSS_RATE_12WK_TO_TERM = 0.015;
+export const GA_PRIOR_CORRECTION_FACTOR =
+  (1 - EUPLOID_FETAL_LOSS_RATE_12WK_TO_TERM) / (1 - T21_FETAL_LOSS_RATE_12WK_TO_TERM);
+
+/** Risco a priori BASAL (só idade, já corrigido para ~12 semanas) por trissomia. */
 export function ageRelatedRisk(ageYears: number): Record<Trisomy, number> {
-  const t21 = t21TermRisk(ageYears);
+  const t21 = Math.min(1, t21TermRisk(ageYears) * GA_PRIOR_CORRECTION_FACTOR);
   return { t21, t18: t21 * T18_FRACTION_OF_T21, t13: t21 * T13_FRACTION_OF_T21 };
 }
 
 export const PROVISIONAL_TRISOMY_PARAMS: TrisomyModelParams = {
   validated: false, // 🚫 conferir com casos-ouro antes de liberar
-  version: 'trisomy-wright2008NT + kagan2008biochem + marcadores2009-T13exato-v5',
+  version: 'trisomy-wright2008NT + kagan2008biochem + marcadores2009 + gaCorrection2011-v6',
 
   // ── TN: modelo de mistura (Wright 2008, Tabela 2) — EXATO ──────────────
   nt: {

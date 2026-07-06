@@ -8,7 +8,7 @@ import {
   type RacialOrigin, type Conception, type PeMaternalFactors, type PeBiomarkers,
 } from '../fmf/preeclampsia';
 import { PROVISIONAL_PE_COEFFICIENTS, PE_BIOMARKER_MODEL } from '../fmf/preeclampsiaData';
-import { momPlausible } from '../fmf/qc';
+import { momPlausible, formatOneInN } from '../fmf/qc';
 import { mapMedianMmHg, utaPiMedian, plgfMedian, toMoM, type Analyzer, type PeMedianCovariates } from '../fmf/medians';
 
 type Parity = 'nulliparous' | 'parousNoPE' | 'parousPE';
@@ -138,7 +138,7 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
       });
       return;
     }
-    const fmt = (n: number) => (isFinite(n) ? `1:${n}` : '—');
+    const fmt = formatOneInN;
     const disclaimer = validated ? '' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
     const conduta = result.aspirinRecommended
       ? 'Risco elevado de PE pré-termo — considerar AAS 150 mg/noite (11–14 até 36 sem).'
@@ -156,8 +156,15 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
         `${disclaimer}Risco de pré-eclâmpsia (1º trimestre) — pré-termo (<37s): ${fmt(result.pretermPE.oneInN)}; ` +
         `a termo: ${fmt(result.termPE.oneInN)}. ${conduta}`,
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, mapMoM, utaPiMoM]);
+  // `result` já reage a age/weightKg/heightCm/racialOrigin/conception/parity/
+  // previousPeGaWeeks/diabetes/chronicHypertension/sleOrAps/familyHistoryPE
+  // (estão no array de deps do próprio useMemo). gaWeeks/smoker/analyzer/
+  // mapMmHg/utaPiRaw/plgfRaw são valores "crus" que só entram no payload do
+  // onChange (ou alimentam covariates indiretamente) e NÃO garantem troca de
+  // referência de `result` quando mudam sozinhos — precisam estar aqui,
+  // senão o _summary/dados salvos podem ficar desatualizados se forem o
+  // último campo editado pelo médico.
+  }, [result, mapMoM, utaPiMoM, plgfMoM, gaWeeks, smoker, analyzer, mapMmHg, utaPiRaw, plgfRaw]);
 
   return (
     <div className="space-y-7">
@@ -254,7 +261,7 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
         <div className="flex flex-col gap-3">
           <ResultCard
             label="PE Pré-termo (< 37 semanas)"
-            value={isFinite(result.pretermPE.oneInN) ? `1 : ${result.pretermPE.oneInN}` : '—'}
+            value={formatOneInN(result.pretermPE.oneInN)}
             recommendation={
               result.aspirinRecommended
                 ? `Acima do cutoff (1:${DEFAULT_PE_THRESHOLDS.aspirinCutoffOneInN}) — considerar AAS 150 mg/noite (11–14 até 36 sem).`
@@ -264,7 +271,7 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
           />
           <ResultCard
             label="PE a Termo"
-            value={isFinite(result.termPE.oneInN) ? `1 : ${result.termPE.oneInN}` : '—'}
+            value={formatOneInN(result.termPE.oneInN)}
             variant="brand"
           />
           {result.aspirinRecommended && (

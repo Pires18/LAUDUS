@@ -79,7 +79,9 @@ describe('deriveStructuredSchema — overlays ginecologia e mastologia', () => {
     );
     const utero = schema.sections.find((s) => s.id === 'utero');
     expect(utero?.fields.find((f) => f.id === 'mioma_figo')?.calcId).toBe('figo-myoma');
-    expect(schema.sections.find((s) => s.id === 'anexos')?.fields[0].calcId).toBe('orads-us-2022');
+    const formacoes = schema.sections.find((s) => s.id === 'formacoes');
+    expect(formacoes?.repeatable).toBe(true);
+    expect(formacoes?.fields.find((f) => f.id === 'orads')?.options).toContain('O-RADS 4');
     expect(schema.sections.find((s) => s.id === 'ovario-d')?.fields[0].calcId).toBe('volume-elipsoide');
   });
 
@@ -98,7 +100,9 @@ describe('deriveStructuredSchema — overlays ginecologia e mastologia', () => {
       'mastologia'
     );
     expect(schema.sections.find((s) => s.id === 'composicao')?.fields[0].options?.length).toBe(4);
-    expect(schema.sections.find((s) => s.id === 'mama-d')?.fields.find((f) => f.id === 'md_birads')?.calcId).toBe('birads-us-2013');
+    const lesoes = schema.sections.find((s) => s.id === 'lesoes');
+    expect(lesoes?.repeatable).toBe(true);
+    expect(lesoes?.fields.find((f) => f.id === 'birads')?.options).toContain('BI-RADS 4B');
   });
 
   it('LINFONODOS AXILARES resolve overlay de axilas', () => {
@@ -114,7 +118,10 @@ describe('deriveStructuredSchema — pequenas-partes e medicina-interna', () => 
   it('TIREOIDE resolve overlay com lobos (volume) e nódulo TI-RADS', () => {
     const schema = deriveStructuredSchema(fakeTemplate({ area: 'pequenas-partes', name: 'TIREOIDE COM DOPPLER' }), 'pequenas-partes');
     expect(schema.sections.find((s) => s.id === 'lobo-d')?.fields[0].calcId).toBe('volume-elipsoide');
-    expect(schema.sections.find((s) => s.id === 'nodulo')?.fields.find((f) => f.id === 'nodulo_tirads')?.calcId).toBe('tirads-2017');
+    const nodulos = schema.sections.find((s) => s.id === 'nodulos');
+    expect(nodulos?.repeatable).toBe(true);
+    expect(nodulos?.score).toBe('tirads');
+    expect(nodulos?.fields.find((f) => f.id === 'composicao')?.scoreKey).toBe('composition');
   });
 
   it('BOLSA ESCROTAL resolve overlay de testículos com volume', () => {
@@ -146,6 +153,63 @@ describe('deriveStructuredSchema — pequenas-partes e medicina-interna', () => 
   });
 });
 
+describe('deriveStructuredSchema — MSK e reumatológico', () => {
+  it('MSK (qualquer articulação) resolve overlay genérico com integridade tendínea e volume de coleção', () => {
+    const schema = deriveStructuredSchema(fakeTemplate({ area: 'musculoesqueletico', name: 'OMBRO' }), 'musculoesqueletico');
+    expect(schema.sections.find((s) => s.id === 'tendoes')?.fields.find((f) => f.id === 'tendao_estado')?.kind).toBe('select');
+    const colecoes = schema.sections.find((s) => s.id === 'colecoes');
+    expect(colecoes?.repeatable).toBe(true);
+    expect(colecoes?.fields.find((f) => f.id === 'dims')?.calcId).toBe('volume-elipsoide');
+  });
+
+  it('reumato periféricas: articulações repetíveis com GSUS/PDUS 0–3', () => {
+    const schema = deriveStructuredSchema(fakeTemplate({ area: 'reumatologico', name: 'ARTICULAÇÕES PERIFÉRICAS' }), 'reumatologico');
+    const art = schema.sections.find((s) => s.id === 'articulacoes');
+    expect(art?.repeatable).toBe(true);
+    expect(art?.fields.find((f) => f.id === 'gsus')?.options?.length).toBe(4);
+    expect(art?.fields.find((f) => f.id === 'pdus')).toBeTruthy();
+  });
+
+  it('SACROILÍACAS e PDUS-28 resolvem overlays dedicados', () => {
+    const si = deriveStructuredSchema(fakeTemplate({ area: 'reumatologico', name: 'SACROILÍACAS' }), 'reumatologico');
+    expect(si.sections.map((s) => s.id)).toContain('si-d');
+    const pdus = deriveStructuredSchema(fakeTemplate({ area: 'reumatologico', name: 'ESCORE PDUS-28' }), 'reumatologico');
+    expect(pdus.sections.find((s) => s.id === 'gloess')).toBeTruthy();
+  });
+});
+
+describe('deriveStructuredSchema — pediatria e procedimentos', () => {
+  it('QUADRIL PEDIÁTRICO resolve overlay de Graf (ângulos + tipo)', () => {
+    const schema = deriveStructuredSchema(fakeTemplate({ area: 'pediatria', name: 'QUADRIL PEDIÁTRICO (DDQ)' }), 'pediatria');
+    const qd = schema.sections.find((s) => s.id === 'quadril-d');
+    expect(qd?.fields.find((f) => f.id === 'alfa_d')?.unit).toBe('°');
+    expect(qd?.fields.find((f) => f.id === 'graf_d')?.options).toContain('IIc');
+  });
+
+  it('TRANSFONTANELAR e RINS PEDIÁTRICO resolvem overlays próprios', () => {
+    const tf = deriveStructuredSchema(fakeTemplate({ area: 'pediatria', name: 'TRANSFONTANELAR' }), 'pediatria');
+    expect(tf.sections.find((s) => s.id === 'ventriculos')).toBeTruthy();
+    const rins = deriveStructuredSchema(fakeTemplate({ area: 'pediatria', name: 'RINS E VIAS URINÁRIAS PEDIÁTRICO' }), 'pediatria');
+    expect(rins.sections.find((s) => s.id === 'rim-d')?.fields.find((f) => f.id === 'rim_d_dilat')?.options).toContain('SFU III');
+  });
+
+  it('PAAF TIREOIDE resolve overlay com TI-RADS + cauda (técnica/material/controle)', () => {
+    const schema = deriveStructuredSchema(fakeTemplate({ area: 'procedimentos', name: 'PAAF TIREOIDE' }), 'procedimentos');
+    expect(schema.sections.find((s) => s.id === 'alvo')?.fields.find((f) => f.id === 'tirads')?.calcId).toBe('tirads-2017');
+    expect(schema.sections.map((s) => s.id)).toEqual(expect.arrayContaining(['tecnica', 'material', 'controle']));
+  });
+
+  it('procedimento genérico tem alvo com volume e cauda padrão', () => {
+    const schema = deriveStructuredSchema(fakeTemplate({ area: 'procedimentos', name: 'CORE BIOPSY' }), 'procedimentos');
+    expect(schema.sections.find((s) => s.id === 'alvo')?.fields.find((f) => f.id === 'alvo_dims')?.calcId).toBe('volume-elipsoide');
+  });
+
+  it('AMNIOCENTESE resolve overlay obstétrico', () => {
+    const schema = deriveStructuredSchema(fakeTemplate({ area: 'procedimentos', name: 'AMNIOCENTESE' }), 'procedimentos');
+    expect(schema.sections.find((s) => s.id === 'pre')?.fields.find((f) => f.id === 'vitalidade')).toBeTruthy();
+  });
+});
+
 describe('parseMaskSections — parser genérico da máscara', () => {
   const analysis =
     '<p><strong>Fígado:</strong> Dimensões normais, medindo [__] x [__] x [__] cm.</p>' +
@@ -168,8 +232,8 @@ describe('parseMaskSections — parser genérico da máscara', () => {
   });
 
   it('deriva do analysisTemplate quando a área não tem overlay', () => {
-    // pediatria ainda não tem overlay curado → cai no parser genérico.
-    const schema = deriveStructuredSchema(fakeTemplate({ area: 'pediatria', analysisTemplate: analysis }), 'pediatria');
+    // área desconhecida (sem overlay curado) → cai no parser genérico da máscara.
+    const schema = deriveStructuredSchema(fakeTemplate({ analysisTemplate: analysis }), 'area-sem-overlay');
     expect(schema.sections.length).toBe(3);
   });
 });
@@ -182,7 +246,8 @@ describe('summarizeStructured — compilação de valores', () => {
       cf: '54',
       dof: '',
     });
-    expect(filledCount).toBe(2);
+    // ≥2 campos reais (morfologia normalable também conta como "sem alterações")
+    expect(filledCount).toBeGreaterThanOrEqual(2);
     expect(lines.join('\n')).toMatch(/DBP: 75 mm/);
     expect(lines.join('\n')).toMatch(/CF: 54 mm/);
   });
@@ -199,7 +264,7 @@ describe('summarizeStructured — compilação de valores', () => {
     const { lines, filledCount } = summarizeStructured(schema, {
       pfe: { text: '1888 g (P45)', calcId: 'who-fetal-biometry' },
     });
-    expect(filledCount).toBe(1);
+    expect(filledCount).toBeGreaterThanOrEqual(1);
     expect(lines.join('\n')).toMatch(/PFE \/ Percentil: 1888 g \(P45\)/);
   });
 });

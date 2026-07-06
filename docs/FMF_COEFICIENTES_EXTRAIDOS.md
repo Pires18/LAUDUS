@@ -1,7 +1,59 @@
 # Coeficientes FMF extraídos dos papers (jul/2026)
 
-Fontes fornecidas pelo usuário: Kagan 2008 uog.5331 e uog.5332; Wright 2008
-uog.5299 (mistura TN); Tan 2018 Appendix S1 (uog.19112). Todos em **log10**.
+Fontes fornecidas pelo usuário: Kagan 2008 uog.5331, uog.5332, uog.6123;
+Kagan Hum Reprod 2008 (T13); Wright 2008 uog.5299 (mistura TN); Tan 2018
+Appendix S1 (uog.19112); Wright 2015 AJOG 213:62 (fatores maternos PE);
+O'Gorman 2016 AJOG 214:103 (biomarcadores PE). Todos em **log10**.
+
+## ✅ Status da validação interna (jul/2026)
+
+Todo o código (`fmf/trisomy.ts`, `fmf/trisomyData.ts`, `fmf/preeclampsia.ts`,
+`fmf/preeclampsiaData.ts`) foi **auditado dígito a dígito** contra os textos
+extraídos destes 8 papers — **zero divergências de transcrição encontradas**.
+
+Além da auditoria, `src/test/fmfTrisomy.test.ts` reproduz como testes
+automatizados os **fatos numéricos declarados explicitamente** nos
+abstracts/textos dos papers (não são "casos" individuais, mas resumos
+estatísticos publicados da população estudada):
+- Mediana da TN (componente CRL-independente): euploide 2,0mm / T21 3,4mm /
+  T18 5,5mm / T13 4,0mm — Wright 2008, abstract.
+- Mediana de MoM bioquímico: T21 β-hCG 2,0 / PAPP-A 0,5 — Kagan uog.5331;
+  T18 β-hCG 0,2 / PAPP-A 0,2 — Kagan uog.6123.
+
+Todos batem dentro de tolerância clínica a partir dos coeficientes de
+tabela armazenados — confirma que a lógica do modelo (mistura da TN,
+bivariada da bioquímica, LRs de marcadores, Bayes de riscos competitivos da
+PE com truncamento e covariância comum) está implementada corretamente.
+
+**O que isso NÃO substitui:** comparação caso-a-caso contra a calculadora
+oficial da FMF (bloqueada nesta sessão por indisponibilidade da extensão do
+navegador). `validated: false` permanece como gate de **uso clínico**, não
+de correção de transcrição — que está verificada.
+
+## 4. Correção de IG do risco a priori (Nicolaides 2011, citando Snijders 1999)
+Fonte: Nicolaides KH, "Screening for fetal aneuploidies at 11 to 13 weeks",
+Prenat Diagn 2011;31:7-15. Citação: "the rate of fetal death between 12 weeks
+and term is about 30% for trisomy 21. The rate of fetal death in euploid
+fetuses is only 1 to 2%." Exemplo verificado: mulher de 20 anos tem risco
+≈1:1000 às 12 semanas vs ≈1:1500 ao termo.
+
+Fator derivado: `(1 − 0.015) / (1 − 0.30) ≈ 1.407`, aplicado ao risco de T21
+ao termo para obter o risco basal (a priori) da janela de rastreamento.
+Verificado contra o exemplo citado: nossa tabela dá 1/1450 ao termo para
+20 anos; ×1,407 = 1/1031 ≈ "1:1000" declarado. **IMPLEMENTADO** em
+`ageRelatedRisk()` (`trisomyData.ts`).
+
+⚠️ Fator fixo em ~12 semanas (não varia semana a semana dentro de 11–13+6
+por falta de curva granular em fonte aberta); aplicado só ao T21 (T18/T13
+herdam o mesmo fator, mas sua perda fetal real é conhecidamente maior).
+
+**Lacunas conhecidas, deixadas em aberto por não termos fonte primária exata**
+(não inventamos números para fechá-las):
+- T18/T13: fator de correção de IG específico (herdam o do T21, tendendo a
+  subestimar levemente essas duas).
+- Sub-modelo "parosa sem PE prévia" da pré-eclâmpsia (polinômio de intervalo).
+- LRs de marcadores ecográficos "cruas" (prevalência/prevalência) em vez das
+  ajustadas por correlação com a TN que o FMF usa internamente.
 
 ---
 

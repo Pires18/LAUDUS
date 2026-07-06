@@ -1,4 +1,5 @@
-import { StructuredSection } from '../../../types';
+import { StructuredSection, StructuredFieldDef } from '../../../types';
+import { TIRADS_OPTIONS } from './scoring';
 
 /**
  * Overlays curados por área — sobrepõem o parser genérico da máscara com
@@ -47,10 +48,10 @@ const FETAL_SECTIONS: StructuredSection[] = [
     label: 'Doppler Obstétrico',
     calcId: 'doppler-fetal',
     fields: [
-      { id: 'ip_au', label: 'IP Art. Umbilical', kind: 'measure', calcId: 'doppler-fetal' },
-      { id: 'ip_acm', label: 'IP ACM', kind: 'measure', calcId: 'doppler-fetal' },
-      { id: 'rcp', label: 'RCP (ACM/AU)', kind: 'measure', hint: 'calculado: IP ACM / IP AU' },
-      { id: 'ip_uta', label: 'IP Uterinas (média)', kind: 'measure', calcId: 'doppler-fetal' },
+      { id: 'ip_au', label: 'IP Art. Umbilical', kind: 'measure', calcId: 'doppler-fetal', hint: 'alterado se > p95' },
+      { id: 'ip_acm', label: 'IP ACM', kind: 'measure', calcId: 'doppler-fetal', hint: 'redistribuição se < p5' },
+      { id: 'rcp', label: 'RCP (ACM/AU)', kind: 'measure', hint: 'auto pelo IP ACM/AU; reduzida se < 1' },
+      { id: 'ip_uta', label: 'IP Uterinas (média)', kind: 'measure', calcId: 'doppler-fetal', hint: 'risco se > p95 / notch bilateral' },
       { id: 'ducto_venoso', label: 'Ducto Venoso', kind: 'text', placeholder: 'onda A positiva' },
     ],
   },
@@ -59,8 +60,8 @@ const FETAL_SECTIONS: StructuredSection[] = [
     label: 'Líquido Amniótico',
     calcId: 'amniotic-fluid',
     fields: [
-      { id: 'ila', label: 'ILA', kind: 'measure', unit: 'cm', calcId: 'amniotic-fluid' },
-      { id: 'mbv', label: 'MBV (maior bolsão)', kind: 'measure', unit: 'mm', calcId: 'amniotic-fluid' },
+      { id: 'ila', label: 'ILA', kind: 'measure', unit: 'cm', calcId: 'amniotic-fluid', hint: 'normal 8–18 cm' },
+      { id: 'mbv', label: 'MBV (maior bolsão)', kind: 'measure', unit: 'mm', calcId: 'amniotic-fluid', hint: 'normal 20–80 mm' },
     ],
   },
   {
@@ -81,9 +82,18 @@ const FETAL_SECTIONS: StructuredSection[] = [
   },
   {
     id: 'morfologia',
-    label: 'Morfologia',
+    label: 'Morfologia Fetal',
+    normalable: true,
+    normalText: 'anatomia fetal sem malformações detectáveis à idade gestacional',
     fields: [
-      { id: 'morfologia', label: 'Avaliação morfológica', kind: 'text', placeholder: 'sem anomalias detectáveis nesta idade gestacional' },
+      { id: 'snc', label: 'SNC (crânio/encéfalo)', kind: 'text', placeholder: 'alteração', fullWidth: true },
+      { id: 'face', label: 'Face / perfil', kind: 'text', placeholder: 'alteração' },
+      { id: 'coracao', label: 'Coração (4 câmaras/vias)', kind: 'text', placeholder: 'alteração' },
+      { id: 'torax', label: 'Tórax / pulmões', kind: 'text', placeholder: 'alteração' },
+      { id: 'abdome_fetal', label: 'Parede / abdome', kind: 'text', placeholder: 'alteração' },
+      { id: 'rins_fetais', label: 'Rins / trato urinário', kind: 'text', placeholder: 'alteração' },
+      { id: 'esqueleto', label: 'Coluna / esqueleto', kind: 'text', placeholder: 'alteração' },
+      { id: 'marcadores', label: 'Marcadores de aneuploidia', kind: 'text', placeholder: 'TN, osso nasal, etc.', fullWidth: true },
     ],
   },
 ];
@@ -130,6 +140,8 @@ const VASC_CAROTID: StructuredSection[] = [
   {
     id: 'vertebrais',
     label: 'Artérias Vertebrais',
+    normalable: true,
+    normalText: 'fluxo anterógrado e simétrico bilateralmente',
     fields: [
       { id: 'vert_d', label: 'Fluxo Vertebral Direito', kind: 'select', options: VERT_FLOW },
       { id: 'vert_e', label: 'Fluxo Vertebral Esquerdo', kind: 'select', options: VERT_FLOW },
@@ -297,15 +309,26 @@ const GYN_PELVIC: StructuredSection[] = [
     ],
   },
   {
-    id: 'anexos',
-    label: 'Formação Anexial (O-RADS)',
-    calcId: 'orads-us-2022',
-    fields: [{ id: 'orads', label: 'Classificação O-RADS', kind: 'calc', calcId: 'orads-us-2022' }],
+    id: 'formacoes',
+    label: 'Formações Anexiais (O-RADS)',
+    repeatable: true,
+    itemLabel: 'Formação',
+    fields: [
+      { id: 'lado', label: 'Lado', kind: 'select', options: ['ovário direito', 'ovário esquerdo', 'extra-ovariana'] },
+      { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+      { id: 'tipo', label: 'Tipo', kind: 'select', options: ['unilocular', 'unilocular sólida', 'multilocular', 'multilocular sólida', 'sólida'] },
+      { id: 'conteudo', label: 'Conteúdo', kind: 'select', options: ['anecoico', 'de vidro fosco', 'hemorrágico', 'espesso/heterogêneo'] },
+      { id: 'septos', label: 'Septos / projeções', kind: 'select', options: ['ausentes', 'septos finos', 'septos espessos', 'projeções papilares'] },
+      { id: 'vascularizacao', label: 'Fluxo (color score)', kind: 'select', options: ['1 – ausente', '2 – mínimo', '3 – moderado', '4 – marcante'] },
+      { id: 'orads', label: 'Categoria O-RADS', kind: 'select', options: ['O-RADS 1', 'O-RADS 2', 'O-RADS 3', 'O-RADS 4', 'O-RADS 5'] },
+    ],
   },
   {
     id: 'douglas',
     label: 'Fundo de Saco de Douglas',
-    fields: [{ id: 'douglas', label: 'Douglas', kind: 'select', options: ['livre', 'líquido livre em pequena quantidade', 'coleção'] }],
+    normalable: true,
+    normalText: 'livre',
+    fields: [{ id: 'douglas', label: 'Conteúdo', kind: 'select', options: ['líquido livre em pequena quantidade', 'líquido livre moderado/volumoso', 'coleção organizada'] }],
   },
 ];
 
@@ -337,6 +360,13 @@ function gynecoOverlay(examName?: string): StructuredSection[] {
 const ACR_COMPOSITION = ['ACR A (adiposa)', 'ACR B (fibroglandular esparsa)', 'ACR C (heterogeneamente densa)', 'ACR D (densa)'];
 const LN_ASPECT = ['normal', 'reativo/benigno', 'suspeito'];
 
+const BIRADS_CAT = ['BI-RADS 1', 'BI-RADS 2', 'BI-RADS 3', 'BI-RADS 4A', 'BI-RADS 4B', 'BI-RADS 4C', 'BI-RADS 5', 'BI-RADS 6'];
+const MAMA_SHAPE = ['oval', 'redonda', 'irregular'];
+const MAMA_ORIENT = ['paralela', 'não paralela (mais alta que larga)'];
+const MAMA_MARGIN = ['circunscrita', 'indistinta', 'angular', 'microlobulada', 'espiculada'];
+const MAMA_ECHO = ['anecoico', 'hipoecoico', 'isoecoico', 'hiperecoico', 'heterogêneo', 'complexo cístico-sólido'];
+const MAMA_ACOUSTIC = ['nenhuma', 'reforço acústico posterior', 'sombra acústica', 'padrão combinado'];
+
 const MAMA_STD: StructuredSection[] = [
   {
     id: 'composicao',
@@ -344,31 +374,33 @@ const MAMA_STD: StructuredSection[] = [
     fields: [{ id: 'acr', label: 'Densidade (ACR)', kind: 'select', options: ACR_COMPOSITION }],
   },
   {
-    id: 'mama-d',
-    label: 'Mama Direita',
-    calcId: 'birads-us-2013',
+    id: 'lesoes',
+    label: 'Nódulos / Lesões (BI-RADS)',
+    repeatable: true,
+    itemLabel: 'Lesão',
     fields: [
-      { id: 'md_loc', label: 'Localização (h / dist. papila)', kind: 'text', placeholder: 'ex: 10h, 3 cm da papila' },
-      { id: 'md_dims', label: 'Dimensões do nódulo', kind: 'triplet', unit: 'cm' },
-      { id: 'md_morf', label: 'Morfologia', kind: 'text', placeholder: 'forma, orientação, margens, ecogenicidade' },
-      { id: 'md_birads', label: 'BI-RADS', kind: 'calc', calcId: 'birads-us-2013' },
-    ],
-  },
-  {
-    id: 'mama-e',
-    label: 'Mama Esquerda',
-    calcId: 'birads-us-2013',
-    fields: [
-      { id: 'me_loc', label: 'Localização (h / dist. papila)', kind: 'text', placeholder: 'ex: 2h, 4 cm da papila' },
-      { id: 'me_dims', label: 'Dimensões do nódulo', kind: 'triplet', unit: 'cm' },
-      { id: 'me_morf', label: 'Morfologia', kind: 'text', placeholder: 'forma, orientação, margens, ecogenicidade' },
-      { id: 'me_birads', label: 'BI-RADS', kind: 'calc', calcId: 'birads-us-2013' },
+      { id: 'mama', label: 'Mama', kind: 'select', options: ['direita', 'esquerda'] },
+      { id: 'loc', label: 'Localização (h / dist. papila)', kind: 'text', placeholder: 'ex: 10h, 3 cm da papila' },
+      { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+      { id: 'forma', label: 'Forma', kind: 'select', options: MAMA_SHAPE },
+      { id: 'orientacao', label: 'Orientação', kind: 'select', options: MAMA_ORIENT },
+      { id: 'margem', label: 'Margem', kind: 'select', options: MAMA_MARGIN },
+      { id: 'eco', label: 'Padrão ecogênico', kind: 'select', options: MAMA_ECHO },
+      { id: 'acusticas', label: 'Características acústicas', kind: 'select', options: MAMA_ACOUSTIC },
+      { id: 'birads', label: 'Categoria BI-RADS', kind: 'select', options: BIRADS_CAT },
     ],
   },
   {
     id: 'axilas',
     label: 'Regiões Axilares',
-    fields: [{ id: 'axilas', label: 'Linfonodos axilares', kind: 'text', placeholder: 'sem linfonodomegalias suspeitas' }],
+    normalable: true,
+    normalText: 'linfonodos axilares de aspecto habitual',
+    fields: [
+      { id: 'axila_lado', label: 'Axila', kind: 'select', options: ['direita', 'esquerda', 'bilateral'] },
+      { id: 'axila_maior', label: 'Maior linfonodo', kind: 'measure', unit: 'mm' },
+      { id: 'axila_cortical', label: 'Cortical', kind: 'measure', unit: 'mm' },
+      { id: 'axila_susp', label: 'Achados suspeitos', kind: 'text', placeholder: 'perda do hilo, cortical > 3 mm...' },
+    ],
   },
 ];
 
@@ -415,18 +447,36 @@ const PP_THYROID: StructuredSection[] = [
     fields: [{ id: 'lobo_e_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' }],
   },
   { id: 'istmo', label: 'Istmo', fields: [{ id: 'istmo', label: 'Espessura', kind: 'measure', unit: 'mm' }] },
-  { id: 'parenquima', label: 'Parênquima', fields: [{ id: 'parenquima', label: 'Ecotextura', kind: 'text', placeholder: 'homogêneo, ecogenicidade normal' }] },
   {
-    id: 'nodulo',
-    label: 'Nódulo (ACR TI-RADS)',
-    calcId: 'tirads-2017',
+    id: 'parenquima', label: 'Parênquima', normalable: true, normalText: 'ecotextura homogênea, ecogenicidade normal',
     fields: [
-      { id: 'nodulo_loc', label: 'Localização', kind: 'text', placeholder: 'lobo/terço' },
-      { id: 'nodulo_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm' },
-      { id: 'nodulo_tirads', label: 'Classificação TI-RADS', kind: 'calc', calcId: 'tirads-2017' },
+      { id: 'parenquima_eco', label: 'Ecotextura', kind: 'select', options: ['homogênea', 'heterogênea', 'micronodular difusa'] },
+      { id: 'parenquima_vasc', label: 'Vascularização', kind: 'select', options: ['normal', 'aumentada (tireoidite)', 'reduzida'] },
     ],
   },
-  { id: 'linfonodos', label: 'Linfonodos Cervicais', fields: [{ id: 'linfonodos', label: 'Cadeias', kind: 'text', placeholder: 'sem linfonodomegalias suspeitas' }] },
+  {
+    id: 'nodulos',
+    label: 'Nódulos (ACR TI-RADS)',
+    repeatable: true,
+    itemLabel: 'Nódulo',
+    score: 'tirads',
+    fields: [
+      { id: 'loc', label: 'Localização', kind: 'text', placeholder: 'lobo / terço' },
+      { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+      { id: 'composicao', label: 'Composição', kind: 'select', options: TIRADS_OPTIONS.composition, scoreKey: 'composition' },
+      { id: 'ecogenicidade', label: 'Ecogenicidade', kind: 'select', options: TIRADS_OPTIONS.echogenicity, scoreKey: 'echogenicity' },
+      { id: 'forma', label: 'Forma', kind: 'select', options: TIRADS_OPTIONS.shape, scoreKey: 'shape' },
+      { id: 'margem', label: 'Margem', kind: 'select', options: TIRADS_OPTIONS.margin, scoreKey: 'margin' },
+      { id: 'focos', label: 'Focos ecogênicos', kind: 'select', options: TIRADS_OPTIONS.foci, scoreKey: 'foci' },
+    ],
+  },
+  {
+    id: 'linfonodos', label: 'Linfonodos Cervicais', normalable: true, normalText: 'cadeias sem linfonodomegalias suspeitas',
+    fields: [
+      { id: 'ln_nivel', label: 'Nível / cadeia', kind: 'text', placeholder: 'ex: nível III direito' },
+      { id: 'ln_carac', label: 'Características suspeitas', kind: 'text', placeholder: 'perda do hilo, microcalcificações...' },
+    ],
+  },
 ];
 
 const PP_CERVICAL: StructuredSection[] = [
@@ -436,9 +486,12 @@ const PP_CERVICAL: StructuredSection[] = [
   {
     id: 'linfonodos',
     label: 'Cadeias Linfonodais (I–VII)',
+    normalable: true,
+    normalText: 'sem linfonodomegalias suspeitas',
     fields: [
-      { id: 'linfonodos_asp', label: 'Aspecto', kind: 'select', options: ['sem linfonodomegalias', 'linfonodos reativos', 'linfonodo suspeito'] },
+      { id: 'linfonodos_asp', label: 'Aspecto', kind: 'select', options: ['linfonodos reativos', 'linfonodo suspeito'] },
       { id: 'linfonodo_maior', label: 'Maior linfonodo', kind: 'measure', unit: 'mm' },
+      { id: 'linfonodo_nivel', label: 'Nível / lado', kind: 'text', placeholder: 'ex: nível II direito' },
     ],
   },
 ];
@@ -516,19 +569,32 @@ function pequenasPartesOverlay(examName?: string): StructuredSection[] {
 // ── MEDICINA INTERNA / ABDOME (Etapa 4) ──
 
 const MI_ABDOME: StructuredSection[] = [
-  { id: 'figado', label: 'Fígado', fields: [
-    { id: 'figado', label: 'Parênquima / dimensões', kind: 'text', placeholder: 'dimensões normais, ecotextura homogênea' },
+  { id: 'figado', label: 'Fígado', normalable: true, normalText: 'dimensões normais, ecotextura homogênea, sem lesões focais', fields: [
+    { id: 'esteatose', label: 'Esteatose', kind: 'select', options: ['ausente', 'leve (grau I)', 'moderada (grau II)', 'acentuada (grau III)'] },
+    { id: 'contornos', label: 'Contornos', kind: 'select', options: ['regulares', 'irregulares/nodulares'] },
+    { id: 'lesao_focal', label: 'Lesão focal', kind: 'text', placeholder: 'localização, dimensões, aspecto', fullWidth: true },
     { id: 'porta', label: 'Veia porta', kind: 'text', placeholder: 'calibre normal, fluxo hepatopeta' },
   ] },
-  { id: 'vias-biliares', label: 'Vias Biliares / Vesícula', fields: [
+  { id: 'vias-biliares', label: 'Vias Biliares / Vesícula', normalable: true, normalText: 'vesícula de paredes finas sem cálculos; vias não dilatadas', fields: [
+    { id: 'vesicula', label: 'Vesícula', kind: 'select', options: ['cálculo(s)', 'lama biliar', 'pólipo', 'espessamento parietal', 'colecistectomizado'] },
+    { id: 'calculo_maior', label: 'Maior cálculo', kind: 'measure', unit: 'mm' },
     { id: 'coledoco', label: 'Colédoco', kind: 'measure', unit: 'mm' },
-    { id: 'vesicula', label: 'Vesícula biliar', kind: 'text', placeholder: 'paredes finas, sem cálculos' },
   ] },
-  { id: 'pancreas', label: 'Pâncreas', fields: [{ id: 'pancreas', label: 'Aspecto', kind: 'text', placeholder: 'dimensões e ecotextura normais' }] },
-  { id: 'baco', label: 'Baço', fields: [{ id: 'baco', label: 'Maior eixo', kind: 'measure', unit: 'cm' }] },
-  { id: 'rins', label: 'Rins', fields: [{ id: 'rins', label: 'Aspecto', kind: 'text', placeholder: 'dimensões normais, sem hidronefrose/cálculos' }] },
-  { id: 'aorta', label: 'Aorta / VCI', fields: [
-    { id: 'aorta', label: 'Calibre da aorta', kind: 'measure', unit: 'cm' },
+  { id: 'pancreas', label: 'Pâncreas', normalable: true, normalText: 'dimensões e ecotextura normais', fields: [
+    { id: 'pancreas', label: 'Aspecto', kind: 'text', placeholder: 'descrever alteração' },
+    { id: 'wirsung', label: 'Ducto de Wirsung', kind: 'measure', unit: 'mm' },
+  ] },
+  { id: 'baco', label: 'Baço', normalable: true, normalText: 'dimensões normais, homogêneo', fields: [
+    { id: 'baco_eixo', label: 'Maior eixo', kind: 'measure', unit: 'cm' },
+    { id: 'baco_desc', label: 'Achados', kind: 'text', placeholder: 'lesão focal / esplenomegalia' },
+  ] },
+  { id: 'rins', label: 'Rins', normalable: true, normalText: 'dimensões normais, sem hidronefrose ou cálculos', fields: [
+    { id: 'litiase', label: 'Litíase', kind: 'text', placeholder: 'lado, localização, maior cálculo' },
+    { id: 'hidronefrose', label: 'Dilatação (SFU)', kind: 'select', options: ['ausente', 'SFU I', 'SFU II', 'SFU III', 'SFU IV'] },
+    { id: 'cisto', label: 'Cistos / lesões', kind: 'text', placeholder: 'Bosniak se aplicável', fullWidth: true },
+  ] },
+  { id: 'aorta', label: 'Aorta / VCI', normalable: true, normalText: 'aorta de calibre normal', fields: [
+    { id: 'aorta', label: 'Calibre da aorta', kind: 'measure', unit: 'cm', hint: 'aneurisma se ≥ 3,0 cm' },
     { id: 'vci', label: 'VCI (colapsabilidade)', kind: 'calc', calcId: 'ivc-index' },
   ] },
   { id: 'referencias', label: 'Valores de Referência', calcId: 'organ-refs', fields: [
@@ -573,6 +639,238 @@ function medicinaInternaOverlay(examName?: string): StructuredSection[] {
   return MI_ABDOME;
 }
 
+// ── MUSCULOESQUELÉTICO (Etapa 5) — genérico (serve às articulações) ──
+
+const TENDON_STATE = ['íntegro', 'tendinopatia', 'ruptura parcial', 'ruptura completa'];
+const EFFUSION = ['ausente', 'pequeno', 'moderado', 'volumoso'];
+const SEMIQ = ['0 (ausente)', '1 (leve)', '2 (moderado)', '3 (acentuado)'];
+
+const MSK_GENERIC: StructuredSection[] = [
+  { id: 'regiao', label: 'Região / Articulação Avaliada', fields: [{ id: 'regiao', label: 'Local', kind: 'text', placeholder: 'ex: ombro direito' }] },
+  {
+    id: 'tendoes',
+    label: 'Tendões',
+    fields: [
+      { id: 'tendao', label: 'Tendão avaliado', kind: 'text', placeholder: 'ex: supraespinal' },
+      { id: 'tendao_estado', label: 'Integridade', kind: 'select', options: TENDON_STATE },
+    ],
+  },
+  {
+    id: 'articulacao',
+    label: 'Articulação',
+    fields: [
+      { id: 'derrame', label: 'Derrame articular', kind: 'select', options: EFFUSION },
+      { id: 'sinovite', label: 'Sinovite (modo B)', kind: 'select', options: ['ausente', 'presente'] },
+    ],
+  },
+  { id: 'bursa', label: 'Bursas', normalable: true, normalText: 'sem bursopatia', fields: [{ id: 'bursa', label: 'Achados', kind: 'text', placeholder: 'bursa distendida, conteúdo' }] },
+  { id: 'nervo', label: 'Nervos Periféricos', normalable: true, normalText: 'sem sinais compressivos', fields: [{ id: 'nervo', label: 'Achados', kind: 'text', placeholder: 'ex: mediano no túnel do carpo' }] },
+  {
+    id: 'colecoes',
+    label: 'Cistos / Coleções',
+    repeatable: true,
+    itemLabel: 'Achado',
+    fields: [
+      { id: 'loc', label: 'Localização', kind: 'text', placeholder: 'plano/região' },
+      { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+      { id: 'carac', label: 'Características', kind: 'text', placeholder: 'conteúdo, margens, Doppler' },
+    ],
+  },
+  { id: 'power-doppler', label: 'Power Doppler', normalable: true, normalText: 'sem hiperemia', fields: [{ id: 'power_doppler', label: 'Grau (0–3)', kind: 'select', options: SEMIQ }] },
+];
+
+// ── REUMATOLÓGICO (Etapa 5) — escores EULAR-OMERACT ──
+
+const REUMATO_PERIPH: StructuredSection[] = [
+  {
+    id: 'articulacoes',
+    label: 'Articulações (GSUS / PDUS)',
+    repeatable: true,
+    itemLabel: 'Articulação',
+    fields: [
+      { id: 'nome', label: 'Articulação', kind: 'text', placeholder: 'ex: MCF 2 direita' },
+      { id: 'gsus', label: 'Sinovite GSUS (0–3)', kind: 'select', options: SEMIQ },
+      { id: 'pdus', label: 'Power Doppler (0–3)', kind: 'select', options: SEMIQ },
+      { id: 'derrame', label: 'Derrame', kind: 'select', options: EFFUSION },
+      { id: 'erosao', label: 'Erosão', kind: 'select', options: ['ausente', 'presente'] },
+    ],
+  },
+  { id: 'enteses', label: 'Ênteses e Tendões', normalable: true, normalText: 'sem entesopatia ou tenossinovite', fields: [{ id: 'enteses', label: 'Achados', kind: 'text', placeholder: 'espessamento, PD, erosão na inserção' }] },
+];
+
+const REUMATO_SI: StructuredSection[] = [
+  { id: 'si-d', label: 'Sacroilíaca Direita', fields: [
+    { id: 'si_d_pdus', label: 'Power Doppler (0–3)', kind: 'select', options: SEMIQ },
+    { id: 'si_d_desc', label: 'Achados', kind: 'text', placeholder: 'irregularidade/erosão' },
+  ] },
+  { id: 'si-e', label: 'Sacroilíaca Esquerda', fields: [
+    { id: 'si_e_pdus', label: 'Power Doppler (0–3)', kind: 'select', options: SEMIQ },
+    { id: 'si_e_desc', label: 'Achados', kind: 'text', placeholder: 'irregularidade/erosão' },
+  ] },
+  { id: 'enteses', label: 'Ênteses Pélvicas', fields: [{ id: 'enteses', label: 'Inserções', kind: 'text', placeholder: 'sem entesopatia' }] },
+];
+
+const REUMATO_PDUS28: StructuredSection[] = [
+  { id: 'protocolo', label: 'Protocolo PDUS-28', fields: [{ id: 'protocolo', label: 'Articulações do protocolo', kind: 'text', placeholder: 'listar as avaliadas' }] },
+  { id: 'gsus', label: 'Sinovite GSUS (0–3) por região', fields: [{ id: 'gsus_regioes', label: 'GSUS por região', kind: 'text', placeholder: 'ex: MCF2 D: 2; punho E: 1' }] },
+  { id: 'pdus', label: 'Power Doppler (0–3) por região', fields: [{ id: 'pdus_regioes', label: 'PDUS por região', kind: 'text', placeholder: 'ex: MCF2 D: 1' }] },
+  { id: 'gloess', label: 'Escore Combinado', fields: [{ id: 'gloess', label: 'GLOESS', kind: 'measure' }] },
+  { id: 'atividade', label: 'Articulações com Atividade (PD ≥1)', fields: [{ id: 'atividade', label: 'Quais', kind: 'text', placeholder: 'listar' }] },
+  { id: 'erosoes', label: 'Erosões', fields: [{ id: 'erosoes', label: 'Erosões', kind: 'text', placeholder: 'ausentes / descrever' }] },
+];
+
+function reumatoOverlay(examName?: string): StructuredSection[] {
+  const n = (examName || '').toLowerCase();
+  if (/sacroil/.test(n)) return REUMATO_SI;
+  if (/pdus|escore/.test(n)) return REUMATO_PDUS28;
+  return REUMATO_PERIPH;
+}
+
+// ── PEDIATRIA (Etapa 6) ──
+
+const GRAF_TYPES = ['I (normal)', 'IIa', 'IIb', 'IIc', 'D (descentrando)', 'III', 'IV'];
+const SFU = ['ausente', 'SFU I', 'SFU II', 'SFU III', 'SFU IV'];
+const TEST_FLOW = ['presente/simétrico', 'reduzido', 'ausente (suspeita de torção)'];
+
+const PED_TRANSFONT: StructuredSection[] = [
+  { id: 'parenquima', label: 'Parênquima Supratentorial', fields: [{ id: 'parenquima', label: 'Aspecto', kind: 'text', placeholder: 'ecogenicidade normal, sem hemorragia' }] },
+  { id: 'ventriculos', label: 'Sistema Ventricular', fields: [
+    { id: 'atrio_ventricular', label: 'Átrio ventricular', kind: 'measure', unit: 'mm' },
+    { id: 'ventriculos_asp', label: 'Aspecto', kind: 'text', placeholder: 'simétrico, não dilatado' },
+  ] },
+  { id: 'linha-media', label: 'Linha Média / Núcleos', fields: [{ id: 'linha_media', label: 'Aspecto', kind: 'text', placeholder: 'centrada; núcleos e tálamos normais' }] },
+  { id: 'fossa-posterior', label: 'Fossa Posterior', fields: [{ id: 'fossa_posterior', label: 'Aspecto', kind: 'text', placeholder: 'cerebelo e cisterna magna normais' }] },
+  { id: 'doppler', label: 'Dopplerfluxometria', fields: [{ id: 'ir', label: 'IR (ACA)', kind: 'measure' }] },
+];
+
+const PED_SPINE: StructuredSection[] = [
+  { id: 'cone', label: 'Cone Medular', fields: [{ id: 'nivel_cone', label: 'Nível do cone', kind: 'text', placeholder: 'ex: L1-L2' }] },
+  { id: 'filum', label: 'Filum / Raízes', fields: [{ id: 'filum', label: 'Aspecto', kind: 'text', placeholder: 'filum fino, raízes livres' }] },
+  { id: 'canal', label: 'Canal Espinhal', fields: [{ id: 'canal', label: 'Arcos posteriores', kind: 'text', placeholder: 'íntegros' }] },
+  { id: 'partes-moles', label: 'Partes Moles / Pele', fields: [{ id: 'partes_moles', label: 'Aspecto', kind: 'text', placeholder: 'sem disrafismo/coleção' }] },
+];
+
+const PED_HIP: StructuredSection[] = [
+  { id: 'quadril-d', label: 'Quadril Direito (Graf)', fields: [
+    { id: 'alfa_d', label: 'Ângulo α', kind: 'measure', unit: '°' },
+    { id: 'beta_d', label: 'Ângulo β', kind: 'measure', unit: '°' },
+    { id: 'graf_d', label: 'Tipo de Graf', kind: 'select', options: GRAF_TYPES },
+  ] },
+  { id: 'quadril-e', label: 'Quadril Esquerdo (Graf)', fields: [
+    { id: 'alfa_e', label: 'Ângulo α', kind: 'measure', unit: '°' },
+    { id: 'beta_e', label: 'Ângulo β', kind: 'measure', unit: '°' },
+    { id: 'graf_e', label: 'Tipo de Graf', kind: 'select', options: GRAF_TYPES },
+  ] },
+  { id: 'estabilidade', label: 'Estabilidade (manobras)', fields: [{ id: 'estabilidade', label: 'Estabilidade', kind: 'select', options: ['estável', 'frouxidão', 'instável/luxável'] }] },
+];
+
+const PED_SCROTUM: StructuredSection[] = [
+  { id: 'testiculo-d', label: 'Testículo Direito', calcId: 'volume-elipsoide', fields: [
+    { id: 'test_d_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+    { id: 'test_d_fluxo', label: 'Fluxo', kind: 'select', options: TEST_FLOW },
+  ] },
+  { id: 'testiculo-e', label: 'Testículo Esquerdo', calcId: 'volume-elipsoide', fields: [
+    { id: 'test_e_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+    { id: 'test_e_fluxo', label: 'Fluxo', kind: 'select', options: TEST_FLOW },
+  ] },
+  { id: 'epididimos', label: 'Epidídimos / Apêndices', fields: [{ id: 'epididimos', label: 'Aspecto', kind: 'text', placeholder: 'normais; apêndices sem torção' }] },
+];
+
+const PED_ABDOME: StructuredSection[] = [
+  { id: 'figado', label: 'Fígado / Baço', fields: [{ id: 'figado', label: 'Aspecto', kind: 'text', placeholder: 'dimensões e ecotextura normais' }] },
+  { id: 'vias-vesicula', label: 'Vias Biliares / Vesícula / Pâncreas', fields: [{ id: 'vias_vesicula', label: 'Aspecto', kind: 'text', placeholder: 'sem alterações' }] },
+  { id: 'rins', label: 'Rins', fields: [{ id: 'rins', label: 'Aspecto', kind: 'text', placeholder: 'dimensões adequadas à idade, sem dilatação' }] },
+  { id: 'adrenais', label: 'Adrenais', fields: [{ id: 'adrenais', label: 'Aspecto', kind: 'text', placeholder: 'sem alterações' }] },
+  { id: 'bexiga', label: 'Bexiga', fields: [{ id: 'bexiga', label: 'Aspecto', kind: 'text', placeholder: 'paredes finas' }] },
+];
+
+const PED_KIDNEY: StructuredSection[] = [
+  { id: 'rim-d', label: 'Rim Direito', fields: [
+    { id: 'rim_d_dims', label: 'Comprimento', kind: 'measure', unit: 'cm' },
+    { id: 'rim_d_dilat', label: 'Dilatação (SFU)', kind: 'select', options: SFU },
+  ] },
+  { id: 'rim-e', label: 'Rim Esquerdo', fields: [
+    { id: 'rim_e_dims', label: 'Comprimento', kind: 'measure', unit: 'cm' },
+    { id: 'rim_e_dilat', label: 'Dilatação (SFU)', kind: 'select', options: SFU },
+  ] },
+  { id: 'ureteres', label: 'Ureteres', fields: [{ id: 'ureteres', label: 'Aspecto', kind: 'text', placeholder: 'não dilatados' }] },
+  { id: 'bexiga', label: 'Bexiga', fields: [{ id: 'bexiga', label: 'Aspecto', kind: 'text', placeholder: 'paredes finas, conteúdo anecoico' }] },
+];
+
+function pediatriaOverlay(examName?: string): StructuredSection[] {
+  const n = (examName || '').toLowerCase();
+  if (/transfontanelar/.test(n)) return PED_TRANSFONT;
+  if (/coluna/.test(n)) return PED_SPINE;
+  if (/quadril/.test(n)) return PED_HIP;
+  if (/escroto/.test(n)) return PED_SCROTUM;
+  if (/rins|urin[áa]ri/.test(n)) return PED_KIDNEY;
+  return PED_ABDOME;
+}
+
+// ── PROCEDIMENTOS (Etapa 6) ──
+
+const PROC_CONTROLE = ['sem intercorrências', 'hematoma local', 'sangramento', 'outro'];
+
+const PROC_TARGET_FIELDS: StructuredFieldDef[] = [
+  { id: 'alvo_loc', label: 'Alvo / localização', kind: 'text', placeholder: 'estrutura e localização' },
+  { id: 'alvo_dims', label: 'Dimensões do alvo', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+];
+const PROC_TAIL: StructuredSection[] = [
+  { id: 'tecnica', label: 'Técnica', fields: [{ id: 'tecnica', label: 'Agulha / via / passagens', kind: 'text', placeholder: 'ex: agulha 22G, via anterior, 3 passagens' }] },
+  { id: 'material', label: 'Material Coletado', fields: [{ id: 'material', label: 'Amostra', kind: 'text', placeholder: 'nº fragmentos / aspirado enviado' }] },
+  { id: 'controle', label: 'Controle Pós-procedimento', fields: [
+    { id: 'controle_pos', label: 'Status', kind: 'select', options: PROC_CONTROLE },
+    { id: 'controle_obs', label: 'Observações', kind: 'text', placeholder: 'orientações/curativo' },
+  ] },
+];
+
+const PROC_GENERIC: StructuredSection[] = [
+  { id: 'alvo', label: 'Lesão / Estrutura-alvo', calcId: 'volume-elipsoide', fields: PROC_TARGET_FIELDS },
+  ...PROC_TAIL,
+];
+
+const PROC_THYROID: StructuredSection[] = [
+  { id: 'alvo', label: 'Nódulo-alvo (ACR TI-RADS)', calcId: 'tirads-2017', fields: [
+    { id: 'alvo_loc', label: 'Localização', kind: 'text', placeholder: 'lobo/terço' },
+    { id: 'alvo_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm' },
+    { id: 'tirads', label: 'Classificação TI-RADS', kind: 'calc', calcId: 'tirads-2017' },
+  ] },
+  ...PROC_TAIL,
+];
+
+const PROC_BREAST: StructuredSection[] = [
+  { id: 'alvo', label: 'Lesão-alvo (BI-RADS)', calcId: 'birads-us-2013', fields: [
+    { id: 'alvo_loc', label: 'Localização (h / dist. papila)', kind: 'text', placeholder: 'ex: 10h, 3 cm da papila' },
+    { id: 'alvo_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm' },
+    { id: 'birads', label: 'BI-RADS', kind: 'calc', calcId: 'birads-us-2013' },
+  ] },
+  ...PROC_TAIL,
+];
+
+const PROC_OBSTETRIC: StructuredSection[] = [
+  { id: 'pre', label: 'Avaliação Pré-procedimento', fields: [
+    { id: 'placenta', label: 'Placenta', kind: 'text', placeholder: 'localização' },
+    { id: 'la', label: 'Líquido amniótico', kind: 'text', placeholder: 'normal' },
+    { id: 'vitalidade', label: 'Vitalidade fetal', kind: 'text', placeholder: 'BCF presente' },
+  ] },
+  { id: 'tecnica', label: 'Descrição do Procedimento', fields: [
+    { id: 'tecnica', label: 'Técnica de punção', kind: 'text', placeholder: 'via/agulha' },
+    { id: 'amostra', label: 'Amostra coletada', kind: 'text', placeholder: 'volume/aspecto' },
+  ] },
+  { id: 'controle', label: 'Avaliação Pós / Intercorrências', fields: [
+    { id: 'controle_pos', label: 'Status', kind: 'select', options: PROC_CONTROLE },
+    { id: 'intercorrencias', label: 'Intercorrências', kind: 'text', placeholder: 'ausentes' },
+  ] },
+];
+
+function procedimentosOverlay(examName?: string): StructuredSection[] {
+  const n = (examName || '').toLowerCase();
+  if (/paaf\s+tireoide|tireoide/.test(n)) return PROC_THYROID;
+  if (/paaf\s+mama|mama/.test(n)) return PROC_BREAST;
+  if (/amnio|vilo\s+cori/.test(n)) return PROC_OBSTETRIC;
+  return PROC_GENERIC;
+}
+
 export function getAreaOverlay(area: string, examName?: string): StructuredSection[] | null {
   if (area === 'medicina-fetal') return FETAL_SECTIONS;
   if (area === 'vascular') return vascularOverlay(examName);
@@ -580,9 +878,17 @@ export function getAreaOverlay(area: string, examName?: string): StructuredSecti
   if (area === 'mastologia') return mastologiaOverlay(examName);
   if (area === 'pequenas-partes') return pequenasPartesOverlay(examName);
   if (area === 'medicina-interna') return medicinaInternaOverlay(examName);
+  if (area === 'musculoesqueletico') return MSK_GENERIC;
+  if (area === 'reumatologico') return reumatoOverlay(examName);
+  if (area === 'pediatria') return pediatriaOverlay(examName);
+  if (area === 'procedimentos') return procedimentosOverlay(examName);
   return null;
 }
 
 export function hasAreaOverlay(area: string): boolean {
-  return ['medicina-fetal', 'vascular', 'ginecologia', 'mastologia', 'pequenas-partes', 'medicina-interna'].includes(area);
+  return [
+    'medicina-fetal', 'vascular', 'ginecologia', 'mastologia',
+    'pequenas-partes', 'medicina-interna', 'musculoesqueletico', 'reumatologico',
+    'pediatria', 'procedimentos',
+  ].includes(area);
 }

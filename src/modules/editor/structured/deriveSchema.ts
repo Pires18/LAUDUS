@@ -6,6 +6,7 @@ import {
   StructuredFieldValue,
 } from '../../../types';
 import { getAreaOverlay } from './areaOverlays';
+import { sectionState, itemCount, itemFieldId } from './structuredKeys';
 
 /** Placeholders de preenchimento usados nas máscaras (fetal `(...)` / não-fetal `[__]`). */
 const PLACEHOLDER_RE = /\(\.\.\.\)|\(…\)|\[_{2,}\]|\[inserir\]/g;
@@ -94,10 +95,16 @@ export function fieldValueToText(v: StructuredFieldValue | undefined): string {
   return (v.text || '').trim();
 }
 
+function withUnit(field: StructuredFieldDef, text: string): string {
+  const unit = field.unit && !new RegExp(`${field.unit}\\b`).test(text) ? ` ${field.unit}` : '';
+  return `${text}${unit}`;
+}
+
 /**
  * Resume os campos preenchidos numa lista `rótulo: valor unidade`, pronta para
- * compor a instrução `[DADOS ESTRUTURADOS]`. Retorna também a contagem de
- * campos preenchidos (para habilitar o botão de compilar).
+ * compor a instrução `[DADOS ESTRUTURADOS]`. Lida com seções Normal/Alterado
+ * (emite "normal") e seções repetíveis (itera instâncias). Retorna também a
+ * contagem de itens preenchidos (habilita o botão de compilar).
  */
 export function summarizeStructured(
   schema: StructuredSchema,
@@ -108,13 +115,42 @@ export function summarizeStructured(
   const vals = values || {};
 
   for (const section of schema.sections) {
+    // Seção normalable em estado 'normal' → emite normalidade e segue.
+    if (section.normalable && sectionState(vals, section.id) === 'normal') {
+      lines.push(`${section.label}: sem alterações${section.normalText ? ` (${section.normalText})` : ''}`);
+      filledCount++;
+      continue;
+    }
+
+    if (section.repeatable) {
+      const n = itemCount(vals, section.id);
+      const block: string[] = [];
+      for (let i = 0; i < n; i++) {
+        const itemLines: string[] = [];
+        for (const field of section.fields) {
+          const text = fieldValueToText(vals[itemFieldId(section.id, i, field.id)]);
+          if (!text) continue;
+          filledCount++;
+          itemLines.push(`    - ${field.label}: ${withUnit(field, text)}`);
+        }
+        if (itemLines.length) {
+          block.push(`  ${section.itemLabel || 'Item'} ${i + 1}:`);
+          block.push(...itemLines);
+        }
+      }
+      if (block.length) {
+        lines.push(`${section.label}:`);
+        lines.push(...block);
+      }
+      continue;
+    }
+
     const sectionLines: string[] = [];
     for (const field of section.fields) {
       const text = fieldValueToText(vals[field.id]);
       if (!text) continue;
       filledCount++;
-      const unit = field.unit && !new RegExp(`${field.unit}\\b`).test(text) ? ` ${field.unit}` : '';
-      sectionLines.push(`  - ${field.label}: ${text}${unit}`);
+      sectionLines.push(`  - ${field.label}: ${withUnit(field, text)}`);
     }
     if (sectionLines.length) {
       lines.push(`${section.label}:`);

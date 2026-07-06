@@ -4,6 +4,7 @@ import {
   DEFAULT_PE_THRESHOLDS, type PeMaternalFactors, type PeBiomarkers,
 } from '../modules/calculators/fmf/preeclampsia';
 import { PROVISIONAL_PE_COEFFICIENTS, PE_BIOMARKER_MODEL } from '../modules/calculators/fmf/preeclampsiaData';
+import { formatOneInN } from '../modules/calculators/fmf/qc';
 
 const C = PROVISIONAL_PE_COEFFICIENTS;
 const M = PE_BIOMARKER_MODEL;
@@ -89,6 +90,19 @@ describe('conduta', () => {
   it('cutoff de AAS configurável', () => {
     const r = computePreeclampsiaRisk(reference, noBio, C, M, { ...DEFAULT_PE_THRESHOLDS, aspirinCutoffOneInN: 100000 });
     expect(r.aspirinRecommended).toBe(true);
+  });
+});
+
+describe('teto de exibição do risco "1:N" (mesma convenção da calculadora FMF)', () => {
+  it('gestante de risco muito baixo tem o denominador travado em ">1:10.000"', () => {
+    // Referência sem nenhuma comorbidade e biomarcadores todos protetores.
+    const r = risk(reference, { mapMoM: 0.85, utaPiMoM: 0.7, plgfMoM: 2.0 });
+    if (r.pretermPE.oneInN > 10000) {
+      expect(formatOneInN(r.pretermPE.oneInN)).toBe('>1:10.000');
+    }
+  });
+  it('risco a termo, tipicamente maior que o pré-termo, também respeita o teto', () => {
+    expect(formatOneInN(999999)).toBe('>1:10.000');
   });
 });
 

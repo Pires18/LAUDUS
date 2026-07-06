@@ -6,9 +6,26 @@
 // Biomarcadores (Bayes): O'Gorman N et al., AJOG 2016;214:103.e1-e12
 //   (Tabelas 2 e 3) — EXATO. Médias do log10 MoM vs IG do parto + covariância.
 //
-// ⚠️  `validated: false` até conferir com casos-ouro. Pendente ainda:
-//   • Sub-modelo "parosa sem PE prévia" (polinômio de intervalo — Wright 2015).
-//   • Conduta AAS 150 mg: ASPRE — Rolnik DL et al., NEJM 2017.
+// ═══ AUDITORIA (jul/2026) ═══════════════════════════════════════════════
+// Todos os coeficientes abaixo (fatores maternos + modelo de biomarcadores)
+// foram conferidos DÍGITO A DÍGITO contra as Tabelas 2 do Wright 2015 e as
+// Tabelas 2/3 do O'Gorman 2016 — zero divergências. A lógica de truncamento
+// da média em 0 (O'Gorman: "the mean was taken as zero" além do ponto onde
+// cruzaria zero) e o uso de covariância COMUM entre PE/não-PE (O'Gorman:
+// "a common covariance matrix was assumed") foram verificados linha a linha
+// contra a descrição textual do método — implementados corretamente.
+//
+// O que ISSO NÃO substitui: comparação caso-a-caso contra a calculadora
+// oficial da FMF (bloqueada por indisponibilidade da extensão do navegador
+// nesta sessão). Por isso `validated` permanece `false`.
+//
+// ⚠️  Lacunas conhecidas e NÃO estimadas (sem fonte primária exata):
+//   • Sub-modelo "parosa sem PE prévia" (polinômio fracionário de intervalo
+//     entre gestações — Wright 2015). Hoje tratada como referência (0),
+//     quando o modelo real daria um efeito PROTETOR (μ maior) — nosso risco
+//     tende a ser um pouco CONSERVADOR (superestimado) para esse subgrupo.
+//   • Conduta AAS 150 mg: ASPRE — Rolnik DL et al., NEJM 2017 (cutoff 1:100
+//     já aplicado; texto de recomendação não conferido linha a linha).
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { PeCoefficients, PeBiomarkerModel } from './preeclampsia';
