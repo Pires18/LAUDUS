@@ -224,6 +224,8 @@ export interface DicomDevice {
   name: string;
   aeTitle: string;
   modality: string;
+  /** IP local do aparelho — usado para autorizá-lo no Orthanc (DicomModalities). */
+  ip?: string;
 }
 
 /** Estado do provisionamento do PACS gerenciado (VM/container por usuário). */
@@ -344,6 +346,7 @@ export interface AppSettings {
   dicomSyncEnabled?: boolean;
   dicomWorklistFolder?: string;
   dicomModalityAETitle?: string;
+  dicomModalityIp?: string;
   dicomModalityType?: string;
   dicomDevices?: DicomDevice[];
   dicomOrthancAETitle?: string;

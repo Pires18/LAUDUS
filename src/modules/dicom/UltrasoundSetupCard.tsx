@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { classNames } from '../../utils/format';
 import type { DicomDevice } from '../../types';
+import { getActivePacsUrl, getProxyEndpoint, getDicomAuthParams } from '../../store/db';
 import {
-  Radio, Copy, Check, Plus, Trash2, Info, Network, Router
+  Radio, Copy, Check, Plus, Trash2, Info, Network, Router, ShieldCheck, RefreshCw
 } from 'lucide-react';
 
 /**
@@ -14,12 +15,40 @@ import {
 export function UltrasoundSetupCard() {
   const { settings, updateSettings, showToast } = useApp();
   const [copied, setCopied] = useState<string | null>(null);
-  const [newDevice, setNewDevice] = useState({ name: '', aeTitle: '', modality: 'US' });
+  const [newDevice, setNewDevice] = useState({ name: '', aeTitle: '', modality: 'US', ip: '' });
 
   const pacsAe = settings.dicomOrthancAETitle || 'ORTHANC';
   const deviceAe = settings.dicomModalityAETitle || 'MINDRAYMX7';
   const devices = settings.dicomDevices || [];
   const dicomPort = settings.pacsInstance?.dicomPort || 4242;
+
+  // Autoriza/remove o aparelho no Orthanc (DicomModalities) via a API REST
+  // dele mesmo, passando pelo mesmo proxy já usado pelas imagens — sem precisar
+  // de SSH na VM. Sem isso, o Orthanc rejeita a consulta de Worklist com
+  // "This AET is not listed in configuration option DicomModalities", mesmo
+  // com o C-ECHO funcionando (Echo é sempre liberado; Worklist exige registro).
+  async function syncModalityInOrthanc(aeTitle: string, ip: string, action: 'put' | 'delete') {
+    const id = aeTitle.toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'device';
+    const baseUrl = getActivePacsUrl(settings, false).replace(/\/$/, '');
+    const auth = getDicomAuthParams(settings, false);
+    const proxyPath = getProxyEndpoint(settings, false);
+    const target = `${baseUrl}/modalities/${id}`;
+    const url = `${proxyPath}?url=${encodeURIComponent(target)}${auth}`;
+    const res = await fetch(url, {
+      method: action === 'put' ? 'PUT' : 'DELETE',
+      headers: action === 'put' ? { 'Content-Type': 'application/json' } : undefined,
+      body: action === 'put'
+        // AllowFindWorklist é uma permissão SEPARADA de AllowFind no Orthanc —
+        // é exatamente a que faltava (o log mostrou o C-FIND de worklist sendo
+        // rejeitado mesmo com DicomAlwaysAllowFind:true no config global).
+        ? JSON.stringify({ AET: aeTitle, Host: ip || '0.0.0.0', Port: 104, AllowEcho: true, AllowFind: true, AllowFindWorklist: true, AllowStore: true })
+        : undefined,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`PACS recusou (HTTP ${res.status})${text ? ': ' + text.slice(0, 150) : ''}`);
+    }
+  }
 
   // IP tailnet da VM do PACS — consultado direto no Agente (health-check
   // público) para montar a instrução do relé já pronta com o endereço real.
@@ -35,17 +64,25 @@ export function UltrasoundSetupCard() {
     return () => { cancelled = true; };
   }, [settings.dicomLocalAgentUrl]);
 
-  // AE Title do aparelho — editável (cada ultrassom tem o seu).
+  // AE Title + IP do aparelho — editáveis (cada ultrassom tem o seu). Salvar
+  // já autoriza o aparelho no Orthanc (DicomModalities) automaticamente.
   const [aeInput, setAeInput] = useState(deviceAe);
+  const [ipInput, setIpInput] = useState(settings.dicomModalityIp || '');
   const [savingAe, setSavingAe] = useState(false);
   async function saveDeviceAe() {
     const v = aeInput.trim().toUpperCase();
+    const ip = ipInput.trim();
     if (!v) { showToast('Informe o AE Title do aparelho.', 'error'); return; }
     setSavingAe(true);
     try {
-      await updateSettings({ dicomModalityAETitle: v });
+      await updateSettings({ dicomModalityAETitle: v, dicomModalityIp: ip });
       setAeInput(v);
-      showToast('AE Title do aparelho salvo.', 'success');
+      try {
+        await syncModalityInOrthanc(v, ip, 'put');
+        showToast('AE Title salvo e aparelho autorizado no PACS.', 'success');
+      } catch (err: any) {
+        showToast('AE Title salvo, mas falha ao autorizar no PACS: ' + (err.message || ''), 'error');
+      }
     } finally { setSavingAe(false); }
   }
 
@@ -75,15 +112,35 @@ export function UltrasoundSetupCard() {
   async function addDevice() {
     const name = newDevice.name.trim();
     const aeTitle = newDevice.aeTitle.trim().toUpperCase();
+    const ip = newDevice.ip.trim();
     if (!name || !aeTitle) { showToast('Preencha nome e AE Title do aparelho.', 'error'); return; }
-    const device: DicomDevice = { id: `dev_${Date.now().toString(36)}`, name, aeTitle, modality: newDevice.modality || 'US' };
+    const device: DicomDevice = { id: `dev_${Date.now().toString(36)}`, name, aeTitle, modality: newDevice.modality || 'US', ip };
     await updateSettings({ dicomDevices: [...devices, device] });
-    setNewDevice({ name: '', aeTitle: '', modality: 'US' });
-    showToast('Aparelho adicionado.', 'success');
+    setNewDevice({ name: '', aeTitle: '', modality: 'US', ip: '' });
+    try {
+      await syncModalityInOrthanc(aeTitle, ip, 'put');
+      showToast('Aparelho adicionado e autorizado no PACS.', 'success');
+    } catch (err: any) {
+      showToast('Aparelho salvo, mas falha ao autorizar no PACS: ' + (err.message || ''), 'error');
+    }
   }
 
-  async function removeDevice(id: string) {
-    await updateSettings({ dicomDevices: devices.filter((d) => d.id !== id) });
+  async function removeDevice(device: DicomDevice) {
+    await updateSettings({ dicomDevices: devices.filter((d) => d.id !== device.id) });
+    try {
+      await syncModalityInOrthanc(device.aeTitle, device.ip || '', 'delete');
+    } catch { /* remoção no Orthanc é best-effort — não bloqueia a UI */ }
+  }
+
+  const [resyncingId, setResyncingId] = useState<string | null>(null);
+  async function resyncDevice(device: DicomDevice) {
+    setResyncingId(device.id);
+    try {
+      await syncModalityInOrthanc(device.aeTitle, device.ip || '', 'put');
+      showToast('Aparelho autorizado no PACS.', 'success');
+    } catch (err: any) {
+      showToast('Falha ao autorizar no PACS: ' + (err.message || ''), 'error');
+    } finally { setResyncingId(null); }
   }
 
   const CopyRow = ({ label, value, id, hint }: { label: string; value: string; id: string; hint?: string }) => (
@@ -175,35 +232,44 @@ export function UltrasoundSetupCard() {
         <div className="p-3 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
           <div>
             <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">AE Title do aparelho (origem)</p>
-            <p className="text-[10px] text-ink-400">Identidade do seu ultrassom na rede DICOM — edite para o AE real do seu aparelho.</p>
+            <p className="text-[10px] text-ink-400">Identidade do seu ultrassom na rede DICOM — edite para o AE real do seu aparelho. Precisa ser <strong>autorizado no PACS</strong> (abaixo) para a Worklist funcionar — Echo funciona sem isso, mas Worklist não.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <input
               className="input h-9 text-sm font-mono flex-1 uppercase"
               value={aeInput}
               onChange={(e) => setAeInput(e.target.value.toUpperCase())}
-              placeholder="Ex: MINDRAYMX7"
+              placeholder="AE Title — Ex: MINDRAYMX7"
               spellCheck={false}
             />
-            <button
-              onClick={saveDeviceAe}
-              disabled={savingAe || !aeInput.trim() || aeInput.trim().toUpperCase() === deviceAe}
-              className="h-9 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-wider transition-all"
-            >
-              {savingAe ? '…' : 'Salvar'}
-            </button>
-            <button
-              onClick={() => copy(aeInput || deviceAe, 'devae')}
-              className="shrink-0 h-9 px-2.5 rounded-lg bg-white border border-ink-200 text-ink-500 hover:bg-ink-100 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider transition-all"
-              title="Copiar"
-            >
-              {copied === 'devae' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-            </button>
+            <input
+              className="input h-9 text-sm font-mono sm:w-36"
+              value={ipInput}
+              onChange={(e) => setIpInput(e.target.value)}
+              placeholder="IP do aparelho"
+              spellCheck={false}
+            />
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={saveDeviceAe}
+                disabled={savingAe || !aeInput.trim()}
+                className="h-9 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-wider transition-all"
+              >
+                {savingAe ? '…' : 'Salvar'}
+              </button>
+              <button
+                onClick={() => copy(aeInput || deviceAe, 'devae')}
+                className="shrink-0 h-9 px-2.5 rounded-lg bg-white border border-ink-200 text-ink-500 hover:bg-ink-100 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider transition-all"
+                title="Copiar"
+              >
+                {copied === 'devae' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+              </button>
+            </div>
           </div>
         </div>
         <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-100 flex gap-2 text-[11px] text-amber-800 leading-relaxed">
           <Info size={14} className="shrink-0 mt-0.5" />
-          <span>O <strong>Endereço/IP</strong> a digitar é o do <strong>relé</strong> na sua rede (ex: <code>192.168.x.x</code>), não a URL da nuvem. Depois, no aparelho, rode <strong>C-ECHO / Verify</strong> — deve dar "Sucesso".</span>
+          <span>O <strong>Endereço/IP</strong> a digitar NO APARELHO é o do <strong>relé</strong> na sua rede (ex: <code>192.168.x.x</code>), não a URL da nuvem. O campo "IP do aparelho" acima é o IP do PRÓPRIO ultrassom na sua LAN (usado só para autorizá-lo no PACS). Depois, no aparelho, rode <strong>C-ECHO / Verify</strong> — deve dar "Sucesso".</span>
         </div>
       </div>
 
@@ -221,16 +287,24 @@ export function UltrasoundSetupCard() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-ink-800 truncate">{d.name}</p>
-                  <p className="text-[10px] font-mono text-ink-400">{d.aeTitle} · {d.modality}</p>
+                  <p className="text-[10px] font-mono text-ink-400">{d.aeTitle} · {d.modality}{d.ip ? ` · ${d.ip}` : ''}</p>
                 </div>
-                <button onClick={() => removeDevice(d.id)} className="p-1.5 rounded-lg text-ink-400 hover:text-rose-600 hover:bg-rose-50 transition-all">
+                <button
+                  onClick={() => resyncDevice(d)}
+                  disabled={resyncingId === d.id}
+                  title="Reautorizar no PACS"
+                  className="p-1.5 rounded-lg text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all disabled:opacity-40"
+                >
+                  <RefreshCw size={14} className={resyncingId === d.id ? 'animate-spin' : ''} />
+                </button>
+                <button onClick={() => removeDevice(d)} className="p-1.5 rounded-lg text-ink-400 hover:text-rose-600 hover:bg-rose-50 transition-all">
                   <Trash2 size={14} />
                 </button>
               </div>
             ))}
           </div>
         )}
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto] gap-2 items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto_auto] gap-2 items-center">
           <input
             className="input h-9 text-sm"
             placeholder="Nome (ex: US Sala 1)"
@@ -242,6 +316,12 @@ export function UltrasoundSetupCard() {
             placeholder="AE Title (ex: GE_LOGIQ)"
             value={newDevice.aeTitle}
             onChange={(e) => setNewDevice({ ...newDevice, aeTitle: e.target.value.toUpperCase() })}
+          />
+          <input
+            className="input h-9 text-sm font-mono"
+            placeholder="IP (ex: 192.168.8.50)"
+            value={newDevice.ip}
+            onChange={(e) => setNewDevice({ ...newDevice, ip: e.target.value })}
           />
           <input
             className="input h-9 text-sm w-full sm:w-16 text-center"
@@ -256,6 +336,7 @@ export function UltrasoundSetupCard() {
             <Plus size={13} /> Adicionar
           </button>
         </div>
+        <p className="text-[10px] text-ink-400 px-1 leading-relaxed flex items-center gap-1"><ShieldCheck size={11} className="text-emerald-500 shrink-0" /> Adicionar/remover aqui já autoriza/revoga o aparelho no PACS automaticamente (sem SSH).</p>
       </div>
     </div>
   );
