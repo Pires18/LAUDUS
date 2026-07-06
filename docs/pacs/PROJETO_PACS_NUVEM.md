@@ -1,5 +1,15 @@
 # 🏗️ Projeto — PACS/DICOM unificado em VM na nuvem (Google Cloud + Tailscale)
 
+> ⚠️ **HISTÓRICO — modelo superado.** Este documento descreve o desenho original de
+> **1 VM dedicada por usuário**. Em produção, evoluiu para uma **VM COMPARTILHADA
+> multi-tenant** (1 container Orthanc isolado por cliente, na mesma VM) — veja
+> [PACS_TENANT_SETUP.md](./PACS_TENANT_SETUP.md) para o modelo atual e real. O
+> plano "Dedicado" (VM própria, criada automaticamente pelo app) ainda existe e
+> segue este desenho. Diferenças que mudam instruções deste doc: a porta DICOM
+> **não é fixa 4242** no modelo compartilhado (cada tenant tem a sua, 43xx); e a
+> VM precisa de `tailscale up --accept-routes` para o relé alcançá-la (sem isso,
+> C-ECHO trava em timeout). Mantido como referência histórica/arquitetural.
+
 **Decisões aprovadas (03/07/2026):**
 - **Servidor principal:** **sempre a VM na nuvem** (Google Cloud). O servidor local passa a ser **backup opcional** (redundância), configurável na aba "Servidores" do painel DICOM.
 - **Conectividade do US:** Opção A — **relé Tailscale**, reaproveitando hardware existente: **roteador GL.iNet** (dono / recomendado) ou o **PC do dia a dia** do usuário. Sem caixinha nova.

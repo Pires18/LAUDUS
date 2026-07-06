@@ -327,7 +327,13 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
             </button>
           )}
           <button
-            onClick={() => provision((inst.plan as Plan) || 'pro')}
+            onClick={() => {
+              // Reprovisionar cria um tenant/VM NOVO (nunca repara o atual) —
+              // sem aviso, isso abandonaria silenciosamente os exames já
+              // migrados no tenant em uso. Confirmar antes é obrigatório aqui.
+              if (!window.confirm('Reprovisionar cria um PACS NOVO (novo tenant/VM) — não repara o atual. Os exames já armazenados no PACS de agora ficarão inacessíveis por aqui (continuam na VM, recuperáveis por suporte). Só use se o PACS atual estiver com erro irrecuperável. Continuar?')) return;
+              provision((inst.plan as Plan) || 'pro');
+            }}
             disabled={busy}
             className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink-600 bg-ink-100 border border-ink-200 hover:bg-ink-200 transition-all flex items-center gap-1.5 disabled:opacity-50"
           >

@@ -933,7 +933,7 @@ export function DicomControlCenter() {
                       <span className="text-[9px] font-black uppercase tracking-widest">Projeto completo</span>
                     </div>
                     <p className="text-[10px] text-ink-300 leading-relaxed">Migração de exames, automação por usuário e riscos no documento:</p>
-                    <code className="block bg-black/40 p-1.5 rounded-lg text-[9px] text-emerald-300 break-all">docs/PROJETO_PACS_NUVEM.md</code>
+                    <code className="block bg-black/40 p-1.5 rounded-lg text-[9px] text-emerald-300 break-all">docs/pacs/PROJETO_PACS_NUVEM.md</code>
                   </div>
                 </div>
 
@@ -1068,7 +1068,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <Cmd id="vm-tenant-ls" text="/opt/pacs-tenant.sh list               # lista os tenants da VM" />
                       </Step>
 
-                      <Note tone="amber">Setup manual detalhado (avançado) e o plano <strong>Dedicado</strong> (VM própria por cliente, criada automaticamente pelo app) estão documentados em <code>docs/PACS_TENANT_SETUP.md</code> e <code>docs/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md</code>.</Note>
+                      <Note tone="amber">Setup manual detalhado (avançado) e o plano <strong>Dedicado</strong> (VM própria por cliente, criada automaticamente pelo app) estão documentados em <code>docs/pacs/PACS_TENANT_SETUP.md</code> e <code>docs/roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md</code>.</Note>
 
                       <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
                         <ArrowRight size={14} /> VM pronta. Agora vá para <strong>2 · Configurar no LAUD.US</strong>.
@@ -1134,6 +1134,9 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                           <li>No admin da tailnet, <strong>aprove as rotas</strong> anunciadas pelo GL.iNet.</li>
                           <li>No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):{port}</strong>, AE <code>ORTHANC</code>.</li>
                         </ul>
+                        <Note tone="amber">
+                          Aprovar a rota não basta — a <strong>VM também precisa aceitá-la</strong> (senão o C-ECHO trava em "tempo esgotado": o pacote chega, mas a resposta não acha o caminho de volta). Isso já vem pronto no turnkey (<code>pacs-vm-setup.sh</code>); se a VM foi montada antes disso, rode nela: <code>sudo tailscale up --accept-routes</code>.
+                        </Note>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
@@ -1148,11 +1151,15 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
 
                       <Step n="✓" title="Validar (nos dois modos)">
                         <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                          <li><strong>C-ECHO</strong> no ultrassom → sucesso.</li>
+                          <li><strong>C-ECHO</strong> no ultrassom → sucesso (isso sempre funciona, mesmo sem cadastrar o aparelho).</li>
                           <li>Criar exame no LAUD.US → a worklist aparece no aparelho.</li>
                           <li>Fazer o exame → as imagens sobem à VM e aparecem no laudo.</li>
                         </ul>
                       </Step>
+
+                      <Note tone="amber">
+                        <strong>C-ECHO funciona mas a Worklist dá erro no aparelho ("query error")?</strong> Diferente do Echo, a consulta de Worklist exige o aparelho <strong>autorizado</strong> no Orthanc (AE Title + IP). Cadastre-o no card <strong>"Conectar meu ultrassom" → Passo 3 — meus aparelhos</strong> (ou no campo único de AE Title, com o IP do aparelho) — o app autoriza automaticamente, sem precisar de SSH.
+                      </Note>
                     </div>
                     );
                   })()}
@@ -1206,6 +1213,16 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                               <td className="px-3 py-3">Verifique o relé (IP tailnet:porta ou portproxy). <strong>Numa VM compartilhada, a porta NÃO é 4242</strong> — é a exclusiva do seu tenant (card "Conectar meu ultrassom" ou <code>/opt/pacs-tenant.sh list</code> na VM). AE do aparelho deve bater com o servidor. Faça um C-ECHO.</td>
                             </tr>
                             <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">C-ECHO trava em "tempo esgotado" (não rejeita, só não responde)</td>
+                              <td className="px-3 py-3">A VM não aceita a rota de sub-rede anunciada pelo relé (GL.iNet/PC) — o pacote chega, mas a resposta não sabe o caminho de volta à LAN do aparelho.</td>
+                              <td className="px-3 py-3">Na VM: <code>tailscale status</code> — se aparecer "peers are advertising routes but --accept-routes is false", rode <code>sudo tailscale up --accept-routes</code>.</td>
+                            </tr>
+                            <tr>
+                              <td className="px-3 py-3 font-bold text-ink-800">C-ECHO dá sucesso, mas Worklist responde "query error"</td>
+                              <td className="px-3 py-3">O Orthanc libera Echo sempre, mas exige o aparelho <strong>registrado</strong> (DicomModalities) para consultas de Worklist.</td>
+                              <td className="px-3 py-3">Cadastre o aparelho (AE Title + IP) no card "Conectar meu ultrassom" — o app autoriza automaticamente no Orthanc, sem SSH. Use o botão de reautorizar se o aparelho já estava cadastrado antes dessa função existir.</td>
+                            </tr>
+                            <tr>
                               <td className="px-3 py-3 font-bold text-ink-800">Ultrassom não envia imagens</td>
                               <td className="px-3 py-3">Porta DICOM do tenant fechada no caminho relé→VM.</td>
                               <td className="px-3 py-3">Confirme <code>0.0.0.0:&lt;porta-do-tenant&gt;</code> publicado no container Docker e o relé apontando para o IP tailnet da VM nessa mesma porta.</td>
@@ -1238,6 +1255,8 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                           ['Funnel', 'Recurso do Tailscale que dá um endereço https:// público ao Agente, para o site (Vercel) alcançar a VM.'],
                           ['Relé', 'Ponte na clínica (GL.iNet ou PC) que leva o tráfego DICOM do ultrassom até a VM pela tailnet.'],
                           ['AE Title', 'O "nome" de cada nó DICOM. O AE do aparelho e o do servidor precisam bater.'],
+                          ['DicomModalities', 'Lista de aparelhos autorizados no Orthanc. C-ECHO funciona sem estar nela; consulta de Worklist não. O card "Conectar meu ultrassom" cadastra automaticamente.'],
+                          ['Rotas de sub-rede', 'Como o Tailscale deixa a VM enxergar a LAN da clínica através do relé (GL.iNet/PC). Precisam ser aprovadas (admin da tailnet) E aceitas (--accept-routes na VM).'],
                         ].map(([term, desc]) => (
                           <div key={term} className="flex gap-3 p-2.5 rounded-lg bg-white border border-ink-150">
                             <span className="text-[11px] font-black text-emerald-700 shrink-0 w-28">{term}</span>

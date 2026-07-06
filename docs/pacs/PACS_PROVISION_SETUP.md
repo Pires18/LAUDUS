@@ -3,8 +3,11 @@
 > Depois destes passos, o botão **"Criar meu PACS"** deixa de ser Demo e passa a
 > criar uma **VM real** no Google Cloud, autoconfigurando o app sozinho.
 >
-> Endpoint: [`api/pacs-provision.ts`](../api/pacs-provision.ts). Enquanto as env
+> Endpoint: [`api/pacs-provision.ts`](../../api/pacs-provision.ts). Enquanto as env
 > não existirem, ele opera em **modo mock** (simulado) — nada quebra.
+>
+> Isso vale para o plano **Dedicado** (VM própria por cliente). Starter/Pro usam
+> a VM compartilhada — ver [PACS_TENANT_SETUP.md](./PACS_TENANT_SETUP.md).
 
 ---
 
@@ -111,7 +114,8 @@ VITE_PACS_PROVISION_ENDPOINT=/api/pacs-provision
 
 ---
 
-## 7. Custos e próximos passos
-- Custo por VM: ver §7 do [PLANO_PACS_AUTOMACAO_SELF_SERVICE.md](./PLANO_PACS_AUTOMACAO_SELF_SERVICE.md).
-- **F1 (imagem dourada)** vai acelerar o boot (de ~4 min para ~1 min) — o `startup-script` atual já funciona sem ela.
-- **F6 (lifecycle)** liga o provisionamento ao evento de compra do add-on PACS (hook AbacatePay).
+## 7. Custos e status
+
+- Custo por VM: ver §7 do [PLANO_PACS_AUTOMACAO_SELF_SERVICE.md](../roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md).
+- **F1 (imagem dourada):** ✅ feito e em produção — a VM dedicada sobe com Docker/Tailscale/Orthanc pré-instalados (boot ~3 min, era ~6 min).
+- **F6 (lifecycle):** ✅ feito — `api/reset-monthly-reports.ts` suspende o PACS quando a assinatura cancela/expira (período de graça), reativa se o cliente voltar antes do prazo, e destrói de vez (VM/tenant) se o prazo vencer.

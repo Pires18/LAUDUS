@@ -2,7 +2,22 @@
 
 > Como migrar a VM `orthanc-server` para **multi-tenant** e criar tenants (planos
 > Starter/Pro). Cada tenant = 1 container Orthanc isolado. Ver desenho em
-> [PLANO_PACS_VM_COMPARTILHADA.md](./PLANO_PACS_VM_COMPARTILHADA.md).
+> [PLANO_PACS_VM_COMPARTILHADA.md](../archive/PLANO_PACS_VM_COMPARTILHADA.md).
+
+> **Estado real (validado com aparelho físico em 06/07/2026):** este é o modelo
+> em produção. Duas pegadinhas que já causaram incidentes reais e não são
+> óbvias — confira sempre ao configurar um relé novo:
+> 1. **Rotas de sub-rede:** aprovar a rota do relé no admin da tailnet NÃO
+>    basta — a **VM também precisa aceitá-la** (`sudo tailscale up --accept-routes`,
+>    já incluído no `pacs-vm-setup.sh`). Sem isso, o C-ECHO trava em *timeout*
+>    (não rejeita — o pacote chega, a resposta não acha o caminho de volta).
+> 2. **DicomModalities:** o Orthanc libera C-ECHO de qualquer aparelho, mas
+>    **exige o aparelho registrado** para responder consultas de Worklist
+>    (permissão `AllowFindWorklist`, separada de `AllowFind`). Isso é
+>    automatizado pelo app — o usuário cadastra o aparelho em "Conectar meu
+>    ultrassom" e ele mesmo chama `PUT /modalities/{id}` no Orthanc via o
+>    proxy do agente. Não precisa editar `orthanc.json` nem reiniciar
+>    container à mão.
 
 ## Pré-requisitos
 - VM já montada pelo `setup-vm.sh` (Docker + Tailscale + Agente + Funnel).
@@ -61,20 +76,50 @@ AE Title           = ORTHANC
 ```
 
 ## 3. Configurar no app
-No usuário (Configurações → PACS/DICOM), preencha `dicomTenantId`, `dicomAgentSecret`
-e `dicomLocalAgentUrl` com os valores acima. (Na automação — S2b/F6 — isso será
-gravado sozinho pelo provisionador; por ora, manual.)
+Só é manual se o tenant foi criado **direto na VM** (comando acima, uso de suporte).
+Quando o cliente usa o botão **"Criar meu PACS"** no app (Starter/Pro), tudo isso é
+gravado sozinho pelo provisionador (S2b já em produção). Se precisar preencher à
+mão: no usuário (Configurações → PACS/DICOM), `dicomTenantId`, `dicomAgentSecret`
+e `dicomLocalAgentUrl` com os valores acima. O campo **Porta DICOM** (card
+"Conectar meu ultrassom") também precisa bater com a porta DICOM do tenant — se
+o provisionamento foi manual, edite-o lá (é editável).
 
 ## 4. Apontar o aparelho (via relé)
 No ultrassom (Worklist + Storage): **IP do relé** na LAN, **porta = a porta DICOM
 do tenant** (`43xx`), **AE = ORTHANC**. C-ECHO deve dar sucesso.
 
+> **Depois do C-ECHO, cadastre o aparelho** no card "Conectar meu ultrassom" (AE
+> Title + IP) — sem isso, o Orthanc aceita o Echo mas recusa a consulta de
+> Worklist ("This AET is not listed in configuration option DicomModalities").
+> O app registra automaticamente via `PUT /modalities/{id}`, sem precisar editar
+> `orthanc.json` nem reiniciar o container.
+
 ## Comandos úteis
 ```bash
-/opt/pacs-tenant.sh list              # lista tenants (não precisa root)
-sudo /opt/pacs-tenant.sh remove <id>  # remove container; move dados p/ /opt/tenants-removed
-docker stats --no-stream              # uso de CPU/RAM por container
+sudo /opt/pacs-tenant.sh list          # lista tenants (precisa sudo — /opt/tenants é 0700)
+sudo /opt/pacs-tenant.sh remove <id>   # remove container; move dados p/ /opt/tenants-removed
+docker stats --no-stream               # uso de CPU/RAM por container
+sudo bash -c 'du -sh /opt/tenants/*/data'   # qual tenant tem dados reais (glob precisa rodar JÁ como root)
 ```
+
+## Diagnóstico "aparelho não conecta" (ordem que funciona)
+1. `sudo docker ps --filter name=orthanc-<tid>` + `sudo ss -tlnp | grep <porta>` — container de pé e escutando?
+2. `nc -zv -w 3 <ip-tailnet-vm> <porta>` **rodado na própria VM** — a porta responde localmente?
+3. O mesmo `nc` rodado de **outro nó da tailnet** (ex: seu Mac) — isola ACL do Tailscale vs. problema de rota do relé.
+4. `tailscale status` na VM — procure "peers are advertising routes but --accept-routes is false".
+5. `sudo docker logs orthanc-<tid> --tail 50` **no momento exato da tentativa** — a causa real quase sempre aparece aqui (ex: rejeição de DicomModalities).
+
+## Atualizar `agent.js` na VM depois de um fix no código
+```bash
+sudo curl -fsSL "https://laudus.vercel.app/pacs/agent.js?t=$(date +%s)" -o /opt/laudus-agent/agent.js
+sudo systemctl restart laudus-agent
+# valide direto pela VM (sem depender de cache do navegador):
+curl -s -X OPTIONS -i https://orthanc-server.<ts_net>/api/orthanc-proxy | grep -i access-control-allow-methods
+```
+O `?t=$(date +%s)` força ignorar cache de CDN — sem ele, o `curl` às vezes traz uma
+cópia antiga mesmo já publicada. Se `sudo` responder com uma frase estranha em vez
+de pedir senha, é uma trava intermitente dessa VM — repita o comando sozinho (sem
+colar em bloco); costuma passar na 2ª tentativa.
 
 ## Segurança / hardening (S4)
 Rode o script de endurecimento na VM (idempotente):

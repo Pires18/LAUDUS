@@ -2,6 +2,13 @@
 
 **Versão 3.0 · Foco: fácil e rápido.** Este guia monta um PACS (servidor de imagens) do zero e o integra ao LAUD.US — **localmente** ou **pela nuvem (Vercel) via Tailscale** — com o mínimo de burocracia.
 
+> **A maioria dos usuários não precisa deste manual.** Se você só quer usar o
+> PACS/DICOM no LAUD.US, clique em **"Criar meu PACS"** dentro do app (aba
+> Servidores & Conexão) — a VM/tenant é criada e configurada sozinha, e o guia
+> in-app (aba "Guia de Configuração") já traz os valores certos pro seu caso.
+> Este documento é para quem quer montar e manter o **próprio Orthanc** (fora
+> do PACS gerenciado do LAUD.US) — instalação local ou VM própria manual.
+
 > **Filosofia deste manual:** priorizamos praticidade. A segurança é **opcional** e fica concentrada na seção 9. No caminho rápido, o Orthanc roda sem senha e o Agente roda aberto — suficiente para a maioria das clínicas em rede fechada.
 
 ---
@@ -102,13 +109,26 @@ Troque `PASTA_DA_WORKLIST_AQUI` por (crie a pasta se não existir):
 
 Salve e **reinicie o Orthanc** (Windows: `services.msc` → Orthanc → Reiniciar / macOS: `brew services restart orthanc`).
 
-### 2.2 (Opcional) Cadastrar os aparelhos por nome
-Só é necessário se você quiser restringir quem envia. No caminho rápido, `DicomAlwaysAllow*` já libera tudo. Se quiser cadastrar:
+### 2.2 Cadastrar os aparelhos por nome (obrigatório para a Worklist)
+`DicomAlwaysAllowFind: true` libera **C-ECHO** e consultas normais de C-FIND, mas
+**NÃO cobre a Worklist** — o plugin de Worklist tem sua própria checagem
+(`AllowFindWorklist`), separada. Sem o aparelho cadastrado aqui, o Orthanc
+aceita o Echo mas rejeita a consulta de Worklist com "This AET is not listed in
+configuration option DicomModalities" (confirmado em produção). Cadastre cada
+aparelho:
 ```jsonc
 "DicomModalities": {
-  "US_SALA_01": [ "MINDRAYMX7", "192.168.1.150", 104 ]
+  "US_SALA_01": { "AET": "MINDRAYMX7", "Host": "192.168.1.150", "Port": 104, "AllowEcho": true, "AllowFind": true, "AllowFindWorklist": true, "AllowStore": true }
 }
 ```
+Ou registre em tempo real (sem editar o arquivo nem reiniciar o Orthanc) via REST:
+```bash
+curl -X PUT http://localhost:8042/modalities/us_sala_01 \
+  -H "Content-Type: application/json" \
+  -d '{"AET":"MINDRAYMX7","Host":"192.168.1.150","Port":104,"AllowEcho":true,"AllowFind":true,"AllowFindWorklist":true,"AllowStore":true}'
+```
+No modelo de PACS gerenciado do LAUD.US (self-service), isso é **automático** — o
+card "Conectar meu ultrassom" faz essa chamada por você.
 
 ---
 
@@ -222,8 +242,9 @@ No menu DICOM do aparelho (Mindray, GE, Samsung…):
 | "Testar" falha na nuvem | Agente não exposto / Funnel caiu | `tailscale funnel status`; rode `tailscale funnel --bg 3000` de novo |
 | Imagens não carregam (nuvem) | "URL Pública Tailscale" preenchida indevidamente | Deixe-a **vazia**; URL do Orthanc = `http://localhost:8042` |
 | Aparelho: "No worklists found" | Pasta da worklist diverge OU sem `.wl` | Confira se `Worklists.Database` (Orthanc) == "Pasta da Worklist" (app); veja se o `.wl` foi criado |
+| **C-ECHO ok, mas Worklist dá "query error"** | Aparelho não registrado em `DicomModalities` — Echo é sempre liberado, Worklist não | Cadastre o aparelho (seção 2.2). No PACS gerenciado, isso é automático pelo card "Conectar meu ultrassom" |
 | Worklist falha com erro de Python | `pydicom` não instalado | `pip install pydicom` (ou `pip3`) |
-| Aparelho não conecta na 4242 | Firewall | Libere a porta **4242** (entrada) no firewall da máquina |
+| Aparelho não conecta na 4242 | Firewall, OU rota de sub-rede Tailscale não aceita pelo servidor (se o relé for um subnet router) | Libere a porta **4242** (entrada) no firewall; se usar relé Tailscale (GL.iNet/roteador), rode `tailscale up --accept-routes` no servidor Orthanc |
 | Mixed Content no console | App HTTPS tentando HTTP local | Use o método Tailscale Funnel (seção 5) |
 | Agente escreve `.wl` no lugar errado | Pasta padrão diferente do Orthanc | Preencha "Pasta da Worklist" no app **ou** defina `LAUDUS_WORKLIST_DIR` no agente |
 
