@@ -163,6 +163,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         consentTerm: template.consentTemplate || undefined,
         consentAccepted: false,
         clinicalIndication: anamnesis.trim() || undefined,
+        dicomDeviceId: selectedDeviceId || undefined,
         examDate: examDateStr ? (() => {
           const [year, month, day] = examDateStr.split('-').map(Number);
           return new Date(year, month - 1, day).getTime();

@@ -206,7 +206,8 @@ export function Worklist() {
       const { success, primarySuccess, backupSuccess, error } = await syncExamToOrthancWorklist(
         exam.id, exam.examType,
         { id: exam.patientId, name: patientName, birthDate: patientBirthDate, gender: patientSex },
-        settings
+        settings,
+        exam.dicomDeviceId
       );
       if (!success) {
         showToast('Erro ao sincronizar: ' + (error || 'Desconhecido'), 'error');

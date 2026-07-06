@@ -209,6 +209,7 @@ export function Appointments() {
         status: 'pendente',
         scheduledAt: confirmingApp.scheduledAt,
         clinicalIndication: confirmingApp.notes || undefined,
+        dicomDeviceId: deviceId || undefined,
         examDate: Date.now(),
         createdAt: Date.now(),
         updatedAt: Date.now(),

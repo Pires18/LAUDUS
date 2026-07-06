@@ -123,6 +123,10 @@ export interface ExamRequest {
     content: string;
     trigger: 'generation' | 'refine' | 'copilot' | 'manual';
   }>;
+  /** Aparelho de ultrassom (dicomDevices[].id) escolhido na criação — reutilizado
+   * ao reenviar a worklist depois, para não redirecionar o exame ao aparelho
+   * errado quando há mais de um cadastrado. */
+  dicomDeviceId?: string;
   /** Dados salvos das calculadoras para este exame */
   calculatorData?: Record<string, any>;
   /** Valores preenchidos na aba "Estruturado" do Copiloto (por fieldId) */
