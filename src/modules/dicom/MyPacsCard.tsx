@@ -176,6 +176,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
           instanceName: result.instanceName,
           tenantId: result.tenantId,
           agentUrl: result.agentUrl,
+          dicomPort: result.dicomPort,
           orthancVersion: result.orthancVersion,
           diskGb: result.diskGb ?? plans[plan].disk,
           diskUsedGb: result.diskUsedGb ?? 0,

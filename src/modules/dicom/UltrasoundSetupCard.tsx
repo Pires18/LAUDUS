@@ -49,6 +49,22 @@ export function UltrasoundSetupCard() {
     } finally { setSavingAe(false); }
   }
 
+  // Porta DICOM — editável. Necessário porque tenants criados numa VM
+  // compartilhada usam uma porta exclusiva (43xx), nunca a 4242 padrão; e o
+  // provisionamento pode ter salvo a instância antes de o campo existir.
+  const [portInput, setPortInput] = useState(String(dicomPort));
+  const [savingPort, setSavingPort] = useState(false);
+  useEffect(() => { setPortInput(String(dicomPort)); }, [dicomPort]);
+  async function saveDicomPort() {
+    const n = parseInt(portInput, 10);
+    if (!n || n < 1 || n > 65535) { showToast('Informe uma porta válida (1–65535).', 'error'); return; }
+    setSavingPort(true);
+    try {
+      await updateSettings({ pacsInstance: { ...(settings.pacsInstance || { status: 'ready' }), dicomPort: n } });
+      showToast('Porta DICOM salva.', 'success');
+    } finally { setSavingPort(false); }
+  }
+
   function copy(text: string, id: string) {
     navigator.clipboard.writeText(text);
     setCopied(id);
@@ -122,12 +138,39 @@ export function UltrasoundSetupCard() {
           <Network size={13} className="text-violet-500" />
           <p className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Passo 2 — digite estes valores no aparelho (Worklist e Storage)</p>
         </div>
-        <CopyRow
-          label="Porta DICOM"
-          value={String(settings.pacsInstance?.dicomPort || 4242)}
-          id="port"
-          hint={settings.pacsInstance?.dicomPort ? 'Porta exclusiva do seu PACS na nuvem — use exatamente esta.' : undefined}
-        />
+        <div className="p-3 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
+          <div>
+            <p className="text-[9px] font-black text-ink-400 uppercase tracking-widest">Porta DICOM</p>
+            <p className="text-[10px] text-ink-400">
+              {settings.pacsInstance?.dicomPort
+                ? 'Porta exclusiva do seu PACS na nuvem — use exatamente esta no aparelho e no relé.'
+                : 'Não veio do provisionamento (instância antiga) — confira a porta real na VM (/opt/pacs-tenant.sh list) e corrija aqui.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              className="input h-9 text-sm font-mono flex-1"
+              value={portInput}
+              onChange={(e) => setPortInput(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="Ex: 4301"
+              inputMode="numeric"
+            />
+            <button
+              onClick={saveDicomPort}
+              disabled={savingPort || !portInput || portInput === String(dicomPort)}
+              className="h-9 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-wider transition-all"
+            >
+              {savingPort ? '…' : 'Salvar'}
+            </button>
+            <button
+              onClick={() => copy(portInput, 'port')}
+              className="shrink-0 h-9 px-2.5 rounded-lg bg-white border border-ink-200 text-ink-500 hover:bg-ink-100 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider transition-all"
+              title="Copiar"
+            >
+              {copied === 'port' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            </button>
+          </div>
+        </div>
         <CopyRow label="AE Title do PACS (destino)" value={pacsAe} id="pacsae" hint="Onde o aparelho busca a fila e envia as imagens." />
         <div className="p-3 rounded-xl bg-ink-50 border border-ink-100 space-y-2">
           <div>

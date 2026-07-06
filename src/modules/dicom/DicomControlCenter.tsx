@@ -1111,29 +1111,38 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                     </div>
                   )}
 
-                  {selectedSection === 'relay' && (
+                  {selectedSection === 'relay' && (() => {
+                    const port = draft.pacsInstance?.dicomPort || 4242;
+                    const isSharedTenant = draft.pacsInstance?.provider === 'shared';
+                    return (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
                         <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Radio size={16} className="text-emerald-600" /> 3 · Relé + ultrassom</h3>
                         <p className="text-[11px] text-ink-500 font-medium">O relé faz o ultrassom (que não roda Tailscale) alcançar a VM. Escolha o seu caso.</p>
                       </div>
 
+                      {isSharedTenant && (
+                        <Note tone="amber">
+                          Seu PACS é um <strong>tenant numa VM compartilhada</strong> — a porta DICOM NÃO é a 4242 padrão, é exclusiva do seu tenant: <strong className="font-mono">{port}</strong>. Use exatamente esse número em todo o relé/aparelho (o card "Conectar meu ultrassom" já mostra isso pronto). Apontar para 4242 é a causa mais comum de "aparelho não encontra o servidor".
+                        </Note>
+                      )}
+
                       <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-2">
                         <div className="flex items-center gap-2 text-emerald-800"><Wifi size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A1 — Roteador GL.iNet (recomendado)</span></div>
                         <P>O GL.iNet já roda Tailscale e roteia a LAN para a tailnet. Sempre ligado, zero software extra.</P>
                         <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
                           <li>No admin da tailnet, <strong>aprove as rotas</strong> anunciadas pelo GL.iNet.</li>
-                          <li>No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):4242</strong>, AE <code>ORTHANC</code>.</li>
+                          <li>No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):{port}</strong>, AE <code>ORTHANC</code>.</li>
                         </ul>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
                         <div className="flex items-center gap-2 text-ink-800"><Cpu size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A2 — PC do dia a dia (com Tailscale)</span></div>
-                        <P>O PC não é o gateway, então encaminhamos a porta 4242 dele para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:4242</strong>.</P>
+                        <P>O PC não é o gateway, então encaminhamos a porta {port} dele para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:{port}</strong>.</P>
                         <p className="text-[10px] text-ink-500 font-bold">Windows (nativo):</p>
-                        <Cmd id="relay-netsh" text="netsh interface portproxy add v4tov4 listenport=4242 listenaddress=0.0.0.0 connectport=4242 connectaddress=<IP-TAILNET-DA-VM>" />
+                        <Cmd id="relay-netsh" text={`netsh interface portproxy add v4tov4 listenport=${port} listenaddress=0.0.0.0 connectport=${port} connectaddress=<IP-TAILNET-DA-VM>`} />
                         <p className="text-[10px] text-ink-500 font-bold">macOS/Linux:</p>
-                        <Cmd id="relay-socat" text="socat TCP-LISTEN:4242,fork,reuseaddr TCP:<IP-TAILNET-DA-VM>:4242" />
+                        <Cmd id="relay-socat" text={`socat TCP-LISTEN:${port},fork,reuseaddr TCP:<IP-TAILNET-DA-VM>:${port}`} />
                         <Note tone="amber">Neste modo o ultrassom só alcança a VM com o PC ligado e no Tailscale.</Note>
                       </div>
 
@@ -1145,7 +1154,8 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         </ul>
                       </Step>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {selectedSection === 'backup' && (
                     <div className="space-y-5 animate-fade-in">
@@ -1192,13 +1202,13 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                             </tr>
                             <tr>
                               <td className="px-3 py-3 font-bold text-ink-800">Worklist não aparece no ultrassom</td>
-                              <td className="px-3 py-3">Relé não alcança a VM, ou AE Title divergente.</td>
-                              <td className="px-3 py-3">Verifique o relé (IP tailnet:4242 ou portproxy). AE do aparelho deve bater com o servidor. Faça um C-ECHO.</td>
+                              <td className="px-3 py-3">Relé não alcança a VM, porta errada, ou AE Title divergente.</td>
+                              <td className="px-3 py-3">Verifique o relé (IP tailnet:porta ou portproxy). <strong>Numa VM compartilhada, a porta NÃO é 4242</strong> — é a exclusiva do seu tenant (card "Conectar meu ultrassom" ou <code>/opt/pacs-tenant.sh list</code> na VM). AE do aparelho deve bater com o servidor. Faça um C-ECHO.</td>
                             </tr>
                             <tr>
                               <td className="px-3 py-3 font-bold text-ink-800">Ultrassom não envia imagens</td>
-                              <td className="px-3 py-3">Porta 4242 fechada no caminho relé→VM.</td>
-                              <td className="px-3 py-3">Confirme <code>0.0.0.0:4242</code> no docker-compose e o relé apontando para o IP tailnet da VM.</td>
+                              <td className="px-3 py-3">Porta DICOM do tenant fechada no caminho relé→VM.</td>
+                              <td className="px-3 py-3">Confirme <code>0.0.0.0:&lt;porta-do-tenant&gt;</code> publicado no container Docker e o relé apontando para o IP tailnet da VM nessa mesma porta.</td>
                             </tr>
                             <tr>
                               <td className="px-3 py-3 font-bold text-ink-800">Botão "Viewer" externo sumiu</td>
