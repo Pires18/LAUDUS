@@ -88,6 +88,13 @@ export interface PeRisk {
   pretermPE: { prob: number; oneInN: number };
   termPE: { prob: number; oneInN: number };
   aspirinRecommended: boolean;
+  /** Risco BASAL (só fatores maternos, antes dos biomarcadores). */
+  basalPretermPE: { prob: number; oneInN: number };
+  basalTermPE: { prob: number; oneInN: number };
+  /** true se a verossimilhança dos biomarcadores sofreu underflow numérico
+   *  (MoM implausível/extremo) e o motor caiu de volta para o risco basal
+   *  por segurança — ver `computePreeclampsiaRisk`. */
+  biomarkerLikelihoodUnderflow: boolean;
 }
 
 // ───────────────────────────── Estatística ──────────────────────────────
@@ -165,6 +172,18 @@ function corr(model: PeBiomarkerModel, a: BiomarkerKey, b: BiomarkerKey): number
 
 // ───────────────────────────── Orquestração ─────────────────────────────
 
+const oneInN = (p: number) => (p > 0 && isFinite(p) ? Math.round(1 / p) : Infinity);
+
+/** Risco (basal, só fatores maternos) de PE antes de cada limiar. */
+function basalRisk(mu: number, sigma: number, thresholds: PeThresholds) {
+  const pPre = peRiskBefore(thresholds.pretermGa, mu, sigma);
+  const pTerm = peRiskBefore(thresholds.termGa, mu, sigma);
+  return {
+    pretermPE: { prob: pPre, oneInN: oneInN(pPre) },
+    termPE: { prob: pTerm, oneInN: oneInN(pTerm) },
+  };
+}
+
 export function computePreeclampsiaRisk(
   factors: PeMaternalFactors,
   biomarkers: PeBiomarkers,
@@ -174,6 +193,7 @@ export function computePreeclampsiaRisk(
 ): PeRisk {
   const mu = maternalMeanGa(factors, coeffs);
   const sigma = coeffs.sigma;
+  const basal = basalRisk(mu, sigma, thresholds);
 
   // Marcadores presentes (MoM válido).
   const momByKey: Record<BiomarkerKey, number | undefined> = {
@@ -181,17 +201,16 @@ export function computePreeclampsiaRisk(
   };
   const present = (['map', 'utaPi', 'plgf', 'pappa'] as BiomarkerKey[]).filter(k => momByKey[k] && momByKey[k]! > 0);
 
-  const oneInN = (p: number) => (p > 0 && isFinite(p) ? Math.round(1 / p) : Infinity);
-
-  // Sem biomarcadores: risco = prior (competing-risks só com fatores maternos).
+  // Sem biomarcadores: risco final = risco basal (competing-risks só com fatores maternos).
   if (present.length === 0) {
-    const pPre = peRiskBefore(thresholds.pretermGa, mu, sigma);
-    const pTerm = peRiskBefore(thresholds.termGa, mu, sigma);
     return {
       mu,
-      pretermPE: { prob: pPre, oneInN: oneInN(pPre) },
-      termPE: { prob: pTerm, oneInN: oneInN(pTerm) },
-      aspirinRecommended: pPre >= 1 / thresholds.aspirinCutoffOneInN,
+      pretermPE: basal.pretermPE,
+      termPE: basal.termPE,
+      basalPretermPE: basal.pretermPE,
+      basalTermPE: basal.termPE,
+      aspirinRecommended: basal.pretermPE.prob >= 1 / thresholds.aspirinCutoffOneInN,
+      biomarkerLikelihoodUnderflow: false,
     };
   }
 
@@ -216,12 +235,35 @@ export function computePreeclampsiaRisk(
     if (t < thresholds.termGa) cumTerm += f;
   }
 
-  const pPre = total > 0 ? cumPreterm / total : 0;
-  const pTerm = total > 0 ? cumTerm / total : 0;
+  // ⚠️ SEGURANÇA NUMÉRICA: um MoM absurdo/fora de qualquer faixa plausível
+  // (ex.: valor bruto digitado por engano no campo de MoM) pode fazer a
+  // verossimilhança de TODOS os pontos da integração colapsar (underflow de
+  // ponto flutuante) para 0. Sem esta rede de segurança, `total=0` faria o
+  // risco final aparentar ser ~zero (falsa tranquilização perigosa). Nesse
+  // caso, caímos de volta para o risco BASAL (mais conservador) em vez de
+  // reportar um risco artificialmente baixo.
+  const underflow = !(total > 0);
+  if (underflow) {
+    return {
+      mu,
+      pretermPE: basal.pretermPE,
+      termPE: basal.termPE,
+      basalPretermPE: basal.pretermPE,
+      basalTermPE: basal.termPE,
+      aspirinRecommended: basal.pretermPE.prob >= 1 / thresholds.aspirinCutoffOneInN,
+      biomarkerLikelihoodUnderflow: true,
+    };
+  }
+
+  const pPre = cumPreterm / total;
+  const pTerm = cumTerm / total;
   return {
     mu,
     pretermPE: { prob: pPre, oneInN: oneInN(pPre) },
     termPE: { prob: pTerm, oneInN: oneInN(pTerm) },
+    basalPretermPE: basal.pretermPE,
+    basalTermPE: basal.termPE,
     aspirinRecommended: pPre >= 1 / thresholds.aspirinCutoffOneInN,
+    biomarkerLikelihoodUnderflow: false,
   };
 }

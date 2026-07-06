@@ -114,22 +114,37 @@ function bivariatePdf(x: number, y: number, mx: number, my: number, sx: number, 
 
 // ───────────────────────────── LRs ──────────────────────────────────────
 
+// O ajuste quadrático de μ0(CRL) e a proporção logística p(CRL) (Wright 2008)
+// só foram estimados na janela de rastreamento (CCN 45–84mm). Fora dela, a
+// extrapolação de um polinômio/logística pode "explodir" (ex.: CCN=650mm por
+// erro de digitação geraria μ0 absurdamente negativo). Por isso, para os
+// termos QUE SÃO FUNÇÃO DE CRL (μ0 e a proporção logística), usamos o CRL
+// clampado à janela válida — a observação x=log10(TN) em si permanece a
+// medida real, não o CRL.
+const CRL_MODEL_MIN = 45;
+const CRL_MODEL_MAX = 84;
+function clampCrlForModel(crlMm: number): number {
+  return Math.min(CRL_MODEL_MAX, Math.max(CRL_MODEL_MIN, crlMm));
+}
+
 /** Mediana esperada da TN (mm) para o CCN — componente CRL-dependente. */
 export function ntExpectedMedianMm(crlMm: number, nt: NtMixtureParams): number {
   const { b0, b1, b2 } = nt.crlDependent;
-  return Math.pow(10, b0 + b1 * crlMm + b2 * crlMm * crlMm);
+  const c = clampCrlForModel(crlMm);
+  return Math.pow(10, b0 + b1 * c + b2 * c * c);
 }
 
 /** LR da TN pelo modelo de mistura (Wright 2008). */
 export function ntMixtureLR(ntMm: number, crlMm: number, nt: NtMixtureParams, t: Trisomy): number {
   if (!(ntMm > 0) || !(crlMm > 0)) return 1;
   const x = Math.log10(ntMm);
+  const c = clampCrlForModel(crlMm);
   const { b0, b1, b2, sd: sd0 } = nt.crlDependent;
-  const mu0 = b0 + b1 * crlMm + b2 * crlMm * crlMm;
+  const mu0 = b0 + b1 * c + b2 * c * c;
   const fDep = normalPdf(x, mu0, sd0);
 
   const { alpha0, alpha1, mu: mu1, sd: sd1 } = nt.normalIndep;
-  const pNorm = 1 / (1 + Math.exp(-(alpha0 + alpha1 * crlMm)));
+  const pNorm = 1 / (1 + Math.exp(-(alpha0 + alpha1 * c)));
   const fNorm = (1 - pNorm) * fDep + pNorm * normalPdf(x, mu1, sd1);
 
   const aff = nt.affectedIndep[t];

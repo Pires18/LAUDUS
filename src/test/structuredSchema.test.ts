@@ -195,7 +195,9 @@ describe('deriveStructuredSchema — pediatria e procedimentos', () => {
 
   it('PAAF TIREOIDE resolve overlay com TI-RADS + cauda (técnica/material/controle)', () => {
     const schema = deriveStructuredSchema(fakeTemplate({ area: 'procedimentos', name: 'PAAF TIREOIDE' }), 'procedimentos');
-    expect(schema.sections.find((s) => s.id === 'alvo')?.fields.find((f) => f.id === 'tirads')?.calcId).toBe('tirads-2017');
+    const alvo = schema.sections.find((s) => s.id === 'alvo');
+    expect(alvo?.score).toBe('tirads');
+    expect(alvo?.fields.find((f) => f.id === 'composicao')?.scoreKey).toBe('composition');
     expect(schema.sections.map((s) => s.id)).toEqual(expect.arrayContaining(['tecnica', 'material', 'controle']));
   });
 

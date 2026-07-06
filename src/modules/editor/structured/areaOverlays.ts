@@ -313,6 +313,7 @@ const GYN_PELVIC: StructuredSection[] = [
     label: 'Formações Anexiais (O-RADS)',
     repeatable: true,
     itemLabel: 'Formação',
+    score: 'orads',
     fields: [
       { id: 'lado', label: 'Lado', kind: 'select', options: ['ovário direito', 'ovário esquerdo', 'extra-ovariana'] },
       { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
@@ -378,6 +379,7 @@ const MAMA_STD: StructuredSection[] = [
     label: 'Nódulos / Lesões (BI-RADS)',
     repeatable: true,
     itemLabel: 'Lesão',
+    score: 'birads',
     fields: [
       { id: 'mama', label: 'Mama', kind: 'select', options: ['direita', 'esquerda'] },
       { id: 'loc', label: 'Localização (h / dist. papila)', kind: 'text', placeholder: 'ex: 10h, 3 cm da papila' },
@@ -733,14 +735,17 @@ const SFU = ['ausente', 'SFU I', 'SFU II', 'SFU III', 'SFU IV'];
 const TEST_FLOW = ['presente/simétrico', 'reduzido', 'ausente (suspeita de torção)'];
 
 const PED_TRANSFONT: StructuredSection[] = [
-  { id: 'parenquima', label: 'Parênquima Supratentorial', fields: [{ id: 'parenquima', label: 'Aspecto', kind: 'text', placeholder: 'ecogenicidade normal, sem hemorragia' }] },
-  { id: 'ventriculos', label: 'Sistema Ventricular', fields: [
-    { id: 'atrio_ventricular', label: 'Átrio ventricular', kind: 'measure', unit: 'mm' },
-    { id: 'ventriculos_asp', label: 'Aspecto', kind: 'text', placeholder: 'simétrico, não dilatado' },
+  { id: 'parenquima', label: 'Parênquima Supratentorial', normalable: true, normalText: 'ecogenicidade normal, sem hemorragia (Papile)', fields: [
+    { id: 'hemorragia', label: 'Hemorragia (Papile)', kind: 'select', options: ['grau I', 'grau II', 'grau III', 'grau IV'] },
+    { id: 'parenquima', label: 'Outros achados', kind: 'text', placeholder: 'leucomalácia, edema...' },
   ] },
-  { id: 'linha-media', label: 'Linha Média / Núcleos', fields: [{ id: 'linha_media', label: 'Aspecto', kind: 'text', placeholder: 'centrada; núcleos e tálamos normais' }] },
-  { id: 'fossa-posterior', label: 'Fossa Posterior', fields: [{ id: 'fossa_posterior', label: 'Aspecto', kind: 'text', placeholder: 'cerebelo e cisterna magna normais' }] },
-  { id: 'doppler', label: 'Dopplerfluxometria', fields: [{ id: 'ir', label: 'IR (ACA)', kind: 'measure' }] },
+  { id: 'ventriculos', label: 'Sistema Ventricular', normalable: true, normalText: 'simétrico, não dilatado', fields: [
+    { id: 'atrio_ventricular', label: 'Átrio ventricular', kind: 'measure', unit: 'mm', hint: 'ventriculomegalia se > 10 mm' },
+    { id: 'ventriculos_asp', label: 'Aspecto', kind: 'text', placeholder: 'dilatação, assimetria' },
+  ] },
+  { id: 'linha-media', label: 'Linha Média / Núcleos', normalable: true, normalText: 'centrada; núcleos da base e tálamos normais', fields: [{ id: 'linha_media', label: 'Achados', kind: 'text', placeholder: 'desvio, cistos, calcificações' }] },
+  { id: 'fossa-posterior', label: 'Fossa Posterior', normalable: true, normalText: 'cerebelo e cisterna magna normais', fields: [{ id: 'fossa_posterior', label: 'Achados', kind: 'text', placeholder: 'malformação, hemorragia' }] },
+  { id: 'doppler', label: 'Dopplerfluxometria', fields: [{ id: 'ir', label: 'IR (ACA)', kind: 'measure', hint: 'normal ~0,65–0,85' }] },
 ];
 
 const PED_SPINE: StructuredSection[] = [
@@ -830,11 +835,18 @@ const PROC_GENERIC: StructuredSection[] = [
 ];
 
 const PROC_THYROID: StructuredSection[] = [
-  { id: 'alvo', label: 'Nódulo-alvo (ACR TI-RADS)', calcId: 'tirads-2017', fields: [
-    { id: 'alvo_loc', label: 'Localização', kind: 'text', placeholder: 'lobo/terço' },
-    { id: 'alvo_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm' },
-    { id: 'tirads', label: 'Classificação TI-RADS', kind: 'calc', calcId: 'tirads-2017' },
-  ] },
+  {
+    id: 'alvo', label: 'Nódulo-alvo (ACR TI-RADS)', score: 'tirads',
+    fields: [
+      { id: 'alvo_loc', label: 'Localização', kind: 'text', placeholder: 'lobo/terço' },
+      { id: 'alvo_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+      { id: 'composicao', label: 'Composição', kind: 'select', options: TIRADS_OPTIONS.composition, scoreKey: 'composition' },
+      { id: 'ecogenicidade', label: 'Ecogenicidade', kind: 'select', options: TIRADS_OPTIONS.echogenicity, scoreKey: 'echogenicity' },
+      { id: 'forma', label: 'Forma', kind: 'select', options: TIRADS_OPTIONS.shape, scoreKey: 'shape' },
+      { id: 'margem', label: 'Margem', kind: 'select', options: TIRADS_OPTIONS.margin, scoreKey: 'margin' },
+      { id: 'focos', label: 'Focos ecogênicos', kind: 'select', options: TIRADS_OPTIONS.foci, scoreKey: 'foci' },
+    ],
+  },
   ...PROC_TAIL,
 ];
 

@@ -111,3 +111,38 @@ describe('trava de segurança', () => {
     expect(PROVISIONAL_PE_COEFFICIENTS.validated).toBe(false);
   });
 });
+
+describe('risco basal (fatores maternos) — auditoria', () => {
+  it('sempre presente no resultado, mesmo sem biomarcadores', () => {
+    const r = risk(reference, noBio);
+    expect(r.basalPretermPE.oneInN).toBeGreaterThan(0);
+    expect(r.basalTermPE.oneInN).toBeGreaterThan(0);
+  });
+  it('sem biomarcadores, basal = final (risco só de fatores maternos)', () => {
+    const r = risk(reference, noBio);
+    expect(r.basalPretermPE.oneInN).toBe(r.pretermPE.oneInN);
+    expect(r.basalTermPE.oneInN).toBe(r.termPE.oneInN);
+    expect(r.biomarkerLikelihoodUnderflow).toBe(false);
+  });
+  it('com biomarcadores presentes, basal permanece igual ao prior (não muda com a evidência)', () => {
+    const noBioResult = risk(reference, noBio);
+    const withBio = risk(reference, { mapMoM: 1.3, utaPiMoM: 1.8, plgfMoM: 0.4 });
+    expect(withBio.basalPretermPE.oneInN).toBe(noBioResult.pretermPE.oneInN);
+    expect(withBio.basalTermPE.oneInN).toBe(noBioResult.termPE.oneInN);
+  });
+});
+
+describe('rede de segurança — underflow numérico dos biomarcadores', () => {
+  it('MoM absurdo (erro de digitação) não gera risco falsamente baixo: cai para o basal', () => {
+    // MoM=1e8 é fisiologicamente impossível (janela plausível QC é 0,2–5,0) —
+    // simula um valor bruto digitado por engano no campo de MoM.
+    const r = risk(reference, { mapMoM: 1e8, utaPiMoM: 1e8, plgfMoM: 1e8 });
+    expect(r.biomarkerLikelihoodUnderflow).toBe(true);
+    expect(r.pretermPE.oneInN).toBe(r.basalPretermPE.oneInN);
+    expect(r.termPE.oneInN).toBe(r.basalTermPE.oneInN);
+  });
+  it('valores plausíveis normais não disparam a rede de segurança', () => {
+    const r = risk(reference, { mapMoM: 1.0, utaPiMoM: 1.0, plgfMoM: 1.0 });
+    expect(r.biomarkerLikelihoodUnderflow).toBe(false);
+  });
+});

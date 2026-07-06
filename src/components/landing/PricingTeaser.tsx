@@ -47,7 +47,11 @@ export function PricingTeaser({ onShowPricing, onEnter }: Props) {
     <section className="bg-gradient-to-b from-ink-50 to-white border-y border-ink-100">
       <div className="max-w-6xl mx-auto px-6 py-24">
         <div className="text-center max-w-xl mx-auto mb-14">
-          <h2 className="text-3xl sm:text-4xl font-black text-ink-900 tracking-tight mb-3">Planos para todo tamanho de clínica</h2>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-ink-200 shadow-sm mb-5">
+            <Sparkles size={13} className="text-brand-500" />
+            <span className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Planos para médicos individuais</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-ink-900 tracking-tight mb-3">Assine no seu ritmo, sem burocracia</h2>
           <p className="text-ink-500 font-medium">Comece grátis e assine só quando fizer sentido para a sua rotina. Cancele quando quiser.</p>
         </div>
 

@@ -3,9 +3,11 @@ import { PricingPlans } from './PricingPlans';
 import { scrollToSection } from '../utils/scrollToSection';
 import { Nav } from './landing/Nav';
 import { Hero } from './landing/Hero';
+import { FirstDay } from './landing/FirstDay';
 import { HowItWorks } from './landing/HowItWorks';
 import { Features } from './landing/Features';
 import { TrustSecurity } from './landing/TrustSecurity';
+import { ForClinics } from './landing/ForClinics';
 import { PricingTeaser } from './landing/PricingTeaser';
 import { Faq } from './landing/Faq';
 import { Footer } from './landing/Footer';
@@ -55,9 +57,11 @@ export function LandingScreen({ onEnter }: Props) {
     <div className="h-full w-full overflow-y-auto bg-white font-sans">
       <Nav onEnter={onEnter} onShowPricing={() => setShowPricing(true)} />
       <Hero onEnter={onEnter} onShowPricing={() => setShowPricing(true)} />
+      <FirstDay />
       <HowItWorks />
       <Features />
       <TrustSecurity onOpenPrivacy={() => navigateTo('/privacidade')} />
+      <ForClinics />
       <PricingTeaser onShowPricing={() => setShowPricing(true)} onEnter={onEnter} />
       <Faq />
       <Footer

@@ -109,7 +109,7 @@ export function Hero({ onEnter, onShowPricing }: Props) {
             Do agendamento ao<br className="hidden sm:block" /> laudo assinado — <span className="bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent">em minutos</span>.
           </h1>
           <p className="text-ink-500 text-lg sm:text-xl leading-relaxed font-medium max-w-2xl mx-auto mb-10">
-            Plataforma completa de laudos ultrassonográficos com IA, PACS/DICOM integrado e gestão de clínica. Foque no diagnóstico; a LAUD.IA cuida do resto.
+            Plataforma para o <strong className="text-ink-700">médico que faz o próprio laudo</strong> — IA, PACS/DICOM integrado e agenda, tudo em um só lugar. Foque no diagnóstico; a LAUD.IA cuida do resto.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 mb-9">
             <button onClick={() => onEnter('signup')} className="h-13 px-8 py-3.5 rounded-2xl bg-brand-600 text-white text-xs font-black uppercase tracking-widest hover:bg-brand-700 shadow-xl shadow-brand-500/30 hover:shadow-brand-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95">

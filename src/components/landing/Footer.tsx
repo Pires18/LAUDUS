@@ -25,6 +25,7 @@ export function Footer({ onShowPricing, onNavigateLegal }: Props) {
               <a href="#funcionalidades" onClick={(e) => { e.preventDefault(); scrollToSection('funcionalidades'); }} className="text-ink-400 hover:text-white transition-colors">Funcionalidades</a>
               <a href="#seguranca" onClick={(e) => { e.preventDefault(); scrollToSection('seguranca'); }} className="text-ink-400 hover:text-white transition-colors">Segurança</a>
               <button onClick={onShowPricing} className="text-ink-400 hover:text-white transition-colors text-left">Planos</button>
+              <a href="#clinicas" onClick={(e) => { e.preventDefault(); scrollToSection('clinicas'); }} className="text-ink-400 hover:text-white transition-colors">Para Clínicas</a>
               <a href="#faq" onClick={(e) => { e.preventDefault(); scrollToSection('faq'); }} className="text-ink-400 hover:text-white transition-colors">FAQ</a>
             </div>
           </div>

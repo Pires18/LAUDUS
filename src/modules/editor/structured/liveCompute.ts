@@ -89,6 +89,8 @@ export function computeDerivations(
         }
       }
 
+      const scoreId = (suffix: string) => `${section.id}${section.repeatable ? `@${i}` : ''}__${suffix}`;
+
       // Escore TI-RADS a partir dos descritores (scoreKey)
       if (section.score === 'tirads') {
         const desc: Record<string, string> = {};
@@ -100,7 +102,7 @@ export function computeDerivations(
         const r = tiradsScore(desc);
         if (r) {
           out.push({
-            id: `${section.id}${section.repeatable ? `@${i}` : ''}__tr`,
+            id: scoreId('tr'),
             sectionId: section.id,
             label: `${prefix}TI-RADS`,
             text: `TR${r.tr} (${r.label}) · ${r.points} pts · ${r.conduct}`,
@@ -108,6 +110,39 @@ export function computeDerivations(
           });
         }
       }
+
+      // Sugestão BI-RADS a partir da morfologia
+      if (section.score === 'birads') {
+        const s = biradsSuggest({
+          forma: fieldValueToText(v[fid('forma')]),
+          orientacao: fieldValueToText(v[fid('orientacao')]),
+          margem: fieldValueToText(v[fid('margem')]),
+          eco: fieldValueToText(v[fid('eco')]),
+          acusticas: fieldValueToText(v[fid('acusticas')]),
+        });
+        if (s) out.push({ id: scoreId('bi'), sectionId: section.id, label: `${prefix}Sugestão`, text: s.detail ? `${s.label} (${s.detail})` : s.label, alert: s.suspicious });
+      }
+
+      // Sugestão O-RADS a partir do tipo/conteúdo/fluxo
+      if (section.score === 'orads') {
+        const s = oradsSuggest({
+          tipo: fieldValueToText(v[fid('tipo')]),
+          conteudo: fieldValueToText(v[fid('conteudo')]),
+          septos: fieldValueToText(v[fid('septos')]),
+          vascularizacao: fieldValueToText(v[fid('vascularizacao')]),
+        });
+        if (s) out.push({ id: scoreId('or'), sectionId: section.id, label: `${prefix}Sugestão`, text: s.detail ? `${s.label} (${s.detail})` : s.label, alert: s.suspicious });
+      }
+    }
+  }
+
+  // ── Quadril infantil: tipo de Graf a partir dos ângulos α (e β) ──
+  for (const side of ['d', 'e'] as const) {
+    const alpha = num(v[`alfa_${side}`]);
+    const beta = num(v[`beta_${side}`]);
+    if (alpha != null) {
+      const g = grafType(alpha, beta ?? undefined);
+      if (g) out.push({ id: `graf_${side}`, sectionId: `quadril-${side}`, label: 'Tipo de Graf', text: g, alert: alpha < 60 });
     }
   }
 

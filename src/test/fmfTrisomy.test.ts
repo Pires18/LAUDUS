@@ -206,6 +206,39 @@ describe('trava de segurança', () => {
   });
 });
 
+describe('CCN fora da janela de rastreamento (45–84mm) — clamp anti-extrapolação', () => {
+  // O ajuste quadrático de μ0(CRL) e a proporção logística p(CRL) (Wright 2008)
+  // só foram estimados dentro da janela 45–84mm. Um CCN digitado incorretamente
+  // (ex.: 650mm em vez de 65mm) não pode fazer o modelo extrapolar para um
+  // μ0 absurdo — o CRL usado nos termos dependentes de CRL deve ser clampado.
+  it('mediana esperada da TN não se altera fora da janela (clampada no limite)', () => {
+    const mAbove = ntExpectedMedianMm(650, P.nt);
+    const mAt84 = ntExpectedMedianMm(84, P.nt);
+    expect(mAbove).toBeCloseTo(mAt84, 10);
+
+    const mBelow = ntExpectedMedianMm(10, P.nt);
+    const mAt45 = ntExpectedMedianMm(45, P.nt);
+    expect(mBelow).toBeCloseTo(mAt45, 10);
+  });
+  it('LR da TN permanece estável (não "explode") para CCN muito acima da janela', () => {
+    const lrAt84 = ntMixtureLR(3.4, 84, P.nt, 't21');
+    const lrWayAbove = ntMixtureLR(3.4, 650, P.nt, 't21');
+    expect(lrWayAbove).toBeCloseTo(lrAt84, 8);
+  });
+  it('LR da TN permanece estável para CCN muito abaixo da janela', () => {
+    const lrAt45 = ntMixtureLR(2.0, 45, P.nt, 't21');
+    const lrWayBelow = ntMixtureLR(2.0, 5, P.nt, 't21');
+    expect(lrWayBelow).toBeCloseTo(lrAt45, 8);
+  });
+  it('a observação de TN em si (não o CRL) continua sendo a real, não clampada', () => {
+    // TN=8mm com CCN fora de janela ainda deve gerar LR muito alta para T21
+    // (a TN medida é grosseiramente aumentada, isso não pode ser "escondido"
+    // pelo clamp do CRL, que só afeta os termos μ0/proporção do modelo).
+    const lr = ntMixtureLR(8.0, 650, P.nt, 't21');
+    expect(lr).toBeGreaterThan(10);
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 // VALIDAÇÃO POR "FATOS-OURO" PUBLICADOS — sem depender de calculadora externa.
 // Cada valor abaixo é um número declarado EXPLICITAMENTE no texto/abstract

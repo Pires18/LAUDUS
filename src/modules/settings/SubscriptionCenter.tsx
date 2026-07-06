@@ -12,7 +12,7 @@ import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText, Wallet,
   Building2, RefreshCw, ChevronDown, ChevronUp,
-  Package, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus,
+  Package, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus, Mail,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -786,16 +786,21 @@ export function SubscriptionCenter() {
             loading={loadingAddon === 'appointments'}
           />
 
-          {/* Clínicas */}
+          {/* Clínicas — não é autoatendimento: múltiplas unidades/equipe têm
+              plano sob medida, então o CTA leva a contato comercial, não a
+              checkout automático. Usuário que JÁ tem o módulo ativo continua
+              vendo "Ativo no Plano" normalmente (sem mudança retroativa). */}
           <AddonCard
             icon={Hospital} iconColor="teal"
             title="Módulo de Clínicas"
             description={ac.clinics?.description ?? ADDONS_DEFAULT.clinics!.description}
-            price={addonPriceMeta(ac.clinics, 49)}
+            price="Sob consulta"
             active={hasClinics}
-            actionLabel="Assinar Módulo"
-            onAction={() => handleBuyAddon('clinics')}
-            loading={loadingAddon === 'clinics'}
+            actionLabel="Fale Conosco"
+            actionIcon={Mail}
+            onAction={() => {
+              window.location.href = 'mailto:contato.laudus@gmail.com?subject=M%C3%B3dulo%20de%20Cl%C3%ADnicas&body=Ol%C3%A1%2C%20gostaria%20de%20falar%20sobre%20o%20m%C3%B3dulo%20de%20cl%C3%ADnicas.';
+            }}
           />
         </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import {
   Loader2, Lock, Mail, KeyRound, Eye, EyeOff,
-  Sparkles, Server, ShieldCheck, Building2, FlaskConical,
+  Sparkles, Server, ShieldCheck, Stethoscope, FlaskConical,
 } from 'lucide-react';
 import { LogoIcon } from './LogoIcon';
 import { PricingPlans } from './PricingPlans';
@@ -19,7 +19,7 @@ const VALUE_POINTS = [
   { icon: Sparkles, title: 'IA com revisão médica obrigatória', text: 'O LAUD.IA sugere o texto do laudo; a decisão clínica e a assinatura são sempre do médico.' },
   { icon: Server, title: 'PACS/DICOM gerenciado', text: 'Imagens do aparelho entram direto na worklist, sem pendrive e sem servidor local.' },
   { icon: ShieldCheck, title: 'LGPD by design', text: 'Identificadores do paciente são removidos antes de qualquer chamada à IA.' },
-  { icon: Building2, title: 'Multi-clínica', text: 'Agenda, pacientes e laudos organizados por clínica, com permissões por equipe.' },
+  { icon: Stethoscope, title: 'Feito pra quem faz o próprio laudo', text: 'Pensado para o médico individual — sem burocracia de clínica, sem contrato mínimo.' },
 ];
 
 export function LoginScreen({ initialMode = 'login', onBack }: Props) {

@@ -23,6 +23,7 @@ export function Nav({ onEnter, onShowPricing }: Props) {
       <a href="#funcionalidades" onClick={goTo('funcionalidades')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Funcionalidades</a>
       <a href="#seguranca" onClick={goTo('seguranca')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Segurança</a>
       <button onClick={() => { onShowPricing(); setMobileMenu(false); }} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors text-left">Planos</button>
+      <a href="#clinicas" onClick={goTo('clinicas')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">Para Clínicas</a>
       <a href="#faq" onClick={goTo('faq')} className="text-xs font-bold text-ink-500 hover:text-ink-900 transition-colors">FAQ</a>
     </>
   );
@@ -31,7 +32,7 @@ export function Nav({ onEnter, onShowPricing }: Props) {
     <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-ink-100">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-white border border-ink-200 flex items-center justify-center overflow-hidden shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-white border border-ink-200 flex items-center justify-center overflow-hidden shrink-0">
             <LogoIcon size={22} />
           </div>
           <div className="flex items-center">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tiradsScore, TIRADS_OPTIONS } from '../modules/editor/structured/scoring';
+import { tiradsScore, TIRADS_OPTIONS, biradsSuggest, oradsSuggest, grafType } from '../modules/editor/structured/scoring';
 import { deriveStructuredSchema, summarizeStructured } from '../modules/editor/structured/deriveSchema';
 import { computeDerivations } from '../modules/editor/structured/liveCompute';
 import { normalKey, countKey, itemFieldId } from '../modules/editor/structured/structuredKeys';
@@ -39,6 +39,29 @@ describe('scoring — ACR TI-RADS inline', () => {
   it('as opções de descritor batem com as chaves de pontuação', () => {
     expect(TIRADS_OPTIONS.composition).toContain('sólida');
     expect(TIRADS_OPTIONS.shape.length).toBe(2);
+  });
+});
+
+describe('scoring — sugestões BI-RADS / O-RADS e Graf', () => {
+  it('BI-RADS: morfologia benigna → 3; suspeita → 4/5', () => {
+    expect(biradsSuggest({ forma: 'oval', orientacao: 'paralela', margem: 'circunscrita' })?.suspicious).toBe(false);
+    const susp = biradsSuggest({ forma: 'irregular', orientacao: 'não paralela (mais alta que larga)', margem: 'espiculada' });
+    expect(susp?.suspicious).toBe(true);
+    expect(susp?.label).toMatch(/BI-RADS/);
+    expect(biradsSuggest({})).toBeNull();
+  });
+
+  it('O-RADS: cisto unilocular anecoico → benigno; sólido com fluxo → alto risco', () => {
+    expect(oradsSuggest({ tipo: 'unilocular', conteudo: 'anecoico', septos: 'ausentes' })?.suspicious).toBe(false);
+    const solid = oradsSuggest({ tipo: 'sólida', vascularizacao: '4 – marcante' });
+    expect(solid?.suspicious).toBe(true);
+    expect(solid?.label).toMatch(/O-RADS 5/);
+  });
+
+  it('Graf: α≥60 → tipo I; α<43 → displásico', () => {
+    expect(grafType(64)).toMatch(/^I /);
+    expect(grafType(40)).toMatch(/III/);
+    expect(grafType(0)).toBeNull();
   });
 });
 

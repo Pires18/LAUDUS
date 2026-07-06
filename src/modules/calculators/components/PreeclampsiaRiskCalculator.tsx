@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CalculatorProps } from '../registry';
-import { HeartPulse, AlertTriangle, Pill, Info } from 'lucide-react';
-import { CalculatorInput, CategorySelector, ResultCard } from './CalculatorUI';
+import { HeartPulse, AlertTriangle, Pill, Info, ArrowRight } from 'lucide-react';
+import { CalculatorInput, CategorySelector } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 import {
   computePreeclampsiaRisk, DEFAULT_PE_THRESHOLDS,
@@ -42,6 +42,39 @@ const DIABETES_OPTIONS = [
   { label: 'Tipo 1', value: 'type1' },
   { label: 'Tipo 2', value: 'type2' },
 ];
+
+function PeJourneyCard({
+  label, basalOneInN, finalOneInN, variant, recommendation,
+}: {
+  label: string;
+  basalOneInN: number;
+  finalOneInN: number;
+  variant: 'red' | 'emerald' | 'brand';
+  recommendation?: string;
+}) {
+  const styles = {
+    red: 'bg-rose-50 border-rose-200 text-rose-900',
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+    brand: 'bg-brand-50 border-brand-200 text-brand-900',
+  }[variant];
+  return (
+    <div className={classNames('rounded-2xl border-2 p-5 space-y-3 shadow-sm', styles)}>
+      <span className="text-[12px] font-black uppercase tracking-widest">{label}</span>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 text-center py-2">
+          <span className="text-[9px] font-black uppercase tracking-widest opacity-60 block mb-1">Basal (fatores maternos)</span>
+          <span className="text-lg font-black opacity-80">{formatOneInN(basalOneInN)}</span>
+        </div>
+        <ArrowRight size={20} className="opacity-40 shrink-0" />
+        <div className="flex-1 text-center py-2 bg-white/50 rounded-xl">
+          <span className="text-[9px] font-black uppercase tracking-widest opacity-60 block mb-1">Corrigido (final)</span>
+          <span className="text-2xl font-black">{formatOneInN(finalOneInN)}</span>
+        </div>
+      </div>
+      {recommendation && <p className="text-[10px] font-bold leading-relaxed pt-1">{recommendation}</p>}
+    </div>
+  );
+}
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -143,6 +176,9 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
     const conduta = result.aspirinRecommended
       ? 'Risco elevado de PE pré-termo — considerar AAS 150 mg/noite (11–14 até 36 sem).'
       : 'Risco não elevado para PE pré-termo pelo rastreamento.';
+    const underflowNote = result.biomarkerLikelihoodUnderflow
+      ? ' ⚠️ Biomarcadores informados fora de faixa plausível — risco calculado apenas com fatores maternos (basal).'
+      : '';
 
     onChange({
       age, weightKg, heightCm, gaWeeks, racialOrigin, conception, parity, previousPeGaWeeks,
@@ -150,11 +186,15 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
       mapMmHg, mapMoM: mapMoM ? Number(mapMoM.toFixed(3)) : '',
       utaPiRaw, utaPiMoM: utaPiMoM ? Number(utaPiMoM.toFixed(3)) : '',
       plgfRaw, plgfMoM: plgfMoM ? Number(plgfMoM.toFixed(3)) : '',
+      riscoBasalPePretermo: fmt(result.basalPretermPE.oneInN),
+      riscoBasalPeTermo: fmt(result.basalTermPE.oneInN),
       riscoPePretermo: fmt(result.pretermPE.oneInN),
       riscoPeTermo: fmt(result.termPE.oneInN),
+      biomarkerLikelihoodUnderflow: result.biomarkerLikelihoodUnderflow,
       _summary:
-        `${disclaimer}Risco de pré-eclâmpsia (1º trimestre) — pré-termo (<37s): ${fmt(result.pretermPE.oneInN)}; ` +
-        `a termo: ${fmt(result.termPE.oneInN)}. ${conduta}`,
+        `${disclaimer}Risco de pré-eclâmpsia (1º trimestre) — basal: pré-termo ${fmt(result.basalPretermPE.oneInN)}, ` +
+        `a termo ${fmt(result.basalTermPE.oneInN)}; corrigido: pré-termo (<37s) ${fmt(result.pretermPE.oneInN)}, ` +
+        `a termo ${fmt(result.termPE.oneInN)}. ${conduta}${underflowNote}`,
     });
   // `result` já reage a age/weightKg/heightCm/racialOrigin/conception/parity/
   // previousPeGaWeeks/diabetes/chronicHypertension/sleOrAps/familyHistoryPE
@@ -259,9 +299,20 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
 
       {result ? (
         <div className="flex flex-col gap-3">
-          <ResultCard
+          {result.biomarkerLikelihoodUnderflow && (
+            <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-200 flex gap-3 items-start">
+              <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-[11px] text-amber-800 font-bold leading-relaxed">
+                Os biomarcadores informados estão fora de qualquer faixa plausível — por segurança, o
+                risco abaixo é calculado apenas com fatores maternos (basal), ignorando os biomarcadores.
+                Confira os valores digitados.
+              </div>
+            </div>
+          )}
+          <PeJourneyCard
             label="PE Pré-termo (< 37 semanas)"
-            value={formatOneInN(result.pretermPE.oneInN)}
+            basalOneInN={result.basalPretermPE.oneInN}
+            finalOneInN={result.pretermPE.oneInN}
             recommendation={
               result.aspirinRecommended
                 ? `Acima do cutoff (1:${DEFAULT_PE_THRESHOLDS.aspirinCutoffOneInN}) — considerar AAS 150 mg/noite (11–14 até 36 sem).`
@@ -269,9 +320,10 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
             }
             variant={result.aspirinRecommended ? 'red' : 'emerald'}
           />
-          <ResultCard
+          <PeJourneyCard
             label="PE a Termo"
-            value={formatOneInN(result.termPE.oneInN)}
+            basalOneInN={result.basalTermPE.oneInN}
+            finalOneInN={result.termPE.oneInN}
             variant="brand"
           />
           {result.aspirinRecommended && (
