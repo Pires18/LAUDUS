@@ -64,6 +64,42 @@ function ensureIsolationStyle(): void {
   document.head.appendChild(style);
 }
 
+// Cache do módulo pagedjs — evita reimportar/reparsear a lib a cada impressão.
+let pagedjsModulePromise: Promise<typeof import('pagedjs')> | null = null;
+function loadPagedjs(): Promise<typeof import('pagedjs')> {
+  if (!pagedjsModulePromise) pagedjsModulePromise = import('pagedjs');
+  return pagedjsModulePromise;
+}
+
+/**
+ * Pré-aquece o import do Paged.js assim que o médico abre a pré-visualização
+ * (bem antes de clicar em "Imprimir"), pra tirar o custo de download/parse do
+ * caminho crítico do clique.
+ */
+export function preloadPrintEngine(): void {
+  void loadPagedjs();
+}
+
+/**
+ * Espera as imagens do laudo (fotos DICOM, logo, assinatura) carregarem ANTES
+ * de entregar o conteúdo ao Paged.js. Sem isso, a paginação mede alturas com
+ * imagens ainda em 0×0 (carregando), o que já causou saltos/corte de página —
+ * e cada `<img>` demora o round-trip até o proxy do PACS em vez de já estar
+ * pronta quando a paginação começa.
+ */
+async function waitForImages(root: DocumentFragment, timeoutMs = 8000): Promise<void> {
+  const images = Array.from(root.querySelectorAll('img'));
+  await Promise.all(images.map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const done = () => { clearTimeout(timer); resolve(); };
+      const timer = setTimeout(done, timeoutMs);
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+  }));
+}
+
 /**
  * Pagina o laudo e dispara a impressão/geração de PDF.
  * @param settings Configurações de layout (fonte, margens…).
@@ -122,7 +158,8 @@ export async function printLaudo(settings: AppSettings, footerId: string): Promi
   };
 
   try {
-    const { Previewer } = await import('pagedjs');
+    const { Previewer } = await loadPagedjs();
+    await waitForImages(template.content);
     const previewer = new Previewer();
     await previewer.preview(template.content, [{ 'laudo-print.css': css }], out);
 

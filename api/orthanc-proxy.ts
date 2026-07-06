@@ -40,6 +40,14 @@ function isBlockedTarget(url: URL): string | null {
   return null;
 }
 
+/**
+ * Preview/arquivo/frame de uma instância DICOM são imutáveis (mesmo ID ==
+ * mesmo conteúdo pra sempre no Orthanc) — seguro para cache longo no navegador.
+ */
+function isImmutableInstanceContent(pathname: string): boolean {
+  return /\/instances\/[^/]+\/(preview|file|frames\/\d+(\/(preview|raw))?)$/.test(pathname);
+}
+
 export default async function handler(req: any, res: any) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -162,11 +170,19 @@ export default async function handler(req: any, res: any) {
         lowerKey !== 'www-authenticate' &&
         lowerKey !== 'content-encoding' &&
         lowerKey !== 'connection' &&
-        lowerKey !== 'keep-alive'
+        lowerKey !== 'keep-alive' &&
+        lowerKey !== 'cache-control'
       ) {
         res.setHeader(key, value);
       }
     });
+
+    // Conteúdo de pixel de uma instância DICOM (preview/file/frame) nunca muda
+    // para o mesmo ID — permite ao navegador reusar a resposta ao reabrir o
+    // modal ou revisitar uma foto, sem passar de novo pela função/Vercel.
+    if (req.method === 'GET' && response.ok && isImmutableInstanceContent(targetUrlObj.pathname)) {
+      res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    }
 
     const arrayBuffer = await response.arrayBuffer();
     res.end(Buffer.from(arrayBuffer));

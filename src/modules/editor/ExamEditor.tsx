@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { classNames, formatDate } from '../../utils/format';
 import { logger } from '../../utils/logger';
 import { PrintLayout } from '../export/PrintLayout';
-import { printLaudo } from '../export/printReport';
+import { printLaudo, preloadPrintEngine } from '../export/printReport';
 import { ReportPreview } from '../export/ReportDocument';
 import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
@@ -125,6 +125,13 @@ export function ExamEditor({ examId }: Props) {
   const [unlockReason, setUnlockReason] = useState('');
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  // Pré-aquece o Paged.js assim que a prévia abre — quando o médico clicar em
+  // "Imprimir/PDF" o módulo já está baixado/parseado, sem esperar nessa hora.
+  useEffect(() => {
+    if (showPreview) preloadPrintEngine();
+  }, [showPreview]);
 
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -463,23 +470,32 @@ export function ExamEditor({ examId }: Props) {
     const backupBaseUrl = getActivePacsUrl(settings, true);
 
     try {
-      for (let i = 0; i < instances.length; i++) {
-        const instance = instances[i];
-        setPrintProgress(`Otimizando imagens (${i + 1}/${instances.length})...`);
-        const isBackup = instance.serverSource === 'backup';
-        const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
-        const proxyPath = getProxyEndpoint(settings, isBackup);
-        // Inclui token Firebase (proxy Vercel) + agentSecret (agente seguro) além
-        // de user/senha — sem eles, o fetch para o PDF falha com 401/403 na nuvem.
-        const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
+      // Baixa as imagens em paralelo (lote limitado, em vez de uma por vez) —
+      // com N fotos, o tempo total deixa de ser N × round-trip e passa a ser
+      // ~ (N / CONCURRENCY) × round-trip.
+      const CONCURRENCY = 6;
+      let completed = 0;
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < instances.length) {
+          const i = cursor++;
+          const instance = instances[i];
+          const isBackup = instance.serverSource === 'backup';
+          const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
+          const proxyPath = getProxyEndpoint(settings, isBackup);
+          // Inclui token Firebase (proxy Vercel) + agentSecret (agente seguro) além
+          // de user/senha — sem eles, o fetch para o PDF falha com 401/403 na nuvem.
+          const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
 
-        // Fetch the image as blob
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        localUrlsMap[instance.ID] = blobUrl;
-      }
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+          const blob = await res.blob();
+          localUrlsMap[instance.ID] = URL.createObjectURL(blob);
+          completed++;
+          setPrintProgress(`Otimizando imagens (${completed}/${instances.length})...`);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, instances.length) }, worker));
 
       setPrintLocalUrls(localUrlsMap);
       setSelectedInstancesForPrint(instances);
@@ -1330,14 +1346,22 @@ export function ExamEditor({ examId }: Props) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
-                  void printLaudo(settings, footerId);
+                  if (isPrinting) return;
+                  setIsPrinting(true);
+                  try {
+                    const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
+                    await printLaudo(settings, footerId);
+                  } finally {
+                    setIsPrinting(false);
+                  }
                 }}
-                className="h-9 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center gap-1.5 active:scale-95"
+                disabled={isPrinting}
+                className="h-9 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center gap-1.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Printer size={13} /> Imprimir / PDF
+                {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+                {isPrinting ? 'Preparando…' : 'Imprimir / PDF'}
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setShowPreview(false); }}

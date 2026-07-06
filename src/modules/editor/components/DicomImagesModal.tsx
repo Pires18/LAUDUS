@@ -49,6 +49,39 @@ export function DicomImagesModal({
   const initializedRef = useRef(false);
   const prevInstanceIdsRef = useRef<string[]>([]);
 
+  // Pré-computa a URL de preview de cada instância uma única vez por
+  // estudo/config — evita reconstruir a string de todas as fotos a cada
+  // re-render (ex.: ao clicar numa miniatura). Depende dos campos PRIMITIVOS
+  // de settings (não do objeto inteiro) — se `settings` for recriado a cada
+  // render do pai (comum nesse app), depender do objeto faria este useMemo
+  // recalcular sempre, gerando um array novo por render e dando loop no efeito
+  // de pré-carregamento abaixo (já aconteceu — ver histórico).
+  const instancesWithUrls = useMemo(() => {
+    return instances.map((instance) => {
+      const isBackup = instance.serverSource === 'backup';
+      const currentBaseUrl = getActivePacsUrl(settings, isBackup);
+      const proxyPath = getProxyEndpoint(settings, isBackup);
+      const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
+      return { instance, previewUrl };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    instances,
+    settings.dicomViewerUrl,
+    settings.dicomBackupViewerUrl,
+    settings.dicomTailscalePublicUrl,
+    settings.dicomBackupTailscalePublicUrl,
+    settings.dicomUsername,
+    settings.dicomBackupUsername,
+    settings.dicomPassword,
+    settings.dicomBackupPassword,
+    settings.dicomAgentSecret,
+    settings.dicomBackupAgentSecret,
+    settings.dicomLocalAgentUrl,
+    settings.dicomBackupLocalAgentUrl,
+    settings.dicomTenantId,
+  ]);
+
   // Reset active image and adjustments on close/open
   useEffect(() => {
     if (open) {
@@ -121,13 +154,28 @@ export function DicomImagesModal({
   }, [instances, activeInstanceId]);
 
   const activeImageUrl = useMemo(() => {
-    if (!activeInstance) return null;
-    const isBackup = activeInstance.serverSource === 'backup';
-    const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-    const proxyPath = getProxyEndpoint(settings, isBackup);
+    if (!activeInstanceId) return null;
+    return instancesWithUrls.find(({ instance }) => instance.ID === activeInstanceId)?.previewUrl || null;
+  }, [instancesWithUrls, activeInstanceId]);
 
-    return `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
-  }, [activeInstance, settings]);
+  // Pré-carrega (fora da tela) as fotos vizinhas da atual — ao clicar em
+  // "próxima" a imagem já está no cache do navegador, sem espera. Como
+  // `instancesWithUrls` agora só muda quando as fotos ou os campos PRIMITIVOS
+  // de conexão mudam (não a cada render), este efeito não fica re-disparando.
+  useEffect(() => {
+    if (!activeInstanceId || instancesWithUrls.length === 0) return;
+    const idx = instancesWithUrls.findIndex(({ instance }) => instance.ID === activeInstanceId);
+    if (idx === -1) return;
+    const neighborUrls = [idx - 1, idx + 1]
+      .map((i) => instancesWithUrls[i]?.previewUrl)
+      .filter((u): u is string => !!u);
+    const preloadImages = neighborUrls.map((url) => {
+      const img = new Image();
+      img.src = url;
+      return img;
+    });
+    return () => { preloadImages.forEach((img) => { img.src = ''; }); };
+  }, [activeInstanceId, instancesWithUrls]);
 
 
 
@@ -224,13 +272,9 @@ export function DicomImagesModal({
               {/* Scrollable Thumbnails Grid */}
               <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
                 <div className="grid grid-cols-2 gap-2.5">
-                  {instances.map((instance, idx) => {
+                  {instancesWithUrls.map(({ instance, previewUrl }, idx) => {
                     const isSelected = selectedIds.has(instance.ID);
                     const isActive = activeInstanceId === instance.ID;
-                    const isBackup = instance.serverSource === 'backup';
-                    const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-                    const proxyPath = getProxyEndpoint(settings, isBackup);
-                    const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
                     const instNum = instance.MainDicomTags?.InstanceNumber || (idx + 1);
 
                     return (
@@ -263,6 +307,7 @@ export function DicomImagesModal({
                           <DicomThumbnail
                             src={previewUrl}
                             alt={`Instance ${instNum}`}
+                            priority={idx < 8 || isActive}
                             className={classNames(
                               "transition-transform duration-500 group-hover:scale-105",
                               isActive ? "scale-97" : ""
@@ -308,6 +353,7 @@ export function DicomImagesModal({
                     <img
                       src={activeImageUrl}
                       alt="Viewport"
+                      fetchPriority="high"
                       style={{
                         maxHeight: '100%',
                         maxWidth: '100%',

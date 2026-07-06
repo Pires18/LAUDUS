@@ -184,10 +184,16 @@ function localOrthancWorklistPlugin() {
             response.headers.forEach((value, key) => {
               const lowerKey = key.toLowerCase();
               // Prevent browser from prompting for Basic Auth by stripping WWW-Authenticate
-              if (lowerKey !== 'transfer-encoding' && lowerKey !== 'www-authenticate') {
+              if (lowerKey !== 'transfer-encoding' && lowerKey !== 'www-authenticate' && lowerKey !== 'cache-control') {
                 res.setHeader(key, value);
               }
             });
+            // Preview/file/frame de uma instância DICOM são imutáveis (mesmo ID
+            // == mesmo conteúdo pra sempre) — evita rebaixar o cache ao trocar
+            // de foto e voltar (espelha api/orthanc-proxy.ts).
+            if (req.method === 'GET' && response.ok && /\/instances\/[^/]+\/(preview|file|frames\/\d+(\/(preview|raw))?)$/.test(targetUrlObj.pathname)) {
+              res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+            }
             const arrayBuffer = await response.arrayBuffer();
             res.end(Buffer.from(arrayBuffer));
           } catch (err: any) {
