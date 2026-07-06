@@ -109,8 +109,13 @@ systemctl daemon-reload && systemctl enable --now laudus-agent && systemctl rest
 sleep 1
 systemctl is-active --quiet laudus-agent && ok "Agente ativo (modo $MODE)." || warn "Agente não subiu — veja: journalctl -u laudus-agent -n 30"
 
-log "5/6 Tailscale Funnel (porta 3000) + hardening"
+log "5/6 Tailscale Funnel (porta 3000) + rotas + hardening"
 tailscale funnel --bg 3000 >/dev/null 2>&1 && ok "Funnel ativo." || warn "Funnel não ativou — confira HTTPS/MagicDNS na tailnet e rode: tailscale funnel --bg 3000"
+# Aceita rotas de sub-rede anunciadas por relés (GL.iNet/PC) — sem isso, a VM
+# recebe o SYN do aparelho (IP da LAN do cliente) mas não sabe o caminho de
+# volta pra responder: o C-ECHO trava em "tempo esgotado" mesmo com a porta
+# do tenant certa e o container saudável. Idempotente (não perde config já feita).
+tailscale up --accept-routes >/dev/null 2>&1 && ok "Rotas de sub-rede (relés) aceitas." || warn "Não foi possível aceitar rotas automaticamente — rode: tailscale up --accept-routes"
 [ "$MODE" = "multi" ] && { DATA_DISK="$DATA_DISK" /opt/pacs-harden.sh || warn "Hardening retornou aviso."; }
 
 log "6/6 Pronto!"
