@@ -889,12 +889,14 @@ export function DicomControlCenter() {
                 {/* Menu Lateral de Seções */}
                 <div className="col-span-1 border-r border-ink-100 bg-ink-50/50 p-4 space-y-1">
                   {[
-                    { group: '▶ Comece aqui', items: [
+                    { group: '▶ Para você (cliente do PACS)', items: [
                       { id: 'overview', label: 'Visão geral', icon: BookOpen },
-                      { id: 'setup_vm', label: '1 · Montar a VM (nuvem)', icon: Cloud },
-                      { id: 'app_config', label: '2 · Configurar no LAUD.US', icon: Server },
-                      { id: 'tailscale', label: '3 · Tailscale (VM ↔ seu PC/roteador)', icon: Network },
-                      { id: 'relay', label: '4 · Relé + ultrassom', icon: Radio },
+                      { id: 'relay', label: 'Conectar relé + ultrassom', icon: Radio },
+                    ]},
+                    { group: 'Avançado (infraestrutura / operador)', items: [
+                      { id: 'setup_vm', label: 'Montar a VM (nuvem)', icon: Cloud },
+                      { id: 'app_config', label: 'Configurar no LAUD.US (manual)', icon: Server },
+                      { id: 'tailscale', label: 'Administração da rede (Tailscale)', icon: Network },
                     ]},
                     { group: 'Extras', items: [
                       { id: 'backup', label: 'Backup local (opcional)', icon: HardDrive },
@@ -972,27 +974,40 @@ export function DicomControlCenter() {
 
                     return (
                     <>
-                  {selectedSection === 'overview' && (
+                  {selectedSection === 'overview' && (() => {
+                    const inst = draft.pacsInstance;
+                    const hasPacsReady = inst?.status === 'ready';
+                    return (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
                         <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> Visão geral — servidor PACS na nuvem</h3>
                         <p className="text-[11px] text-ink-500 font-medium">O servidor principal é uma VM (Google Cloud). A clínica só faz um relé Tailscale. O local vira backup opcional.</p>
                       </div>
 
-                      <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2.5">
-                        <div className="flex items-center gap-1.5 text-emerald-800 font-black text-xs uppercase tracking-wider"><Sparkles size={13} /> O jeito fácil (self-service)</div>
-                        <p className="text-[11px] text-ink-700 leading-relaxed">Na aba <strong>Servidores</strong>, o cartão <strong>“Criar meu PACS”</strong> provisiona e configura tudo sozinho — você só escolhe o plano. Depois é só apontar o ultrassom (passo 3). Este guia explica os bastidores.</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <div className="p-2.5 rounded-lg bg-white border border-ink-150">
-                            <div className="text-[10px] font-black text-blue-700 uppercase">Compartilhado (Starter/Pro)</div>
-                            <p className="text-[10px] text-ink-600 leading-relaxed">Seu cliente vira um “tenant” isolado numa VM compartilhada — barato e imediato.</p>
-                          </div>
-                          <div className="p-2.5 rounded-lg bg-white border border-ink-150">
-                            <div className="text-[10px] font-black text-emerald-700 uppercase">Dedicado</div>
-                            <p className="text-[10px] text-ink-600 leading-relaxed">Uma VM própria por cliente, criada automaticamente (~3 min) — isolamento máximo.</p>
+                      {hasPacsReady ? (
+                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-emerald-800 font-black text-xs uppercase tracking-wider"><CheckCircle2 size={13} /> Seu PACS já está pronto</div>
+                          <p className="text-[11px] text-ink-700 leading-relaxed">
+                            Plano <strong>{inst?.plan === 'dedicado' ? 'Dedicado' : inst?.plan === 'starter' ? 'Starter' : 'Pro'}</strong>
+                            {inst?.provider === 'shared' ? ' (tenant isolado numa VM compartilhada)' : ' (VM própria)'} — tudo já provisionado e configurado. Você só precisa <strong>conectar o relé e o aparelho</strong>, ao lado. As seções em "Avançado" abaixo são só para quem administra a infraestrutura (não é o seu caso).
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-2.5">
+                          <div className="flex items-center gap-1.5 text-emerald-800 font-black text-xs uppercase tracking-wider"><Sparkles size={13} /> O jeito fácil (self-service)</div>
+                          <p className="text-[11px] text-ink-700 leading-relaxed">Na aba <strong>Servidores &amp; Conexão</strong>, o cartão <strong>"Criar meu PACS"</strong> provisiona e configura tudo sozinho — você só escolhe o plano. Depois é só conectar o relé e apontar o ultrassom (ao lado, em "Conectar relé + ultrassom"). O resto deste guia (seção "Avançado") explica os bastidores para quem administra a infraestrutura.</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="p-2.5 rounded-lg bg-white border border-ink-150">
+                              <div className="text-[10px] font-black text-blue-700 uppercase">Compartilhado (Starter/Pro)</div>
+                              <p className="text-[10px] text-ink-600 leading-relaxed">Seu cliente vira um "tenant" isolado numa VM compartilhada — barato e imediato.</p>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-white border border-ink-150">
+                              <div className="text-[10px] font-black text-emerald-700 uppercase">Dedicado</div>
+                              <p className="text-[10px] text-ink-600 leading-relaxed">Uma VM própria por cliente, criada automaticamente (~3 min) — isolamento máximo.</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                       <div className="p-4 rounded-2xl bg-zinc-900 text-zinc-100 overflow-x-auto">
                         <pre className="text-[10px] leading-relaxed font-mono text-zinc-300 whitespace-pre">{`  CLÍNICA                          NUVEM — VM do usuário
@@ -1041,14 +1056,19 @@ export function DicomControlCenter() {
 
                       <Note tone="emerald">Fluxo: criar exame no LAUD.US → Agente grava a worklist na VM → ultrassom lê e faz o exame → imagens sobem à VM (4242) → LAUD.US mostra as imagens no laudo (via Agente/Funnel).</Note>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {selectedSection === 'setup_vm' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> 1 · Montar a VM (Google Cloud)</h3>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Cloud size={16} className="text-emerald-600" /> Montar a VM (Google Cloud)</h3>
                         <p className="text-[11px] text-ink-500 font-medium">Um único comando configura tudo. Rode por SSH numa VM Debian/Ubuntu. Região sugerida: southamerica-east1.</p>
                       </div>
+
+                      <Note tone="amber">
+                        <strong>Isso é infraestrutura — só necessário se você administra a VM/tenant</strong> (ex: você opera o LAUD.US para outros clientes). Se você é cliente de um PACS gerenciado, sua VM já foi criada pelo "Criar meu PACS" — vá direto em <strong>"Conectar relé + ultrassom"</strong>.
+                      </Note>
 
                       <Step n={1} title="Um comando faz tudo (turnkey)">
                         <P>Como <strong>root</strong> na VM. Ele baixa os scripts, instala Docker/Node/pydicom, sobe o agente em <strong>modo multi-tenant</strong>, ativa o <strong>Funnel</strong> e aplica o <strong>hardening</strong>:</P>
@@ -1072,7 +1092,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                       <Note tone="amber">Setup manual detalhado (avançado) e o plano <strong>Dedicado</strong> (VM própria por cliente, criada automaticamente pelo app) estão documentados em <code>docs/pacs/PACS_TENANT_SETUP.md</code> e <code>docs/roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md</code>.</Note>
 
                       <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
-                        <ArrowRight size={14} /> VM pronta. Agora vá para <strong>2 · Configurar no LAUD.US</strong>.
+                        <ArrowRight size={14} /> VM pronta. Agora vá para <strong>"Configurar no LAUD.US (manual)"</strong>.
                       </div>
                     </div>
                   )}
@@ -1080,9 +1100,13 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                   {selectedSection === 'app_config' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Server size={16} className="text-emerald-600" /> 2 · Configurar no LAUD.US</h3>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Server size={16} className="text-emerald-600" /> Configurar no LAUD.US (manual)</h3>
                         <p className="text-[11px] text-ink-500 font-medium">Na aba <strong>Servidores &amp; Conexão</strong>, use o preset e preencha 2 campos.</p>
                       </div>
+
+                      <Note tone="amber">
+                        <strong>Só é necessário para instalações manuais</strong> (você mesmo montou uma VM/Orthanc). Quem usa "Criar meu PACS" tem tudo isso preenchido automaticamente — confira em "Servidores &amp; Conexão → Configuração avançada" que já está tudo certo, sem precisar mexer aqui.
+                      </Note>
 
                       <Step n={1} title="Aplicar o preset">
                         <P>No topo do card "Servidor PACS Principal", clique em <strong>☁️ Servidor na Nuvem (VM)</strong>. Ele preenche Orthanc = <code>http://localhost:8042</code>, AE = <code>ORTHANC</code> e a pasta da worklist, e ativa a sincronização.</P>
@@ -1108,16 +1132,20 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <P>Clique em <strong>Salvar</strong> e depois em <strong>Executar Diagnóstico</strong> (aba Servidores). Imagens e Worklist do "Servidor Principal" devem ficar verdes.</P>
                       </Step>
 
-                      <Note tone="emerald">Pronto: worklist e imagens já passam pela VM. Falta só ligar o relé da clínica na mesma rede Tailscale (passo 3) e apontar o ultrassom (passo 4).</Note>
+                      <Note tone="emerald">Pronto: worklist e imagens já passam pela VM. Falta só ligar o relé da clínica na tailnet e apontar o ultrassom — veja "Conectar relé + ultrassom".</Note>
                     </div>
                   )}
 
                   {selectedSection === 'tailscale' && (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Network size={16} className="text-emerald-600" /> 3 · Tailscale — conectar a VM e seu computador/roteador</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">O Tailscale é a rede privada que liga sua VM na nuvem ao computador/roteador da clínica. Sem essa conexão, o ultrassom nunca alcança o PACS.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Network size={16} className="text-emerald-600" /> Administração da rede (Tailscale)</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Como a VM entra na tailnet, e como administrar contas/rotas/ACL — conteúdo de quem opera a infraestrutura.</p>
                       </div>
+
+                      <Note tone="amber">
+                        <strong>Se você é cliente de um PACS gerenciado, não precisa de nada aqui</strong> — vá direto em <strong>"Conectar relé + ultrassom"</strong>, onde já tem a chave de acesso pronta para o seu relé. O conteúdo abaixo é para quem administra a VM/tailnet.
+                      </Note>
 
                       <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 space-y-2">
                         <div className="flex items-center gap-2 text-blue-800"><Info size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Como pensar nisso</span></div>
@@ -1130,10 +1158,10 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                       </div>
 
                       <Note tone="emerald">
-                        <strong>Você é cliente de um PACS gerenciado (self-service)?</strong> Não precisa de conta Tailscale nenhuma — o card <strong>"Conectar meu ultrassom"</strong> já mostra uma <strong>chave de autenticação</strong> pronta (gerada no provisionamento). Cole ela na tela de login do seu roteador/PC (passo 2 ou 3 abaixo) em vez de criar conta — ela já autoriza só o necessário, sem enxergar outros clientes. O passo 1 abaixo (conta própria) só vale para quem monta a VM por conta própria.
+                        Cada cliente do PACS gerenciado (self-service) recebe uma <strong>chave de autenticação</strong> própria no provisionamento — visível no card "Conectar meu ultrassom" dele. Isso é o que evita ter que dar sua conta Tailscale pra cada cliente (passo 1 abaixo é só pra você, o operador).
                       </Note>
 
-                      <Step n={1} title="Alternativa: ter sua própria conta Tailscale (só se você monta a VM você mesmo)">
+                      <Step n={1} title="Sua própria conta Tailscale (para administrar a VM/tailnet)">
                         <P>Se ainda não tem: entre em <strong>tailscale.com</strong> → "Get Started" → crie a conta (dá pra usar login do Google/Microsoft/e-mail, é gratuito para uso pessoal/pequenas equipes). <strong>Use a MESMA conta</strong> em todos os dispositivos — VM, relé, e qualquer outro nó. Contas diferentes formam tailnets diferentes, que não se enxergam entre si.</P>
                       </Step>
 
@@ -1155,7 +1183,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <p className="text-[10px] text-ink-500 leading-relaxed">Windows/Mac: baixe em <code>tailscale.com/download</code>, instale e, na hora de conectar, escolha "usar chave" e cole a mesma chave (ou faça login com sua própria conta, se for o caso do passo 1).</p>
                         <P>A partir daí, o PC pode agir de duas formas — escolha uma:</P>
                         <ul className="text-[11px] text-ink-700 space-y-1.5 leading-relaxed list-disc pl-4">
-                          <li><strong>Encaminhamento simples (mais fácil de configurar):</strong> o PC só redireciona a porta DICOM para a VM. Não precisa mexer em rotas — veja os comandos <code>netsh</code>/<code>socat</code> no passo "4 · Relé + ultrassom" (Modo A2).</li>
+                          <li><strong>Encaminhamento simples (mais fácil de configurar):</strong> o PC só redireciona a porta DICOM para a VM. Não precisa mexer em rotas — veja os comandos <code>netsh</code>/<code>socat</code> em "Conectar relé + ultrassom" (Modo A2).</li>
                           <li><strong>Subnet router (mais robusto, igual ao GL.iNet):</strong> o PC anuncia a rede local inteira, e qualquer aparelho da LAN (não só o ultrassom) passa a alcançar a VM sem regra de porta:</li>
                         </ul>
                         <Cmd id="ts-advertise-routes" text="sudo tailscale up --advertise-routes=192.168.x.0/24" />
@@ -1163,14 +1191,14 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                       </Step>
 
                       <Step n={4} title="Aprovar a rota anunciada (admin da tailnet — só quem opera a VM faz isso)">
-                        <P>Rotas anunciadas por um relé (subnet router) exigem aprovação manual por segurança — feita uma única vez por relé, por quem administra a tailnet (o operador do PACS, não o cliente final):</P>
+                        <P>Rotas anunciadas por um relé (subnet router) normalmente exigem aprovação manual por segurança. Com <code>autoApprovers</code> configurado na ACL (recomendado — ver <code>PACS_PROVISION_SETUP.md</code> §2), a rota do <strong>relé do cliente</strong> (<code>tag:pacs-client</code>) é aprovada sozinha, sem você precisar entrar no admin console a cada cliente novo. Sem isso, aprove manualmente:</P>
                         <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
                           <li>Acesse <strong>login.tailscale.com/admin/machines</strong>.</li>
                           <li>Encontre o relé (o roteador GL.iNet ou o PC) na lista de dispositivos.</li>
                           <li>Clique nos <strong>"⋯"</strong> (três pontinhos) ao lado do nome dele → <strong>"Edit route settings"</strong>.</li>
                           <li>Marque a sub-rede anunciada (ex: <code>192.168.8.0/24</code>) como <strong>habilitada</strong>.</li>
                         </ul>
-                        <Note tone="amber">Sem esse passo, a rota fica "anunciada mas não aprovada" — nada flui, mesmo com tudo certo do lado do relé.</Note>
+                        <Note tone="amber">Sem aprovação (manual ou automática), a rota fica "anunciada mas não aprovada" — nada flui, mesmo com tudo certo do lado do relé.</Note>
                       </Step>
 
                       <Step n={5} title="A VM também precisa ACEITAR a rota">
@@ -1197,7 +1225,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                       </div>
 
                       <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
-                        <ArrowRight size={14} /> Relé conectado à tailnet. Agora vá para <strong>4 · Relé + ultrassom</strong> para apontar o aparelho de vez.
+                        <ArrowRight size={14} /> Relé conectado à tailnet. Agora vá para <strong>"Conectar relé + ultrassom"</strong> para apontar o aparelho de vez.
                       </div>
                     </div>
                   )}
@@ -1208,8 +1236,8 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                     return (
                     <div className="space-y-5 animate-fade-in">
                       <div className="pb-3 border-b border-ink-100">
-                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Radio size={16} className="text-emerald-600" /> 3 · Relé + ultrassom</h3>
-                        <p className="text-[11px] text-ink-500 font-medium">O relé faz o ultrassom (que não roda Tailscale) alcançar a VM. Escolha o seu caso.</p>
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Radio size={16} className="text-emerald-600" /> Conectar relé + ultrassom</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">É só isso que você precisa fazer. O relé faz o ultrassom (que não roda Tailscale) alcançar seu PACS. Escolha o seu caso.</p>
                       </div>
 
                       {isSharedTenant && (
@@ -1222,17 +1250,17 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <div className="flex items-center gap-2 text-emerald-800"><Wifi size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A1 — Roteador GL.iNet (recomendado)</span></div>
                         <P>O GL.iNet já roda Tailscale e roteia a LAN para a tailnet. Sempre ligado, zero software extra.</P>
                         <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                          <li>No admin da tailnet, <strong>aprove as rotas</strong> anunciadas pelo GL.iNet.</li>
+                          <li>Cole a <strong>chave de autenticação</strong> do card "Conectar meu ultrassom" no login do Tailscale do roteador, e ligue o roteamento de sub-rede (ver "Administração da rede" para o passo a passo detalhado).</li>
                           <li>No ultrassom, aponte Worklist e Storage para o <strong>IP tailnet da VM (100.x):{port}</strong>, AE <code>ORTHANC</code>.</li>
                         </ul>
-                        <Note tone="amber">
-                          Aprovar a rota não basta — a <strong>VM também precisa aceitá-la</strong> (senão o C-ECHO trava em "tempo esgotado": o pacote chega, mas a resposta não acha o caminho de volta). Isso já vem pronto no turnkey (<code>pacs-vm-setup.sh</code>); se a VM foi montada antes disso, rode nela: <code>sudo tailscale up --accept-routes</code>.
+                        <Note>
+                          Sua conexão é aprovada automaticamente — não precisa entrar em nenhum admin console. Se o C-ECHO travar em "tempo esgotado" (não rejeitando na hora), fale com o suporte: pode ser a rota ainda não aprovada do lado da VM.
                         </Note>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
-                        <div className="flex items-center gap-2 text-ink-800"><Cpu size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A2 — PC do dia a dia (com Tailscale)</span></div>
-                        <P>O PC não é o gateway, então encaminhamos a porta {port} dele para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:{port}</strong>.</P>
+                        <div className="flex items-center gap-2 text-ink-800"><Cpu size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Modo A2 — PC do dia a dia (sem roteador com Tailscale)</span></div>
+                        <P>Primeiro instale o Tailscale no PC e conecte com a chave do card "Conectar meu ultrassom" (comando completo em "Administração da rede", passo "Conectar o relé — Opção B"). Depois, como o PC não é o gateway da rede, encaminhamos a porta {port} dele para a VM. No ultrassom, aponte para o <strong>IP LAN do PC:{port}</strong>.</P>
                         <p className="text-[10px] text-ink-500 font-bold">Windows (nativo):</p>
                         <Cmd id="relay-netsh" text={`netsh interface portproxy add v4tov4 listenport=${port} listenaddress=0.0.0.0 connectport=${port} connectaddress=<IP-TAILNET-DA-VM>`} />
                         <p className="text-[10px] text-ink-500 font-bold">macOS/Linux:</p>

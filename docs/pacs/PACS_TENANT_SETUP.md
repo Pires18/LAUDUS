@@ -125,9 +125,12 @@ Duas formas de usar o PC como relé:
   sudo tailscale up --advertise-routes=192.168.x.0/24   # troque pela LAN real do cliente
   ```
 
-**Aprovar a rota (uma vez, no admin da tailnet):**
-`login.tailscale.com/admin/machines` → achar o relé → "⋯" → **Edit route
-settings** → habilitar a sub-rede anunciada.
+**Aprovar a rota:** se a ACL tiver `autoApprovers` para `tag:pacs-client`
+(ver `PACS_PROVISION_SETUP.md` §2), isso é **automático** — a rota do relé do
+cliente é aprovada sozinha assim que ele conecta, sem você precisar entrar no
+admin console. Sem `autoApprovers` configurado, precisa aprovar manualmente
+toda vez que um relé novo conecta: `login.tailscale.com/admin/machines` →
+achar o relé → "⋯" → **Edit route settings** → habilitar a sub-rede anunciada.
 
 **A VM precisa ACEITAR a rota** (não basta aprovar) — já vem no turnkey atual;
 se a VM for antiga, rode nela:

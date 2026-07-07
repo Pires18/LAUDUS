@@ -56,9 +56,17 @@
      ],
      "acls": [
        { "action": "accept", "src": ["tag:pacs-client"], "dst": ["tag:pacs:4242", "tag:pacs:4300-4399"] }
-     ]
+     ],
+     "autoApprovers": {
+       "routes": {
+         "192.168.0.0/16": ["tag:pacs-client"],
+         "10.0.0.0/8": ["tag:pacs-client"],
+         "172.16.0.0/12": ["tag:pacs-client"]
+       }
+     }
    }
    ```
+   `autoApprovers` é o que elimina o passo manual de "aprovar a rota" **para o relé de cada cliente**: qualquer dispositivo com `tag:pacs-client` que anuncie uma sub-rede dentro das 3 faixas privadas padrão (RFC 1918 — cobre praticamente qualquer roteador doméstico/comercial, incluindo o `192.168.8.0/24` default do GL.iNet) é aprovado automaticamente, sem você precisar entrar no admin console toda vez que um cliente novo conecta o relé dele. Isso não amplia o que o cliente alcança — a regra de `acls` acima continua restringindo `tag:pacs-client` só à porta DICOM das VMs, independente da rota estar auto-aprovada.
    (`tag:pacs` é usada pela auth-key das VMs; `tag:pacs-client` é a auth-key que o provisionador gera **por cliente**, pra ele logar o próprio relé — GL.iNet ou PC — sem precisar da sua conta. A regra de `acls` restringe: quem tem `tag:pacs-client` só alcança a porta DICOM fixa das VMs dedicadas (4242) e a faixa de portas dos tenants na VM compartilhada (4300–4399) — nada além disso, nem SSH, nem outros dispositivos seus.)
 
    > **Isolamento entre clientes:** hoje todos os relés de clientes compartilham a mesma tag (`tag:pacs-client`) — o Tailscale exige que toda tag já exista em `tagOwners` antes de virar uma auth-key, então não dá pra criar 1 tag por cliente automaticamente. Isso já impede um relé de cliente de alcançar qualquer coisa fora do PACS (seu Mac, outras VMs, etc.). Um cliente mal-intencionado ainda poderia, em teoria, tentar a porta DICOM de OUTRO tenant na VM compartilhada — mas o Orthanc de cada tenant só responde a aparelhos registrados em `DicomModalities` (feito pelo próprio cliente, via "Conectar meu ultrassom"), então isso funciona como uma segunda camada de defesa.
