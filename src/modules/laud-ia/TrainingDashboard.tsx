@@ -20,6 +20,7 @@ import {
   buildPersonalCalibration,
   savePersonalCalibration,
   backfillCorpusFromFinalized,
+  backfillQualityRecordsFromCorpus,
   vectorizeCorpus,
   countPendingVectorization,
   runHarness,
@@ -177,6 +178,26 @@ export function TrainingDashboard({
     }
   }, [settings, showToast, pendingVec, load]);
 
+  // Recalcula as notas de qualidade a partir do corpus (popula Score/Segurança).
+  const [scoring, setScoring] = useState(false);
+  const [scoreProgress, setScoreProgress] = useState<{ done: number; total: number } | null>(null);
+  const handleComputeScores = useCallback(async () => {
+    setScoring(true);
+    setScoreProgress({ done: 0, total: corpusCount });
+    try {
+      const r = await backfillQualityRecordsFromCorpus({
+        onProgress: (done, total) => setScoreProgress({ done, total }),
+      });
+      showToast(`Notas calculadas: ${r.written}/${r.total} laudos. Score e segurança atualizados.`, r.written > 0 ? 'success' : 'info');
+      await load();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Falha ao calcular notas', 'error');
+    } finally {
+      setScoring(false);
+      setScoreProgress(null);
+    }
+  }, [showToast, corpusCount, load]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-ink-400">
@@ -316,11 +337,21 @@ export function TrainingDashboard({
                     : 'Retrieval semântico ativo — a IA encontra o caso clinicamente mais parecido.'}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              {corpusCount > 0 && (
+                <button
+                  onClick={handleComputeScores}
+                  disabled={scoring || importing || vectorizing}
+                  className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
+                  title="Calcula Score e Segurança dos laudos do corpus"
+                >
+                  {scoring ? <><Loader2 size={12} className="animate-spin" /> {scoreProgress?.done ?? 0}/{scoreProgress?.total ?? 0}</> : <><Gauge size={12} /> Calcular notas</>}
+                </button>
+              )}
               {pendingVec > 0 && (
                 <button
                   onClick={handleVectorize}
-                  disabled={vectorizing || importing}
+                  disabled={vectorizing || importing || scoring}
                   className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
                 >
                   {vectorizing ? <><Loader2 size={12} className="animate-spin" /> {vecProgress?.done ?? 0}/{vecProgress?.total ?? 0}</> : <><Binary size={12} /> Vetorizar</>}
@@ -328,7 +359,7 @@ export function TrainingDashboard({
               )}
               <button
                 onClick={handleBackfill}
-                disabled={importing || vectorizing}
+                disabled={importing || vectorizing || scoring}
                 className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
               >
                 {importing ? <><Loader2 size={12} className="animate-spin" /> {importProgress?.done ?? 0}/{importProgress?.total ?? 0}</> : <><DownloadCloud size={12} /> Importar</>}

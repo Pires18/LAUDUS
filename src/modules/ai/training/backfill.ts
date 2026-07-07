@@ -3,6 +3,7 @@ import { firestore, auth } from '../../../lib/firebase';
 import { AppSettings, ExamArea, Patient, ExamRequest } from '../../../types';
 import { logger } from '../../../utils/logger';
 import { auditReportQuality } from '../engine';
+import { verifyReport } from '../verification';
 import { anonymizeReport, detectResidualPII } from './anonymize';
 import { ExcellenceEntry } from './excellenceCorpus';
 
@@ -162,5 +163,61 @@ export async function backfillCorpusFromFinalized(
 
   await flush();
   logger.info(`[Backfill] Importação concluída: ${result.imported} laudos no corpus.`);
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BACKFILL DE NOTAS DE QUALIDADE — popula os KPIs de Score/Segurança
+// ═══════════════════════════════════════════════════════════════
+// Calcula auditReportQuality + verifyReport para cada laudo já no corpus,
+// gravando um QualityRecord por laudo. Torna os KPIs de Score e Segurança
+// funcionais imediatamente a partir do histórico (sem esperar novas
+// finalizações). Idempotente: usa id determinístico por laudo.
+
+export interface QualityBackfillResult {
+  total: number;
+  written: number;
+}
+
+export async function backfillQualityRecordsFromCorpus(
+  options: { onProgress?: (done: number, total: number) => void } = {}
+): Promise<QualityBackfillResult> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Usuário não autenticado.');
+
+  const snap = await getDocs(userCol('excellence_corpus'));
+  const entries = snap.docs.map((d) => ({ ...(d.data() as ExcellenceEntry), id: d.id }));
+  const result: QualityBackfillResult = { total: entries.length, written: 0 };
+  if (entries.length === 0) return result;
+
+  const qcol = userCol('quality_records');
+  const COMMIT = 20;
+  for (let i = 0; i < entries.length; i += COMMIT) {
+    const chunk = entries.slice(i, i + COMMIT);
+    const batch = writeBatch(firestore);
+    for (const e of chunk) {
+      const html = e.anonymizedContent || '';
+      if (!html) continue;
+      const audit = auditReportQuality(html, e.area);
+      const verification = verifyReport(html, { area: e.area });
+      // Id determinístico → reprocessar não duplica.
+      const id = `qr-${e.sourceExamId || e.id}`;
+      batch.set(doc(qcol, id), clean({
+        area: e.area,
+        examType: e.examType,
+        motor: e.motor || 'lite',
+        auditScore: audit.score,
+        refinementCount: 0,
+        safetyPassed: verification.passed,
+        latencyMs: 0,
+        timestamp: e.approvedAt || Date.now(),
+      }));
+      result.written++;
+    }
+    await batch.commit();
+    options.onProgress?.(Math.min(i + chunk.length, entries.length), entries.length);
+  }
+
+  logger.info(`[Backfill] Notas de qualidade: ${result.written}/${result.total} gravadas.`);
   return result;
 }
