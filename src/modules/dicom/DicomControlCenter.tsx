@@ -73,7 +73,7 @@ export function DicomControlCenter() {
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
   // A VM autoconfigura tudo; os campos técnicos ficam recolhidos por padrão.
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedSection, setSelectedSection] = useState<'overview' | 'setup_vm' | 'app_config' | 'relay' | 'backup' | 'troubleshoot' | 'concepts'>('overview');
+  const [selectedSection, setSelectedSection] = useState<'overview' | 'setup_vm' | 'app_config' | 'tailscale' | 'relay' | 'backup' | 'troubleshoot' | 'concepts'>('overview');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -893,7 +893,8 @@ export function DicomControlCenter() {
                       { id: 'overview', label: 'Visão geral', icon: BookOpen },
                       { id: 'setup_vm', label: '1 · Montar a VM (nuvem)', icon: Cloud },
                       { id: 'app_config', label: '2 · Configurar no LAUD.US', icon: Server },
-                      { id: 'relay', label: '3 · Relé + ultrassom', icon: Radio },
+                      { id: 'tailscale', label: '3 · Tailscale (VM ↔ seu PC/roteador)', icon: Network },
+                      { id: 'relay', label: '4 · Relé + ultrassom', icon: Radio },
                     ]},
                     { group: 'Extras', items: [
                       { id: 'backup', label: 'Backup local (opcional)', icon: HardDrive },
@@ -1107,7 +1108,96 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <P>Clique em <strong>Salvar</strong> e depois em <strong>Executar Diagnóstico</strong> (aba Servidores). Imagens e Worklist do "Servidor Principal" devem ficar verdes.</P>
                       </Step>
 
-                      <Note tone="emerald">Pronto: worklist e imagens já passam pela VM. Falta só o relé para o ultrassom (passo 3).</Note>
+                      <Note tone="emerald">Pronto: worklist e imagens já passam pela VM. Falta só ligar o relé da clínica na mesma rede Tailscale (passo 3) e apontar o ultrassom (passo 4).</Note>
+                    </div>
+                  )}
+
+                  {selectedSection === 'tailscale' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Network size={16} className="text-emerald-600" /> 3 · Tailscale — conectar a VM e seu computador/roteador</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">O Tailscale é a rede privada que liga sua VM na nuvem ao computador/roteador da clínica. Sem essa conexão, o ultrassom nunca alcança o PACS.</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 space-y-2">
+                        <div className="flex items-center gap-2 text-blue-800"><Info size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Como pensar nisso</span></div>
+                        <P>O Tailscale cria uma rede privada (uma "tailnet") entre dispositivos que fazem login com a <strong>mesma conta</strong>. Cada dispositivo vira um "nó" com um IP fixo tipo <code>100.x.y.z</code>, alcançável pelos outros nós como se estivessem na mesma rede local — mesmo estando em lugares diferentes do mundo. Aqui, 2 nós importam:</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li><strong>A VM</strong> — já entrou na tailnet sozinha, pelo script turnkey (passo 1).</li>
+                          <li><strong>O relé da clínica</strong> — o roteador GL.iNet OU um computador — que você ainda precisa conectar.</li>
+                        </ul>
+                        <P>O <strong>ultrassom em si NÃO entra</strong> no Tailscale (a maioria dos aparelhos não suporta isso) — ele só fala com o relé pela rede local normal, como sempre fez. É o relé que faz a ponte até a VM.</P>
+                      </div>
+
+                      <Step n={1} title="Ter uma conta Tailscale">
+                        <P>Se ainda não tem: entre em <strong>tailscale.com</strong> → "Get Started" → crie a conta (dá pra usar login do Google/Microsoft/e-mail, é gratuito para uso pessoal/pequenas equipes). <strong>Use a MESMA conta</strong> em todos os dispositivos — VM, relé, e qualquer outro nó. Contas diferentes formam tailnets diferentes, que não se enxergam entre si.</P>
+                      </Step>
+
+                      <Step n={2} title="Conectar o relé — Opção A: roteador GL.iNet (recomendado)">
+                        <P>Roteadores GL.iNet já trazem um cliente Tailscale embutido no firmware — não precisa instalar nada.</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1.5 leading-relaxed list-disc pl-4">
+                          <li>Acesse o painel do roteador pelo navegador (geralmente <code>192.168.8.1</code>), com o login de admin.</li>
+                          <li>Vá em <strong>Mais Configurações → VPN → Tailscale</strong> (alguns firmwares chamam de "Applications → Tailscale" — o caminho exato varia por modelo).</li>
+                          <li>Clique em <strong>Ativar/Login</strong>. Ele mostra um link ou QR code: abra num celular ou PC já logado na sua conta Tailscale para autorizar o roteador.</li>
+                          <li>Depois de conectado, habilite o <strong>roteamento de sub-rede</strong> (nomes variam: "Subnet Router", "Advertise Routes", "Compartilhar rede local") e marque a faixa de IP da sua LAN (ex: <code>192.168.8.0/24</code>). É isso que deixa o ultrassom — que está nessa mesma rede local do roteador — alcançável pela VM através da tailnet.</li>
+                        </ul>
+                        <Note tone="amber">Não confunda com "Route all traffic" (isso faria TODO o tráfego da internet do roteador passar pela tailnet — não é o que você quer). O certo é só anunciar a própria LAN.</Note>
+                      </Step>
+
+                      <Step n={3} title="Conectar o relé — Opção B: computador (Windows/Mac/Linux)">
+                        <P>Sem roteador com Tailscale? Um computador sempre ligado, na mesma rede do ultrassom, também funciona como relé.</P>
+                        <p className="text-[10px] text-ink-500 font-bold">Instalar o cliente:</p>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li><strong>Windows/Mac:</strong> baixe em <code>tailscale.com/download</code>, instale e faça login com a MESMA conta usada na VM.</li>
+                          <li><strong>Linux:</strong></li>
+                        </ul>
+                        <Cmd id="ts-install-linux" text={`curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up`} />
+                        <P>A partir daí, o PC pode agir de duas formas — escolha uma:</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1.5 leading-relaxed list-disc pl-4">
+                          <li><strong>Encaminhamento simples (mais fácil de configurar):</strong> o PC só redireciona a porta DICOM para a VM. Não precisa mexer em rotas — veja os comandos <code>netsh</code>/<code>socat</code> no passo "4 · Relé + ultrassom" (Modo A2).</li>
+                          <li><strong>Subnet router (mais robusto, igual ao GL.iNet):</strong> o PC anuncia a rede local inteira, e qualquer aparelho da LAN (não só o ultrassom) passa a alcançar a VM sem regra de porta:</li>
+                        </ul>
+                        <Cmd id="ts-advertise-routes" text="sudo tailscale up --advertise-routes=192.168.x.0/24" />
+                        <Note>Troque <code>192.168.x.0/24</code> pela faixa real da sua rede local (confira no roteador ou nas configurações de rede do próprio PC).</Note>
+                      </Step>
+
+                      <Step n={4} title="Aprovar a rota anunciada (admin da tailnet)">
+                        <P>Rotas anunciadas por um relé (subnet router) exigem aprovação manual por segurança — feita uma única vez:</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li>Acesse <strong>login.tailscale.com/admin/machines</strong> (login com a mesma conta).</li>
+                          <li>Encontre o relé (o roteador GL.iNet ou o PC) na lista de dispositivos.</li>
+                          <li>Clique nos <strong>"⋯"</strong> (três pontinhos) ao lado do nome dele → <strong>"Edit route settings"</strong>.</li>
+                          <li>Marque a sub-rede anunciada (ex: <code>192.168.8.0/24</code>) como <strong>habilitada</strong>.</li>
+                        </ul>
+                        <Note tone="amber">Sem esse passo, a rota fica "anunciada mas não aprovada" — nada flui, mesmo com tudo certo do lado do relé.</Note>
+                      </Step>
+
+                      <Step n={5} title="A VM também precisa ACEITAR a rota">
+                        <P>Aprovar no admin da tailnet não é suficiente — a <strong>própria VM</strong> também precisa aceitar rotas anunciadas por outros nós. Sem isso, ela recebe a conexão do ultrassom mas não sabe o caminho de volta pra responder (o C-ECHO trava em "tempo esgotado", em vez de conectar ou rejeitar na hora).</P>
+                        <Cmd id="ts-accept-routes-tab" text="sudo tailscale up --accept-routes" />
+                        <Note tone="emerald">Já vem pronto se a VM foi montada com o script turnkey atual (<code>pacs-vm-setup.sh</code>). Só rode manualmente se a VM for de uma montagem antiga, ou se o diagnóstico indicar esse problema.</Note>
+                      </Step>
+
+                      <Step n={6} title="Confirmar que está tudo conectado">
+                        <P>Na VM, rode:</P>
+                        <Cmd id="ts-status" text="tailscale status" />
+                        <P>O relé (GL.iNet ou PC) deve aparecer como <strong>"active"</strong> (não "offline"), e NÃO deve aparecer o aviso "peers are advertising routes but --accept-routes is false". A partir daqui, o card <strong>"Conectar meu ultrassom"</strong> no app já mostra o IP tailnet da VM automaticamente.</P>
+                      </Step>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1">
+                          <div className="text-[10px] font-black text-ink-700 uppercase">MagicDNS</div>
+                          <p className="text-[10px] text-ink-600 leading-relaxed">Dá nomes amigáveis aos nós (ex: <code>orthanc-server</code>) em vez de só IPs numéricos. Ativa-se uma vez, na conta, em Admin console → DNS.</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-white border border-ink-150 space-y-1">
+                          <div className="text-[10px] font-black text-ink-700 uppercase">HTTPS Certificates + Funnel</div>
+                          <p className="text-[10px] text-ink-600 leading-relaxed">Dão à VM um endereço público <code>https://…ts.net</code> — é assim que o navegador (sem Tailscale nenhum) alcança o Agente. Já vem ativado pelo turnkey.</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50/60 border border-emerald-100 rounded-xl px-3 py-2">
+                        <ArrowRight size={14} /> Relé conectado à tailnet. Agora vá para <strong>4 · Relé + ultrassom</strong> para apontar o aparelho de vez.
+                      </div>
                     </div>
                   )}
 

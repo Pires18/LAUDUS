@@ -84,7 +84,48 @@ e `dicomLocalAgentUrl` com os valores acima. O campo **Porta DICOM** (card
 "Conectar meu ultrassom") também precisa bater com a porta DICOM do tenant — se
 o provisionamento foi manual, edite-o lá (é editável).
 
-## 4. Apontar o aparelho (via relé)
+## 4. Conectar o relé da clínica à tailnet (Tailscale)
+
+O relé é o que liga a rede local do cliente (onde está o ultrassom) à tailnet
+onde a VM já está. É sempre a **mesma conta Tailscale** em todos os nós (VM +
+relé) — contas diferentes formam tailnets diferentes, que não se enxergam.
+
+**Opção A — roteador GL.iNet (recomendado, sempre ligado, zero manutenção):**
+1. Painel admin do roteador (`192.168.8.1` por padrão) → **Mais Configurações
+   → VPN → Tailscale** (nome do menu varia por firmware).
+2. Login/autorizar com a mesma conta Tailscale da VM (via link/QR code).
+3. Habilitar **roteamento de sub-rede** ("Subnet Router" / "Advertise Routes"),
+   marcando a faixa de IP da LAN do cliente (ex: `192.168.8.0/24`). **Não**
+   habilitar "route all traffic" — só a LAN local.
+
+**Opção B — computador (Windows/Mac/Linux) sempre ligado na rede do aparelho:**
+```bash
+# Linux
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+# Windows/Mac: baixar em tailscale.com/download e logar com a mesma conta
+```
+Duas formas de usar o PC como relé:
+- **Encaminhamento simples de porta** (netsh/socat — ver exemplos no guia
+  in-app, aba "Guia de Configuração → 4 · Relé + ultrassom").
+- **Subnet router** (mais robusto, mesmo princípio do GL.iNet):
+  ```bash
+  sudo tailscale up --advertise-routes=192.168.x.0/24   # troque pela LAN real do cliente
+  ```
+
+**Aprovar a rota (uma vez, no admin da tailnet):**
+`login.tailscale.com/admin/machines` → achar o relé → "⋯" → **Edit route
+settings** → habilitar a sub-rede anunciada.
+
+**A VM precisa ACEITAR a rota** (não basta aprovar) — já vem no turnkey atual;
+se a VM for antiga, rode nela:
+```bash
+sudo tailscale up --accept-routes
+```
+Sem isso, o C-ECHO trava em "tempo esgotado" (o pacote chega, a resposta não
+acha caminho de volta) — foi a causa real de um caso em produção (06/07/2026).
+
+## 5. Apontar o aparelho de ultrassom
 No ultrassom (Worklist + Storage): **IP do relé** na LAN, **porta = a porta DICOM
 do tenant** (`43xx`), **AE = ORTHANC**. C-ECHO deve dar sucesso.
 
