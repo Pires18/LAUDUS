@@ -29,6 +29,10 @@ const FAQ = [
     q: 'Como falo com o suporte?',
     a: 'Pelo Centro de Suporte dentro do próprio sistema (chat com a equipe) ou pelo e-mail contato.laudus@gmail.com.',
   },
+  {
+    q: 'Minha clínica tem vários médicos inscritos — dá pra usar o LAUD.US?',
+    a: 'Os 3 planos acima são de autoatendimento para o médico individual. Para clínica com múltiplos profissionais, o LAUD.US Enterprise está em construção — deixe seu contato na seção "Para Clínicas" acima e avisamos quando abrir.',
+  },
 ];
 
 export function Faq() {

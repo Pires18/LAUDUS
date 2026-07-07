@@ -8,6 +8,12 @@
 // DELFIA Xpress, BRAHMS Kryptor). log10 da mediana. Referência: caucasiana,
 // não-fumante, nulípara, sem comorbidade, concepção espontânea.
 //
+// PSV ratio (artéria oftálmica): Gana N et al., UOG 2022;59:731-736
+// (doi 10.1002/uog.24914), Tabela 2 — regressão do valor BRUTO (não log,
+// não MoM) do PSV ratio vs características maternas. O "delta" usado na
+// verossimilhança Bayesiana = medido − esperado por esta equação (ver
+// `psvRatioExpected`/`toDelta` abaixo e `preeclampsia.ts`).
+//
 // ⚠️ MEDIANS_VALIDATED=false até conferir com casos-ouro.
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -38,6 +44,14 @@ export interface PeMedianCovariates {
 export function toMoM(measured: number | undefined, median: number | null): number | undefined {
   if (measured === undefined || !(measured > 0) || !median || median <= 0) return undefined;
   return measured / median;
+}
+
+/** delta = medido − esperado (escala natural — NÃO é razão/MoM). Usado
+ *  pelo PSV ratio da artéria oftálmica (Gana 2022), que ao contrário dos
+ *  demais biomarcadores de PE não é convertido para MoM/log10. */
+export function toDelta(measured: number | undefined, expected: number | null): number | undefined {
+  if (measured === undefined || !isFinite(measured) || expected === null || !isFinite(expected)) return undefined;
+  return measured - expected;
 }
 
 // ─── Mediana da TN (mm) por CCN — provisória (o motor usa o modelo de mistura).
@@ -105,4 +119,27 @@ export function plgfMedian(c: PeMedianCovariates, analyzer: Analyzer = 'cobas'):
   if (c.ivf) s += -0.022250585;
   if (c.parity === 'parousNoPE') s += 0.020750050;
   return Math.pow(10, s);
+}
+
+// ─── PSV ratio da artéria oftálmica: valor bruto esperado (Gana 2022,
+// Tabela 2) — regressão linear múltipla direta (não log, não MoM). Termos
+// transcritos exatamente como "Term" na tabela: contínuos em torno do
+// centro de referência (69kg/35a/164cm), sem truncamento de faixa etária
+// (diferente do modelo de fatores maternos de Wright 2015 para IG-no-parto,
+// que trunca em "idade > 35"). Não depende de IG gestacional nem de
+// analisador — apenas das características maternas listadas na tabela
+// (as demais, ex. etnia negra/mista, DM, FIV, foram eliminadas por
+// backwards elimination = sem efeito significativo no PSV ratio).
+export function psvRatioExpected(c: PeMedianCovariates): number | null {
+  if (!(c.weightKg > 0) || !(c.heightCm > 0) || !(c.ageYears > 0)) return null;
+  let s = 0.657922
+    + 0.000367 * (c.weightKg - 69)
+    + 0.007082 * (c.ageYears - 35)
+    - 0.002167 * (c.heightCm - 164);
+  if (c.racialOrigin === 'eastAsian') s += -0.022983;
+  if (c.racialOrigin === 'southAsian') s += 0.018507;
+  if (c.smoker) s += 0.020684;
+  if (c.chronicHypertension) s += 0.072817;
+  if (c.parity === 'parousNoPE') s += -0.007652;
+  return s;
 }

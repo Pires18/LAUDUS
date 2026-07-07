@@ -66,7 +66,11 @@ export function tiradsScore(desc: {
     pts('margin', desc.margin),
   ];
   const complete = parts.every((p) => p !== null);
-  const fociPts = pts('foci', desc.foci) ?? 0;
+  // Focos ecogênicos são ADITIVOS (multiseleção): soma os pontos de cada foco.
+  const fociPts = (desc.foci || '')
+    .split(',')
+    .map((f) => pts('foci', f.trim()) ?? 0)
+    .reduce((a, b) => a + b, 0);
   const sum = parts.reduce<number>((a, p) => a + (p ?? 0), 0) + fociPts;
   if (!complete && sum === 0) return null;
   const cat = categoryFromPoints(sum);
@@ -128,6 +132,45 @@ export function oradsSuggest(desc: {
     return { label: 'O-RADS 3 (baixo risco)', suspicious: false };
   }
   return { label: 'O-RADS 3 (baixo risco)', suspicious: false };
+}
+
+/**
+ * Grau de estenose carotídea (critérios de consenso SRU 2003) a partir da
+ * VPS/VDF da ACI e da relação ACI/ACC. VPS em cm/s.
+ */
+export function carotidStenosisNASCET(vpsIca: number, vdfIca?: number, vpsCca?: number): { label: string; severe: boolean } | null {
+  if (!(vpsIca > 0)) return null;
+  let label: string;
+  if (vpsIca < 125) label = 'normal / < 50%';
+  else if (vpsIca < 230) label = 'estenose 50–69%';
+  else label = 'estenose ≥ 70%';
+  const severe = vpsIca >= 230 || (vdfIca != null && vdfIca >= 100);
+  const ratio = vpsCca && vpsCca > 0 ? vpsIca / vpsCca : null;
+  const ratioTxt = ratio != null ? ` · ACI/ACC ${ratio.toFixed(1).replace('.', ',')}` : '';
+  return { label: label + ratioTxt, severe };
+}
+
+/** Interpretação do Índice Tornozelo-Braquial (ITB). */
+export function itbClassification(itb: number): { label: string; alert: boolean } | null {
+  if (!(itb > 0)) return null;
+  if (itb > 1.3) return { label: 'incompressível (> 1,3) — calcificação', alert: true };
+  if (itb >= 0.9) return { label: 'normal (0,9–1,3)', alert: false };
+  if (itb >= 0.7) return { label: 'DAOP leve (0,7–0,9)', alert: true };
+  if (itb >= 0.4) return { label: 'DAOP moderada (0,4–0,7)', alert: true };
+  return { label: 'DAOP grave (< 0,4)', alert: true };
+}
+
+/** Sugestão Bosniak (adaptado ao US) para cisto renal a partir dos descritores. */
+export function bosniakSuggest(desc: {
+  septos?: string; parede?: string; calcificacao?: string; solido?: string;
+}): CategorySuggestion | null {
+  const any = desc.septos || desc.parede || desc.calcificacao || desc.solido;
+  if (!any) return null;
+  if (desc.solido === 'presente') return { label: 'Bosniak IV (provavelmente maligno)', suspicious: true };
+  if (desc.parede === 'espessa/irregular' || desc.septos === 'espessos/irregulares') return { label: 'Bosniak III (indeterminado — avaliar cirurgia)', suspicious: true };
+  if (desc.septos === 'múltiplos finos' || desc.calcificacao === 'grosseira') return { label: 'Bosniak IIF (seguimento)', suspicious: false };
+  if (desc.septos === 'poucos finos' || desc.calcificacao === 'fina') return { label: 'Bosniak II (benigno)', suspicious: false };
+  return { label: 'Bosniak I (cisto simples benigno)', suspicious: false };
 }
 
 /** Tipo de Graf a partir dos ângulos α (e β) do quadril infantil. */

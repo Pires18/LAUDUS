@@ -416,9 +416,13 @@ function UnauthenticatedGate() {
 }
 
 function AuthRouter() {
-  const { user, setUser } = useApp();
+  const { user, setUser, setView } = useApp();
   const [authChecked, setAuthChecked] = useState(false);
   const { path } = usePublicPath();
+  // Rastreia se já havia usuário logado nesta sessão do app (em memória) —
+  // distingue "login de verdade" (null → user) de uma renovação de token
+  // (user → user, dispara onAuthStateChanged de novo sem trocar de conta).
+  const hadUser = useRef(false);
 
   // Reage a mudanças do tema do SO quando a preferência é "system".
   useEffect(() => {
@@ -433,11 +437,18 @@ function AuthRouter() {
       if (firebaseUser && ['login', 'signup'].includes(getPublicPath())) {
         window.history.replaceState({}, '', '/');
       }
+      // Entrar no sistema sempre abre o Dashboard — sem isso, a `view` do
+      // Zustand (não persistida, mas viva em memória) mantinha a última tela
+      // visitada antes de um logout, e reaparecia ao entrar de novo na mesma aba.
+      if (firebaseUser && !hadUser.current) {
+        setView({ name: 'dashboard' });
+      }
+      hadUser.current = !!firebaseUser;
       setUser(firebaseUser);
       setAuthChecked(true);
     });
     return unsubscribe;
-  }, [setUser]);
+  }, [setUser, setView]);
 
   // Páginas legais são públicas e compartilháveis: renderizam logado ou não,
   // sem esperar a checagem de auth.

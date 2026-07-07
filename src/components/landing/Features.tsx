@@ -20,7 +20,7 @@ const SPOTLIGHTS = [
 const GRID_FEATURES = [
   { icon: Calculator,   title: 'Calculadoras clínicas',  desc: 'Biometria fetal, Doppler, TI-RADS, BI-RADS, O-RADS e outras — resultado inserido direto no laudo.' },
   { icon: CalendarDays, title: 'Agenda & Worklist',      desc: 'Agendamento que já gera o exame na fila de trabalho, sem retrabalho manual.' },
-  { icon: Building2,    title: 'Múltiplas clínicas',     desc: 'Gerencie mais de uma unidade na mesma conta, com dados isolados por clínica.' },
+  { icon: Building2,    title: 'Múltiplos locais',        desc: 'Gerencie mais de um local de atendimento na mesma conta, com dados isolados por local.' },
   { icon: CreditCard,   title: 'Planos & assinatura',    desc: 'Mensal, semestral e anual, com add-ons por módulo conforme a necessidade.' },
 ];
 
@@ -37,7 +37,7 @@ export function Features() {
           <ScanSearch size={13} className="text-brand-500" />
           <span className="text-[10px] font-black text-ink-500 uppercase tracking-widest">Funcionalidades</span>
         </div>
-        <h2 className="text-3xl sm:text-4xl font-black text-ink-900 tracking-tight mb-3">Tudo o que sua clínica precisa, em um só lugar</h2>
+        <h2 className="text-3xl sm:text-4xl font-black text-ink-900 tracking-tight mb-3">Tudo o que o médico precisa, em um só lugar</h2>
         <p className="text-ink-500 font-medium">Do primeiro agendamento à entrega do laudo assinado — sem trocar de sistema.</p>
       </div>
 

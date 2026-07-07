@@ -20,6 +20,17 @@ export function momPlausible(mom: number | undefined | null): boolean {
   return mom >= MOM_MIN && mom <= MOM_MAX;
 }
 
+/** Faixa plausível do PSV ratio BRUTO da artéria oftálmica (Gana 2022) —
+ *  não é MoM (a razão em si, tipicamente ~0,3–1,0 na população). */
+export const PSV_RATIO_MIN = 0.2;
+export const PSV_RATIO_MAX = 2.0;
+
+/** Verdadeiro se o PSV ratio bruto está na faixa plausível (ausente ⇒ true). */
+export function psvRatioPlausible(value: number | undefined | null): boolean {
+  if (value === undefined || value === null || !isFinite(value)) return true;
+  return value >= PSV_RATIO_MIN && value <= PSV_RATIO_MAX;
+}
+
 /**
  * IG (semanas decimais) a partir do CCN (mm) — Hadlock 1992
  * (mesma curva do CrlCalculator). Retorna null se CCN inválido.

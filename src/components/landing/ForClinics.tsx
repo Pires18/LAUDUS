@@ -1,19 +1,22 @@
 import { Building2, Users, Headset, Layers, Mail } from 'lucide-react';
 
 /**
- * Seção separada dos 3 planos de autoatendimento (médico individual) — para
- * clínicas com múltiplas unidades/médicos, o caminho é contato comercial, não
- * checkout automático. `mailto:` reaproveita o e-mail já usado em todo o
- * resto do app (rodapé, termos, DPO), sem novo canal a manter.
+ * Seção separada dos 3 planos de autoatendimento (médico individual, que já
+ * pode cadastrar seus próprios locais de atendimento dentro da cota do
+ * plano). O Enterprise (clínica com múltiplos médicos inscritos) ainda não é
+ * autoatendimento — hoje é captação de interesse por contato comercial, não
+ * um produto pronto para ativação imediata. A copy é deliberadamente honesta
+ * sobre isso ("em construção"), para não prometer algo que o sistema ainda
+ * não entrega.
  */
 const DIFFERENTIALS = [
-  { icon: Building2, title: 'Múltiplas unidades', text: 'Uma conta, várias clínicas — cabeçalhos, dados e laudos isolados por unidade.' },
-  { icon: Users, title: 'Gestão de equipe', text: 'Convide médicos e recepção com permissões próprias por clínica.' },
-  { icon: Layers, title: 'Cota sob medida', text: 'Volume de laudos, PACS/DICOM e add-ons dimensionados pro seu movimento real.' },
-  { icon: Headset, title: 'Atendimento dedicado', text: 'Onboarding acompanhado e um contato direto para configuração e suporte.' },
+  { icon: Building2, title: 'Múltiplos médicos, uma clínica', text: 'Vários profissionais inscritos sob a mesma unidade, com laudos e agenda organizados por médico.' },
+  { icon: Users, title: 'Gestão de equipe', text: 'Permissões por papel (médico, recepção) dentro da clínica.' },
+  { icon: Layers, title: 'Cota sob medida', text: 'Volume de laudos, PACS/DICOM e add-ons dimensionados pro movimento da clínica.' },
+  { icon: Headset, title: 'Atendimento dedicado', text: 'Onboarding acompanhado e um contato direto durante a implantação.' },
 ];
 
-const CONTACT_HREF = 'mailto:contato.laudus@gmail.com?subject=Plano%20exclusivo%20para%20cl%C3%ADnica&body=Ol%C3%A1%2C%20gostaria%20de%20falar%20sobre%20um%20plano%20para%20minha%20cl%C3%ADnica.';
+const CONTACT_HREF = 'mailto:contato.laudus@gmail.com?subject=Interesse%20no%20plano%20Enterprise&body=Ol%C3%A1%2C%20tenho%20interesse%20no%20plano%20Enterprise%20para%20cl%C3%ADnica%20com%20m%C3%BAltiplos%20m%C3%A9dicos.';
 
 export function ForClinics() {
   return (
@@ -23,13 +26,13 @@ export function ForClinics() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-indigo-200 shadow-sm mb-5">
               <Building2 size={13} className="text-indigo-500" />
-              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Para clínicas</span>
+              <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Plano Enterprise · Em construção</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-ink-900 tracking-tight mb-3">
-              Sua clínica tem mais de uma unidade ou vários médicos?
+              Sua clínica tem vários médicos inscritos?
             </h2>
             <p className="text-ink-500 font-medium max-w-xl mb-7">
-              Nesse caso, um plano fechado não serve — montamos uma proposta sob medida para o seu volume e sua equipe. Fale com a gente.
+              Estamos desenvolvendo o LAUD.US Enterprise para clínicas com múltiplos profissionais. Ainda não é autoatendimento — deixe seu contato e te avisamos assim que abrir, com condições especiais de early access.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {DIFFERENTIALS.map((d) => (
@@ -51,7 +54,7 @@ export function ForClinics() {
               href={CONTACT_HREF}
               className="h-14 px-8 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 shadow-xl shadow-indigo-500/25 transition-all flex items-center gap-2.5 active:scale-95 whitespace-nowrap"
             >
-              <Mail size={15} /> Fale Conosco
+              <Mail size={15} /> Quero ser avisado
             </a>
             <p className="text-[10px] font-bold text-ink-400 uppercase tracking-widest text-center">contato.laudus@gmail.com</p>
           </div>

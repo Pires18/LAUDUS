@@ -12,7 +12,7 @@ import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText, Wallet,
   Building2, RefreshCw, ChevronDown, ChevronUp,
-  Package, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus, Mail,
+  Package, ShieldCheck, Calendar, TrendingUp, CalendarDays, Hospital, Plus,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -433,7 +433,7 @@ export function SubscriptionCenter() {
                       </div>
                       <div className="flex items-center gap-2">
                         <CheckCircle2 size={12} className="text-indigo-600 shrink-0" />
-                        <span>Até <strong>{p.clinicsQuota === 0 ? 'clínicas ilimitadas' : `${p.clinicsQuota} clínicas`}</strong></span>
+                        <span>Até <strong>{p.clinicsQuota === 0 ? 'locais de atendimento ilimitados' : `${p.clinicsQuota} local(is) de atendimento`}</strong></span>
                       </div>
                       {p.motorProDefault && (
                         <div className="flex items-center gap-2">
@@ -786,21 +786,19 @@ export function SubscriptionCenter() {
             loading={loadingAddon === 'appointments'}
           />
 
-          {/* Clínicas — não é autoatendimento: múltiplas unidades/equipe têm
-              plano sob medida, então o CTA leva a contato comercial, não a
-              checkout automático. Usuário que JÁ tem o módulo ativo continua
-              vendo "Ativo no Plano" normalmente (sem mudança retroativa). */}
+          {/* Clínicas — recurso do médico individual (locais de atendimento
+              próprios, dentro da cota do plano). Autoatendimento normal, como
+              os demais add-ons; o Enterprise (múltiplos médicos por clínica)
+              é um conceito à parte, ainda não lançado (ver landing/#clinicas). */}
           <AddonCard
             icon={Hospital} iconColor="teal"
             title="Módulo de Clínicas"
             description={ac.clinics?.description ?? ADDONS_DEFAULT.clinics!.description}
-            price="Sob consulta"
+            price={addonPriceMeta(ac.clinics, 49)}
             active={hasClinics}
-            actionLabel="Fale Conosco"
-            actionIcon={Mail}
-            onAction={() => {
-              window.location.href = 'mailto:contato.laudus@gmail.com?subject=M%C3%B3dulo%20de%20Cl%C3%ADnicas&body=Ol%C3%A1%2C%20gostaria%20de%20falar%20sobre%20o%20m%C3%B3dulo%20de%20cl%C3%ADnicas.';
-            }}
+            actionLabel="Assinar Módulo"
+            onAction={() => handleBuyAddon('clinics')}
+            loading={loadingAddon === 'clinics'}
           />
         </div>
 

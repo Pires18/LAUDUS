@@ -14,13 +14,21 @@
 // MoM dos biomarcadores é calculado com medianas por analisador (Cobas) —
 // ver `medians.ts`.
 //
+// ARTÉRIAS OFTÁLMICAS (PSV ratio): Gana N et al., UOG 2022;59:731-736
+// (doi 10.1002/uog.24914) — marcador ADICIONAL ao O'Gorman 2016, mesmo
+// arcabouço Bayesiano. Diferença importante: o PSV ratio entra na
+// verossimilhança como um DELTA em escala NATURAL (medido − esperado pelas
+// características maternas, Tabela 2 do paper) — NÃO é MoM, não se aplica
+// log10 (ao contrário de MAP/UtA-PI/PlGF/PAPP-A). Ver `psvRatioDelta` em
+// `PeBiomarkers` e `psvRatioExpected()` em `medians.ts`.
+//
 // ⚠️ `validated: false` até conferir com casos-ouro. NÃO é a calculadora
 //    oficial da FMF; apoio à decisão baseado em modelos publicados.
 // ═══════════════════════════════════════════════════════════════════════
 
 export type RacialOrigin = 'white' | 'afroCaribbean' | 'southAsian' | 'eastAsian' | 'mixed';
 export type Conception = 'spontaneous' | 'ovulationInduction' | 'ivf';
-export type BiomarkerKey = 'map' | 'utaPi' | 'plgf' | 'pappa';
+export type BiomarkerKey = 'map' | 'utaPi' | 'plgf' | 'pappa' | 'psvRatio';
 
 export interface PeMaternalFactors {
   ageYears: number;
@@ -43,6 +51,10 @@ export interface PeBiomarkers {
   utaPiMoM?: number;
   plgfMoM?: number;
   pappaMoM?: number;
+  /** Delta bruto do PSV ratio da artéria oftálmica (Gana 2022): medido −
+   *  esperado pelas características maternas (Tabela 2). Escala NATURAL
+   *  (não é MoM — não se aplica log10, diferente dos demais marcadores). */
+  psvRatioDelta?: number;
 }
 
 export interface PeCoefficients {
@@ -67,7 +79,7 @@ export interface PeCoefficients {
 export interface PeBiomarkerModel {
   reg: Record<BiomarkerKey, { intercept: number; slope: number }>;
   sd: Record<BiomarkerKey, number>;
-  /** correlações por par "a_b" (ordem: map,utaPi,plgf,pappa). */
+  /** correlações por par "a_b" (ordem: map,utaPi,plgf,pappa,psvRatio). */
   corr: Record<string, number>;
 }
 
@@ -159,7 +171,8 @@ export function maternalMeanGa(f: PeMaternalFactors, c: PeCoefficients): number 
 
 // ───────────────────────────── Verossimilhança ──────────────────────────
 
-/** Média do log10(MoM) do marcador na IG de parto t (semanas), truncada em 0. */
+/** Média do marcador (log10 MoM, ou delta bruto no caso do PSV ratio) na
+ *  IG de parto t (semanas), truncada em 0. */
 function markerMean(reg: { intercept: number; slope: number }, t: number): number {
   const m = reg.intercept + reg.slope * t;
   return reg.intercept > 0 ? Math.max(0, m) : Math.min(0, m);
@@ -195,11 +208,21 @@ export function computePreeclampsiaRisk(
   const sigma = coeffs.sigma;
   const basal = basalRisk(mu, sigma, thresholds);
 
-  // Marcadores presentes (MoM válido).
-  const momByKey: Record<BiomarkerKey, number | undefined> = {
+  // Marcadores presentes: log10(MoM) para MAP/UtA-PI/PlGF/PAPP-A; para o PSV
+  // ratio (Gana 2022) o valor já é um DELTA em escala natural (não é MoM),
+  // então NÃO se aplica log10 — ver comentário no topo do arquivo.
+  const logMomByKey: Partial<Record<BiomarkerKey, number>> = {
     map: biomarkers.mapMoM, utaPi: biomarkers.utaPiMoM, plgf: biomarkers.plgfMoM, pappa: biomarkers.pappaMoM,
-  };
-  const present = (['map', 'utaPi', 'plgf', 'pappa'] as BiomarkerKey[]).filter(k => momByKey[k] && momByKey[k]! > 0);
+  } as Partial<Record<BiomarkerKey, number>>;
+  const observedByKey: Partial<Record<BiomarkerKey, number>> = {};
+  for (const k of ['map', 'utaPi', 'plgf', 'pappa'] as BiomarkerKey[]) {
+    const mom = logMomByKey[k];
+    if (mom && mom > 0) observedByKey[k] = Math.log10(mom);
+  }
+  if (biomarkers.psvRatioDelta !== undefined && isFinite(biomarkers.psvRatioDelta)) {
+    observedByKey.psvRatio = biomarkers.psvRatioDelta;
+  }
+  const present = (Object.keys(observedByKey) as BiomarkerKey[]);
 
   // Sem biomarcadores: risco final = risco basal (competing-risks só com fatores maternos).
   if (present.length === 0) {
@@ -214,8 +237,8 @@ export function computePreeclampsiaRisk(
     };
   }
 
-  // Vetor observado y (log10 MoM) e precisão Σ⁻¹ dos marcadores presentes.
-  const y = present.map(k => Math.log10(momByKey[k]!));
+  // Vetor observado y e precisão Σ⁻¹ dos marcadores presentes.
+  const y = present.map(k => observedByKey[k]!);
   const cov = present.map(a => present.map(b => corr(model, a, b) * model.sd[a] * model.sd[b]));
   const prec = invertMatrix(cov);
 

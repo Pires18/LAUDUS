@@ -7,6 +7,7 @@ import { updateItem, addItemWithId, genId } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
 import { FileText, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList, Copy } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
+import { StructuredPreview } from '../editor/components/StructuredPreview';
 import { classNames } from '../../utils/format';
 import { auth } from '../../lib/firebase';
 
@@ -17,7 +18,7 @@ interface Props {
 export function TemplateEditor({ templateId }: Props) {
   const { isAdmin } = useAdmin();
   const { setView, showToast, settings } = useApp();
-  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'copilot' | 'prompt'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'structure' | 'copilot' | 'structured' | 'prompt'>('info');
   const [draft, setDraft] = useState<ReportTemplate | null>(null);
 
   const { data: template, loading } = useDocument<ReportTemplate>('templates', templateId);
@@ -83,6 +84,7 @@ export function TemplateEditor({ templateId }: Props) {
     { id: 'info', label: 'Informações Básicas' },
     { id: 'structure', label: 'Estrutura do Laudo' },
     { id: 'copilot', label: 'Formulário & Fichas' },
+    { id: 'structured', label: 'Estruturado' },
     { id: 'prompt', label: 'Prompt LAUD.IA' },
   ] as const).filter(t => isAdmin || t.id !== 'prompt');
 
@@ -331,6 +333,23 @@ export function TemplateEditor({ templateId }: Props) {
                 placeholder="Ex: Eu, [Nome do Paciente], autorizo a realização do exame..."
               />
             </div>
+          </div>
+        )}
+
+        {activeTab === 'structured' && (
+          <div className="max-w-4xl space-y-4">
+            <div className="bg-white rounded-2xl border border-ink-100 p-5 shadow-sm">
+              <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                <ClipboardList size={16} className="text-brand-500" />
+                Formulário Estruturado
+              </h3>
+              <p className="text-xs text-ink-500 leading-relaxed mt-2">
+                Campos tipados derivados desta máscara ({EXAM_AREAS.find(a => a.id === draft.area)?.label || draft.area}),
+                com escores e cálculos clínicos em tempo real. É o que o médico preenche na aba "Estruturado" do Copiloto de cada exame.
+                Esta é uma pré-visualização interativa — os valores aqui não são salvos.
+              </p>
+            </div>
+            <StructuredPreview template={draft} />
           </div>
         )}
 

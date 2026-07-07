@@ -5,6 +5,12 @@
 //   Referência: branca, nulípara, espontânea, 69 kg, 164 cm.
 // Biomarcadores (Bayes): O'Gorman N et al., AJOG 2016;214:103.e1-e12
 //   (Tabelas 2 e 3) — EXATO. Médias do log10 MoM vs IG do parto + covariância.
+// Artéria oftálmica (PSV ratio): Gana N et al., UOG 2022;59:731-736
+//   (doi 10.1002/uog.24914), Tabela 3 — EXATO. Intercepto/slope/SD do delta
+//   de PSV ratio vs IG do parto + correlações com log10(MoM) dos demais
+//   marcadores. A equação para o valor ESPERADO do PSV ratio bruto (usada
+//   para computar o delta = medido − esperado) está na Tabela 2 do mesmo
+//   paper e vive em `medians.ts` (`psvRatioExpected`).
 //
 // ═══ AUDITORIA (jul/2026) ═══════════════════════════════════════════════
 // Todos os coeficientes abaixo (fatores maternos + modelo de biomarcadores)
@@ -61,12 +67,16 @@ export const PE_BIOMARKER_MODEL: PeBiomarkerModel = {
     map: { intercept: 0.095640, slope: -0.0018240 },
     pappa: { intercept: -0.62165, slope: 0.014692 },
     plgf: { intercept: -0.93687, slope: 0.021930 },
+    // Gana 2022, Tabela 3 — "Intercept e slope definem a média de PE para
+    // IG de parto <41+3 semanas" (delta bruto do PSV ratio, não log10 MoM).
+    psvRatio: { intercept: 0.446837, slope: -0.01079 },
   },
   sd: {
     utaPi: 0.12894,
     map: 0.03724,
     plgf: 0.17723,
     pappa: 0.23539,
+    psvRatio: 0.09541, // Gana 2022, Tabela 3
   },
   corr: {
     utaPi_map: -0.05133,
@@ -75,5 +85,11 @@ export const PE_BIOMARKER_MODEL: PeBiomarkerModel = {
     map_pappa: -0.00497,
     map_plgf: -0.02791,
     pappa_plgf: 0.31983,
+    // Gana 2022, Tabela 3 — correlações entre o delta do PSV ratio e o
+    // log10(MoM) dos demais marcadores.
+    psvRatio_map: 0.14969,
+    psvRatio_utaPi: -0.00997,
+    psvRatio_plgf: -0.1285,
+    psvRatio_pappa: -0.03545,
   },
 };

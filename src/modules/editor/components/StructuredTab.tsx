@@ -21,6 +21,8 @@ interface StructuredTabProps {
   derivations: Derivation[];
   isGenerating: boolean;
   filledCount: number;
+  /** Pré-visualização (ex.: dentro do editor de máscara): oculta o rodapé de compilar. */
+  preview?: boolean;
 }
 
 /** Renderiza um input de medida/texto com sufixo de unidade opcional. */
@@ -91,6 +93,43 @@ function TripletInput({
   );
 }
 
+/** Multisseleção como chips (valor = opções separadas por vírgula). */
+function MultiSelectInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: StructuredFieldDef;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const selected = value ? value.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const toggle = (opt: string) => {
+    const next = selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt];
+    onChange(next.join(', '));
+  };
+  return (
+    <div className="flex flex-wrap gap-1">
+      {field.options?.map((o) => {
+        const on = selected.includes(o);
+        return (
+          <button
+            key={o}
+            type="button"
+            onClick={() => toggle(o)}
+            className={classNames(
+              'px-2 py-1 rounded-lg text-[10px] font-bold border transition-all active:scale-95',
+              on ? 'bg-brand-500 text-white border-brand-500' : 'bg-white text-ink-600 border-ink-200 hover:border-brand-300'
+            )}
+          >
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function FieldRenderer({
   field,
   value,
@@ -132,6 +171,8 @@ function FieldRenderer({
         ))}
       </select>
     );
+  } else if (field.kind === 'multiselect') {
+    control = <div className="flex-1 min-w-0"><MultiSelectInput field={field} value={asText} onChange={onChange} /></div>;
   } else if (field.kind === 'triplet') {
     control = <div className="flex-1 min-w-0"><TripletInput field={field} value={asText} onChange={onChange} /></div>;
   } else if (field.kind === 'calc') {
@@ -172,6 +213,7 @@ export function StructuredTab({
   derivations,
   isGenerating,
   filledCount,
+  preview,
 }: StructuredTabProps) {
   const derivBySection = derivations.reduce<Record<string, Derivation[]>>((acc, d) => {
     (acc[d.sectionId] = acc[d.sectionId] || []).push(d);
@@ -181,8 +223,12 @@ export function StructuredTab({
   /** Grade de campos usando um mapeador de id de armazenamento (identidade ou instância). */
   const renderGrid = (fields: StructuredFieldDef[], keyFor: (fieldId: string) => string) => (
     <div className="grid grid-cols-2 gap-2.5">
-      {fields.map((field) => (
-        <div key={field.id} className={classNames(field.kind === 'triplet' || field.kind === 'calc' || field.fullWidth ? 'col-span-2' : '')}>
+      {fields.filter((field) => {
+        if (!field.showIf) return true;
+        const cur = fieldValueToText(values[keyFor(field.showIf.field)]);
+        return field.showIf.equals != null ? cur === field.showIf.equals : !!cur;
+      }).map((field) => (
+        <div key={field.id} className={classNames(field.kind === 'triplet' || field.kind === 'calc' || field.kind === 'multiselect' || field.fullWidth ? 'col-span-2' : '')}>
           <FieldRenderer
             field={field}
             value={values[keyFor(field.id)]}
@@ -318,29 +364,37 @@ export function StructuredTab({
         })}
       </div>
 
-      <div className="p-3 pb-4 bg-white border-t border-ink-100 shrink-0">
-        <button
-          onClick={onCompile}
-          disabled={isGenerating || filledCount === 0}
-          className="w-full h-11 rounded-2xl bg-ink-900 hover:bg-ink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 size={15} className="animate-spin" /> Processando...
-            </>
-          ) : (
-            <>
-              <Sparkles size={15} /> Processar e Integrar ao Laudo
-              {filledCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black">{filledCount}</span>
-              )}
-            </>
-          )}
-        </button>
-        <p className="mt-2 text-center text-[9px] text-ink-400 font-medium flex items-center justify-center gap-1">
-          <RotateCcw size={9} /> Campos vazios são ignorados — a IA preenche apenas o informado.
-        </p>
-      </div>
+      {preview ? (
+        <div className="p-3 pb-4 bg-ink-50/60 border-t border-ink-100 shrink-0">
+          <p className="text-center text-[10px] text-ink-500 font-semibold flex items-center justify-center gap-1.5">
+            <LayoutGrid size={11} className="text-brand-500" /> Pré-visualização do formulário estruturado desta máscara — preenchível no Copiloto de cada exame.
+          </p>
+        </div>
+      ) : (
+        <div className="p-3 pb-4 bg-white border-t border-ink-100 shrink-0">
+          <button
+            onClick={onCompile}
+            disabled={isGenerating || filledCount === 0}
+            className="w-full h-11 rounded-2xl bg-ink-900 hover:bg-ink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={15} className="animate-spin" /> Processando...
+              </>
+            ) : (
+              <>
+                <Sparkles size={15} /> Processar e Integrar ao Laudo
+                {filledCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black">{filledCount}</span>
+                )}
+              </>
+            )}
+          </button>
+          <p className="mt-2 text-center text-[9px] text-ink-400 font-medium flex items-center justify-center gap-1">
+            <RotateCcw size={9} /> Campos vazios são ignorados — a IA preenche apenas o informado.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

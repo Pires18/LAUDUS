@@ -110,7 +110,17 @@ export function PricingPlans({ open, onClose, onChoose }: Props) {
           })()}
 
           <p className="text-center text-[11px] text-ink-400 font-medium mt-8 leading-relaxed">
-            Add-ons (PACS/DICOM, Calculadoras, Agendamentos, Clínicas) podem ser incluídos no plano ou contratados à parte no Centro de Assinatura. O pagamento é processado com segurança pela AbacatePay.
+            Add-ons (PACS/DICOM, Calculadoras, Agendamentos) podem ser incluídos no plano ou contratados à parte no Centro de Assinatura. O pagamento é processado com segurança pela AbacatePay.
+          </p>
+          <p className="text-center text-[11px] text-ink-400 font-medium mt-2 leading-relaxed">
+            Clínica com vários médicos inscritos? O plano Enterprise está em construção —{' '}
+            <a
+              href="mailto:contato.laudus@gmail.com?subject=Interesse%20no%20plano%20Enterprise&body=Ol%C3%A1%2C%20tenho%20interesse%20no%20plano%20Enterprise%20para%20cl%C3%ADnica%20com%20m%C3%BAltiplos%20m%C3%A9dicos."
+              className="text-brand-600 font-bold hover:underline"
+            >
+              quero ser avisado
+            </a>{' '}
+            quando abrir.
           </p>
         </div>
       </div>
@@ -128,7 +138,7 @@ function PlanCard({ plan, interval, savingHint, onChoose }: { plan: Plan & { id:
     { on: plan.includesCalculators, icon: Calculator, label: 'Calculadoras clínicas' },
     { on: plan.includesPacs, icon: Database, label: 'PACS / DICOM' },
     { on: plan.includesAppointments, icon: CalendarDays, label: 'Agendamentos' },
-    { on: plan.includesClinics, icon: Building2, label: 'Múltiplas clínicas' },
+    { on: plan.includesClinics, icon: Building2, label: 'Organização por local de atendimento' },
   ];
 
   return (
@@ -167,7 +177,7 @@ function PlanCard({ plan, interval, savingHint, onChoose }: { plan: Plan & { id:
       <div className="mt-5 space-y-2 flex-1">
         <Line ok label={reports} />
         <Line ok icon={Sparkles} label={plan.motorProDefault ? 'Motor Lite + Pro' : 'Motor Lite'} />
-        {plan.clinicsQuota > 0 && <Line ok label={`Até ${plan.clinicsQuota} clínica(s)`} />}
+        {plan.clinicsQuota > 0 && <Line ok label={`Até ${plan.clinicsQuota} local(is) de atendimento`} />}
         {addons.map(a => (
           <Line key={a.label} ok={!!a.on} icon={a.icon} label={a.label} muted={!a.on} />
         ))}

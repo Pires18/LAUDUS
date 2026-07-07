@@ -5,7 +5,7 @@ import {
   StructuredFieldDef,
   StructuredFieldValue,
 } from '../../../types';
-import { getAreaOverlay } from './areaOverlays';
+import { enrichSections } from './fieldLibrary';
 import { sectionState, itemCount, itemFieldId } from './structuredKeys';
 
 /** Placeholders de preenchimento usados nas máscaras (fetal `(...)` / não-fetal `[__]`). */
@@ -40,12 +40,16 @@ export function parseMaskSections(analysisTemplate: string): StructuredSection[]
   const seen = new Set<string>();
 
   for (const block of blocks) {
-    const strongMatch = block.match(/<strong>\s*([^<:]+?):?\s*<\/strong>/i);
-    const rawLabel = strongMatch
-      ? strongMatch[1].trim()
-      : stripTags(block).split('.')[0].slice(0, 40);
+    const bodyText = stripTags(block);
+    if (!bodyText) continue; // pula <p> vazios (evita seções-fantasma)
+
+    // Rótulo: conteúdo do <strong> até o primeiro ':' (aceita rótulo com valor inline).
+    const strongMatch =
+      block.match(/<strong>\s*([^<:]+?)\s*:/i) || block.match(/<strong>\s*([^<]+?)\s*<\/strong>/i);
+    const rawLabel = strongMatch ? strongMatch[1].trim() : bodyText.split('.')[0].slice(0, 40);
     // remove parênteses explicativos do rótulo (ex.: "(CCN)")
-    const label = rawLabel.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim() || 'Estrutura';
+    const label = rawLabel.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!label) continue; // sem rótulo utilizável → ignora
 
     let id = slug(label);
     while (seen.has(id)) id += '-x';
@@ -69,23 +73,20 @@ export function parseMaskSections(analysisTemplate: string): StructuredSection[]
 }
 
 /**
- * Deriva o esquema estruturado de um exame.
- * - Área com overlay curado (ex.: medicina-fetal) → usa o overlay (campos
- *   tipados + calculadoras ligadas).
- * - Demais áreas → parser genérico do analysisTemplate da máscara.
+ * Deriva o esquema estruturado de um exame PADRONIZADO POR MÁSCARA:
+ * as seções vêm dos compartimentos do `analysisTemplate` da própria máscara
+ * (fidelidade por exame), e cada seção casada é ENRIQUECIDA com campos
+ * tipados/escores da biblioteca (`fieldLibrary`). Seções sem casamento mantêm
+ * os campos genéricos derivados dos placeholders.
  */
 export function deriveStructuredSchema(
   template: ReportTemplate | null,
   area: string
 ): StructuredSchema {
-  const overlay = getAreaOverlay(area, template?.name);
-  if (overlay) {
-    return { area, examName: template?.name, sections: overlay };
-  }
-  const sections = template?.analysisTemplate
+  const parsed = template?.analysisTemplate
     ? parseMaskSections(template.analysisTemplate)
     : [];
-  return { area, examName: template?.name, sections };
+  return { area, examName: template?.name, sections: enrichSections(area, parsed) };
 }
 
 /** Texto compilável de um valor de campo (string ou objeto calc/triplet). */

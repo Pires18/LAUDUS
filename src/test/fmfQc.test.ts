@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  momPlausible, crlToGaWeeks, crlInWindow, formatGa,
-  MOM_MIN, MOM_MAX, CRL_MIN_MM, CRL_MAX_MM,
+  momPlausible, psvRatioPlausible, crlToGaWeeks, crlInWindow, formatGa,
+  MOM_MIN, MOM_MAX, CRL_MIN_MM, CRL_MAX_MM, PSV_RATIO_MIN, PSV_RATIO_MAX,
 } from '../modules/calculators/fmf/qc';
 
 describe('QC — plausibilidade de MoM', () => {
@@ -18,6 +18,23 @@ describe('QC — plausibilidade de MoM', () => {
   it('fora da faixa ⇒ false', () => {
     expect(momPlausible(0.1)).toBe(false);
     expect(momPlausible(6)).toBe(false);
+  });
+});
+
+describe('QC — plausibilidade do PSV ratio bruto (artéria oftálmica, Gana 2022)', () => {
+  it('ausente/None ⇒ sem alerta (true)', () => {
+    expect(psvRatioPlausible(undefined)).toBe(true);
+    expect(psvRatioPlausible(null)).toBe(true);
+    expect(psvRatioPlausible(NaN)).toBe(true);
+  });
+  it('dentro da faixa 0,2–2,0 ⇒ true', () => {
+    expect(psvRatioPlausible(0.65)).toBe(true);
+    expect(psvRatioPlausible(PSV_RATIO_MIN)).toBe(true);
+    expect(psvRatioPlausible(PSV_RATIO_MAX)).toBe(true);
+  });
+  it('fora da faixa ⇒ false', () => {
+    expect(psvRatioPlausible(0.1)).toBe(false);
+    expect(psvRatioPlausible(5)).toBe(false);
   });
 });
 

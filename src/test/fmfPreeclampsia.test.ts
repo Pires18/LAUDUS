@@ -146,3 +146,40 @@ describe('rede de segurança — underflow numérico dos biomarcadores', () => {
     expect(r.biomarkerLikelihoodUnderflow).toBe(false);
   });
 });
+
+describe('PSV ratio da artéria oftálmica (Gana 2022, UOG 59:731) — marcador adicional', () => {
+  it('delta muito elevado (padrão de PE precoce) eleva bastante o risco de PE pré-termo', () => {
+    // Tabela 3: intercepto do delta em PE = 0.446837 (delta grande e positivo
+    // é o padrão de PE, especialmente precoce) — SD 0.09541, então um delta
+    // de +0.4 está bem dentro da distribuição afetada e distante da null (0).
+    const base = risk(reference, noBio).pretermPE.prob;
+    const elevated = risk(reference, { psvRatioDelta: 0.4 }).pretermPE.prob;
+    expect(elevated).toBeGreaterThan(base * 3);
+  });
+  it('delta próximo de zero (padrão não afetado/termo) fica próximo do prior', () => {
+    const base = risk(reference, noBio).pretermPE.prob;
+    const neutral = risk(reference, { psvRatioDelta: 0 }).pretermPE.prob;
+    expect(neutral).toBeLessThan(base * 2);
+    expect(neutral).toBeGreaterThan(base / 5);
+  });
+  it('combinado com MAP/UtA-PI/PlGF anormais, eleva ainda mais o risco', () => {
+    const withoutPsv = risk(reference, { mapMoM: 1.3, utaPiMoM: 1.8, plgfMoM: 0.4 }).pretermPE.prob;
+    const withPsv = risk(reference, { mapMoM: 1.3, utaPiMoM: 1.8, plgfMoM: 0.4, psvRatioDelta: 0.4 }).pretermPE.prob;
+    expect(withPsv).toBeGreaterThan(withoutPsv);
+  });
+  it('basal não é afetado pela presença do PSV ratio (só entra na verossimilhança)', () => {
+    const noBioResult = risk(reference, noBio);
+    const withPsv = risk(reference, { psvRatioDelta: 0.4 });
+    expect(withPsv.basalPretermPE.oneInN).toBe(noBioResult.pretermPE.oneInN);
+  });
+  it('delta implausível (erro de digitação) dispara a rede de segurança e cai para o basal', () => {
+    const r = risk(reference, { psvRatioDelta: 1e8 });
+    expect(r.biomarkerLikelihoodUnderflow).toBe(true);
+    expect(r.pretermPE.oneInN).toBe(r.basalPretermPE.oneInN);
+  });
+  it('coeficientes do PSV ratio presentes no modelo (Gana 2022, Tabela 3)', () => {
+    expect(M.reg.psvRatio.intercept).toBeCloseTo(0.446837, 6);
+    expect(M.reg.psvRatio.slope).toBeCloseTo(-0.01079, 6);
+    expect(M.sd.psvRatio).toBeCloseTo(0.09541, 6);
+  });
+});

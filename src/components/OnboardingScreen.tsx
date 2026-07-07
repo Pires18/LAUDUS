@@ -298,7 +298,7 @@ export function OnboardingScreen() {
                       ? 'Laudos ilimitados'
                       : `${selectedPlan?.reportsQuota || 100} laudos/mês`}
                     {' · '}
-                    {selectedPlan?.clinicsQuota || 5} clínicas
+                    {selectedPlan?.clinicsQuota || 5} local(is) de atendimento
                   </p>
                 </>
               )}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ntMedianMm, mapMedianMmHg, utaPiMedian, plgfMedian, toMoM, MEDIANS_VALIDATED,
+  ntMedianMm, mapMedianMmHg, utaPiMedian, plgfMedian, psvRatioExpected, toMoM, toDelta, MEDIANS_VALIDATED,
   type PeMedianCovariates,
 } from '../modules/calculators/fmf/medians';
 
@@ -65,5 +65,49 @@ describe('medianas de PE (Tan 2018 Appendix S1)', () => {
 
   it('gate de validação continua falso', () => {
     expect(MEDIANS_VALIDATED).toBe(false);
+  });
+});
+
+describe('PSV ratio da artéria oftálmica (Gana 2022, Tabela 2)', () => {
+  it('fato-ouro: na referência (69kg/35a/164cm/branca/não-fumante/não-HAS/nulípara), esperado = intercepto exato', () => {
+    // Todos os termos de covariável são centrados em 0 na referência —
+    // "Intercept 0.657922" é declarado explicitamente na Tabela 2.
+    expect(psvRatioExpected(ref)).toBeCloseTo(0.657922, 6);
+  });
+  it('idade acima de 35 eleva o PSV ratio esperado (slope positivo)', () => {
+    expect(psvRatioExpected({ ...ref, ageYears: 40 })!).toBeGreaterThan(psvRatioExpected(ref)!);
+  });
+  it('altura acima de 164cm reduz o PSV ratio esperado (slope negativo)', () => {
+    expect(psvRatioExpected({ ...ref, heightCm: 180 })!).toBeLessThan(psvRatioExpected(ref)!);
+  });
+  it('HAS crônica eleva bastante o PSV ratio esperado', () => {
+    const base = psvRatioExpected(ref)!;
+    const htn = psvRatioExpected({ ...ref, chronicHypertension: true })!;
+    expect(htn - base).toBeCloseTo(0.072817, 6);
+  });
+  it('parosa sem PE prévia reduz levemente o PSV ratio esperado', () => {
+    const base = psvRatioExpected(ref)!;
+    const parous = psvRatioExpected({ ...ref, parity: 'parousNoPE' })!;
+    expect(base - parous).toBeCloseTo(0.007652, 6);
+  });
+  it('dados maternos insuficientes ⇒ null', () => {
+    expect(psvRatioExpected({ ...ref, weightKg: 0 })).toBeNull();
+    expect(psvRatioExpected({ ...ref, heightCm: 0 })).toBeNull();
+    expect(psvRatioExpected({ ...ref, ageYears: 0 })).toBeNull();
+  });
+});
+
+describe('toDelta — escala natural (PSV ratio, não é MoM)', () => {
+  it('delta = medido − esperado', () => {
+    expect(toDelta(0.75, 0.657922)).toBeCloseTo(0.092078, 6);
+    expect(toDelta(0.5, 0.657922)).toBeCloseTo(-0.157922, 6);
+  });
+  it('medido = esperado ⇒ delta = 0', () => {
+    expect(toDelta(0.657922, 0.657922)).toBeCloseTo(0, 10);
+  });
+  it('entradas inválidas ⇒ undefined', () => {
+    expect(toDelta(undefined, 0.6)).toBeUndefined();
+    expect(toDelta(0.6, null)).toBeUndefined();
+    expect(toDelta(NaN, 0.6)).toBeUndefined();
   });
 });
