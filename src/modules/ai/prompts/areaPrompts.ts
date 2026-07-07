@@ -125,7 +125,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
        (a) Parede >4 mm com duplo halo; (b) Murphy sonográfico positivo;
        (c) Cálculo impactado no infundíbulo; (d) Líquido perivesicular; (e) Debris intraluminais.
        ≥3 critérios = colecistite aguda provável → ATIVAR R6.
-     Pólipo vesicular: sessil, sem sombra. <6 mm → controle anual.
+     Pólipo vesicular (classificar via GRADS — ACR 2021): sessil, sem sombra. <6 mm → controle anual.
        6–9 mm → controle 6 meses. ≥10 mm → avaliação cirúrgica (risco oncológico).
 
 3. PÂNCREAS — Avaliação sistemática
@@ -300,7 +300,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
    Tumor vesical suspeito: "Cistoscopia + biopsia; avaliação urológica."
    HPB volumosa (>80 cm³) + RPM >100 mL: "Avaliação urológica + urodinâmica."
    RPM >300 mL: ATIVAR R6 — "ALERTA UROLÓGICO: retenção urinária — sondagem imediata."
-   Lesão suspeita de CaP: "mpMRI prostática (PI-RADS) ou TRUS com biópsia."
+   Lesão suspeita de CaP: "mpMRI prostática (PI-RADS v2.1) ou TRUS com biópsia."
    Aneurisma aorta 3–4,9 cm: "US semestral + encaminhamento para cirurgia vascular."
    Aneurisma aorta 5,0–5,4 cm: "Avaliação vascular imediata (2 semanas)."
    Aneurisma ≥5,5 cm: ATIVAR R6 — "ALERTA VASCULAR: cirurgia/endovascular urgente."
@@ -734,7 +734,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    Átrio VL (2T)           │ <10 mm                    │ ≥10 mm = ventricomeg.
    Cisterna magna (2T)     │ 2–10 mm                   │ <2 ou >10 mm = avall.
    Prega nucal (15–20 sem) │ <6 mm                     │ ≥6 mm = marcador T21
-   ILA                     │ 8–24 cm                   │ <5 cm ou >25 cm → R6
+   ILA                     │ 8–24 cm                   │ <5 cm ou >35 cm → R6
    MBA                     │ 2–8 cm                    │ <2 cm → R6
    IP AU (IG-dependente)   │ <P95 para IG              │ ADU ou REDF → R6
    RCP                     │ >1,00                     │ <1,00 = centralização
@@ -848,7 +848,7 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
 2. ÚTERO — Parâmetros obrigatórios
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    DIMENSÕES: comprimento (longitudinal) × altura (AP) × largura (transverso).
-   Volume uterino normal: 60–130 cm³ (nuligesta). >200 cm³ = útero volumoso.
+   Volume uterino normal: 60–100 cm³ (nuligesta) / até 130 cm³ (multípara). >200 cm³ = útero volumoso.
    POSIÇÃO: anteversoflexão (AVF) — normal. Retrovertido (RVF) — relatar.
    CONTORNOS: regulares = normal; bosselados = miomatose.
 
@@ -1127,7 +1127,7 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
    Endométrio pós-meno >5 mm s/ sangramento: "Controle US em 6 meses; se >8 mm → histo."
    Endométrio pós-meno >5 mm c/ sangramento: "Histeroscopia diagnóstica urgente."
    Pólipo endometrial: "SHG (sonoistero) ou histeroscopia diagnóstica para confirmação."
-   SOMP morfológico: "Correlação clínica e laboratorial para diagnóstico de SOMP (Síndrome Ovariana Metabólica Poliendócrina) — critérios de Rotterdam completos."
+   SOMP morfológico: "Correlação clínica e laboratorial para diagnóstico de SOMP (Síndrome Ovariana Metabólica Poliendócrina) — critérios diagnósticos completos (Diretriz Internacional 2023)."
    Hidrossalpinge: "Avaliação ginecológica para investigação de DIP / infertilidade."
    Piosalpinge / ATO: ATIVAR R6 — "ALERTA INFECCIOSO: internação + ATB IV + avaliação cirúrgica."
    Gestação ectópica suspeita: ATIVAR R6 — "ALERTA OBSTÉTRICO: avaliação emergencial."
@@ -1319,7 +1319,15 @@ MAPA DE EXAMES DESTA ÁREA (8 templates de Camada 3):
    C: 10–15 cm — cirurgia preferível se paciente cirúrgico.
    D: >15 cm + oclusão + infrapoplítea difusa — cirurgia.
 
-   ISQUEMIA CRÍTICA DE MEMBRO (ICM — ATIVAR R6):
+   ÍNDICE TORNOZELO-BRAÇO (ITB/ABI) — valores de referência:
+   Normal: 1,00–1,40. Limítrofe: 0,91–0,99. DAP leve-moderada: 0,41–0,90. DAP grave/isquemia crítica: ≤0,40.
+   >1,40 = suspeita de calcificação arterial (vasos incompressíveis, ex. DM/DRC) — correlacionar com pressão em artéria pediosa/dedo.
+
+   CLASSIFICAÇÃO DE RUTHERFORD (gravidade clínica da DAP):
+   0: assintomático. 1–3: claudicação leve/moderada/grave. 4: dor de repouso.
+   5: perda tecidual menor (úlcera não cicatrizante, gangrena focal). 6: perda tecidual maior (gangrena extensa).
+
+   ISQUEMIA CRÍTICA DE MEMBRO (ICM — Rutherford 4–6 — ATIVAR R6):
    Critérios: dor de repouso + úlcera/gangrena + ABI <0,40 + PAS tornozelo <50 mmHg.
    "ALERTA VASCULAR: isquemia crítica — avaliação vascular emergencial (revascularização)."
 
@@ -1396,7 +1404,7 @@ MAPA DE EXAMES DESTA ÁREA (8 templates de Camada 3):
      → Progressão acelerada = risco cardiovascular elevado independente do valor absoluto → intensificar manejo: estatinas de alta potência, pressão <120 mmHg, anti-plaquetário se indicado.
      Declarar: "EMI atual de X,X mm vs. X,X mm em [data anterior] — progressão de X,XX mm/período — [dentro do esperado / progressão acelerada]."
 
-   INSUFICIÊNCIA VENOSA CRÓNICA (IVC) — CEAP 2020:
+   INSUFICIÊNCIA VENOSA CRÔNICA (IVC) — CEAP 2020:
    C0: sem sinais visíveis ou palpáveis. C1: teleangiectasias/veias reticulares.
    C2: varizes (>3 mm). C2r: varizes recorrentes pós-tratamento.
    C3: edema venoso. C4a: pigmentação/eczema. C4b: lipodermatoesclerose/atrofia branca.
@@ -1769,7 +1777,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     SINOVITE ATIVA: Power Doppler positivo na membrana sinovial = inflamação ativa.
       G0 = ausente · G1 = 1–3 sinais pontuais · G2 = confluentes sem encher ·
-      G3 = llenando todo o espaço sinovial (sinovite grave).
+      G3 = preenchendo todo o espaço sinovial (sinovite grave).
     BURSITE: PD nas paredes = ativa/séptica. Ausente = mecânica/crônica.
     TENDÃO: PD interno = neoformação vascular (tendinose crônica / "tendinite").
       Localização do PD: peritendínea vs. intratendinosa (mais patológica).
@@ -1994,7 +2002,7 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
    Nível III: medial ao peitoral menor (infraclavicular/axila alta).
    Relatar: nível, número, maior eixo (mm), espessura cortical (mm), hilo.
 
-   CRITÉRIOS MORFOLÓGICOS:
+   CRITÉRIOS MORFOLÓGICOS (Bedi/Robbins):
    Normal: oval · córtex uniforme ≤3 mm · hilo gorduroso preservado e central.
    Suspeito (qualquer um):
      Córtex >3 mm focal ou difuso.
@@ -2304,7 +2312,7 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
      Estenose 50–69%: VPS ACI ≥125 cm/s · relação VPS ACI/ACC ≥2,0.
      Estenose ≥70%: VPS ACI ≥230 cm/s · relação VPS ACI/ACC ≥4,0.
      Estenose ≥70%: ATIVAR N3 → neurologia/neurocirurgia vascular (CEA ou CAS).
-   OCLUSÃO TOTAL: ausência de sinal em toda extensão · thrombosis intra-luminal.
+   OCLUSÃO TOTAL: ausência de sinal em toda extensão · trombose intra-luminal.
      → ATIVAR R6 (AVC isquêmico em curso?) → avaliação neurológica urgente.
 
    ARTÉRIA VERTEBRAL (AV):
@@ -2450,7 +2458,7 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     Estrutura                  │ Normal                      │ Alerta / Ação
     ───────────────────────────┼─────────────────────────────┼────────────────────────
-    Lobo tireoidiano (vol.)    │ ♀ 4–15 cm³ · ♂ 6–20 cm³    │ >20 cm³ = bócio
+    Lobo tireoidiano (vol.)    │ ♀ 4–15 cm³ · ♂ 6–20 cm³    │ Vol. total >25 cm³(♀)/>30 cm³(♂) = bócio
     Istmo tireoidiano          │ ≤3 mm                       │ >5 mm = bócio/tireoidite
     Nódulo tireoidiano         │ Classificar TI-RADS          │ TI-RADS 4–5 → biópsia
     EMI carotídeo (bulbo)      │ <0,9 mm                     │ >1,2 mm = placa
@@ -2871,8 +2879,8 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
    Grau 3: Sinal exuberante (confluência em >50% da área sinovial).
 
    Sinovite grau 0/1 + PD 0: N0/N1 — remissão ou atividade mínima.
-   Sinovite grau 2 + PD 1: N2 — atividade leve.
-   Sinovite grau 2-3 + PD 2-3: N3 → ajuste terapêutico com reumatologista.
+   Sinovite grau 1-3 + PD ≥1: N3 — atividade residual, NÃO remissão (EULAR 2022) → ajuste terapêutico com reumatologista.
+   Sinovite grau 2-3 + PD 2-3: N3 → ajuste terapêutico com reumatologista, achado exuberante.
    PDUS-28: avaliação padronizada de 28 articulações (ver template específico).
 
    PDUS-7 (escore simplificado — 7 articulações):

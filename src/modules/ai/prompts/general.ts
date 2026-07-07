@@ -22,6 +22,12 @@
  * VERSÃO ANTERIOR: V1.0 → Substituída por V2.0 em Jun/2026.
  */
 
+// Regra de segurança repetida verbatim no Bloco 1 (autocálculo geral) e na
+// Fase 4.10 do Bloco 2 (autocálculo clínico) — extraída para uma única fonte
+// para que as duas camadas não possam divergir com edições futuras.
+const REGRA_SEGURANCA_CALCULO_AUSENTE =
+  `Se qualquer dado necessário for ausente ou incompleto → NÃO calcule, NÃO estime/invente. Declare: "Dados insuficientes para cálculo de [parâmetro]."`;
+
 // ═══════════════════════════════════════════════════════════════════════
 // BLOCO 1 — PROMPT MESTRE / DOUTRINA
 // ═══════════════════════════════════════════════════════════════════════
@@ -89,8 +95,7 @@ PERMITIDO (autocálculo baseado em dados fornecidos):
   • Aplicar normalidade qualitativa da máscara para órgãos não mencionados nas notas;
   • Expandir morfologicamente achados informados (tradução de jargões para terminologia técnica);
   • Apresentar diagnósticos diferenciais morfológicos quando o achado for ambíguo (ver abaixo).
-  Regra geral de segurança: se qualquer dado necessário for ausente ou incompleto
-  → NÃO calcule, NÃO estime. Declare: "Dados insuficientes para cálculo de [parâmetro]."
+  Regra geral de segurança: ${REGRA_SEGURANCA_CALCULO_AUSENTE}
 
 DIAGNÓSTICO DIFERENCIAL MORFOLÓGICO (V2.0):
 Quando um achado for morfologicamente ambíguo (padrão não específico, múltiplas hipóteses plausíveis):
@@ -182,7 +187,9 @@ IDIOMA, TERMINOLOGIA E PADRÃO NUMÉRICO:
  * 1. Ancoragem Clínica       — calibra por IDADE × SEXO × INDICAÇÃO × MEDICAÇÕES
  * 2. Mapeamento do Exame     — identifica tipo, área, modo (geração vs refine)
  * 3. Normalidade Habitual    — preenche órgãos sem dados com qualidade padrão
- * 4. Autocálculos            — executa volume, peso, IG, DPP, IP médio, RCP, Hadlock, AFI, NASCET
+ * 4. Autocálculos            — 14 fórmulas (4.1-4.14): elipsoide, peso prostático, IP médio,
+ *                              RCP, IG/DPP por DUM, Hadlock, AFI, NASCET, volume renal,
+ *                              cervicometria, ductus venosus, espessura endometrial, CC/CA
  * 5. Expansão Morfológica    — traduz jargões para terminologia técnica
  * 6. Cascata e Diplomacia    — classifica conduta N0→N4 e define linguagem
  * 7. Self-Audit              — checklist ⑬ itens espelhando auditReportQuality (placeholders, cascata, classificação, decimal, alerta, obs, higiene HTML)
@@ -344,8 +351,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
     Pediátrico: usar nomogramas por altura e peso (referenciar nas OBSERVAÇÕES).
 
 4.10 REGRA GERAL DE SEGURANÇA:
-    Se qualquer dado necessário para cálculo for ausente ou incompleto → NÃO calcule, NÃO invente.
-    Declare: "Dados insuficientes para cálculo de [parâmetro]."
+    ${REGRA_SEGURANCA_CALCULO_AUSENTE}
 
 4.11 CERVICOMETRIA (COMPRIMENTO DO COLO UTERINO):
     Medição transvaginal, no plano sagital médio do útero, ao longo do canal endocervical fechado (de orifício interno a externo).
@@ -927,13 +933,16 @@ são declarados DENTRO da ANÁLISE, nunca em seção CLASSIFICAÇÃO separada. C
  * normalidade, que o laudo nunca seja truncado e que a cascata
  * tripartite seja mantida após qualquer edição.
  *
- * @must_contain
- * - Lei da preservação de dados clínicos (inquebrável)
- * - Laudo sempre completo (sem "...")
- * - Eliminação de placeholders (exceto Fetal/Vascular)
- * - Integridade da cascata após edição
- * - Classificações sistematizadas invioláveis (V2.0)
- * - ALERTA R6 inviolável (V2.0)
+ * @rules_summary
+ * LEI 1 — Laudo completo e perfeito (sem truncamento)
+ * LEI 2 — Preservação de dados clínicos (inquebrável)
+ * LEI 3 — Adequação integral à instrução recebida (multi-parte)
+ * LEI 4 — Técnica e Recomendações congeladas (fiéis à máscara)
+ * LEI 5 — Eliminação de placeholders (exceto Fetal/Vascular)
+ * LEI 6 — Integridade da cascata tripartite pós-edição
+ * LEI 7 — Espaçamento e parágrafo por órgão
+ * LEI 8 — Classificações sistematizadas invioláveis (V2.0)
+ * LEI 9 — ALERTA R6 inviolável (V2.0)
  *
  * @config AppSettings.aiRefinementGoldenRules
  */

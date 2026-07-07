@@ -1,5 +1,5 @@
 # LAUD.IA — Documentação Oficial da Cascata de Prompts
-**Versão:** V1.0 | **Sistema:** LAUDUS | **Módulo:** LAUD.IA
+**Versão:** V2.0 | **Sistema:** LAUDUS | **Módulo:** LAUD.IA
 
 > Este documento é a **referência canônica** de toda a cascata de prompts do motor cognitivo LAUD.IA.
 > Antes de qualquer ajuste em prompt, leia a seção correspondente aqui.
@@ -73,6 +73,8 @@ Instruções do Exame > Diretriz de Área > Sistema Universal
 ```
 
 **Exceção absoluta:** As Regras Rígidas (Bloco 4) **NUNCA** são overridadas — elas são leis de segurança médica e legal.
+
+> **Nota de implementação:** esta prioridade é uma **doutrina textual** — o texto de cada bloco instrui o modelo a tratar camadas internas como mais específicas/vinculantes. Não existe um mecanismo de código em `engine.ts` que resolva conflitos entre camadas (as strings são apenas concatenadas em ordem); a hierarquia depende inteiramente da capacidade do modelo de interpretar a ênfase e a ordem das instruções. `auditReportQuality()` (ver §5.1) funciona como uma rede de segurança determinística *a posteriori* para uma parte destas regras (R1, R5, R6, R7), mas não arbitra conflitos de conteúdo entre Camada 2 e Camada 3.
 
 ---
 
@@ -202,6 +204,8 @@ Define a **arquitetura física do laudo**: quais tags HTML são permitidas, a or
   <p>...</p>
 <h2>ANÁLISE</h2>
   <p><strong>ÓRGÃO:</strong> descrição.</p>
+<h2>CLASSIFICAÇÃO</h2>  <!-- CONDICIONAL: ver abaixo -->
+  <p>...</p>
 <h2>CONCLUSÃO</h2>
   <p>• Achado 1.</p>
 <h2>RECOMENDAÇÕES</h2>
@@ -209,6 +213,8 @@ Define a **arquitetura física do laudo**: quais tags HTML são permitidas, a or
 <h2>OBSERVAÇÕES METODOLÓGICAS</h2>
   <p><em>Nota técnico-legal.</em></p>
 ```
+
+**Seção `<h2>CLASSIFICAÇÃO</h2>` (condicional, R10):** aparece entre ANÁLISE e CONCLUSÃO **apenas** quando o achado exige um sistema "RADS" (BI-RADS, TI-RADS, O-RADS, LI-RADS), Bosniak, GRADS ou FIGO. Sistemas de gradação/adjuntos (SFU, CEAP, Rutherford, OMERACT, IOTA, Chammas, Tokyo, BAMIC, Bedi) são declarados dentro da própria ANÁLISE e **não** geram esta seção. Exames vasculares e obstétricos tipicamente não usam `<h2>CLASSIFICAÇÃO</h2>` — ver R10 (`general.ts:889-914`).
 
 #### O que NÃO pode ser removido
 
@@ -236,14 +242,18 @@ São as **leis de segurança médico-legal** do sistema. Anulam qualquer outra i
 
 | Regra | Nome | Descrição |
 |-------|------|-----------|
-| **R1** | Anti-invenção / Unidade Órfã | Proibido inventar qualquer valor numérico. Placeholders `(...)` devem virar qualidade. |
+| **R1** | Anti-invenção / Unidade Órfã | Proibido inventar qualquer valor numérico. Placeholders `(...)` devem virar qualidade (exceto Fetal/Vascular). |
 | **R2** | Blindagem Histopatológica | Proibido diagnóstico histológico definitivo (carcinoma, metástase). Use "sugestivo de". |
 | **R3** | Compliance de Refinamento | O output de refine/copiloto deve ser o laudo COMPLETO — nunca truncar. |
-| **R4** | Diplomacia Consultiva | Linguagem "recomenda-se" em não-urgências. Suspender em R9 (emergência). |
+| **R4** | Diplomacia Consultiva | Linguagem "recomenda-se" em não-urgências. Suspender em R6 (emergência). |
 | **R5** | Classificações Oficiais | Proibido usar BI-RADS, TI-RADS, O-RADS sem dados descritivos mínimos. |
 | **R6** | Override de Urgência | Red flags → RECOMENDAÇÕES começa com `<p>• <strong>ALERTA [CAT]:</strong>…</p>` |
 | **R7** | OBSERVAÇÕES obrigatórias | A seção OBSERVAÇÕES METODOLÓGICAS é obrigatória em TODOS os laudos. |
 | **R8** | Padronização Técnica | TÉCNICA e RECOMENDAÇÕES devem seguir a máscara modelo. Proibido alterar. |
+| **R9** | Segurança Pediátrica (V2.0) | Proibido usar valores de referência de adulto em pacientes <18 anos; usa faixa etária/Graf/SFU pediátricos. |
+| **R10** | Versões de Classificações (V2.0) | Fixa a versão oficial vigente de cada sistema (BI-RADS v2025, TI-RADS ACR 2017, O-RADS ACR 2022, LI-RADS v2024, Bosniak v2019, FIGO 2021 etc.) e proíbe misturar versões. Também define quais sistemas usam a seção `<h2>CLASSIFICAÇÃO</h2>` (RADS/Bosniak/GRADS/FIGO) versus quais são declarados dentro da ANÁLISE (SFU, CEAP, Rutherford, OMERACT, IOTA, Chammas, Tokyo, BAMIC, Bedi). |
+
+> Nota de correção (jul/2026): a tabela anterior desta doc listava apenas R1–R8. R9 e R10 foram adicionados no release V2.0 (`general.ts:876-914`) e ficaram sem documentação por um período — corrigido nesta revisão.
 
 #### Red Flags que ativam R6 (Urgências)
 
@@ -273,14 +283,19 @@ São as **leis de segurança médico-legal** do sistema. Anulam qualquer outra i
 #### O que é
 São as **regras especiais dos modos de edição**. Ativas APENAS quando a IA está refinando um laudo já gerado (não na geração inicial).
 
-#### Regras de Ouro do Refinamento
+#### Leis de Ouro do Refinamento (9 leis, `general.ts:946-1018`)
 
-1. **LAUDO COMPLETO** — Output sempre do início ao fim, nunca "...", nunca truncado
-2. **PRESERVAÇÃO DE DADOS** — Achados patológicos, medidas e descrições do laudo atual são INVIOLÁVEIS
-3. **TÉCNICA CONGELADA** — A seção TÉCNICA deve ser reproduzida identicamente ao laudo atual
-4. **RECOMENDAÇÕES PADRÃO** — Usar apenas as recomendações das INSTRUÇÕES ESPECÍFICAS DO EXAME
+1. **LAUDO COMPLETO E PERFEITO** — Output sempre do início ao fim, nunca "...", nunca truncado
+2. **PRESERVAÇÃO DE DADOS CLÍNICOS** — Achados patológicos, medidas e descrições do laudo atual são INVIOLÁVEIS
+3. **ADEQUAÇÃO INTEGRAL À INSTRUÇÃO** — Instruções multi-parte devem ser aplicadas na íntegra, não parcialmente
+4. **TÉCNICA E RECOMENDAÇÕES CONGELADAS** — Reproduzidas identicamente ao laudo/máscara, salvo instrução explícita
 5. **ELIMINAÇÃO DE PLACEHOLDERS** — `(...)` → normalidade qualitativa (exceto Fetal e Vascular)
 6. **INTEGRIDADE DA CASCATA** — Cada achado na Análise → 1 bullet Conclusão → 1 conduta Recomendação
+7. **ESPAÇAMENTO E PARÁGRAFO POR ÓRGÃO** — Preserva a formatação `<p>` por estrutura anatômica
+8. **CLASSIFICAÇÕES INVIOLÁVEIS (V2.0)** — Proibido alterar BI-RADS/TI-RADS/O-RADS etc. sem dado novo explícito
+9. **ALERTA R6 INVIOLÁVEL (V2.0)** — Proibido remover/suavizar um ALERTA de urgência já presente sem justificativa clínica nova
+
+> Nota de correção (jul/2026): esta seção listava apenas 6 "Regras de Ouro". O código (`DEFAULT_REFINEMENT_GOLDEN_RULES`) define 9 LEIS numeradas; as leis 3, 7, 8 e 9 estavam ausentes desta doc.
 
 #### Formato do Copiloto
 
@@ -291,6 +306,14 @@ São as **regras especiais dos modos de edição**. Ativas APENAS quando a IA es
 === PROPOSTA ===
 [HTML completo do laudo modificado, começando com <h1>]
 ```
+
+#### Sub-protocolos do Copiloto (não documentados anteriormente)
+
+Além do formato CONVERSA/PROPOSTA, `DEFAULT_COPILOT_OVERRIDE` (`general.ts:1048-1126`) define três protocolos adicionais:
+
+- **Protocolo de Conflito** — como agir quando a instrução do médico contradiz um achado patológico já registrado no laudo (não aplicar a instrução silenciosamente; a IA deve sinalizar o conflito na resposta de CONVERSA).
+- **Protocolo de Instrução Multi-Parte** — como decompor e aplicar, em sequência, uma instrução do médico que contém múltiplas alterações em uma única frase.
+- **Integração de Resultados de Calculadoras Clínicas** — contrato de marcador `[RESULTADO TÉCNICO: ...]` usado quando o médico cola o resultado de uma calculadora clínica da UI (ex: Hadlock, NASCET) para a IA incorporar ao laudo sem recalcular.
 
 ---
 
@@ -390,10 +413,15 @@ OBSERVAÇÕES ESPECÍFICAS:
 
 ## 5. Ordem de Montagem do Prompt Final
 
-Quando o usuário clica em "Gerar Laudo", o `engine.ts` monta o prompt nesta ordem exata:
+Quando o usuário clica em "Gerar Laudo", `engine.ts` monta três strings — `universalContext`, `areaContext` e `userMessage` (`BuiltPrompt`, `engine.ts:57-61`) — e é o **provider** (`GeminiProvider.ts:76,113`) que decide o que vira `system_instruction` e o que vira a mensagem `role: 'user'` do Gemini:
 
 ```
-[SYSTEM PROMPT]
+system_instruction = universalContext + "\n\n" + areaContext
+contents[0] = { role: 'user', text: userMessage }
+```
+
+```
+[SYSTEM INSTRUCTION]  ← universalContext + areaContext
 ═════════════════════════════════════
 Bloco 1 — Prompt Mestre (Doutrina)
 
@@ -402,30 +430,56 @@ Bloco 2 — Instruções Globais (Raciocínio)
 Bloco 3 — Skeleton / Arquitetura HTML
 
 Bloco 4 — Regras Rígidas (Compliance)
-═════════════════════════════════════
 
-[USER MESSAGE]
-═════════════════════════════════════
+[Motor Profile — Lite/Pro, ver §5.1]
+[Bloco "Modo Rápido", se aiFastMode ativo]
+[Bloco de few-shot do Corpus de Excelência, se aiTrainingEnabled — só na Geração]
+─────────────────────────────────────
 INSTRUÇÕES DA ÁREA DE [ÁREA]:
 [Diretriz da Área — Camada 2]
 
 INSTRUÇÕES ESPECÍFICAS DO EXAME:
 [aiInstructions da máscara — Camada 3]
 
+[Bloco 5 — DEFAULT_COPILOT_OVERRIDE, apenas em modo Copiloto]
+═════════════════════════════════════
+
+[USER MESSAGE]  ← userMessage
+═════════════════════════════════════
+[Bloco 5 — DEFAULT_REFINEMENT_GOLDEN_RULES, apenas em Refine/Copiloto — prefixado]
+
 ---
 MODO: GERAÇÃO INICIAL
 EXAME: [nome do exame]
 DATA DO EXAME: [data]
-PACIENTE: [nome], [idade], [sexo]
+PACIENTE: [idade], [sexo]  ← nome do paciente NUNCA é enviado à IA (LGPD)
+CONVÊNIO / HISTÓRICO CLÍNICO (anonimizado)
 INDICAÇÃO: [indicação clínica]
-ANAMNESE: [anamnese]
-NOTAS DO MÉDICO: [notas]
-REFERÊNCIA DE ESTILO: [laudos anteriores para mimetismo]
+ANAMNESE: [anamnese, anonimizada]
+NOTAS DO MÉDICO / INSTRUÇÃO DE ALTERAÇÃO: [notas]
+REFERÊNCIA DE ESTILO: [laudos anteriores para mimetismo, anonimizado]
+HISTÓRICO CLÍNICO ANTERIOR DO PACIENTE: [exames prévios do mesmo paciente, para comparação evolutiva]
+MÁSCARA MODELO ORIGINAL DO EXAME: [apenas em Refine/Copiloto]
 
-MÁSCARA DE REFERÊNCIA:
-[HTML completo da máscara]
+MÁSCARA DE REFERÊNCIA (Geração) / LAUDO ATUAL (Refine/Copiloto):
+[HTML completo da máscara/laudo]
 ═════════════════════════════════════
 ```
+
+> Nota de correção (jul/2026): a versão anterior desta doc mostrava a Diretriz de Área e as Instruções do Exame dentro do `[USER MESSAGE]`. Na implementação real (`GeminiProvider.ts:76`), `areaContext` é concatenado ao `system_instruction`, junto com `universalContext` — apenas dados do paciente, notas e a máscara/laudo HTML vão na mensagem de usuário.
+
+### 5.1 Mecanismos adicionais não cobertos pelo modelo de 4 blocos
+
+Estes elementos são reais e afetam o output, mas não fazem parte do modelo original "Bloco 1-4" desta doc:
+
+| Mecanismo | Onde | O que faz |
+|---|---|---|
+| **Motor Profile (Lite/Pro)** | `getMotorProfile()` em `motorProfiles.ts`, injetado em `universalContext` (`engine.ts:280`) | Modula o comportamento conforme o motor (Lite vs. Pro) contratado pelo usuário. |
+| **Modo Rápido (`aiFastMode`)** | `engine.ts:282-291` | Desativa o raciocínio `<scratchpad>` (as 7 Fases) para respostas mais rápidas/baratas; também remove instruções de scratchpad do Bloco 5 (Copiloto). |
+| **Retrieval de Few-Shot (RAG)** | `augmentWithRetrieval()` + `training/augment.ts`, `engine.ts:803-821` | Busca exemplos do "Corpus de Excelência" (laudos aprovados pelo médico) e injeta no `universalContext` — apenas em modo Geração, condicionado a `aiTrainingEnabled`. |
+| **Temperatura adaptativa** | `TEMPERATURE_BY_MODE`, `engine.ts:123-128` | Geração 0.35, Refino 0.10, Copiloto 0.20, Template 0.20 — não é um valor fixo único. |
+| **Limite de tokens por área** | `MAX_TOKENS_BY_AREA`, `engine.ts:132-143` | Ex: `medicina-fetal` usa 16384 tokens de saída; demais áreas usam um default menor. |
+| **Auditoria pós-geração local** | `auditReportQuality()`, `engine.ts:1085-1269` | Motor de regras local (não-IA, regex) que roda DEPOIS da resposta da IA, verificando placeholders órfãos, seções obrigatórias, decimal pt-BR, tags proibidas e presença de ALERTA/CLASSIFICAÇÃO quando exigido — operacionaliza parte de R1/R5/R6/R7 como um segundo controle, independente do LLM. |
 
 ---
 
@@ -485,4 +539,4 @@ MÁSCARA DE REFERÊNCIA:
 
 ---
 
-*Documento mantido por: Sistema LAUDUS | Última atualização: v16.0*
+*Documento mantido por: Sistema LAUDUS | Última atualização: V2.0 (jul/2026) — sincronizado com `general.ts` @version V2.0 (R1–R10, 9 Leis de Refinamento, mecanismos §5.1)*
