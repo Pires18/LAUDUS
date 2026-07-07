@@ -3,7 +3,7 @@
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
 Versão do documento: 2026-07-07 (v4 — Vercel Pro, Aba Estruturado do Copiloto completa, LAUD.IA V2.0/backfill de qualidade) · Ambiente: produção (Vercel Pro + Firebase).
 
-**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa 07/07](AUDITORIA_COMPLETA_2026-07-07.md) · [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · auditorias/planos anteriores em [`docs/archive/`](archive/).
+**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa 07/07](AUDITORIA_COMPLETA_2026-07-07.md) · [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) · [Auditoria do Admin](AUDITORIA_ADMIN_2026-07.md) · [Plano de Finalização do Admin](PLANO_FINALIZACAO_ADMIN_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · auditorias/planos anteriores em [`docs/archive/`](archive/).
 
 ---
 
@@ -407,8 +407,9 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 | Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — usuário confirma API/dataset ativos em 07/07/2026; falta confirmar se a 1ª tabela já tem linhas e então implementar a query server-side + ligar ao painel Financeiro | Confirmação do usuário de que a tabela `laudussys.gcp_billing_export_v1_*` já tem dados |
 | Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v3.0 sem identificação da operadora (razão social/CNPJ removida por decisão do responsável durante a fase de testes) — pacote em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) já sinaliza esse ponto como prioritário para o advogado | Validação por advogado especializado em LGPD/saúde digital |
 | Identificação da operadora nos documentos legais | Razão social/CNPJ removidos de todos os documentos e da interface durante a fase de testes — recomendável reintroduzir ao menos nos documentos legais antes da operação comercial plena (ver alerta em `PACOTE_REVISAO_JURIDICA.md`) | Decisão do responsável, a rever com o advogado |
+| Exclusão de usuário deixa órfãos | `deleteUserDocument` apaga só `users/{uid}` — `subscriptions`/`ai_usage` órfãos e conta Auth intocada (achado C7 da [Auditoria do Admin](AUDITORIA_ADMIN_2026-07.md)) | Decisão de retenção de dados (LGPD/financeiro) antes de implementar a limpeza |
 
-**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby).
+**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby). Auditoria completa do módulo Admin (8 abas + LAUD.IA) — 30 achados, a maior parte já corrigida (ver [Auditoria](AUDITORIA_ADMIN_2026-07.md) / [Plano de Finalização](PLANO_FINALIZACAO_ADMIN_2026-07.md)).
 
 ---
 

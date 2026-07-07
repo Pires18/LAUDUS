@@ -59,6 +59,25 @@ export function classNames(...classes: (string | false | undefined | null)[]): s
 }
 
 /**
+ * Faz parse de um valor numérico de formulário (preço, cota, custo) nunca
+ * permitindo negativo — `parseFloat(v) || 0` sozinho deixa passar negativos
+ * (só cai no fallback para NaN/0/vazio, `-149` é truthy). Usado em todo
+ * campo monetário/de cota do Admin.
+ */
+export function parseNonNegativeNumber(value: string, fallback = 0): number {
+  const n = parseFloat(value);
+  if (isNaN(n)) return fallback;
+  return Math.max(0, n);
+}
+
+/** Mesma proteção de `parseNonNegativeNumber`, para campos inteiros (dias, tokens, unidades). */
+export function parseNonNegativeInt(value: string, fallback = 0): number {
+  const n = parseInt(value, 10);
+  if (isNaN(n)) return fallback;
+  return Math.max(0, n);
+}
+
+/**
  * Cria uma versão debounced de uma função.
  * Atrasa a execução até que `ms` milissegundos tenham passado sem nova chamada.
  */

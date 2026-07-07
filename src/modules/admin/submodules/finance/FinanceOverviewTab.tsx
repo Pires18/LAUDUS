@@ -9,7 +9,7 @@ import {
 } from '../../../../store/db';
 import { intervalMultiplier } from '../../../../../api/_pricing';
 import { logger } from '../../../../utils/logger';
-import { classNames } from '../../../../utils/format';
+import { classNames, parseNonNegativeNumber } from '../../../../utils/format';
 import { Spinner } from './Spinner';
 import {
   DollarSign, TrendingUp, TrendingDown, Cpu, Server, RefreshCw, Loader2, Save,
@@ -271,7 +271,7 @@ export function FinanceOverviewTab() {
       {/* ── KPIs principais ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'MRR Teórico',        value: money(mrr),          sub: 'assinaturas ativas', grad: 'from-emerald-500 to-teal-600',  icon: TrendingUp  },
+          { label: 'MRR Teórico',        value: money(mrr),          sub: 'ativas + trials c/ preço', grad: 'from-emerald-500 to-teal-600',  icon: TrendingUp  },
           { label: 'Custo Total / Mês',  value: money(totalCost),    sub: 'VMs + IA',            grad: 'from-rose-500 to-pink-600',    icon: TrendingDown },
           { label: 'Margem Líquida',     value: money(netMargin),    sub: `${marginPct}% do MRR`, grad: netMargin >= 0 ? 'from-brand-500 to-indigo-600' : 'from-rose-600 to-rose-700', icon: BarChart3 },
           { label: 'Receita Acumulada',  value: money(totalRevenue), sub: `${fin?.paidCount ?? 0} pagamentos`, grad: 'from-violet-500 to-purple-600', icon: DollarSign },
@@ -409,7 +409,7 @@ export function FinanceOverviewTab() {
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-ink-50">
               <span className="text-[10px] font-bold text-ink-500">Câmbio US$→R$</span>
               <input type="number" step="0.01" min={0} value={usdToBrl}
-                onChange={e => setUsdToBrl(parseFloat(e.target.value) || 0)}
+                onChange={e => setUsdToBrl(parseNonNegativeNumber(e.target.value))}
                 className="input h-8 w-20 text-xs font-bold" />
               <button onClick={saveRate} disabled={savingRate}
                 className="h-8 px-3 rounded-lg bg-ink-900 hover:bg-ink-800 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 disabled:opacity-50 transition-all">

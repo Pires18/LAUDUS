@@ -27,6 +27,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 ### Testado
 - **34 testes novos**: os dois endpoints serverless de maior risco (`api/abacatepay-webhook.ts` 15, `api/pacs-provision.ts` 9) e `calculateAge` (10) — 411 testes no total (era 377).
 
+### Módulo Admin — auditoria completa + finalização (07/07/2026)
+Auditoria de todas as 8 abas do painel Admin + LAUD.IA (`docs/AUDITORIA_ADMIN_2026-07.md`, 30 achados) seguida da correção da maior parte deles (`docs/PLANO_FINALIZACAO_ADMIN_2026-07.md`):
+- **Validação numérica**: preço/cota/disco em todo o Financeiro aceitavam negativo sem checagem (`parseFloat(v) || 0` não bloqueia `-149`); centralizado em `parseNonNegativeNumber`/`parseNonNegativeInt` (`utils/format.ts`) e aplicado em 13+ campos.
+- **Confirmações adicionadas**: trocar credenciais AbacatePay (alterna Mock↔Pagamentos Reais), desativar plano ou mudar sua cota (agora mostra quantos assinantes são afetados via `getCountFromServer` antes de gravar), excluir máscara do sistema (avisa que é visível a todos os médicos), Motor Pro/add-on/reativar assinatura.
+- **Auditoria (`addAuditLog`) adicionada** onde faltava: Motor Pro, add-on, cancelar/reativar assinatura, e todo o módulo de Suporte (responder/status/nota/limpar tudo).
+- **Bugs de dados corrigidos**: falha silenciosa ao sincronizar cota de usuário agora mostra erro real; "Carregar mais" da Auditoria não some mais quando um filtro está ativo.
+- **Validação de conteúdo**: `TemplateEditor` exige campos essenciais não-vazios; import de máscaras (`AdminMasks`) valida o lote inteiro antes de gravar qualquer item (rejeita tudo se algo estiver malformado); editor de prompt do Copiloto avisa se um save removeria os marcadores que o parser exige.
+- **"Salvar Bloco" do LAUD.IA** agora salva de verdade só o bloco ativo (antes gravava todo o `localSettings`, publicando de brinde rascunhos não-salvos de outras abas).
+- Card "Pagamentos" da aba Saúde agora sinaliza `warn`/`down` (não só `ok`/`unknown`); `window.confirm` nativo trocado por `useConfirm()` estilizado em `MyPacsCard.tsx`.
+- **Exclusão de usuário (`adminUsers.ts`)** agora também apaga a assinatura órfã (`subscriptions/sub_{uid}`); `ai_usage`/`transactions` mantidos por retenção financeira/fiscal (decisão confirmada com o responsável).
+- **`clearAllSupportTickets`** ("Limpar Tudo" do Suporte) reescrita para deletar em lotes de ≤500 (limite do Firestore) — antes um único `writeBatch` quebrava silenciosamente acima disso; botão agora mostra progresso ("Excluindo X/Y...").
+
 ### Removido (04/07)
 - **Anthropic Claude** — provedor removido por completo (`api/anthropic.ts` excluído); a plataforma passa a usar exclusivamente **Google Gemini** como motor de IA. Corrige também IDs de modelo default e do copiloto que ainda apontavam para versões descontinuadas. As menções a "Anthropic/Claude" em versões anteriores deste changelog refletem o estado da época e não a versão atual.
 

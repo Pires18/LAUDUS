@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { classNames } from '../../../../utils/format';
+import { classNames, parseNonNegativeNumber } from '../../../../utils/format';
 
 // Primitivas de formulário do AdminFinanceiro — extraídas (autocontidas).
 export const FormLabel = ({ children }: { children: ReactNode }) => (
@@ -12,7 +12,7 @@ export function NumInput({ label, hint, value, onChange, step = 1 }: { label: st
     <div>
       <FormLabel>{label}</FormLabel>
       <input type="number" min={0} step={step} value={value}
-        onChange={e => onChange(parseFloat(e.target.value) || 0)}
+        onChange={e => onChange(parseNonNegativeNumber(e.target.value))}
         className="input h-9 text-sm w-full" />
       {hint && <p className="text-[9px] text-ink-400 mt-0.5">{hint}</p>}
     </div>

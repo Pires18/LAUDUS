@@ -1015,15 +1015,24 @@ export function onSupportTicketsChange(userId: string | null, callback: (tickets
 
 /**
  * Remove permanentemente todo o histórico de chamados de suporte do Firestore.
+ * Em lotes de até 500 (limite de operações por `writeBatch` do Firestore) —
+ * acima disso, um único batch lançava exceção sem apagar nada.
  */
-export async function clearAllSupportTickets(): Promise<void> {
+export async function clearAllSupportTickets(onProgress?: (done: number, total: number) => void): Promise<void> {
   const colRef = collection(firestore, 'support_tickets');
   const snap = await getDocs(colRef);
-  const batch = writeBatch(firestore);
-  snap.docs.forEach((docSnap) => {
-    batch.delete(docSnap.ref);
-  });
-  await batch.commit();
+  const docs = snap.docs;
+  const CHUNK = 500;
+  let done = 0;
+  onProgress?.(0, docs.length);
+  for (let i = 0; i < docs.length; i += CHUNK) {
+    const batch = writeBatch(firestore);
+    const slice = docs.slice(i, i + CHUNK);
+    slice.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    done += slice.length;
+    onProgress?.(done, docs.length);
+  }
 }
 
 /**

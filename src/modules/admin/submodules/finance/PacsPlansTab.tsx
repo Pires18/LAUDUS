@@ -3,6 +3,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firestore } from '../../../../lib/firebase';
 import { useApp } from '../../../../store/app';
 import { logger } from '../../../../utils/logger';
+import { parseNonNegativeNumber } from '../../../../utils/format';
 import { Save, Database, Loader2, Server, Info } from 'lucide-react';
 import { Spinner } from './Spinner';
 import { planPrices } from '../../../../../api/_pricing';
@@ -136,14 +137,14 @@ export function PacsPlansTab() {
                       ]).map(x => (
                         <div key={x.iv}>
                           <span className="text-[8px] font-black uppercase tracking-widest text-ink-400 block mb-0.5">{x.label}</span>
-                          <input type="number" step="0.01" className="input h-9 text-sm w-full font-bold" value={pr[x.iv]} onChange={e => setPrice(key, x.iv, parseFloat(e.target.value) || 0)} />
+                          <input type="number" step="0.01" min={0} className="input h-9 text-sm w-full font-bold" value={pr[x.iv]} onChange={e => setPrice(key, x.iv, parseNonNegativeNumber(e.target.value))} />
                         </div>
                       ))}
                     </div>
                   </Field>
                 );
               })()}
-              <Field label="Disco (GB)"><input type="number" className="input h-9 text-sm w-full" value={p.disk} onChange={e => upd(key, 'disk', parseInt(e.target.value, 10) || 0)} /></Field>
+              <Field label="Disco (GB)"><input type="number" min={0} className="input h-9 text-sm w-full" value={p.disk} onChange={e => upd(key, 'disk', Math.round(parseNonNegativeNumber(e.target.value)))} /></Field>
               <Field label="Modelo"><input className="input h-9 text-sm w-full" value={p.model} onChange={e => upd(key, 'model', e.target.value)} placeholder="Compartilhado isolado / VM exclusiva" /></Field>
               <Field label="Badge (opcional)"><input className="input h-9 text-sm w-full" value={p.badge || ''} onChange={e => upd(key, 'badge', e.target.value)} placeholder="Popular" /></Field>
             </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, query, where, limit, getCountFromServer } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
-import { addSupportMessage, updateGlobalItem, clearAllSupportTickets } from '../../../store/db';
+import { addSupportMessage, updateGlobalItem, clearAllSupportTickets, addAuditLog } from '../../../store/db';
 import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
 import { useCollection, orderBy } from '../../../hooks/useFirestore';
@@ -60,6 +60,7 @@ export function AdminSupport() {
   const [isSending, setIsSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [isClearing, setIsClearing] = useState(false);
+  const [clearProgress, setClearProgress] = useState<{ done: number; total: number } | null>(null);
   const [adminNoteText, setAdminNoteText] = useState('');
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(true);
 
@@ -71,16 +72,23 @@ export function AdminSupport() {
       variant: 'danger',
     });
     if (!confirmed) return;
-    
+
     setIsClearing(true);
+    // Registrado ANTES de rodar a exclusão em massa — se o batch falhar no
+    // meio (ex.: mais de 500 tickets, limite do Firestore), ao menos fica
+    // registrado que a operação foi tentada e por quem.
     try {
-      await clearAllSupportTickets();
+      await addAuditLog({ action: 'LIMPAR_TODO_SUPORTE', details: `Exclusão de todo o histórico de suporte iniciada (${counts.total || tickets.length} chamados no momento).`, module: 'Admin' });
+    } catch { /* auditoria é best-effort, não bloqueia a ação principal */ }
+    try {
+      await clearAllSupportTickets((done, total) => setClearProgress({ done, total }));
       setSelectedTicketId(null);
       showToast('Todo o histórico de chamados foi excluído com sucesso.', 'success');
     } catch {
       showToast('Erro ao limpar histórico de suporte.', 'error');
     } finally {
       setIsClearing(false);
+      setClearProgress(null);
     }
   }
 
@@ -112,6 +120,7 @@ export function AdminSupport() {
       if (selectedTicket.status === 'open') {
         await updateGlobalItem('support_tickets', selectedTicket.id, { status: 'pending', updatedAt: Date.now() });
       }
+      await addAuditLog({ action: 'RESPONDER_TICKET', details: `Resposta enviada ao chamado "${selectedTicket.subject}" (${selectedTicket.userName}).`, module: 'Admin' }).catch(() => {});
       setNewMessage('');
     } catch {
       showToast('Erro ao enviar resposta', 'error');
@@ -124,6 +133,7 @@ export function AdminSupport() {
     if (!selectedTicket) return;
     try {
       await updateGlobalItem('support_tickets', selectedTicket.id, { status, updatedAt: Date.now() });
+      await addAuditLog({ action: 'ALTERAR_STATUS_TICKET', details: `Chamado "${selectedTicket.subject}" (${selectedTicket.userName}) → ${status}.`, module: 'Admin' }).catch(() => {});
       showToast(`Status alterado para ${status}`, 'success');
     } catch {
       showToast('Erro ao atualizar status', 'error');
@@ -143,6 +153,7 @@ export function AdminSupport() {
         adminNotes: [...currentNotes, newNote],
         updatedAt: Date.now()
       });
+      await addAuditLog({ action: 'NOTA_INTERNA_TICKET', details: `Nota interna adicionada ao chamado "${selectedTicket.subject}" (${selectedTicket.userName}).`, module: 'Admin' }).catch(() => {});
       setAdminNoteText('');
       showToast('Nota administrativa adicionada.', 'success');
     } catch {
@@ -155,7 +166,12 @@ export function AdminSupport() {
   const pendingCount = counts.pending || tickets.filter(t => t.status === 'pending').length;
   const resolvedCount = counts.resolved || tickets.filter(t => t.status === 'resolved').length;
   // Alta prioridade entre os tickets recentes carregados (indicador de fila quente).
+  // Só sobre os 200 tickets mais recentes carregados (não há getCountFromServer
+  // seguro pra "alta prioridade + não-resolvido" sem exigir um índice composto
+  // novo no Firestore) — se a lista carregada já bateu o teto de 200, o número
+  // pode estar subcontando; sinalizado com "+" em vez de fingir precisão.
   const highPriorityCount = tickets.filter(t => t.priority === 'high' && t.status !== 'resolved').length;
+  const highPriorityMayUndercount = tickets.length >= 200;
 
   // ── SLA ──────────────────────────────────────────────────────────────────
   const HOUR = 3600000, DAY = 86400000;
@@ -202,7 +218,7 @@ export function AdminSupport() {
                   ) : (
                     <Trash2 size={12} />
                   )}
-                  <span>Limpar Tudo</span>
+                  <span>{isClearing && clearProgress ? `Excluindo ${clearProgress.done}/${clearProgress.total}...` : 'Limpar Tudo'}</span>
                 </button>
               )}
            </div>
@@ -221,9 +237,9 @@ export function AdminSupport() {
                <p className="text-[8px] font-black text-emerald-650 uppercase tracking-wider">Resolvidos</p>
                <p className="text-sm font-black text-ink-900 mt-0.5">{resolvedCount}</p>
              </div>
-             <div className="text-center border-l border-ink-100">
+             <div className="text-center border-l border-ink-100" title={highPriorityMayUndercount ? 'Contado só sobre os 200 tickets mais recentes — pode haver mais.' : undefined}>
                <p className="text-[8px] font-black text-purple-650 uppercase tracking-wider">Alta Pri.</p>
-               <p className="text-sm font-black text-ink-900 mt-0.5">{highPriorityCount}</p>
+               <p className="text-sm font-black text-ink-900 mt-0.5">{highPriorityCount}{highPriorityMayUndercount ? '+' : ''}</p>
              </div>
            </div>
 

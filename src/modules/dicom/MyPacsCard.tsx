@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
+import { useConfirm } from '../../hooks/useConfirm';
 import { getIdToken } from '../../lib/authToken';
 import { classNames } from '../../utils/format';
 import type { PacsInstance } from '../../types';
@@ -53,6 +54,7 @@ async function pollAgentHealth(agentUrl: string, timeoutMs = 600000): Promise<bo
 
 export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
   const { settings, updateSettings, showToast, setView } = useApp();
+  const confirm = useConfirm();
   const inst: PacsInstance = settings.pacsInstance || { status: 'none' };
   const [busy, setBusy] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>((settings.pacsSelectedPlan as Plan) || 'pro');
@@ -201,7 +203,13 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
 
   async function deprovision() {
     if (busy) return;
-    if (!window.confirm('Remover seu PACS na nuvem? As configurações do agente serão limpas e, no modo real, a VM/tenant é destruída de vez — mantenha um backup antes.')) return;
+    const ok = await confirm({
+      title: 'Remover PACS na nuvem',
+      message: 'As configurações do agente serão limpas e, no modo real, a VM/tenant é destruída de vez — mantenha um backup antes.',
+      variant: 'danger',
+      confirmLabel: 'Remover',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       // Destrói de fato a VM/tenant na nuvem ANTES de limpar o Firestore — sem
@@ -330,11 +338,17 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
             </button>
           )}
           <button
-            onClick={() => {
+            onClick={async () => {
               // Reprovisionar cria um tenant/VM NOVO (nunca repara o atual) —
               // sem aviso, isso abandonaria silenciosamente os exames já
               // migrados no tenant em uso. Confirmar antes é obrigatório aqui.
-              if (!window.confirm('Reprovisionar cria um PACS NOVO (novo tenant/VM) — não repara o atual. Os exames já armazenados no PACS de agora ficarão inacessíveis por aqui (continuam na VM, recuperáveis por suporte). Só use se o PACS atual estiver com erro irrecuperável. Continuar?')) return;
+              const ok = await confirm({
+                title: 'Reprovisionar PACS',
+                message: 'Isso cria um PACS NOVO (novo tenant/VM) — não repara o atual. Os exames já armazenados no PACS de agora ficarão inacessíveis por aqui (continuam na VM, recuperáveis por suporte). Só use se o PACS atual estiver com erro irrecuperável.',
+                variant: 'danger',
+                confirmLabel: 'Reprovisionar',
+              });
+              if (!ok) return;
               provision((inst.plan as Plan) || 'pro');
             }}
             disabled={busy}

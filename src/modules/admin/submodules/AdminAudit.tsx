@@ -214,8 +214,8 @@ export function AdminAudit() {
           </table>
         </div>
 
-        {hasMore && !anyFilter && (
-          <div className="p-4 border-t border-ink-100 flex justify-center">
+        {hasMore && (
+          <div className="p-4 border-t border-ink-100 flex flex-col items-center gap-1.5">
             <button
               onClick={loadMore}
               className="flex items-center gap-2 px-6 py-3 text-xs font-black uppercase tracking-widest text-ink-600 bg-ink-50 hover:bg-ink-100 rounded-2xl border border-ink-200 transition-all"
@@ -223,6 +223,11 @@ export function AdminAudit() {
               <ChevronDown size={14} />
               Carregar mais registros
             </button>
+            {anyFilter && (
+              <p className="text-[10px] text-ink-400 text-center max-w-sm">
+                Filtro ativo — isso busca mais registros do servidor (não só os já carregados) e reaplica o filtro sobre eles.
+              </p>
+            )}
           </div>
         )}
       </div>

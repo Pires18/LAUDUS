@@ -46,6 +46,12 @@ export function TemplateEditor({ templateId }: Props) {
 
   async function handleSave() {
     if (!draft || !templateId) return;
+    // Máscaras do sistema (sem clinicId) são visíveis a TODOS os médicos —
+    // salvar com campos essenciais vazios quebra o laudo pra todo mundo que
+    // usa essa máscara, sem nenhum aviso até a próxima geração.
+    if (!draft.name?.trim()) { showToast('Nome da máscara é obrigatório.', 'error'); return; }
+    if (!draft.analysisTemplate?.trim()) { showToast('O template de Análise não pode ficar vazio.', 'error'); return; }
+    if (!draft.conclusionTemplate?.trim()) { showToast('O template de Conclusão não pode ficar vazio.', 'error'); return; }
     try {
       const { id, ...data } = draft;
       await updateItem('templates', templateId, data);

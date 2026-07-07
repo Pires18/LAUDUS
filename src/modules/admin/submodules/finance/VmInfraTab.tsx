@@ -3,7 +3,7 @@ import { collection, collectionGroup, doc, getDoc, getDocs, setDoc } from 'fireb
 import { firestore } from '../../../../lib/firebase';
 import { useApp } from '../../../../store/app';
 import { logger } from '../../../../utils/logger';
-import { classNames } from '../../../../utils/format';
+import { classNames, parseNonNegativeNumber } from '../../../../utils/format';
 import { planPrices } from '../../../../../api/_pricing';
 import { Spinner } from './Spinner';
 import {
@@ -229,7 +229,7 @@ export function VmInfraTab() {
           </Field>
           <Field label="Disco (R$/GB·mês)">
             <input type="number" step="0.01" min={0} className="input h-9 text-sm w-full" value={costs.storagePerGbMonth}
-              onChange={e => setCosts(c => ({ ...c, storagePerGbMonth: parseFloat(e.target.value) || 0 }))} />
+              onChange={e => setCosts(c => ({ ...c, storagePerGbMonth: parseNonNegativeNumber(e.target.value) }))} />
           </Field>
           <div className="flex items-end gap-2">
             <a href={billingUrl} target="_blank" rel="noopener noreferrer" className="flex-1 h-9 rounded-xl border border-ink-200 text-ink-600 text-[10px] font-black uppercase tracking-widest hover:bg-ink-50 flex items-center justify-center gap-1 transition-all"><DollarSign size={12} /> Billing</a>
@@ -247,7 +247,7 @@ export function VmInfraTab() {
                   <span className="text-[9px] font-bold text-ink-400">{PLAN_MACHINE[p]}</span>
                 </div>
                 <input type="number" step="0.01" min={0} className="input h-9 text-sm w-full font-bold" value={costs.costByPlan[p]}
-                  onChange={e => setCosts(c => ({ ...c, costByPlan: { ...c.costByPlan, [p]: parseFloat(e.target.value) || 0 } }))} />
+                  onChange={e => setCosts(c => ({ ...c, costByPlan: { ...c.costByPlan, [p]: parseNonNegativeNumber(e.target.value) } }))} />
               </div>
             ))}
           </div>

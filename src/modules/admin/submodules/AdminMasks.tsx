@@ -55,8 +55,6 @@ export function AdminMasks() {
       const imported: Array<{ id: string; aiInstructions?: string; [key: string]: unknown }> = JSON.parse(text);
       if (!Array.isArray(imported)) throw new Error('JSON inválido: esperado array de templates.');
       const existingIds = new Set(allTemplates.map(t => t.id));
-      let updated = 0;
-      let created = 0;
       // Campos ajustáveis por importação. A atualização é PARCIAL: apenas os
       // campos efetivamente presentes em cada objeto do JSON são alterados;
       // os demais campos da máscara permanecem intactos (retrocompatível com
@@ -67,6 +65,42 @@ export function AdminMasks() {
         'recommendationsTemplate', 'observationsTemplate', 'aiInstructions',
         'customForm', 'anamnesisTemplate', 'consentTemplate', 'clinicId',
       ] as const;
+      const STRING_FIELDS = UPDATABLE_FIELDS.filter(f => f !== 'clinicId');
+      const validAreas = new Set(EXAM_AREAS.map(a => a.id));
+
+      // Valida o lote INTEIRO antes de gravar qualquer coisa — máscaras do
+      // sistema são globais (visíveis a todos os médicos); um import malformado
+      // não pode corromper parte delas silenciosamente (A3, achado da auditoria).
+      const errors: string[] = [];
+      imported.forEach((tmpl, idx) => {
+        const label = tmpl?.id ? `item ${idx} (id="${tmpl.id}")` : `item ${idx}`;
+        if (!tmpl.id || typeof tmpl.id !== 'string') { errors.push(`${label}: "id" ausente ou não é string.`); return; }
+        for (const f of STRING_FIELDS) {
+          if (tmpl[f] !== undefined && typeof tmpl[f] !== 'string') {
+            errors.push(`${label}: campo "${f}" deveria ser texto, veio ${typeof tmpl[f]}.`);
+          }
+        }
+        if (tmpl.clinicId !== undefined && tmpl.clinicId !== null && typeof tmpl.clinicId !== 'string') {
+          errors.push(`${label}: campo "clinicId" deveria ser texto ou null.`);
+        }
+        if (tmpl.area !== undefined && !validAreas.has(tmpl.area as any)) {
+          errors.push(`${label}: "area"="${tmpl.area}" não é uma área clínica válida.`);
+        }
+        // Template NOVO (não existe ainda): exige os campos essenciais pra não
+        // nascer uma máscara quebrada (mesma regra do editor manual, TemplateEditor).
+        if (!existingIds.has(tmpl.id) && tmpl.aiInstructions !== undefined) {
+          if (!tmpl.name || typeof tmpl.name !== 'string' || !tmpl.name.trim()) errors.push(`${label}: máscara nova sem "name".`);
+          if (!tmpl.area || typeof tmpl.area !== 'string') errors.push(`${label}: máscara nova sem "area".`);
+          if (!tmpl.analysisTemplate || typeof tmpl.analysisTemplate !== 'string' || !tmpl.analysisTemplate.trim()) errors.push(`${label}: máscara nova sem "analysisTemplate".`);
+          if (!tmpl.conclusionTemplate || typeof tmpl.conclusionTemplate !== 'string' || !tmpl.conclusionTemplate.trim()) errors.push(`${label}: máscara nova sem "conclusionTemplate".`);
+        }
+      });
+      if (errors.length > 0) {
+        throw new Error(`Import rejeitado (nada foi gravado) — ${errors.length} erro(s): ${errors.slice(0, 5).join(' | ')}${errors.length > 5 ? ` ... e mais ${errors.length - 5}.` : ''}`);
+      }
+
+      let updated = 0;
+      let created = 0;
       for (const tmpl of imported) {
         if (!tmpl.id) continue;
         if (existingIds.has(tmpl.id)) {
@@ -304,9 +338,12 @@ export function AdminMasks() {
                     className="p-1.5 text-ink-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors"
                     onClick={async (e) => {
                       e.stopPropagation();
+                      const isSystemTemplate = !template.clinicId;
                       const ok = await confirm({
                         title: 'Excluir máscara',
-                        message: `Remover a máscara "${template.name}" definitivamente? Esta ação é irreversível.`,
+                        message: isSystemTemplate
+                          ? `"${template.name}" é uma máscara DO SISTEMA — visível e usada por TODOS os médicos da plataforma, não só você. Excluí-la pode quebrar laudos em andamento de qualquer clínica que a use. Esta ação é irreversível. Confirma mesmo assim?`
+                          : `Remover a máscara "${template.name}" definitivamente? Esta ação é irreversível.`,
                         variant: 'danger',
                         confirmLabel: 'Excluir',
                       });

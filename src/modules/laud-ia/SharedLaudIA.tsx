@@ -724,6 +724,10 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
               mustHave: ['"=== CONVERSA ===" (1 frase)', '"=== PROPOSTA ===" (HTML completo)', 'Integração de calculadoras'],
               neverRemove: ['"=== CONVERSA ===" e "=== PROPOSTA ===" (o parser depende disso)'],
               safeToAdjust: ['Instrução da CONVERSA', 'Tipos de calculadoras suportadas'],
+              // Marcadores literais que o parser do Copiloto exige — diferente de
+              // `neverRemove` (só texto explicativo), isto é checado de verdade
+              // antes de salvar (best-effort, avisa mas não bloqueia).
+              requiredMarkers: ['=== CONVERSA ===', '=== PROPOSTA ==='],
             },
           ];
 
@@ -846,10 +850,27 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                     <button
                       onClick={async () => {
                         const currentValue = (localSettings[activeBlock.settingsKey] as string) || '';
+                        // Marcadores parser-críticos (hoje só o Copiloto) — aviso
+                        // best-effort, não bloqueia (o admin pode ter um motivo
+                        // legítimo, ex.: reescrevendo o bloco em etapas).
+                        const missingMarkers = (activeBlock.requiredMarkers || []).filter(m => !currentValue.includes(m));
+                        if (missingMarkers.length > 0) {
+                          const proceed = await confirm({
+                            title: 'Marcador obrigatório ausente',
+                            message: `Este bloco não contém ${missingMarkers.map(m => `"${m}"`).join(' e ')}, que o parser do Copiloto espera encontrar (ver "Nunca Remover" acima). Salvar mesmo assim pode quebrar o Copiloto na próxima geração.`,
+                            variant: 'warning',
+                            confirmLabel: 'Salvar mesmo assim',
+                          });
+                          if (!proceed) return;
+                        }
                         savePromptVersion(activeBlock.id, currentValue);
                         setIsSaving(true);
                         try {
-                          await updateSettings(localSettings);
+                          // Salva SÓ o bloco ativo (merge parcial contra o que já
+                          // está persistido) — não o localSettings inteiro, que
+                          // incluiria rascunhos não-salvos de OUTRAS abas deste
+                          // mesmo painel (A5, achado da auditoria).
+                          await updateSettings({ [activeBlock.settingsKey]: currentValue } as Partial<typeof localSettings>);
                           showToast(`✓ "${activeBlock.label}" salvo!`, 'success');
                         } catch { showToast('Erro ao salvar bloco', 'error'); }
                         finally { setIsSaving(false); }

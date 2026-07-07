@@ -8,14 +8,14 @@ import { FinanceOverviewTab } from './finance/FinanceOverviewTab';
 import { Spinner } from './finance/Spinner';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  deleteDoc, updateDoc, query, orderBy, where,
+  deleteDoc, updateDoc, query, orderBy, where, getCountFromServer,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { useApp } from '../../../store/app';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { getAllUsersAiUsageStats, groupAiUsageByUser } from '../../../store/db';
-import { classNames } from '../../../utils/format';
+import { classNames, parseNonNegativeNumber, parseNonNegativeInt } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
 import { planPrices, addonPrices } from '../../../../api/_pricing';
 import { Modal } from '../../../components/Modal';
@@ -164,6 +164,7 @@ function PlansTab() {
   const [plans, setPlans]         = useState<(Plan & { id: string })[]>([]);
   const [loading, setLoading]     = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [originalPlan, setOriginalPlan] = useState<Plan | null>(null);
   const [showForm, setShowForm]   = useState(false);
   const [form, setForm]           = useState<PlanForm>(EMPTY_PLAN);
   const [saving, setSaving]       = useState(false);
@@ -189,17 +190,47 @@ function PlansTab() {
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
-  const openNew = () => { setForm(EMPTY_PLAN); setEditingId(null); setShowForm(true); };
+  const openNew = () => { setForm(EMPTY_PLAN); setEditingId(null); setOriginalPlan(null); setShowForm(true); };
 
   const openEdit = (plan: Plan & { id: string }) => {
     // Migra planos legados (price único) para o modelo de 3 preços embutidos.
     setForm({ ...EMPTY_PLAN, ...plan, prices: planPrices(plan) });
     setEditingId(plan.id);
+    setOriginalPlan(plan);
     setShowForm(true);
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) { showToast('Nome do plano é obrigatório.', 'error'); return; }
+
+    // Editar um plano existente pode (a) desativá-lo e/ou (b) mudar a cota que
+    // se propaga pra TODOS os assinantes ativos dele, logo abaixo — nenhuma das
+    // duas tinha confirmação nem mostrava quantos assinantes seriam afetados.
+    if (editingId && originalPlan) {
+      const willDeactivate = originalPlan.active !== false && form.active === false;
+      const quotaChanged = originalPlan.reportsQuota !== form.reportsQuota || originalPlan.clinicsQuota !== form.clinicsQuota;
+      if (willDeactivate || quotaChanged) {
+        let subscriberCount = 0;
+        try {
+          const countSnap = await getCountFromServer(query(collection(firestore, 'subscriptions'), where('planId', '==', editingId)));
+          subscriberCount = countSnap.data().count;
+        } catch { /* segue sem contagem exata se a leitura falhar */ }
+
+        const parts: string[] = [];
+        if (willDeactivate) parts.push(`Desativar este plano o remove do catálogo/checkout`);
+        if (quotaChanged) parts.push(`Mudar a cota vai propagar o novo valor para TODOS os assinantes ativos deste plano`);
+        const affected = subscriberCount > 0 ? ` (${subscriberCount} assinante${subscriberCount === 1 ? '' : 's'} vinculado${subscriberCount === 1 ? '' : 's'} a este plano).` : '.';
+
+        const ok = await confirm({
+          title: willDeactivate ? 'Confirmar desativação do plano' : 'Confirmar mudança de cota',
+          message: `${parts.join('. ')}${affected} Confirma a alteração?`,
+          variant: 'danger',
+          confirmLabel: 'Confirmar',
+        });
+        if (!ok) return;
+      }
+    }
+
     setSaving(true);
     try {
       const prices = form.prices || { month: form.price || 0, semester: (form.price || 0) * 6, year: (form.price || 0) * 12 };
@@ -252,6 +283,7 @@ function PlansTab() {
       }
       setShowForm(false);
       setEditingId(null);
+      setOriginalPlan(null);
       await loadPlans();
     } catch {
       showToast('Erro ao salvar plano.', 'error');
@@ -545,7 +577,7 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
             </div>
             <div>
               <FormLabel>Dias de Trial</FormLabel>
-              <input type="number" min={0} value={form.trialDays} onChange={e => set('trialDays', parseInt(e.target.value) || 0)} className="input h-10 text-sm w-full" />
+              <input type="number" min={0} value={form.trialDays} onChange={e => set('trialDays', parseNonNegativeInt(e.target.value))} className="input h-10 text-sm w-full" />
             </div>
           </div>
         </section>
@@ -565,7 +597,7 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
               <div key={iv.key} className="rounded-xl border border-ink-100 bg-ink-50/40 p-3">
                 <FormLabel>{iv.label} (R$)</FormLabel>
                 <input type="number" min={0} step={0.01} value={prices[iv.key]}
-                  onChange={e => setPrice(iv.key, parseFloat(e.target.value) || 0)}
+                  onChange={e => setPrice(iv.key, parseNonNegativeNumber(e.target.value))}
                   className="input h-10 text-sm w-full font-black" />
                 <p className="text-[9px] text-ink-400 mt-1">{iv.hint}</p>
               </div>
@@ -736,7 +768,7 @@ function FeaturesTab() {
                         <div key={x.iv}>
                           <span className="text-[9px] font-black uppercase tracking-widest text-ink-400 block mb-0.5">{x.label}</span>
                           <input type="number" min={0} step={0.01} value={pr[x.iv]}
-                            onChange={e => setPrice(x.iv, parseFloat(e.target.value) || 0)}
+                            onChange={e => setPrice(x.iv, parseNonNegativeNumber(e.target.value))}
                             className="input h-9 text-sm w-full font-bold" />
                         </div>
                       ))}
@@ -840,14 +872,14 @@ function ExtraResourcesTab() {
                 <div>
                   <FormLabel>{priceLabel}</FormLabel>
                   <input type="number" min={0} step={0.01} value={extra.price}
-                    onChange={e => setField(key, { price: parseFloat(e.target.value) || 0 } as any)}
+                    onChange={e => setField(key, { price: parseNonNegativeNumber(e.target.value) } as any)}
                     className="input h-9 text-sm w-full" />
                 </div>
                 {hasBundle ? (
                   <div>
                     <FormLabel>Laudos por pacote</FormLabel>
                     <input type="number" min={1} step={1} value={extra.bundleSize || 50}
-                      onChange={e => setField(key, { bundleSize: parseInt(e.target.value) || 50 } as any)}
+                      onChange={e => setField(key, { bundleSize: Math.max(1, parseNonNegativeInt(e.target.value, 50)) } as any)}
                       className="input h-9 text-sm w-full" />
                   </div>
                 ) : <div />}
@@ -876,7 +908,9 @@ function ExtraResourcesTab() {
 
 function AbacatePayTab() {
   const { showToast } = useApp();
+  const confirm = useConfirm();
   const [config, setConfig]       = useState<AbacatePayConfig>(DEFAULT_ABACATE);
+  const [savedConfig, setSavedConfig] = useState<AbacatePayConfig>(DEFAULT_ABACATE);
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [testing, setTesting]     = useState(false);
@@ -900,15 +934,33 @@ function AbacatePayTab() {
     (async () => {
       try {
         const snap = await getDoc(doc(firestore, 'global_config', 'abacatepay_config'));
-        if (snap.exists()) setConfig({ ...DEFAULT_ABACATE, ...(snap.data() as AbacatePayConfig) });
+        if (snap.exists()) {
+          const loaded = { ...DEFAULT_ABACATE, ...(snap.data() as AbacatePayConfig) };
+          setConfig(loaded);
+          setSavedConfig(loaded);
+        }
       } finally { setLoading(false); }
     })();
   }, []);
 
   const handleSave = async () => {
+    // Trocar a chave/segredo alterna o sistema inteiro entre Mock e Pagamentos
+    // Reais (ver banner desta tela) — exige confirmação explícita, já que uma
+    // chave errada/apagada por engano desliga cobranças reais silenciosamente.
+    const credentialsChanged = config.apiKey !== savedConfig.apiKey || config.webhookSecret !== savedConfig.webhookSecret;
+    if (credentialsChanged) {
+      const ok = await confirm({
+        title: 'Confirmar mudança de credenciais',
+        message: 'Você está alterando a API Key e/ou o Webhook Secret do AbacatePay. Isso muda imediatamente se o sistema processa pagamentos REAIS ou entra em modo Mock (simulado). Uma chave errada ou vazia desliga cobranças reais sem aviso adicional. Confirma a alteração?',
+        variant: 'danger',
+        confirmLabel: 'Salvar mesmo assim',
+      });
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       await setDoc(doc(firestore, 'global_config', 'abacatepay_config'), { ...config, updatedAt: Date.now() }, { merge: true });
+      setSavedConfig(config);
       showToast('Configuração AbacatePay salva com sucesso!', 'success');
     } catch { showToast('Erro ao salvar configuração.', 'error'); }
     finally { setSaving(false); }
@@ -1187,13 +1239,13 @@ function AbacatePayTab() {
                   <div>
                     <label className="text-[8px] font-black uppercase text-ink-400">Taxa Base (%)</label>
                     <input type="number" min={0} max={100} step={0.1} value={config.cardFeePercent}
-                      onChange={e => setConfig(c => ({ ...c, cardFeePercent: parseFloat(e.target.value) || 0 }))}
+                      onChange={e => setConfig(c => ({ ...c, cardFeePercent: parseNonNegativeNumber(e.target.value) }))}
                       className="input h-8 text-[11px] w-full mt-1 bg-white" />
                   </div>
                   <div>
                     <label className="text-[8px] font-black uppercase text-ink-400">Taxa Fixa (R$)</label>
                     <input type="number" min={0} step={0.05} value={config.cardFeeFixedBrl}
-                      onChange={e => setConfig(c => ({ ...c, cardFeeFixedBrl: parseFloat(e.target.value) || 0 }))}
+                      onChange={e => setConfig(c => ({ ...c, cardFeeFixedBrl: parseNonNegativeNumber(e.target.value) }))}
                       className="input h-8 text-[11px] w-full mt-1 bg-white" />
                   </div>
                 </div>
@@ -1214,7 +1266,7 @@ function AbacatePayTab() {
                 <div className="pt-2 border-t border-ink-100">
                   <label className="text-[8px] font-black uppercase text-ink-400">Taxa Pix (%)</label>
                   <input type="number" min={0} max={100} step={0.1} value={config.pixFeePercent}
-                    onChange={e => setConfig(c => ({ ...c, pixFeePercent: parseFloat(e.target.value) || 0 }))}
+                    onChange={e => setConfig(c => ({ ...c, pixFeePercent: parseNonNegativeNumber(e.target.value) }))}
                     className="input h-8 text-[11px] w-full mt-1 bg-white" />
                 </div>
               )}
@@ -1433,7 +1485,7 @@ function IACostsTab() {
           <div className="flex-1 min-w-[160px]">
             <FormLabel>Taxa para cálculos (R$ / USD)</FormLabel>
             <input type="number" min={1} max={20} step={0.01} value={conversionRate}
-              onChange={e => setConversionRate(parseFloat(e.target.value) || 5.5)}
+              onChange={e => setConversionRate(parseNonNegativeNumber(e.target.value, 5.5))}
               className="input h-10 text-sm w-full" />
           </div>
           <button onClick={handleSaveRate} disabled={savingRate}
@@ -1629,13 +1681,13 @@ function IACostsTab() {
                     <div>
                       <FormLabel>Tokens / laudo (est.)</FormLabel>
                       <input type="number" min={100} step={100} value={m.tokensPerReport}
-                        onChange={e => setMotor(tier, 'tokensPerReport', parseInt(e.target.value) || 1000)}
+                        onChange={e => setMotor(tier, 'tokensPerReport', Math.max(100, parseNonNegativeInt(e.target.value, 1000)))}
                         className="input h-9 text-sm w-full" />
                     </div>
                     <div>
                       <FormLabel>USD / 1k tokens</FormLabel>
                       <input type="number" min={0} step={0.001} value={m.costPerThousandTokens}
-                        onChange={e => setMotor(tier, 'costPerThousandTokens', parseFloat(e.target.value) || 0)}
+                        onChange={e => setMotor(tier, 'costPerThousandTokens', parseNonNegativeNumber(e.target.value))}
                         className="input h-9 text-sm w-full" />
                     </div>
                   </div>

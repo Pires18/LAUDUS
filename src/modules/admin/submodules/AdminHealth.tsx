@@ -67,6 +67,15 @@ export function AdminHealth() {
   const aggAge = summaryUpdatedAt ? Date.now() - summaryUpdatedAt : Infinity;
   const aggHealth: Health = !summaryUpdatedAt ? 'unknown' : aggAge < 2 * 3600000 ? 'ok' : aggAge < 12 * 3600000 ? 'warn' : 'down';
 
+  // Pagamentos: sem paidCount ainda é 'unknown' (nunca houve pagamento, não é
+  // erro); com histórico, fica 'warn'/'down' se o último evento pago está
+  // velho demais — antes só existia 'ok'/'unknown', nunca sinalizava um
+  // pipeline de pagamento parado há dias.
+  const financeAge = financeUpdatedAt ? Date.now() - financeUpdatedAt : Infinity;
+  const financeHealth: Health = !financeUpdatedAt
+    ? 'unknown'
+    : financeAge < 7 * 86400000 ? 'ok' : financeAge < 30 * 86400000 ? 'warn' : 'down';
+
   const cards: { title: string; icon: any; health: Health; lines: { k: string; v: string }[] }[] = [
     {
       title: 'Pipeline de métricas (CRON)', icon: Database, health: aggHealth,
@@ -77,7 +86,7 @@ export function AdminHealth() {
       ],
     },
     {
-      title: 'Pagamentos (webhook)', icon: CreditCard, health: financeUpdatedAt ? 'ok' : 'unknown',
+      title: 'Pagamentos (webhook)', icon: CreditCard, health: financeHealth,
       lines: [
         { k: 'Último evento pago', v: ago(financeUpdatedAt) },
         { k: 'Transações pagas', v: paidCount.toLocaleString('pt-BR') },

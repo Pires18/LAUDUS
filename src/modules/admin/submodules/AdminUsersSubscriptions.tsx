@@ -15,7 +15,7 @@ import {
   collection, collectionGroup, doc, updateDoc, setDoc, deleteField, getDoc, getDocs, query, where, writeBatch,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
-import { classNames } from '../../../utils/format';
+import { classNames, parseNonNegativeInt } from '../../../utils/format';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { Modal } from '../../../components/Modal';
 import {
@@ -35,7 +35,6 @@ interface SystemUser {
   email: string;
   role: UserRole;
   active: boolean;
-  lastLogin?: number;
   subscriptionStatus?: string;
   subscriptionId?: string;
   motorProEnabled?: boolean;
@@ -371,8 +370,17 @@ export function AdminUsersSubscriptions() {
   }
 
   async function handleToggleMotorPro(u: SystemUser) {
+    const next = !u.motorProEnabled;
+    const ok = await confirm({
+      title: next ? 'Ativar Motor Pro' : 'Desativar Motor Pro',
+      message: `${next ? 'Ativar' : 'Desativar'} o Motor Pro para ${u.name}? Isso muda o custo de IA e a qualidade dos laudos gerados por este usuário.`,
+      variant: next ? 'info' : 'warning',
+      confirmLabel: next ? 'Ativar' : 'Desativar',
+    });
+    if (!ok) return;
     await run(u.id, async () => {
-      await updateDoc(doc(firestore, 'users', u.id), { motorProEnabled: !u.motorProEnabled, updatedAt: Date.now() });
+      await updateDoc(doc(firestore, 'users', u.id), { motorProEnabled: next, updatedAt: Date.now() });
+      await addAuditLog({ action: 'ALTERAR_MOTOR_PRO', details: `Motor Pro de ${u.name} → ${next ? 'ativado' : 'desativado'}.`, module: 'Admin' });
       showToast('Motor Pro alterado.', 'success');
     });
   }
@@ -391,18 +399,38 @@ export function AdminUsersSubscriptions() {
     setQuotaTarget(null);
     await run(u.id, async () => {
       await updateDoc(doc(firestore, 'users', u.id), { reportsQuota: n, updatedAt: Date.now() });
-      await updateDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), { reportsQuota: n, updatedAt: Date.now() }).catch(() => {});
-      showToast('Cota de laudos atualizada.', 'success');
+      // Não engolir a falha aqui: se o doc de assinatura não existir/a escrita
+      // falhar, o admin precisa saber que os dois documentos ficaram fora de
+      // sincronia — mostrar sucesso de qualquer jeito escondia isso (A9).
+      let subSyncFailed = false;
+      await updateDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), { reportsQuota: n, updatedAt: Date.now() })
+        .catch(() => { subSyncFailed = true; });
+      if (subSyncFailed) {
+        showToast('Cota do usuário atualizada, mas a assinatura não pôde ser sincronizada (verifique se ela existe).', 'error');
+      } else {
+        showToast('Cota de laudos atualizada.', 'success');
+      }
     });
   }
 
   async function handleToggleAddon(u: SystemUser, addon: 'calculators' | 'pacs' | 'appointments' | 'clinics') {
     const subId = `sub_${u.id}`;
     const sub   = subscriptions.find((s: any) => s.id === subId);
+    const curr: string[] = sub?.addons ? [...sub.addons] : [];
+    const isRemoving = curr.includes(addon);
+    const ok = await confirm({
+      title: isRemoving ? `Remover add-on ${addon}` : `Ativar add-on ${addon}`,
+      message: isRemoving
+        ? `Remover o add-on "${addon}" de ${u.name}? O acesso pago a esse recurso é cortado imediatamente.`
+        : `Conceder o add-on "${addon}" para ${u.name} de graça (fora de uma compra)?`,
+      variant: isRemoving ? 'danger' : 'info',
+      confirmLabel: isRemoving ? 'Remover' : 'Ativar',
+    });
+    if (!ok) return;
     await run(u.id, async () => {
-      const curr: string[] = sub?.addons ? [...sub.addons] : [];
-      const next = curr.includes(addon) ? curr.filter(a => a !== addon) : [...curr, addon];
+      const next = isRemoving ? curr.filter(a => a !== addon) : [...curr, addon];
       await setDoc(doc(firestore, 'subscriptions', subId), { id: subId, userId: u.id, addons: next, updatedAt: Date.now() }, { merge: true });
+      await addAuditLog({ action: 'ALTERAR_ADDON', details: `Add-on ${addon} de ${u.name} → ${isRemoving ? 'removido' : 'ativado'}.`, module: 'Admin' });
       showToast(`Add-on ${addon} alterado.`, 'success');
     });
   }
@@ -419,19 +447,29 @@ export function AdminUsersSubscriptions() {
     await run(u.id, async () => {
       await updateDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), { status: 'canceled', canceledAt: Date.now() });
       await updateDoc(doc(firestore, 'users', u.id), { subscriptionStatus: 'canceled' });
+      await addAuditLog({ action: 'CANCELAR_ASSINATURA', details: `Assinatura de ${u.name} cancelada pelo admin.`, module: 'Admin' });
       showToast('Assinatura cancelada.', 'info');
     });
   }
 
   async function handleReactivate(u: SystemUser) {
     const now = Date.now();
+    const newPeriodEnd = now + 30 * 24 * 60 * 60 * 1000;
+    const ok = await confirm({
+      title: 'Reativar assinatura',
+      message: `Reativar a assinatura de ${u.name}? Isso inicia um NOVO período de 30 dias a partir de agora (vencendo em ${new Date(newPeriodEnd).toLocaleDateString('pt-BR')}), substituindo o período anterior.`,
+      variant: 'info',
+      confirmLabel: 'Reativar',
+    });
+    if (!ok) return;
     await run(u.id, async () => {
       await setDoc(doc(firestore, 'subscriptions', `sub_${u.id}`), {
         status: 'active', updatedAt: now,
         currentPeriodStart: now,
-        currentPeriodEnd: now + 30 * 24 * 60 * 60 * 1000,
+        currentPeriodEnd: newPeriodEnd,
       }, { merge: true });
       await updateDoc(doc(firestore, 'users', u.id), { subscriptionStatus: 'active', updatedAt: now });
+      await addAuditLog({ action: 'REATIVAR_ASSINATURA', details: `Assinatura de ${u.name} reativada pelo admin (novo período até ${new Date(newPeriodEnd).toLocaleDateString('pt-BR')}).`, module: 'Admin' });
       showToast('Assinatura reativada.', 'success');
     });
   }
@@ -1449,7 +1487,7 @@ function AssignSubModal({
             <div>
               <label className="text-[10px] font-black uppercase tracking-widest text-ink-400 block mb-1">Duração (dias)</label>
               <input type="number" min={1} max={365} value={lifetime ? 0 : periodDays}
-                onChange={e => setPeriodDays(parseInt(e.target.value) || 30)}
+                onChange={e => setPeriodDays(Math.min(365, Math.max(1, parseNonNegativeInt(e.target.value, 30))))}
                 disabled={lifetime}
                 placeholder={lifetime ? '∞' : undefined}
                 className="input h-10 text-sm w-full disabled:opacity-40" />

@@ -158,6 +158,13 @@ export function TrainingDashboard({
   }, [settings, showToast, confirm, load]);
 
   const handleVectorize = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Vetorizar corpus',
+      message: `Gerar embeddings para os ${pendingVec} laudo(s) pendentes do Corpus de Excelência? Ativa o retrieval semântico para eles. Ação segura e idempotente (não duplica).`,
+      confirmLabel: 'Vetorizar agora',
+      variant: 'info',
+    });
+    if (!ok) return;
     setVectorizing(true);
     setVecProgress({ done: 0, total: pendingVec });
     try {
@@ -176,12 +183,19 @@ export function TrainingDashboard({
       setVectorizing(false);
       setVecProgress(null);
     }
-  }, [settings, showToast, pendingVec, load]);
+  }, [settings, showToast, pendingVec, load, confirm]);
 
   // Recalcula as notas de qualidade a partir do corpus (popula Score/Segurança).
   const [scoring, setScoring] = useState(false);
   const [scoreProgress, setScoreProgress] = useState<{ done: number; total: number } | null>(null);
   const handleComputeScores = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Calcular notas de qualidade',
+      message: `Rodar auditoria de qualidade (Score/Segurança) sobre os ${corpusCount} laudo(s) do corpus? Ação segura e idempotente (não duplica registros).`,
+      confirmLabel: 'Calcular agora',
+      variant: 'info',
+    });
+    if (!ok) return;
     setScoring(true);
     setScoreProgress({ done: 0, total: corpusCount });
     try {
@@ -196,7 +210,7 @@ export function TrainingDashboard({
       setScoring(false);
       setScoreProgress(null);
     }
-  }, [showToast, corpusCount, load]);
+  }, [showToast, corpusCount, load, confirm]);
 
   if (loading) {
     return (

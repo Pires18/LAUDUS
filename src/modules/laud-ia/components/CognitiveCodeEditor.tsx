@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Check, Code, Copy, RotateCcw } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { logger } from '../../../utils/logger';
+import { useApp } from '../../../store/app';
 
 // Editor de código/prompt cognitivo — extraído de SharedLaudIA (autocontido).
 function estimatePromptTokens(text: string): number {
@@ -52,6 +53,7 @@ export function CognitiveCodeEditor({
   glowColor = 'brand',
   readOnly = false,
 }: CognitiveCodeEditorProps) {
+  const { showToast } = useApp();
   const lineRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
@@ -74,6 +76,7 @@ export function CognitiveCodeEditor({
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       logger.error('Erro ao copiar para clipboard:', err);
+      showToast('Não foi possível copiar — permissão de área de transferência negada pelo navegador.', 'error');
     }
   };
 

@@ -67,18 +67,26 @@ export async function createUserDocument(
 
 /**
  * Remove um usuário do sistema.
+ *
+ * Decisão de retenção de dados (confirmada com o responsável em 07/07/2026):
+ * apaga `users/{uid}` e `subscriptions/sub_{uid}` (não faz sentido uma
+ * assinatura órfã apontando pra um usuário que não existe mais) — mas MANTÉM
+ * `ai_usage` e `transactions`, que são registros financeiros/fiscais
+ * (o usuário já foi cobrado por aqueles laudos) e continuam consultáveis por
+ * uid nas telas de Financeiro/Auditoria mesmo após a exclusão.
  */
 export async function deleteUserDocument(uid: string, adminId: string, adminName: string) {
-  const userRef = doc(firestore, 'users', uid);
-  // Por segurança, vamos usar o deleteDoc direto, mas em prod geralmente usamos soft-delete
   const { deleteDoc } = await import('firebase/firestore');
+  const userRef = doc(firestore, 'users', uid);
+  const subRef = doc(firestore, 'subscriptions', `sub_${uid}`);
   await deleteDoc(userRef);
+  await deleteDoc(subRef).catch(() => { /* pode não existir (usuário sem assinatura) */ });
 
   await addAuditLog({
     userId: adminId,
     userName: adminName,
     action: 'DELETE_USER',
-    details: `Removido usuário ${uid}`,
+    details: `Removido usuário ${uid} (e sua assinatura). Histórico de uso de IA/transações mantido por retenção financeira.`,
     module: 'ADMIN_USERS'
   });
 }
