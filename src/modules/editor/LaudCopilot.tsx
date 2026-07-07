@@ -15,6 +15,7 @@ import { computeDerivations, derivationsToLines } from './structured/liveCompute
 import { itemCount, itemFieldId, countKey } from './structured/structuredKeys';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { routeMotor } from '../ai/router';
+import { recordHumanFeedback } from '../ai/training/feedbackStore';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { classNames } from '../../utils/format';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1507,13 +1508,24 @@ export function LaudCopilot({
                               )}
                             </div>
 
-                            {/* Avaliação da proposta (auditoria + anti-alucinação) */}
+                            {/* Avaliação da proposta (auditoria + anti-alucinação) + feedback */}
                             <ReportQualityPanel
                               html={proposal}
                               area={exam.area || template?.area}
                               anamnesis={exam.anamnesis}
                               clinicalIndication={exam.clinicalIndication}
                               compact
+                              onRate={(rating, auditScore) => {
+                                recordHumanFeedback({
+                                  area: exam.area || template?.area || '',
+                                  examType: exam.examType,
+                                  motor: selectedMotor,
+                                  rating,
+                                  context: 'copilot-proposal',
+                                  auditScore,
+                                });
+                                showToast(rating === 'positive' ? 'Proposta avaliada: boa 👍' : 'Proposta avaliada: precisa melhorar 👎', 'success');
+                              }}
                             />
 
                             <button

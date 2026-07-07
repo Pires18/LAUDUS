@@ -3,13 +3,16 @@ import { useApp } from '../../store/app';
 import {
   Loader2, ShieldCheck, Gauge, AlertTriangle, PlayCircle, Sparkles,
   GraduationCap, Library, RefreshCw, TrendingUp, Cpu, DownloadCloud, Binary,
-  CheckCircle2, Circle, ChevronRight, Database, Activity,
+  CheckCircle2, Circle, ChevronRight, Database, Activity, ThumbsUp,
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { useConfirm } from '../../hooks/useConfirm';
 import {
   listQualityRecords,
   listCorrectionSignals,
+  listHumanFeedback,
+  aggregateHumanFeedback,
+  HumanFeedbackAggregate,
   countExcellenceCorpus,
   aggregateQualityMetrics,
   aggregatePatterns,
@@ -59,6 +62,7 @@ export function TrainingDashboard({
   const [calibration, setCalibration] = useState('');
   const [corpusCount, setCorpusCount] = useState(0);
   const [pendingVec, setPendingVec] = useState(0);
+  const [feedback, setFeedback] = useState<HumanFeedbackAggregate | null>(null);
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -72,14 +76,16 @@ export function TrainingDashboard({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [records, signals, total, pending] = await Promise.all([
+      const [records, signals, total, pending, humanFb] = await Promise.all([
         listQualityRecords(1000),
         listCorrectionSignals(500),
         countExcellenceCorpus(),
         countPendingVectorization(),
+        listHumanFeedback(1000),
       ]);
       setMetrics(aggregateQualityMetrics(records));
       setCalibration(buildCalibrationBlock(aggregatePatterns(signals, 5)));
+      setFeedback(aggregateHumanFeedback(humanFb));
       // Contagem real do servidor (sem cap). Fallback para o total do
       // contador de pendências caso a agregação falhe.
       setCorpusCount(total || pending.total);
@@ -237,11 +243,12 @@ export function TrainingDashboard({
           </div>
 
           {/* Stats rápidos */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mt-4">
             <QuickStat icon={Library} label="Corpus" value={`${corpusCount}`} sub="laudos" />
             <QuickStat icon={Binary} label="Vetorizado" value={`${vecPct}%`} sub={`${vectorized}/${corpusCount}`} />
             <QuickStat icon={Gauge} label="Score" value={lastScore != null ? `${lastScore}` : '—'} sub="/100" />
             <QuickStat icon={ShieldCheck} label="Segurança" value={hasData ? `${metrics!.safetyIncidents}` : '0'} sub="incidentes" tone={hasData && metrics!.safetyIncidents > 0 ? 'rose' : 'emerald'} />
+            <QuickStat icon={ThumbsUp} label="Satisfação" value={feedback && feedback.total > 0 ? `${feedback.satisfactionRate}%` : '—'} sub={feedback ? `${feedback.total} feedbacks` : 'sem dados'} tone={feedback && feedback.total > 0 && feedback.satisfactionRate < 70 ? 'rose' : 'emerald'} />
           </div>
 
           {/* Pipeline do aprendizado */}

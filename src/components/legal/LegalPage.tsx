@@ -86,8 +86,8 @@ export function LegalPage({ doc }: Props) {
 
   return (
     <div className="h-full w-full overflow-y-auto bg-white font-sans text-ink-900 flex flex-col" style={{ colorScheme: 'light' }}>
-      {/* ── Nav mínima ── */}
-      <header className="legal-nav sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-ink-100">
+      {/* ── Nav mínima (oculta na impressão) ── */}
+      <header className="legal-nav no-print sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-ink-100">
         <div className="max-w-3xl mx-auto px-5 h-16 flex items-center justify-between">
           <a
             href="/"
@@ -186,16 +186,26 @@ export function LegalPage({ doc }: Props) {
               <List size={12} />
               <span className="text-[10px] font-black uppercase tracking-widest">Nesta página</span>
             </div>
-            <nav className="space-y-1 border-l-2 border-ink-100 pl-3">
-              {toc.map((h) => (
-                <button
-                  key={h.id}
-                  onClick={() => scrollToSection(h.id, { updateHash: false })}
-                  className="block w-full text-left text-[12px] font-semibold text-ink-500 hover:text-brand-600 leading-snug py-0.5 transition-colors"
-                >
-                  {h.title}
-                </button>
-              ))}
+            <nav className="no-print space-y-1 border-l-2 border-ink-100 pl-3">
+              {toc.map((h, i) => {
+                // Separador visual quando muda de documento (ex.: Privacidade
+                // → Anexo de Retenção) — sem isso, a numeração reinicia em
+                // "1." no meio da lista e parece um erro de sumário.
+                const showGroupLabel = i === 0 ? false : toc[i - 1].group !== h.group;
+                return (
+                  <div key={h.id}>
+                    {showGroupLabel && (
+                      <p className="text-[9px] font-black text-ink-300 uppercase tracking-widest pt-3 pb-1 -ml-3 pl-3 border-t border-ink-100 mt-2">{h.group}</p>
+                    )}
+                    <button
+                      onClick={() => scrollToSection(h.id, { updateHash: false })}
+                      className="block w-full text-left text-[12px] font-semibold text-ink-500 hover:text-brand-600 leading-snug py-0.5 transition-colors"
+                    >
+                      {h.title}
+                    </button>
+                  </div>
+                );
+              })}
             </nav>
           </aside>
         </div>

@@ -747,7 +747,13 @@ html, body, #root {
     overflow: visible !important;
   }
 
-  #root {
+  /* Só esconde o app nos modos de impressão DEDICADOS (laudo paginado via
+     Paged.js e impressão de imagens). Para window.print() comum — páginas
+     legais, termos, calculadoras — o app imprime normalmente e .no-print
+     esconde a navegação. Antes, o #root era escondido SEMPRE, o que fazia
+     todo botão de impressão fora do laudo imprimir em branco. */
+  body.printing-laudo #root,
+  body.print-mode-images #root {
     display: none !important;
   }
 

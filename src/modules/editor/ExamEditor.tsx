@@ -10,6 +10,7 @@ import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
 import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText, Star, Printer } from 'lucide-react';
 import { addToExcellenceCorpus } from '../ai/training/excellenceCorpus';
+import { recordHumanFeedback } from '../ai/training/feedbackStore';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames, formatDate } from '../../utils/format';
@@ -132,6 +133,20 @@ export function ExamEditor({ examId }: Props) {
   useEffect(() => {
     if (showPreview) preloadPrintEngine();
   }, [showPreview]);
+
+  // Impressão real via Paged.js (fonte oculta #report-print-source). Usada tanto
+  // pelo botão do cabeçalho quanto pela pré-visualização — nunca window.print()
+  // direto (que imprime a UI do app, não o laudo paginado).
+  const handlePrintLaudo = async () => {
+    if (isPrinting || !patient || !exam) return;
+    setIsPrinting(true);
+    try {
+      const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
+      await printLaudo(settings, footerId);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   const [showCopilot, setShowCopilot] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -668,6 +683,8 @@ export function ExamEditor({ examId }: Props) {
             }}
             onOpenAnamnesisConsent={() => setShowAnamnesisConsent(true)}
             onPreview={() => setShowPreview(true)}
+            onPrint={handlePrintLaudo}
+            isPrinting={isPrinting}
             hasDicomImages={hasDicomImages}
             onToggleViewer={() => setShowIntegratedViewer(prev => !prev)}
             viewerOpen={showIntegratedViewer}
@@ -802,6 +819,17 @@ export function ExamEditor({ examId }: Props) {
                     area={exam.area || template?.area}
                     anamnesis={(exam as any).anamnesis}
                     clinicalIndication={exam.clinicalIndication}
+                    onRate={(rating, auditScore) => {
+                      recordHumanFeedback({
+                        area: exam.area || template?.area || '',
+                        examType: exam.examType,
+                        motor: settings.selectedMotor === 'pro' ? 'pro' : 'lite',
+                        rating,
+                        context: 'report-quality',
+                        auditScore,
+                      });
+                      showToast(rating === 'positive' ? 'Feedback registrado: bom laudo 👍' : 'Feedback registrado: sinalizado para melhoria 👎', 'success');
+                    }}
                   />
                 );
               })()}
@@ -1346,17 +1374,7 @@ export function ExamEditor({ examId }: Props) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (isPrinting) return;
-                  setIsPrinting(true);
-                  try {
-                    const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
-                    await printLaudo(settings, footerId);
-                  } finally {
-                    setIsPrinting(false);
-                  }
-                }}
+                onClick={(e) => { e.stopPropagation(); handlePrintLaudo(); }}
                 disabled={isPrinting}
                 className="h-9 px-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm flex items-center gap-1.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
               >

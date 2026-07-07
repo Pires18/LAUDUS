@@ -16,6 +16,8 @@ interface EditorHeaderProps {
   onUnlock: () => void;
   onOpenAnamnesisConsent: () => void;
   onPreview?: () => void;
+  onPrint?: () => void;
+  isPrinting?: boolean;
   hasDicomImages?: boolean;
   onToggleViewer?: () => void;
   viewerOpen?: boolean;
@@ -38,6 +40,8 @@ export function EditorHeader({
   onUnlock,
   onOpenAnamnesisConsent,
   onPreview,
+  onPrint,
+  isPrinting = false,
   hasDicomImages = false,
   onToggleViewer,
   viewerOpen = false,
@@ -284,13 +288,14 @@ export function EditorHeader({
               <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest hidden lg:inline">Finalizado</span>
             </div>
             
-            {/* Botão de imprimir PDF */}
+            {/* Botão de imprimir PDF — usa o fluxo real (Paged.js), não window.print() */}
             <button
-              onClick={() => window.print()}
-              className="h-9 px-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 shadow-sm flex items-center gap-1.5 active:scale-95"
+              onClick={() => (onPrint ? onPrint() : window.print())}
+              disabled={isPrinting}
+              className="h-9 px-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all font-black text-[10px] uppercase tracking-widest shrink-0 shadow-sm flex items-center gap-1.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Printer size={13} />
-              <span>Imprimir PDF</span>
+              {isPrinting ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+              <span>{isPrinting ? 'Preparando…' : 'Imprimir PDF'}</span>
             </button>
 
             <button

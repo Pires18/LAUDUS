@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { cosineSimilarity } from '../modules/ai/training/embeddings';
 import { rankBySimilarity, selectExamples, buildFewShotBlock } from '../modules/ai/training/retrieval';
 import { classifyCorrection, aggregatePatterns, buildCalibrationBlock } from '../modules/ai/training/feedback';
+import { aggregateHumanFeedback, HumanFeedback } from '../modules/ai/training/feedbackStore';
 import { ExcellenceEntry } from '../modules/ai/training/excellenceCorpus';
 
 // ═══════════════════════════════════════════════════════════════
@@ -174,5 +175,35 @@ describe('buildCalibrationBlock', () => {
     expect(block).toContain('CRÍTICO');
     expect(block).toContain('vascular');
     expect(block).toContain('3x');
+  });
+});
+
+describe('aggregateHumanFeedback', () => {
+  const fb = (rating: 'positive' | 'negative', area = 'vascular'): HumanFeedback => ({
+    area, examType: 'Aorta', rating, context: 'report-quality', createdAt: Date.now(),
+  });
+
+  it('calcula taxa de satisfação', () => {
+    const a = aggregateHumanFeedback([fb('positive'), fb('positive'), fb('negative'), fb('positive')]);
+    expect(a.total).toBe(4);
+    expect(a.positive).toBe(3);
+    expect(a.negative).toBe(1);
+    expect(a.satisfactionRate).toBe(75);
+  });
+
+  it('lista áreas com feedback negativo, mais negativas primeiro', () => {
+    const a = aggregateHumanFeedback([
+      fb('negative', 'vascular'), fb('negative', 'vascular'),
+      fb('negative', 'mastologia'), fb('positive', 'ginecologia'),
+    ]);
+    expect(a.worstAreas[0].area).toBe('vascular');
+    expect(a.worstAreas[0].negative).toBe(2);
+  });
+
+  it('retorna zeros para lista vazia', () => {
+    const a = aggregateHumanFeedback([]);
+    expect(a.total).toBe(0);
+    expect(a.satisfactionRate).toBe(0);
+    expect(a.worstAreas).toHaveLength(0);
   });
 });
