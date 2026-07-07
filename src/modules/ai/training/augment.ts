@@ -2,6 +2,7 @@ import { AppSettings, ExamArea } from '../../../types';
 import { logger } from '../../../utils/logger';
 import { embedText } from './embeddings';
 import { listExcellenceCorpus } from './excellenceCorpus';
+import { getPersonalCalibration } from './feedbackStore';
 import { selectExamples, buildFewShotBlock } from './retrieval';
 
 // ═══════════════════════════════════════════════════════════════
@@ -31,23 +32,30 @@ export async function retrieveFewShotBlock(params: RetrievalParams): Promise<str
   if (!params.settings.aiTrainingEnabled) return '';
 
   try {
-    const candidates = await listExcellenceCorpus(params.area);
-    if (candidates.length === 0) return '';
+    // Calibração pessoal (Camada 0.5) — correções + feedback do médico.
+    // Lida em paralelo; degrada para '' se ausente.
+    const [candidates, calibration] = await Promise.all([
+      listExcellenceCorpus(params.area),
+      getPersonalCalibration().catch(() => ''),
+    ]);
 
-    const contextText = `${params.examType}. ${params.clinicalIndication || ''} ${params.anamnesis || ''}`.trim();
-    const embedding = await embedText(contextText, params.settings, params.signal);
-
-    const examples = selectExamples(
-      { examType: params.examType, motor: params.motor, embedding },
-      candidates,
-      2
-    );
-
-    const block = buildFewShotBlock(examples);
-    if (block) {
-      logger.info(`[Retrieval] ${examples.length} exemplo(s) injetado(s) para ${params.area}/${params.examType}.`);
+    let fewShot = '';
+    if (candidates.length > 0) {
+      const contextText = `${params.examType}. ${params.clinicalIndication || ''} ${params.anamnesis || ''}`.trim();
+      const embedding = await embedText(contextText, params.settings, params.signal);
+      const examples = selectExamples(
+        { examType: params.examType, motor: params.motor, embedding },
+        candidates,
+        2
+      );
+      fewShot = buildFewShotBlock(examples);
+      if (fewShot) {
+        logger.info(`[Retrieval] ${examples.length} exemplo(s) injetado(s) para ${params.area}/${params.examType}.`);
+      }
     }
-    return block;
+
+    // Camada 0.5 vem ANTES dos exemplos few-shot.
+    return [calibration, fewShot].filter(Boolean).join('\n\n');
   } catch (err) {
     logger.warn('[Retrieval] Falha na augmentação (seguindo sem reforço):', err);
     return '';

@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, query, orderBy, limit as fsLimit } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit as fsLimit } from 'firebase/firestore';
 import { firestore, auth } from '../../../lib/firebase';
 import { logger } from '../../../utils/logger';
 import { CorrectionSignal } from './feedback';
@@ -77,6 +77,39 @@ export interface HumanFeedbackAggregate {
   satisfactionRate: number;
   /** Áreas com mais feedback negativo (onde padronizar). */
   worstAreas: Array<{ area: string; negative: number; total: number }>;
+}
+
+// ─── Calibração pessoal (Camada 0.5) ─────────────────────────────────────────
+// Bloco de calibração precomputado (correções + feedback) que é injetado na
+// geração. Persistido num doc único para leitura barata por laudo.
+// Caminho: users/{uid}/training_config/personal.
+
+/** Salva o bloco de calibração pessoal. Best-effort. */
+export async function savePersonalCalibration(block: string): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  try {
+    await setDoc(
+      doc(firestore, `users/${uid}/training_config/personal`),
+      { calibration: block, updatedAt: Date.now() },
+      { merge: true }
+    );
+  } catch (err) {
+    logger.warn('[FeedbackStore] Falha ao salvar calibração pessoal:', err);
+  }
+}
+
+/** Lê o bloco de calibração pessoal (ou '' se ausente). */
+export async function getPersonalCalibration(): Promise<string> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return '';
+  try {
+    const snap = await getDoc(doc(firestore, `users/${uid}/training_config/personal`));
+    return snap.exists() ? (snap.data().calibration || '') : '';
+  } catch (err) {
+    logger.warn('[FeedbackStore] Falha ao ler calibração pessoal:', err);
+    return '';
+  }
 }
 
 export function aggregateHumanFeedback(list: HumanFeedback[]): HumanFeedbackAggregate {

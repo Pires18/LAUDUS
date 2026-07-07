@@ -182,3 +182,40 @@ CALIBRAÇÃO PESSOAL (aprendida das correções do médico)
 ═══════════════════════════════════════════
 ${lines.join('\n')}`;
 }
+
+/**
+ * Constrói a calibração pessoal COMPLETA (Camada 0.5): combina os padrões
+ * de correção (específicos e acionáveis) com o feedback humano por área
+ * (satisfação). É este bloco que é injetado na geração para o motor
+ * aprender o padrão do médico em tempo real.
+ */
+export function buildPersonalCalibration(
+  patterns: AggregatedPattern[],
+  feedbackNegativeAreas: Array<{ area: string; negative: number; total: number }> = []
+): string {
+  const parts: string[] = [];
+
+  if (patterns.length > 0) {
+    const lines = patterns.slice(0, 6).map((p) => {
+      const flag = p.critical ? '⚠️ CRÍTICO — ' : '';
+      return `- ${p.area} / ${p.examType}: ${flag}${CATEGORY_HINTS[p.category]} (${p.count}x).`;
+    });
+    parts.push(`PADRÕES DE CORREÇÃO DO MÉDICO (evite repeti-los):\n${lines.join('\n')}`);
+  }
+
+  const relevantFeedback = feedbackNegativeAreas.filter((a) => a.negative >= 2).slice(0, 4);
+  if (relevantFeedback.length > 0) {
+    const lines = relevantFeedback.map(
+      (a) => `- ${a.area}: ${a.negative} laudo(s) marcados como insatisfatórios pelo médico — redobre a fidelidade ao padrão do corpus nesta área.`
+    );
+    parts.push(`ÁREAS COM INSATISFAÇÃO REGISTRADA:\n${lines.join('\n')}`);
+  }
+
+  if (parts.length === 0) return '';
+
+  return `═══════════════════════════════════════════
+CALIBRAÇÃO PESSOAL (Camada 0.5 — aprendida do médico)
+Reforce estes pontos ao gerar; NÃO contradiga as regras de segurança.
+═══════════════════════════════════════════
+${parts.join('\n\n')}`;
+}

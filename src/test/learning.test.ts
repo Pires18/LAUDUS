@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { cosineSimilarity } from '../modules/ai/training/embeddings';
 import { rankBySimilarity, selectExamples, buildFewShotBlock } from '../modules/ai/training/retrieval';
-import { classifyCorrection, aggregatePatterns, buildCalibrationBlock } from '../modules/ai/training/feedback';
+import { classifyCorrection, aggregatePatterns, buildCalibrationBlock, buildPersonalCalibration } from '../modules/ai/training/feedback';
 import { aggregateHumanFeedback, HumanFeedback } from '../modules/ai/training/feedbackStore';
 import { ExcellenceEntry } from '../modules/ai/training/excellenceCorpus';
 
@@ -205,5 +205,27 @@ describe('aggregateHumanFeedback', () => {
     expect(a.total).toBe(0);
     expect(a.satisfactionRate).toBe(0);
     expect(a.worstAreas).toHaveLength(0);
+  });
+});
+
+describe('buildPersonalCalibration', () => {
+  it('combina padrões de correção e feedback negativo', () => {
+    const block = buildPersonalCalibration(
+      [{ area: 'mastologia', examType: 'Mamas', category: 'classificacao', count: 4, critical: false }],
+      [{ area: 'vascular', negative: 3, total: 5 }]
+    );
+    expect(block).toContain('CALIBRAÇÃO PESSOAL');
+    expect(block).toContain('mastologia');
+    expect(block).toContain('vascular');
+    expect(block).toContain('insatisfat');
+  });
+
+  it('ignora áreas com menos de 2 negativos', () => {
+    const block = buildPersonalCalibration([], [{ area: 'x', negative: 1, total: 10 }]);
+    expect(block).toBe('');
+  });
+
+  it('retorna vazio sem dados', () => {
+    expect(buildPersonalCalibration([], [])).toBe('');
   });
 });

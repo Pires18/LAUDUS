@@ -17,6 +17,8 @@ import {
   aggregateQualityMetrics,
   aggregatePatterns,
   buildCalibrationBlock,
+  buildPersonalCalibration,
+  savePersonalCalibration,
   backfillCorpusFromFinalized,
   vectorizeCorpus,
   countPendingVectorization,
@@ -84,8 +86,13 @@ export function TrainingDashboard({
         listHumanFeedback(1000),
       ]);
       setMetrics(aggregateQualityMetrics(records));
-      setCalibration(buildCalibrationBlock(aggregatePatterns(signals, 5)));
-      setFeedback(aggregateHumanFeedback(humanFb));
+      const patterns = aggregatePatterns(signals, 5);
+      const fbAgg = aggregateHumanFeedback(humanFb);
+      setCalibration(buildCalibrationBlock(patterns));
+      setFeedback(fbAgg);
+      // Recomputa e persiste a Camada 0.5 (correções + feedback) usada na
+      // geração — mantém a calibração viva sem custo por laudo.
+      void savePersonalCalibration(buildPersonalCalibration(patterns, fbAgg.worstAreas));
       // Contagem real do servidor (sem cap). Fallback para o total do
       // contador de pendências caso a agregação falhe.
       setCorpusCount(total || pending.total);
