@@ -266,18 +266,21 @@ export function computeDerivations(
     out.push({ id: 'vrpm__class', sectionId: 'vrpm', label: 'VRPM', text: `${fmt(vrpm, 0)} ml${c}`, alert: vrpm > 50 });
   }
 
-  // ── Doppler renal: RAR (≥ 3,5 sugere estenose ≥ 60%) e RI intraparenquimatoso ──
-  const vpsRenal = num(v['vps_renal']);
+  // ── Doppler renal BILATERAL: RAR (≥ 3,5 → estenose ≥ 60%) e IR intraparenq. (> 0,7) por lado ──
   const vpsAorta = num(v['vps_aorta']);
-  if (vpsRenal != null && vpsAorta != null && vpsAorta > 0) {
-    const rar = vpsRenal / vpsAorta;
-    out.push({ id: 'rar__calc', sectionId: 'doppler-renal', label: 'RAR', text: `${fmt(rar, 1)}${rar >= 3.5 ? ' — estenose ≥ 60%' : ''}`, alert: rar >= 3.5 });
-  }
-  const vpsIntra = num(v['vps_intra']);
-  const vdfIntra = num(v['vdf_intra']);
-  if (vpsIntra != null && vdfIntra != null && vdfIntra > 0) {
-    const di = dopplerIndices(vpsIntra, vdfIntra);
-    if (di.ri != null) out.push({ id: 'ri_intra__calc', sectionId: 'doppler-renal', label: 'IR intraparenq.', text: `${fmt(di.ri)}${di.ri > 0.7 ? ' — elevado (> 0,7)' : ''}`, alert: di.ri > 0.7 });
+  for (const [side, label, sid] of [
+    ['d', 'D', 'arteria-renal-direita'],
+    ['e', 'E', 'arteria-renal-esquerda'],
+  ] as const) {
+    const vpsRenal = num(v[`vps_renal_${side}`]);
+    if (vpsRenal != null && vpsAorta != null && vpsAorta > 0) {
+      const rar = vpsRenal / vpsAorta;
+      out.push({ id: `rar_${side}`, sectionId: sid, label: `RAR ${label}`, text: `${fmt(rar, 1)}${rar >= 3.5 ? ' — estenose ≥ 60%' : ''}`, alert: rar >= 3.5 });
+    }
+    const ir = num(v[`ir_${side}`]);
+    if (ir != null) {
+      out.push({ id: `ri_intra_${side}`, sectionId: `indices-intraparenquimatosos-${side === 'd' ? 'direitos' : 'esquerdos'}`, label: `IR intraparenq. ${label}`, text: `${fmt(ir)}${ir > 0.7 ? ' — elevado (> 0,7)' : ''}`, alert: ir > 0.7 });
+    }
   }
 
   // ── Fetal: percentis Doppler (AU/ACM/UtA) por z-score (Arduini/Baschat) ──

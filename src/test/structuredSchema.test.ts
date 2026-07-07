@@ -100,6 +100,53 @@ describe('deriveStructuredSchema — enriquecimento por rótulo', () => {
   });
 });
 
+describe('enriquecimento por área — cobertura dos compartimentos-chave', () => {
+  const hasField = (area: string, comp: string, fieldId: string) => {
+    const s = deriveStructuredSchema(mask(area, 'X', [comp]), area);
+    return s.sections[0]?.fields.some((f) => f.id === fieldId || f.id.endsWith('_' + fieldId));
+  };
+  it('vascular: vertebrais, eixo arterial, venoso, ilíaca, oftálmica', () => {
+    expect(hasField('vascular', 'Artérias Vertebrais', 'vert_d')).toBe(true);
+    expect(hasField('vascular', 'Eixo Femoropoplíteo Direito', 'fluxo')).toBe(true);
+    expect(hasField('vascular', 'Sistema Venoso Profundo Direito', 'compress')).toBe(true);
+    expect(hasField('vascular', 'Artérias Ilíacas Comuns', 'estenose')).toBe(true);
+    expect(hasField('vascular', 'Artéria Oftálmica Direita', 'ir')).toBe(true);
+  });
+  it('medicina-interna: pâncreas, aorta/VCI, bexiga, porta', () => {
+    expect(hasField('medicina-interna', 'Pâncreas', 'wirsung')).toBe(true);
+    expect(hasField('medicina-interna', 'Aorta Abdominal e VCI', 'aorta')).toBe(true);
+    expect(hasField('medicina-interna', 'Bexiga', 'espessamento')).toBe(true);
+    expect(hasField('medicina-interna', 'Veia Porta', 'porta_fluxo')).toBe(true);
+  });
+  it('pequenas-partes: cadeias linfonodais, epidídimos, salivares, hérnia inguinal', () => {
+    expect(hasField('pequenas-partes', 'Cadeias Linfonodais Cervicais', 'maior')).toBe(true);
+    expect(hasField('pequenas-partes', 'Epidídimos', 'desc')).toBe(true);
+    expect(hasField('pequenas-partes', 'Glândulas Parótidas', 'achado')).toBe(true);
+    expect(hasField('pequenas-partes', 'Canal Inguinal e Femoral', 'hernia')).toBe(true);
+  });
+  it('MSK: região/compartimento, superfícies ósseas, menisco', () => {
+    expect(hasField('musculoesqueletico', 'Compartimento Anterior', 'achado')).toBe(true);
+    expect(hasField('musculoesqueletico', 'Superfícies Ósseas', 'osso')).toBe(true);
+    expect(hasField('musculoesqueletico', 'Avaliação Meniscal Periférica', 'menisco')).toBe(true);
+  });
+  it('reumato: GSUS, PDUS, erosões', () => {
+    expect(hasField('reumatologico', 'Hipertrofia Sinovial', 'gsus')).toBe(true);
+    expect(hasField('reumatologico', 'Power Doppler', 'pdus')).toBe(true);
+    expect(hasField('reumatologico', 'Erosões', 'erosao')).toBe(true);
+  });
+  it('pediatria: transfontanelar, coluna, órgãos, escroto', () => {
+    expect(hasField('pediatria', 'Sistema Ventricular', 'atrio_vent')).toBe(true);
+    expect(hasField('pediatria', 'Nível do Cone Medular', 'nivel')).toBe(true);
+    expect(hasField('pediatria', 'Rim Direito', 'rim_dims')).toBe(true);
+    expect(hasField('pediatria', 'Testículo Direito', 'test_d_fluxo')).toBe(true);
+  });
+  it('procedimentos: indicação, técnica, complicações', () => {
+    expect(hasField('procedimentos', 'Indicação Clínica', 'indicacao')).toBe(true);
+    expect(hasField('procedimentos', 'Descrição do Procedimento', 'tecnica')).toBe(true);
+    expect(hasField('procedimentos', 'Complicações Imediatas', 'complicacao')).toBe(true);
+  });
+});
+
 describe('parseMaskSections — parser genérico da máscara', () => {
   const analysis =
     '<p><strong>Fígado:</strong> Dimensões normais, medindo [__] x [__] x [__] cm.</p>' +

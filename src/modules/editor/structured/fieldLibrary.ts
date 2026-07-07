@@ -25,6 +25,7 @@ const VENOUS_COMPRESS = ['compressível (pérvia)', 'parcialmente compressível'
 const VERT_FLOW = ['anterógrado', 'invertido (roubo)', 'ausente'];
 const CEAP = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6'];
 const SFU = ['ausente', 'SFU I', 'SFU II', 'SFU III', 'SFU IV'];
+const SEMIQ = ['0 (ausente)', '1 (leve)', '2 (moderado)', '3 (acentuado)'];
 const BIRADS_CAT = ['BI-RADS 1', 'BI-RADS 2', 'BI-RADS 3', 'BI-RADS 4A', 'BI-RADS 4B', 'BI-RADS 4C', 'BI-RADS 5', 'BI-RADS 6'];
 
 const NODULO_TIRADS: StructuredFieldDef[] = [
@@ -133,11 +134,12 @@ const ENRICHERS: Enricher[] = [
     { id: 'emi_e', label: 'EMI Esquerda', kind: 'measure', unit: 'mm', calcId: 'imt-elsa-br' },
   ] },
   { areas: ['vascular'], match: /art[ée]ria renal direita/i, canonical: true, fields: [
-    { id: 'vps_renal', label: 'VPS a. renal D', kind: 'measure', unit: 'cm/s', hint: 'estenose se > 180' }, { id: 'vps_aorta', label: 'VPS aorta', kind: 'measure', unit: 'cm/s', hint: 'para RAR' },
-    { id: 'vps_intra', label: 'VPS intraparenq.', kind: 'measure', unit: 'cm/s' }, { id: 'vdf_intra', label: 'VDF intraparenq.', kind: 'measure', unit: 'cm/s' },
+    { id: 'vps_renal_d', label: 'VPS a. renal D', kind: 'measure', unit: 'cm/s', hint: 'estenose se > 180' }, { id: 'vps_aorta', label: 'VPS aorta', kind: 'measure', unit: 'cm/s', hint: 'para RAR' },
   ] },
-  { areas: ['vascular'], match: /art[ée]ria renal esquerda/i, fields: [{ id: 'vps', label: 'VPS a. renal E', kind: 'measure', unit: 'cm/s' }, { id: 'ir', label: 'IR', kind: 'measure' }] },
-  { areas: ['vascular'], match: /[íi]ndices intraparenq|intraparenquimatos/i, fields: [{ id: 'ir', label: 'IR intraparenq.', kind: 'measure', hint: 'elevado se > 0,7' }] },
+  { areas: ['vascular'], match: /art[ée]ria renal esquerda/i, canonical: true, fields: [{ id: 'vps_renal_e', label: 'VPS a. renal E', kind: 'measure', unit: 'cm/s', hint: 'estenose se > 180' }] },
+  { areas: ['vascular'], match: /intraparenq.*direit/i, canonical: true, fields: [{ id: 'ir_d', label: 'IR intraparenq. D', kind: 'measure', hint: 'elevado se > 0,7' }] },
+  { areas: ['vascular'], match: /intraparenq.*esquerd/i, canonical: true, fields: [{ id: 'ir_e', label: 'IR intraparenq. E', kind: 'measure', hint: 'elevado se > 0,7' }] },
+  { areas: ['vascular'], match: /[íi]ndices intraparenq|intraparenquimatos/i, canonical: true, fields: [{ id: 'ir_d', label: 'IR intraparenq.', kind: 'measure', hint: 'elevado se > 0,7' }] },
   { areas: ['vascular'], match: /^rim (direito|esquerdo)/i, fields: [{ id: 'comprimento', label: 'Comprimento', kind: 'measure', unit: 'cm' }] },
   { areas: ['vascular'], match: /tornozelo.?braquial|\bitb\b/i, canonical: true, fields: [
     { id: 'itb_d', label: 'ITB Direito', kind: 'measure' }, { id: 'itb_e', label: 'ITB Esquerdo', kind: 'measure' },
@@ -180,6 +182,9 @@ const ENRICHERS: Enricher[] = [
     { id: 'lado', label: 'Axila', kind: 'select', options: ['direita', 'esquerda', 'bilateral'] },
     { id: 'maior', label: 'Maior linfonodo', kind: 'measure', unit: 'mm' }, { id: 'cortical', label: 'Cortical', kind: 'measure', unit: 'mm' },
   ] },
+  { areas: ['mastologia'], match: /ductos mam/i, apply: { normalable: true, normalText: 'sem ectasia ou conteúdo anômalo' }, fields: [{ id: 'ectasia', label: 'Ectasia ductal', kind: 'select', options: ['ausente', 'presente'] }, { id: 'desc', label: 'Conteúdo', kind: 'text' }] },
+  { areas: ['mastologia'], match: /pele|are[óo]lo|papilar|subcut[âa]neo|planos profundos/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['mastologia'], match: /estudo doppler|dopplerfluxometria/i, apply: { normalable: true, normalText: 'sem vascularização anômala' }, fields: [{ id: 'vasc', label: 'Vascularização', kind: 'select', options: ['ausente/habitual', 'aumentada intranodular'] }] },
 
   // ── GINECOLOGIA ──
   { areas: ['ginecologia'], match: /^[úu]tero$|corpo uterino/i, canonical: true, fields: [
@@ -204,6 +209,10 @@ const ENRICHERS: Enricher[] = [
   { areas: ['ginecologia'], match: /douglas|fundo de saco/i, apply: { normalable: true, normalText: 'livre' }, fields: [
     { id: 'douglas', label: 'Conteúdo', kind: 'select', options: ['líquido livre pequena qtde', 'líquido moderado/volumoso', 'coleção'] },
   ] },
+  { areas: ['ginecologia'], match: /colo uterino/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'colo_desc', label: 'Achados', kind: 'text', placeholder: 'cisto de Naboth, pólipo, comprimento' }] },
+  { areas: ['ginecologia'], match: /estudo doppler|dopplerfluxometria/i, apply: { normalable: true, normalText: 'índices arteriais dentro da normalidade' }, fields: [{ id: 'ip_uta_gin', label: 'IP a. uterinas', kind: 'measure' }, { id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['ginecologia'], match: /^ov[áa]rios$/i, apply: { normalable: true, normalText: 'tópicos, sem endometriomas' }, fields: [{ id: 'endometrioma', label: 'Endometrioma', kind: 'text', placeholder: 'lado e dimensões' }] },
+  { areas: ['ginecologia'], match: /compartimento (anterior|posterior)|param[ée]trio|retovaginal|uterossacr|retossigmoide/i, apply: { normalable: true, normalText: 'sem focos de endometriose profunda' }, fields: [{ id: 'die', label: 'Foco de DIE', kind: 'select', options: ['ausente', 'presente'] }, { id: 'desc', label: 'Detalhe', kind: 'text' }] },
 
   // ── PEQUENAS PARTES ──
   { areas: ['pequenas-partes'], match: /lobo direito/i, canonical: true, fields: [{ id: 'lobo_d_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' }] },
@@ -234,11 +243,19 @@ const ENRICHERS: Enricher[] = [
     { id: 'esteatose', label: 'Esteatose', kind: 'select', options: ['ausente', 'leve (I)', 'moderada (II)', 'acentuada (III)'] },
     { id: 'figado_lesao', label: 'Lesão focal', kind: 'text', fullWidth: true },
   ] },
-  { areas: ['medicina-interna'], match: /vias biliares|ves[íi]cula/i, apply: { normalable: true, normalText: 'paredes finas sem cálculos; vias não dilatadas' }, fields: [
+  { areas: ['medicina-interna'], match: /vias biliares|ves[íi]cula biliar/i, apply: { normalable: true, normalText: 'paredes finas sem cálculos; vias não dilatadas' }, fields: [
     { id: 'vesicula', label: 'Vesícula', kind: 'select', options: ['cálculo(s)', 'lama biliar', 'pólipo', 'espessamento', 'colecistectomizado'] },
     { id: 'coledoco', label: 'Colédoco', kind: 'measure', unit: 'mm' },
   ] },
+  { areas: ['medicina-interna'], match: /p[âa]ncreas/i, apply: { normalable: true, normalText: 'dimensões e ecotextura normais, Wirsung não dilatado' }, fields: [{ id: 'pancreas', label: 'Achados', kind: 'text', placeholder: 'lesão, dilatação' }, { id: 'wirsung', label: 'Wirsung', kind: 'measure', unit: 'mm' }] },
   { areas: ['medicina-interna'], match: /^ba[çc]o/i, canonical: true, apply: { normalable: true, normalText: 'dimensões normais, homogêneo' }, fields: [{ id: 'baco_eixo', label: 'Maior eixo', kind: 'measure', unit: 'cm' }] },
+  { areas: ['medicina-interna'], match: /aorta/i, canonical: true, apply: { normalable: true, normalText: 'calibre normal; VCI de aspecto habitual' }, fields: [{ id: 'aorta', label: 'Calibre aorta', kind: 'measure', unit: 'cm', hint: 'aneurisma se ≥ 3,0 cm' }, { id: 'vci', label: 'VCI', kind: 'calc', calcId: 'ivc-index' }] },
+  { areas: ['medicina-interna'], match: /^bexiga|bexiga urin[áa]ria|bexiga e vias/i, apply: { normalable: true, normalText: 'paredes finas, conteúdo anecoico' }, fields: [{ id: 'espessamento', label: 'Parede', kind: 'select', options: ['normal', 'espessamento difuso', 'espessamento focal', 'trabeculação'] }, { id: 'desc', label: 'Conteúdo / lesões', kind: 'text' }] },
+  { areas: ['medicina-interna'], match: /ureter/i, apply: { normalable: true, normalText: 'não dilatados' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text', placeholder: 'dilatação, cálculo' }] },
+  { areas: ['medicina-interna'], match: /cavidade (abdominal|peritoneal|p[ée]lvica)|l[íi]quido livre|asc[íi]te|peritone/i, apply: { normalable: true, normalText: 'sem líquido livre ou coleções' }, fields: [{ id: 'liquido', label: 'Líquido livre', kind: 'select', options: ['ausente', 'pequena quantidade', 'moderada', 'volumosa'] }] },
+  { areas: ['medicina-interna'], match: /ves[íi]cula(s)? seminal|ves[íi]culas seminais/i, apply: { normalable: true, normalText: 'simétricas, sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['medicina-interna'], match: /veia porta|sistema porta/i, fields: [{ id: 'porta_fluxo', label: 'Fluxo portal', kind: 'select', options: ['hepatopeta normal', 'lentificado', 'hepatofugal', 'trombose'] }, { id: 'porta_cal', label: 'Calibre', kind: 'measure', unit: 'mm' }] },
+  { areas: ['medicina-interna'], match: /veias hep[áa]ticas|art[ée]ria hep[áa]tica|art[ée]rias renais|an[áa]lise vascular/i, apply: { normalable: true, normalText: 'fluxo e índices normais' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text', placeholder: 'padrão de onda, IR' }] },
   { areas: ['medicina-interna'], match: /pr[óo]stata/i, canonical: true, fields: [
     { id: 'prostata_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'prostate-weight' },
     { id: 'psa', label: 'PSA total', kind: 'measure', unit: 'ng/mL' }, { id: 'lobo_mediano', label: 'Lobo mediano', kind: 'text' },
@@ -255,19 +272,52 @@ const ENRICHERS: Enricher[] = [
   { areas: ['musculoesqueletico'], match: /tend[ãa]o|tend[õo]es|manguito/i, fields: [{ id: 'estado', label: 'Integridade', kind: 'select', options: ['íntegro', 'tendinopatia', 'ruptura parcial', 'ruptura completa'] }, { id: 'desc', label: 'Detalhe', kind: 'text' }] },
   { areas: ['musculoesqueletico', 'reumatologico'], match: /articula[çc][ãa]o|derrame|recesso|articular/i, fields: [{ id: 'derrame', label: 'Derrame', kind: 'select', options: ['ausente', 'pequeno', 'moderado', 'volumoso'] }, { id: 'sinovite', label: 'Sinovite/PD', kind: 'select', options: ['ausente', 'GS1', 'GS2', 'GS3'] }] },
   { areas: ['musculoesqueletico'], match: /bursa/i, apply: { normalable: true, normalText: 'sem bursopatia' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
-  { areas: ['musculoesqueletico'], match: /nervo/i, apply: { normalable: true, normalText: 'sem sinais compressivos' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['musculoesqueletico'], match: /nervo|t[úu]nel do carpo/i, apply: { normalable: true, normalText: 'sem sinais compressivos' }, fields: [{ id: 'csa', label: 'Área seccional (CSA)', kind: 'measure', unit: 'mm²' }, { id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['musculoesqueletico'], match: /menisc/i, apply: { normalable: true, normalText: 'íntegros à avaliação periférica' }, fields: [{ id: 'menisco', label: 'Menisco', kind: 'select', options: ['íntegro', 'degeneração', 'extrusão', 'rotura'] }] },
+  { areas: ['musculoesqueletico'], match: /superf[íi]cies? [óo]sseas|contornos [óo]sseos|osteoartros/i, apply: { normalable: true, normalText: 'contornos ósseos regulares' }, fields: [{ id: 'osso', label: 'Achado ósseo', kind: 'select', options: ['regulares', 'osteófitos', 'erosão', 'irregularidade cortical'] }] },
+  { areas: ['musculoesqueletico'], match: /trofismo|musculatura|m[úu]sculo|f[áa]scia/i, apply: { normalable: true, normalText: 'trofismo e ecotextura preservados' }, fields: [{ id: 'musculo', label: 'Músculo', kind: 'select', options: ['preservado', 'atrofia', 'lesão/edema', 'hérnia muscular'] }, { id: 'desc', label: 'Detalhe', kind: 'text' }] },
+  // Catch-all de região/compartimento (contém tendões/ligamentos por região)
+  { areas: ['musculoesqueletico'], match: /compartimento|regi[ãa]o (dorsal|volar|medial|lateral|anterior|posterior|plantar)|faces? radial|dedos|ligament/i, apply: { normalable: true, normalText: 'estruturas avaliadas sem alterações' }, fields: [{ id: 'achado', label: 'Achado', kind: 'select', options: ['sem alterações', 'tendinopatia', 'ruptura', 'derrame/bursite', 'lesão ligamentar', 'outro'] }, { id: 'desc', label: 'Descrição', kind: 'text', fullWidth: true }] },
+  { areas: ['musculoesqueletico'], match: /pele e tecido|tecidos moles|vasculonervosas|manobras din[âa]micas/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  // ── REUMATOLÓGICO ──
+  { areas: ['reumatologico'], match: /hipertrofia sinovial|escala de cinza|\bgsus\b/i, fields: [{ id: 'gsus', label: 'GSUS (0–3)', kind: 'select', options: SEMIQ }] },
+  { areas: ['reumatologico'], match: /power doppler|\bpdus\b/i, fields: [{ id: 'pdus', label: 'PDUS (0–3)', kind: 'select', options: SEMIQ }] },
+  { areas: ['reumatologico'], match: /[êe]ntese/i, apply: { normalable: true, normalText: 'sem entesopatia' }, fields: [{ id: 'entese', label: 'Ênteses', kind: 'select', options: ['normal', 'espessamento', 'erosão', 'PD positivo', 'entesófito'] }] },
+  { areas: ['reumatologico'], match: /eros[õo]es|superf[íi]cies [óo]sseas/i, apply: { normalable: true, normalText: 'sem erosões' }, fields: [{ id: 'erosao', label: 'Erosões', kind: 'select', options: ['ausentes', 'presentes'] }] },
+  { areas: ['reumatologico'], match: /protocolo|articula[çc][õo]es com atividade/i, fields: [{ id: 'desc', label: 'Articulações', kind: 'text' }] },
 
   // ── PEDIATRIA ──
   { areas: ['pediatria'], match: /quadril direito|graf.*direit/i, canonical: true, fields: [{ id: 'alfa_d', label: 'Ângulo α', kind: 'measure', unit: '°' }, { id: 'beta_d', label: 'Ângulo β', kind: 'measure', unit: '°' }] },
   { areas: ['pediatria'], match: /quadril esquerdo|graf.*esquerd/i, canonical: true, fields: [{ id: 'alfa_e', label: 'Ângulo α', kind: 'measure', unit: '°' }, { id: 'beta_e', label: 'Ângulo β', kind: 'measure', unit: '°' }] },
   { areas: ['pediatria'], match: /piloro/i, canonical: true, apply: { normalable: true, normalText: 'sem sinais de estenose hipertrófica' }, fields: [{ id: 'piloro_musculo', label: 'Espessura muscular', kind: 'measure', unit: 'mm', hint: '≥ 3 mm' }, { id: 'piloro_canal', label: 'Canal', kind: 'measure', unit: 'mm', hint: '≥ 15 mm' }] },
   { areas: ['pediatria'], match: /ap[êe]ndice|fossa il[íi]aca/i, canonical: true, apply: { normalable: true, normalText: 'apêndice não visualizado / sem sinais de apendicite' }, fields: [{ id: 'apendice_diam', label: 'Diâmetro', kind: 'measure', unit: 'mm', hint: '> 6 mm' }] },
+  // Transfontanelar
+  { areas: ['pediatria'], match: /par[êe]nquima|hemorrag/i, apply: { normalable: true, normalText: 'ecogenicidade normal, sem hemorragia' }, fields: [{ id: 'hemorragia', label: 'Hemorragia (Papile)', kind: 'select', options: ['ausente', 'grau I', 'grau II', 'grau III', 'grau IV'] }, { id: 'desc', label: 'Outros achados', kind: 'text' }] },
+  { areas: ['pediatria'], match: /sistema ventricular|ventr[íi]culo/i, apply: { normalable: true, normalText: 'simétrico, não dilatado' }, fields: [{ id: 'atrio_vent', label: 'Átrio ventricular', kind: 'measure', unit: 'mm', hint: 'ventriculomegalia > 10 mm' }] },
+  { areas: ['pediatria'], match: /linha m[ée]dia|n[úu]cleos|fossa posterior|espa[çc]os extra|cavum/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  // Coluna
+  { areas: ['pediatria'], match: /cone medular/i, apply: { normalable: true, normalText: 'topografia normal (acima de L2-L3)' }, fields: [{ id: 'nivel', label: 'Nível do cone', kind: 'text', placeholder: 'ex: L1-L2' }] },
+  { areas: ['pediatria'], match: /filum|canal espinhal|arcos posteriores|disrafismo/i, apply: { normalable: true, normalText: 'sem sinais de disrafismo' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  // Abdome/rins pediátricos
+  { areas: ['pediatria'], match: /f[íi]gado|ba[çc]o/i, apply: { normalable: true, normalText: 'dimensões e ecotextura normais para a idade' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['pediatria'], match: /vias biliares|ves[íi]cula|p[âa]ncreas|adrenais/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  { areas: ['pediatria'], match: /rim (direito|esquerdo)/i, canonical: true, apply: { normalable: true, normalText: 'comprimento adequado à idade, sem dilatação' }, fields: [{ id: 'rim_dims', label: 'Comprimento', kind: 'measure', unit: 'cm' }, { id: 'rim_dilat', label: 'Dilatação (SFU)', kind: 'select', options: SFU }] },
+  { areas: ['pediatria'], match: /sistema coletor|hidronefrose/i, fields: [{ id: 'sfu', label: 'Dilatação (SFU)', kind: 'select', options: SFU }] },
+  { areas: ['pediatria'], match: /ureter|bexiga|sistema urin/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text' }] },
+  // Escroto agudo pediátrico
+  { areas: ['pediatria'], match: /test[íi]culo direito/i, canonical: true, fields: [{ id: 'test_d_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' }, { id: 'test_d_fluxo', label: 'Fluxo', kind: 'select', options: ['presente/simétrico', 'reduzido', 'ausente (torção?)'] }] },
+  { areas: ['pediatria'], match: /test[íi]culo esquerdo/i, canonical: true, fields: [{ id: 'test_e_dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' }, { id: 'test_e_fluxo', label: 'Fluxo', kind: 'select', options: ['presente/simétrico', 'reduzido', 'ausente (torção?)'] }] },
+  { areas: ['pediatria'], match: /epid[íi]dimo|ap[êe]ndices testicul|t[úu]nica|parede escrotal|estudo doppler/i, apply: { normalable: true, normalText: 'sem alterações' }, fields: [{ id: 'desc', label: 'Achados', kind: 'text', placeholder: 'apêndice, hidrocele, fluxo' }] },
+  { areas: ['pediatria'], match: /estabilidade/i, fields: [{ id: 'estabilidade', label: 'Estabilidade', kind: 'select', options: ['estável', 'frouxidão', 'instável/luxável'] }] },
 
   // ── PROCEDIMENTOS ──
   { areas: ['procedimentos'], match: /alvo|les[ãa]o|n[óo]dul/i, fields: [{ id: 'loc', label: 'Localização', kind: 'text' }, { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' }] },
-  { areas: ['procedimentos'], match: /t[ée]cnica/i, fields: [{ id: 'tecnica', label: 'Agulha / via / passagens', kind: 'text', fullWidth: true }] },
+  { areas: ['procedimentos'], match: /indica[çc][ãa]o/i, fields: [{ id: 'indicacao', label: 'Indicação clínica', kind: 'text', fullWidth: true }] },
+  { areas: ['procedimentos'], match: /t[ée]cnica|descri[çc][ãa]o do procedimento|s[íi]tio de pun/i, fields: [{ id: 'tecnica', label: 'Técnica (agulha / via / passagens)', kind: 'text', fullWidth: true }] },
   { areas: ['procedimentos'], match: /material|amostra/i, fields: [{ id: 'material', label: 'Material coletado', kind: 'text', fullWidth: true }] },
-  { areas: ['procedimentos'], match: /controle|p[óo]s.?procedimento|intercorr/i, apply: { normalable: true, normalText: 'sem intercorrências' }, fields: [{ id: 'controle', label: 'Status', kind: 'select', options: ['sem intercorrências', 'hematoma', 'sangramento', 'outro'] }, { id: 'obs', label: 'Observações', kind: 'text' }] },
+  { areas: ['procedimentos'], match: /complica[çc][õo]es/i, apply: { normalable: true, normalText: 'sem complicações imediatas' }, fields: [{ id: 'complicacao', label: 'Complicação', kind: 'select', options: ['nenhuma', 'hematoma', 'sangramento', 'pneumotórax', 'outra'] }] },
+  { areas: ['procedimentos'], match: /controle|p[óo]s.?procedimento|intercorr|avalia[çc][ãa]o p[óo]s/i, apply: { normalable: true, normalText: 'sem intercorrências' }, fields: [{ id: 'controle', label: 'Status', kind: 'select', options: ['sem intercorrências', 'hematoma', 'sangramento', 'outro'] }, { id: 'obs', label: 'Observações', kind: 'text' }] },
+  { areas: ['procedimentos'], match: /avalia[çc][ãa]o pr[ée]|placenta|l[íi]quido amni|vitalidade|feto/i, apply: { normalable: true, normalText: 'avaliação pré-procedimento sem alterações' }, fields: [{ id: 'pre', label: 'Achados', kind: 'text' }] },
 
   // ── CISTO RENAL (Bosniak) — abdome/rim ──
   { areas: ['medicina-interna'], match: /cisto renal|bosniak/i, apply: { repeatable: true, itemLabel: 'Cisto', score: 'bosniak' }, fields: CISTO_BOSNIAK },

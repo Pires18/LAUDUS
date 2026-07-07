@@ -127,9 +127,11 @@ describe('computeDerivations — cálculo em tempo real', () => {
 
     const rim = deriveStructuredSchema(tpl('medicina-interna', 'RINS E VIAS URINÁRIAS'), 'medicina-interna');
     expect(computeDerivations(rim, { vrpm: '120' }).find((x) => x.id === 'vrpm__class')?.text).toMatch(/acentuado/);
-    const rar = computeDerivations(rim, { vps_renal: '400', vps_aorta: '80' }).find((x) => x.id === 'rar__calc');
-    expect(rar?.text).toMatch(/estenose ≥ 60%/);
-    expect(computeDerivations(rim, { vps_intra: '30', vdf_intra: '5' }).find((x) => x.id === 'ri_intra__calc')?.alert).toBe(true);
+    // RAR e IR intraparenquimatoso agora BILATERAIS (D e E)
+    const bilat = computeDerivations(rim, { vps_renal_d: '400', vps_renal_e: '100', vps_aorta: '80', ir_e: '0,82' });
+    expect(bilat.find((x) => x.id === 'rar_d')?.text).toMatch(/estenose ≥ 60%/);
+    expect(bilat.find((x) => x.id === 'rar_e')?.alert).toBe(false);
+    expect(bilat.find((x) => x.id === 'ri_intra_e')?.alert).toBe(true);
 
     const gyn = deriveStructuredSchema(tpl('ginecologia', 'PÉLVICA TRANSVAGINAL'), 'ginecologia');
     expect(computeDerivations(gyn, { endometrio_esp: '8', menopausa: 'pós-menopausa' }).find((x) => x.id === 'endo__esp')?.alert).toBe(true);
@@ -154,9 +156,10 @@ describe('computeDerivations — cálculo em tempo real', () => {
   });
 
   it('Fase 3: renais/oftálmicas — seções da máscara + RAR por id', () => {
-    const renal = deriveStructuredSchema(tpl('vascular', 'ARTÉRIAS RENAIS', ['Artéria Renal Direita', 'Rim Direito']), 'vascular');
-    expect(renal.sections.map((s) => s.label)).toContain('Artéria Renal Direita');
-    expect(computeDerivations(renal, { vps_renal: '400', vps_aorta: '80' }).find((x) => x.id === 'rar__calc')?.text).toMatch(/estenose ≥ 60%/);
+    const renal = deriveStructuredSchema(tpl('vascular', 'ARTÉRIAS RENAIS', ['Artéria Renal Direita', 'Artéria Renal Esquerda', 'Rim Direito']), 'vascular');
+    expect(renal.sections.find((s) => s.label === 'Artéria Renal Direita')?.fields.some((f) => f.id === 'vps_renal_d')).toBe(true);
+    expect(renal.sections.find((s) => s.label === 'Artéria Renal Esquerda')?.fields.some((f) => f.id === 'vps_renal_e')).toBe(true);
+    expect(computeDerivations(renal, { vps_renal_d: '400', vps_aorta: '80' }).find((x) => x.id === 'rar_d')?.text).toMatch(/estenose ≥ 60%/);
     const oft = deriveStructuredSchema(tpl('vascular', 'ARTÉRIAS OFTÁLMICAS', ['Artéria Oftálmica Direita']), 'vascular');
     expect(oft.sections.map((s) => s.label)).toContain('Artéria Oftálmica Direita');
   });
