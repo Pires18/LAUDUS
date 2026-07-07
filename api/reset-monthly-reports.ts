@@ -99,9 +99,12 @@ async function runCronBatch(req: any, res: any) {
       }
     }
 
-    // Expiração de período: mensal e anual são recorrentes (vira past_due — aguarda
-    // renovação via webhook da AbacatePay ou fatura criada pelo CRON billing).
-    // Semestral é checkout avulso sem renovação automática — vira expired e perde acesso.
+    // Expiração de período: só o mensal é recorrente de verdade (AbacatePay cobra
+    // de novo sozinho) — vence e vira past_due, aguardando renovação via webhook
+    // ou fatura criada pelo CRON billing. Semestral e anual são compra avulsa sem
+    // cobrança automática — vencem e viram expired direto (confirmado como
+    // comportamento intencional em 07/07/2026: período de graça não faz sentido
+    // pra um plano que não vai renovar sozinho).
     // `interval` ausente (docs antigos) é tratado como recorrente por padrão — mais
     // seguro manter acesso do que cortar assinante pagador por campo ausente.
     if ((sub.status === 'active' || sub.status === 'past_due') && sub.currentPeriodEnd && now > sub.currentPeriodEnd) {

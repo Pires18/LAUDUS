@@ -1,11 +1,11 @@
 /**
  * Logger centralizado — silencia logs em produção.
- * Erros são sempre registrados (necessários para debugging).
+ * Erros são sempre registrados (necessários para debugging) e reportados ao
+ * Sentry quando VITE_SENTRY_DSN está configurado (initSentry é no-op sem DSN,
+ * então captureException some silenciosamente em dev/local).
  * Avisos e logs informativos apenas em desenvolvimento.
- *
- * Preparado para integração futura com Sentry:
- *   Substitua os console.error por Sentry.captureException(err)
  */
+import { Sentry } from '../lib/sentry';
 
 const isDev = import.meta.env.DEV;
 
@@ -29,6 +29,8 @@ export const logger = {
     } else {
       console.error(`[LAUDUS] ${message}`);
     }
-    // TODO: Sentry.captureException(err, { extra: { message } });
+    Sentry.captureException(err instanceof Error ? err : new Error(message), {
+      extra: { message },
+    });
   },
 };

@@ -1,9 +1,9 @@
 # 📘 Documentação Oficial — LAUD.US
 
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
-Versão do documento: 2026-07-05 (v3 — produção multi-usuário, LGPD/CFM, landing institucional) · Ambiente: produção (Vercel + Firebase).
+Versão do documento: 2026-07-07 (v4 — Vercel Pro, Aba Estruturado do Copiloto completa, LAUD.IA V2.0/backfill de qualidade) · Ambiente: produção (Vercel Pro + Firebase).
 
-**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Auditoria Integrações/Financeiro](AUDITORIA_INTEGRACOES_FINANCEIRO_2026-07.md) · [Plano de Refinamento](PLANO_REFINAMENTO.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md).
+**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa 07/07](AUDITORIA_COMPLETA_2026-07-07.md) · [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · auditorias/planos anteriores em [`docs/archive/`](archive/).
 
 ---
 
@@ -100,9 +100,9 @@ src/
                            #   PricingPlans, LoginScreen, CommandPalette, LegalModal,
                            #   EmailVerificationBanner, ClinicTeamCard, …
   modules/                 # 14 domínios (ver §4)
-  test/                    # 13 arquivos, 218 testes (Vitest)
-api/                       # 12 funções serverless (teto do plano Hobby da Vercel — ver §12)
-                           #   + helpers _auth,_edgeAuth,_firebase,_secure,_pricing,_entitlements,_rateLimit
+  test/                    # 20 arquivos, 377 testes (Vitest)
+api/                       # 14 funções serverless (Vercel Pro, sem teto de 12 — ver §12)
+                           #   + helpers _auth,_edgeAuth,_firebase,_secure,_pricing,_entitlements,_rateLimit,_pacsLifecycle
 scripts/agent.js           # Agente Local do PACS (worklist + proxy Orthanc + DELETE de tenant compartilhado)
 scripts/generate_wl.py     # gera arquivos .wl (pydicom)
 public/                    # favicon.svg + icons/*.png (marca padrão) + manifest
@@ -133,10 +133,21 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 | **Export** | `ReportDocument.tsx`, `printReport.ts` | PDF (paged.js) + Google Docs | — |
 
 ### 4.1 Editor de Laudo (núcleo)
-- **`ExamEditor.tsx`** (orquestrador) + **`RichEditor.tsx`** (Tiptap) + **`LaudCopilot.tsx`** (chat de refino).
+- **`ExamEditor.tsx`** (orquestrador) + **`RichEditor.tsx`** (Tiptap) + **`LaudCopilot.tsx`** (chat de refino, 3 abas: Chat / Formulário / **Estruturado**).
 - **Componentes:** `EditorHeader`, `EditorToolbar`, `DicomViewerSidebar`, `DicomThumbnail`, `DicomImagesModal` (PDF das imagens), `ReportQualityPanel` (avaliação anti-alucinação), `ReportVersionsModal` (diff/rollback), `AnamnesisConsentModal`, `ExamHistoryModal`.
 - **Hooks:** `useExamActions` (salvar/finalizar/reabrir), `useDicomSync` (busca estudos/imagens no PACS com polling+cache), `useCopilotSuggestions` (sugestões via Gemini), `useGoogleDocs` (export Google Docs), `useVoiceAnalyzer` (**ditado por voz** via SpeechRecognition).
 - **Funcionalidades:** geração IA (`generation`), refino (`refine`), copiloto (`copilot`); export PDF (laudo + imagens em grades) e Google Docs; versões; anamnese; termo de consentimento (assinatura); qualidade/anti-alucinação.
+
+### 4.1.1 Aba Estruturado (formulário tipado por máscara)
+3ª aba do Copiloto (`activeTab: 'structured'`), aditiva — não substitui Chat nem Formulário. Gera um formulário tipado **derivado de cada máscara**, específico por exame (ex.: ECOCARDIOGRAMA gera campos de câmaras/vias/arcos; obstétrico gera biometria fetal), com cálculo clínico em tempo real e escrita de volta ao laudo via IA.
+
+- **Esquema:** `parseMaskSections(analysisTemplate)` (`structured/deriveSchema.ts`) extrai os compartimentos de CADA máscara → `enrichSections(area, sections)` (`structured/fieldLibrary.ts`) casa rótulo por regex+área com campos tipados/escores canônicos. As 10 áreas clínicas têm biblioteca de campos dedicada (fetal, vascular, pequenas-partes, medicina-interna, gineco, mastologia, MSK, reumato, pediatria, procedimentos).
+- **Motor de vivo (`structured/liveCompute.ts`):** calcula em tempo real, sem abrir modal — volume elipsoide, PFE Hadlock IV + percentil OMS, RCP (ACM/AU), IG/DPP, ILA, índices Doppler (IR/SD/RAR renal bilateral), estenose carotídea (NASCET), ITB, volume tireoidiano, BPP, discordância gemelar, entre outros. Badges "Cálculo automático" por seção.
+- **Escores inline (`structured/scoring.ts`):** TI-RADS (aditivo por foco, `multiselect`), sugestões BI-RADS/O-RADS/Bosniak, classificação de Graf (quadril infantil) — calculados ao vivo, rotulados como sugestão (não substituem julgamento médico).
+- **Recursos de engine:** seções normal/alterado (toggle, compila "sem alterações"), itens repetíveis (nódulos/lesões/articulações), campos condicionais (`showIf`), write-back de calculadora clínica para um campo específico (`onOpenCalcForField`).
+- **Preview no editor de máscaras:** `TemplateEditor.tsx` tem aba "Estruturado" com `StructuredPreview` (mesmo componente, sem persistência/IA) para o médico validar o formulário gerado por uma máscara antes de usá-la.
+- **Persistência:** `ExamRequest.structuredValue` (autosave 800ms). **Compilação:** monta `[DADOS DE FORMULÁRIO COMPILADOS]` + instrução de área → segue o pipeline normal de geração da IA (mesmo card/fluxo do Formulário livre).
+- Arquivos: `src/modules/editor/structured/` (deriveSchema, fieldLibrary, liveCompute, scoring, structuredKeys) + `src/modules/editor/components/StructuredTab.tsx` / `StructuredPreview.tsx`. Testes: `structuredSchema.test.ts`, `structuredEngine.test.ts`, `liveCompute.test.ts`.
 
 ### 4.2 Componentes globais notáveis
 `CommandPalette` (navegação ⌘K), `OnboardingScreen` + `SetupChecklist` (primeiro acesso), `SupportCenterModal` (abrir ticket), `BroadcastBanner` (avisos globais do admin), `ClinicSessionModal` (clínica ativa), `PWAUpdatePrompt`, `OfflineBanner`, `EmailVerificationBanner` (exige confirmação de e-mail antes de gerar laudos com IA, contas e-mail/senha), `ErrorBoundary`, `FeatureLocked` (paywall), `PricingPlans` (vitrine pública), `LegalModal` (Termos de Uso/Política de Privacidade, também usado no cadastro).
@@ -156,9 +167,9 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 - **Telemetria:** `recordMetrics()` grava `users/{uid}/ai_usage` (modelo, tokens, custo, área) por evento.
 - **Provider (`providers/GeminiProvider.ts`):** `generate`/`stream`/`extractJson`; envia token + `x-gemini-mode`.
 
-**Prompts (`ai/prompts/`):** camadas mestre/global/estrutura/regras + `areaPrompts.ts` (por especialidade) + `template.ts`.
+**Prompts (`ai/prompts/`):** camadas mestre/global/estrutura/regras + `areaPrompts.ts` (por especialidade) + `template.ts`. Regras Rígidas (Bloco 4) em **V2.0** (`general.ts`): R1–R8 originais + **R9 (Segurança Pediátrica)** — proíbe referência de adulto em <18 anos — e **R10 (Versões de Classificações)** — fixa a versão oficial vigente de cada sistema (BI-RADS v2025, TI-RADS ACR 2017, O-RADS ACR 2022, LI-RADS v2024, Bosniak v2019, FIGO 2021 etc.) e define quais usam a seção `<h2>CLASSIFICAÇÃO</h2>` própria vs. quais são declarados dentro da ANÁLISE (SFU, CEAP, Rutherford, IOTA, Chammas...). Refino/Copiloto têm **9 Leis de Ouro** (`DEFAULT_REFINEMENT_GOLDEN_RULES`) e 3 sub-protocolos no Copiloto (Conflito, Instrução Multi-Parte, Integração de Resultado de Calculadora). A hierarquia de camadas é **doutrina textual** — não há árbitro determinístico de conflito entre Camada 2/3 no código; `auditReportQuality()` é a rede de segurança *a posteriori* (regex, não-IA) para parte das regras (R1/R5/R6/R7). Referência canônica completa e sincronizada com o código: [`docs/CASCADE_PROMPTS.md`](CASCADE_PROMPTS.md).
 
-**Treino & avaliação (`ai/training/`):** golden dataset, evaluator, harness de evals, retrieval few-shot (`augment`/`retrieval`/`embeddings`), corpus de excelência, anonimização (`anonymize` → `scrubForGeneration`), feedback store, métricas de qualidade, experimentos. Painel **LAUD.IA** (admin) opera isso.
+**Treino & avaliação (`ai/training/`):** golden dataset, evaluator, harness de evals, retrieval few-shot (`augment`/`retrieval`/`embeddings`), corpus de excelência, anonimização (`anonymize` → `scrubForGeneration`), feedback store, métricas de qualidade, experimentos. **Backfill de qualidade (`training/backfill.ts`):** os KPIs Score/Segurança do Corpus de Excelência antes só populavam com finalizações novas; `backfillQualityRecordsFromCorpus` roda `auditReportQuality`+`verifyReport` sobre o histórico (id determinístico → idempotente), acionável pelo botão "Calcular notas" no `TrainingDashboard`. Satisfação continua exigindo feedback humano real (não backfillável). Painel **LAUD.IA** (admin) opera tudo isso.
 
 ---
 
@@ -291,9 +302,9 @@ Quando `currentPeriodEnd` vence com status `active`/`past_due`:
 | `health.ts` | Node | — | Health-check |
 | **Helpers** | — | — | `_auth`, `_edgeAuth` (JWKS), `_firebase` (Admin SDK), `_secure` (safeEqual), `_pricing`, `_entitlements`, `_rateLimit` (KV) |
 
-**⚠️ Teto do plano Hobby da Vercel:** exatamente **12 funções** acima = o limite do plano. `api/abacatepay-test.ts` e `api/pacs-deprovision.ts` foram **consolidados** dentro de `abacatepay-checkout.ts` (via `action` no corpo) e `pacs-provision.ts` (via método `DELETE`) especificamente para caber nesse teto — a próxima função nova quebra o deploy a menos que outra seja consolidada ou o projeto suba para o plano Pro.
+**Vercel Pro ativo (desde 07/07/2026):** o projeto deixou o plano Hobby — o teto de 12 funções serverless não se aplica mais (14 hoje, ver §3). `abacatepay-checkout.ts` e `pacs-provision.ts` continuam consolidando `test-key`/`DELETE` por padrão de design (menos superfície, não mais por necessidade do teto), mas novas funções não quebram mais o deploy.
 
-**Crons (`vercel.json`):** `reset-monthly-reports` (03:00 diário) · `cron-aggregate-metrics` (03:30 diário). *Plano Hobby limita a 1×/dia; no Pro, voltar `cron-aggregate-metrics` para horário (`10 * * * *`).*
+**Crons (`vercel.json`):** `reset-monthly-reports` (03:00 diário) · `cron-monthly-billing` (03:45 diário) · `cron-aggregate-metrics` — **agora horário** (`10 * * * *`, habilitado pelo Pro em 07/07/2026; antes 1×/dia no Hobby) — painel financeiro/telemetria do admin fica com dados agregados mais frescos ao longo do dia (agregação é idempotente sobre as últimas 48h, seguro rodar com mais frequência).
 
 ---
 
@@ -353,9 +364,9 @@ Cada geração grava `ai_usage` → CRON diário agrega `metrics_daily`/`_summar
 ---
 
 ## 14. Testes & qualidade
-- **218 testes (Vitest, 13 arquivos):** calculadoras, classificadores, motor de IA, verificação/evolução/aprendizado/treino, segurança (`safeEqual`), preços (`_pricing`), roteamento PACS + multi-tenant + `resolveGeminiModel`.
+- **377 testes (Vitest, 20 arquivos):** calculadoras (incl. FMF trissomias + pré-eclâmpsia), classificadores, motor de IA, verificação/evolução/aprendizado/treino, Aba Estruturada (schema/engine/live-compute), segurança (`safeEqual`), preços (`_pricing`), roteamento PACS + multi-tenant + `resolveGeminiModel`.
 - **Gate de build:** `tsc && vite build`. CI (GitHub Actions).
-- **Dívida conhecida:** ~225 `any`, arquivos > 1.000 L, bundle `vendor-ui` ~1 MB. Roadmap: [PLANO_REFINAMENTO.md](PLANO_REFINAMENTO.md).
+- **Dívida conhecida (medida em 07/07/2026):** 248 usos de `any` (concentrados em fronteiras de integração — admin/pagamento/PACS), 13 arquivos > 800 linhas (maior: `areaPrompts.ts` 3.305 L, config de prompts), chunk `vendor-icons` 905 kB (maior do bundle). Só 3 de 16 endpoints serverless têm teste dedicado; 10 de 14 módulos de UI não têm teste dedicado (cobertura hoje é toda em lógica pura — calculadoras/engine/pricing). Plano priorizado: [PLANO_MELHORIAS_2026-07.md](PLANO_MELHORIAS_2026-07.md).
 
 ---
 
@@ -392,11 +403,12 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 
 | Item | Descrição | Bloqueador |
 |---|---|---|
-| Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário |
-| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — aguardando o Google popular a 1ª tabela (~24-48h) | Tempo de propagação do Google, não decisão/trabalho pendente |
-| Teto de 12 funções serverless (Vercel Hobby) | Já no limite — próxima função nova quebra o deploy | Consolidar mais endpoints ou migrar para o plano Pro |
+| Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário — usuário optou por decidir depois (07/07/2026) |
+| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — usuário confirma API/dataset ativos em 07/07/2026; falta confirmar se a 1ª tabela já tem linhas e então implementar a query server-side + ligar ao painel Financeiro | Confirmação do usuário de que a tabela `laudussys.gcp_billing_export_v1_*` já tem dados |
 | Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v3.0 sem identificação da operadora (razão social/CNPJ removida por decisão do responsável durante a fase de testes) — pacote em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) já sinaliza esse ponto como prioritário para o advogado | Validação por advogado especializado em LGPD/saúde digital |
 | Identificação da operadora nos documentos legais | Razão social/CNPJ removidos de todos os documentos e da interface durante a fase de testes — recomendável reintroduzir ao menos nos documentos legais antes da operação comercial plena (ver alerta em `PACOTE_REVISAO_JURIDICA.md`) | Decisão do responsável, a rever com o advogado |
+
+**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby).
 
 ---
 
@@ -404,4 +416,4 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 **Add-on** — recurso pago avulso. **Orthanc** — servidor PACS. **Worklist** — lista de exames que o aparelho lê (`.wl`). **Agente** — programa que grava `.wl` e faz proxy do Orthanc. **Tenant** — instância isolada numa VM compartilhada (`tenantId`). **Tailscale/Funnel** — VPN privada + endereço HTTPS público. **MRR/ARR** — receita recorrente mensal/anual. **Entitlement** — direito de uso derivado do plano. **Fail-open** — se a checagem falha, libera (não derruba pagante). **Collection-group query** — consulta sobre todas as subcoleções de mesmo nome (ex.: `ai_usage`). **Clinic membership** — vínculo de um usuário convidado (não dono) a uma clínica, com papel `editor`/`viewer` (`clinic_memberships`). **Reconciliação financeira** — comparação entre receita/MRR teóricos e valores reais cobrados/consumidos, para detectar divergência.
 
 ---
-*Documentação oficial v3. Detalhamento de pendências e roadmap nos documentos complementares.*
+*Documentação oficial v4 (07/07/2026). Detalhamento de pendências e roadmap nos documentos complementares.*

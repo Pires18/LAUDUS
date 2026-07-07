@@ -195,9 +195,8 @@ Histórico completo de versões em [CHANGELOG.md](CHANGELOG.md).
 
 - [Documentação Oficial](docs/DOCUMENTACAO_OFICIAL.md) — documento técnico mestre (arquitetura, módulos, IA, dados, segurança, API)
 - [Arquitetura do repositório](src/ARCHITECTURE.md)
-- [Auditoria Completa](docs/AUDITORIA_COMPLETA_2026-07.md) — estado de segurança/LGPD corrente
-- [Plano de Refinamento](docs/PLANO_REFINAMENTO.md) — board de execução ativo
-- [Plano Final de Produção](docs/PLANO_FINAL_PRODUCAO_2026-07.md) — docs, multi-usuário, landing, LGPD/CFM
+- [Auditoria Completa 07/07](docs/AUDITORIA_COMPLETA_2026-07-07.md) — estado atual de dívida técnica, testes, performance e documentação
+- [Plano de Melhorias](docs/PLANO_MELHORIAS_2026-07.md) — board de execução ativo (substitui o Plano de Refinamento anterior)
 - `docs/roadmaps/` — specs prontas aguardando implementação
 - `docs/pacs/` — arquitetura e manuais de PACS/DICOM
 - `docs/archive/` — planos e auditorias históricas (já concluídos/superados)

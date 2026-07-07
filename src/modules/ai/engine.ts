@@ -5,6 +5,7 @@ import { doc, getDoc, runTransaction, updateDoc } from 'firebase/firestore';
 import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
+import { calculateAge } from '../../utils/format';
 import { getMotorProfile } from './motorProfiles';
 import { retrieveFewShotBlock } from './training/augment';
 import { scrubForGeneration } from './training/anonymize';
@@ -198,27 +199,6 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
 }
 
 // ─── Helpers utilitários ─────────────────────────────────────────────────────
-
-function calculateAge(birthDateStr?: string, referenceDateMs?: number): string {
-  if (!birthDateStr) return '';
-  try {
-    const birthDate = new Date(birthDateStr);
-    const today = referenceDateMs ? new Date(referenceDateMs) : new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    if (age === 0) {
-      const months = (today.getFullYear() - birthDate.getFullYear()) * 12 + today.getMonth() - birthDate.getMonth();
-      const finalMonths = months <= 0 ? 1 : months;
-      return `${finalMonths} ${finalMonths === 1 ? 'mês' : 'meses'}`;
-    }
-    return `${age} ${age === 1 ? 'ano' : 'anos'}`;
-  } catch {
-    return '';
-  }
-}
 
 /**
  * Estima tokens (heurística: 1 token ~= 3.5 caracteres para pt-BR)

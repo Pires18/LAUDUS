@@ -27,7 +27,7 @@ async function getRawBody(req: any): Promise<string> {
  *  2. Assinatura HMAC-SHA256 no header X-Webhook-Signature (base64 ou hex)
  * Retorna true se qualquer um validar; em produção exige que o secret esteja configurado.
  */
-function verifyWebhook(req: any, rawBody: string, secret: string): { ok: boolean; reason?: string } {
+export function verifyWebhook(req: any, rawBody: string, secret: string): { ok: boolean; reason?: string } {
   if (!secret) {
     if (isProduction()) {
       return { ok: false, reason: 'Webhook secret não configurado em produção.' };
@@ -56,6 +56,27 @@ function verifyWebhook(req: any, rawBody: string, secret: string): { ok: boolean
   }
 
   return { ok: false, reason: 'Assinatura/segredo ausente.' };
+}
+
+/**
+ * Idempotência: registra o evento em `webhook_events` dentro de uma transação —
+ * se já existir, é um reprocessamento (ex.: retry do gateway) e deve ser ignorado
+ * sem reaplicar a concessão de plano/add-on. Extraído para função própria (em vez
+ * de inline no handler) para ser testável sem precisar de um Firestore real.
+ */
+export async function markEventProcessedOnce(db: any, eventId: string, eventType: string): Promise<{ duplicate: boolean }> {
+  const evtRef = db.collection('webhook_events').doc(String(eventId));
+  try {
+    await db.runTransaction(async (tx: any) => {
+      const snap = await tx.get(evtRef);
+      if (snap.exists) throw new Error('DUPLICATE');
+      tx.set(evtRef, { event: eventType, receivedAt: Date.now(), payloadId: eventId });
+    });
+    return { duplicate: false };
+  } catch (e: any) {
+    if (e.message === 'DUPLICATE') return { duplicate: true };
+    throw e;
+  }
 }
 
 /**
@@ -346,19 +367,10 @@ export default async function handler(req: any, res: any) {
 
     // ── Idempotência: cada evento é processado uma única vez ──
     if (eventId) {
-      const evtRef = db.collection('webhook_events').doc(String(eventId));
-      try {
-        await db.runTransaction(async (tx: any) => {
-          const snap = await tx.get(evtRef);
-          if (snap.exists) throw new Error('DUPLICATE');
-          tx.set(evtRef, { event: eventType, receivedAt: Date.now(), payloadId: eventId });
-        });
-      } catch (e: any) {
-        if (e.message === 'DUPLICATE') {
-          console.log(`[WEBHOOK] Evento duplicado ignorado: ${eventId}`);
-          return res.status(200).json({ status: 'duplicate' });
-        }
-        throw e;
+      const { duplicate } = await markEventProcessedOnce(db, eventId, eventType);
+      if (duplicate) {
+        console.log(`[WEBHOOK] Evento duplicado ignorado: ${eventId}`);
+        return res.status(200).json({ status: 'duplicate' });
       }
     }
 

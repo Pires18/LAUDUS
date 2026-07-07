@@ -29,7 +29,9 @@ export function formatDateTime(date: number | undefined): string {
 }
 
 /**
- * Calcula a idade a partir da data de nascimento.
+ * Calcula a idade a partir da data de nascimento. Abaixo de 1 ano mostra em
+ * meses (nunca "0 anos" — importante em pediatria: usada também em laudos
+ * impressos/PDF/docx e no prompt enviado à IA, ver ai/engine.ts).
  */
 export function calculateAge(birthDate: string | undefined, referenceDate?: number | string | Date): string {
   if (!birthDate) return '';
@@ -41,7 +43,12 @@ export function calculateAge(birthDate: string | undefined, referenceDate?: numb
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
     years--;
   }
-  return `${years} anos`;
+  if (years === 0) {
+    const months = (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth();
+    const finalMonths = months <= 0 ? 1 : months;
+    return `${finalMonths} ${finalMonths === 1 ? 'mês' : 'meses'}`;
+  }
+  return `${years} ${years === 1 ? 'ano' : 'anos'}`;
 }
 
 /**

@@ -36,6 +36,19 @@ function rand(n: number): string {
   return crypto.randomBytes(n).toString('hex');
 }
 
+/**
+ * Decide se o modo mock deve ser BLOQUEADO (erro claro) em vez de simular uma
+ * instância falsa. Nunca simular silenciosamente em produção (Vercel) quando a
+ * config necessária está genuinamente ausente — só quando PACS_MOCK=1 é
+ * explícito (uso deliberado, ex.: smoke test) ou fora da Vercel (dev local).
+ * Sem essa trava, um usuário pagando pelo plano Dedicado receberia uma VM
+ * fictícia (URL que não existe) sem nenhum sinal de erro caso uma credencial
+ * suma da Vercel (rotação de chave, env var apagada por engano etc.).
+ */
+export function shouldBlockMockInProduction(opts: { isVercel: boolean; forcedMock: boolean; configured: boolean }): boolean {
+  return opts.isVercel && !opts.forcedMock && !opts.configured;
+}
+
 // Mint de um access token OAuth do Google a partir da service account (sem deps).
 async function getGcpAccessToken(sa: any, scope: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -230,7 +243,7 @@ export default async function handler(req: any, res: any) {
     const sharedAdmin = process.env.PACS_ADMIN_SECRET;
     // Em produção (Vercel) sem a config compartilhada → ERRO CLARO (não simular,
     // senão o tenant é falso e o diagnóstico falha com "tenantId inválido").
-    if (process.env.VERCEL && process.env.PACS_MOCK !== '1' && (!sharedUrl || !sharedAdmin)) {
+    if (shouldBlockMockInProduction({ isVercel: !!process.env.VERCEL, forcedMock: process.env.PACS_MOCK === '1', configured: !!(sharedUrl && sharedAdmin) })) {
       res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'PACS compartilhado não configurado na Vercel. Defina PACS_SHARED_AGENT_URL e PACS_ADMIN_SECRET e faça Redeploy.' }));
       return;
@@ -275,6 +288,15 @@ export default async function handler(req: any, res: any) {
       res.end(JSON.stringify({ error: err.message || 'Falha no provisionamento compartilhado.' }));
       return;
     }
+  }
+
+  // ── DEDICADO: em produção (Vercel) sem GCP/Tailscale configurados → ERRO
+  // CLARO (mesma trava do compartilhado — não simular uma VM inexistente
+  // pro plano mais caro só porque uma credencial sumiu do ambiente).
+  if (shouldBlockMockInProduction({ isVercel: !!process.env.VERCEL, forcedMock: process.env.PACS_MOCK === '1', configured: gcpConfigured })) {
+    res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'PACS dedicado não configurado na Vercel. Defina GCP_SA_KEY, TAILSCALE_API_KEY e TAILSCALE_TS_NET e faça Redeploy.' }));
+    return;
   }
 
   // ── DEDICADO: MODO MOCK ──

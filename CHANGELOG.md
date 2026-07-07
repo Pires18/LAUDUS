@@ -5,9 +5,29 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
-## [Não versionado] — 2026-07-04
+## [Não versionado] — 2026-07-07
 
-### Removido
+### Adicionado
+- **Aba Estruturado do Copiloto** — 3ª aba do editor (Chat/Formulário/Estruturado): formulário tipado derivado de cada máscara, cobrindo as 10 áreas clínicas, com cálculo em tempo real (`liveCompute.ts`: PFE Hadlock+percentil OMS, RCP, IG/DPP, ILA, Doppler renal bilateral, NASCET, ITB, BPP...), escores inline (TI-RADS aditivo, sugestões BI-RADS/O-RADS/Bosniak, Graf), seções normal/alterado, itens repetíveis e campos condicionais. Preview interativo dentro do editor de máscaras (`TemplateEditor`). Ver §4.1.1 da [Documentação Oficial](docs/DOCUMENTACAO_OFICIAL.md).
+- **LAUD.IA — backfill de qualidade** — `backfillQualityRecordsFromCorpus` calcula Score/Segurança retroativamente sobre o histórico do Corpus de Excelência (antes só populava com finalizações novas); botão "Calcular notas" no `TrainingDashboard`.
+- **LAUD.IA — Regras Rígidas V2.0** (`general.ts`): R9 (Segurança Pediátrica) e R10 (Versões de Classificações RADS/Bosniak/GRADS/FIGO), 9 Leis de Ouro do Refinamento (eram 6), 3 sub-protocolos do Copiloto documentados. `docs/CASCADE_PROMPTS.md` sincronizado com o código real (V2.0).
+- **Calculadora FMF pré-eclâmpsia** — adicionado marcador PSV ratio (Gana 2022) ao modelo bayesiano.
+
+### Modificado
+- **Infraestrutura Vercel** — projeto migrado de Hobby para **Pro**; removido o teto de 12 funções serverless; `cron-aggregate-metrics` passou de 1×/dia para horário.
+- **`logger.error`** agora reporta exceções ao Sentry (`Sentry.captureException`) quando `VITE_SENTRY_DSN` está configurado — fechava o único TODO real remanescente no código.
+- **Documentação reorganizada** — auditorias/planos já executados (`AUDITORIA_COMPLETA_2026-07`, `AUDITORIA_INTEGRACOES_FINANCEIRO_2026-07`, `PLANO_REFINAMENTO`, `PLANO_FINAL_PRODUCAO_2026-07`, `PLANO_PLANOS_INTERVALOS_ABACATEPAY`) movidos para `docs/archive/`; nova [Auditoria Completa 07/07](docs/AUDITORIA_COMPLETA_2026-07-07.md) e [Plano de Melhorias](docs/PLANO_MELHORIAS_2026-07.md) substituem os anteriores como fonte viva.
+- **`vendor-icons` 898 kB → 87,6 kB (−90%)** — `AreaIcon.tsx` usava `import * as LucideIcons` com lookup dinâmico por string, o que impedia o Rollup de tree-shakear o pacote inteiro (3.904 ícones exportados, ~200 usados); reescrito com mapa estático dos 10 ícones de `EXAM_AREAS`.
+- **`calculateAge()` consolidada** — a versão usada na UI/documentos (`utils/format.ts`) mostrava "0 anos" para bebês e nunca pluralizava corretamente ("1 anos"); promovida a versão mais completa de `ai/engine.ts` (já usada só no prompt da IA) para `format.ts`, removida a duplicata.
+
+### Corrigido
+- **`api/pacs-provision.ts`** — o plano Dedicado podia devolver silenciosamente uma VM **falsa** em produção se `GCP_SA_KEY`/`TAILSCALE_API_KEY`/`TAILSCALE_TS_NET` sumissem do ambiente (rotação de chave, env var apagada), sem nenhum erro visível. Aplicada a mesma trava que já existia no plano compartilhado (`shouldBlockMockInProduction`).
+- **`api/reset-monthly-reports.ts`** — comentário incorreto dizia que assinaturas anuais tinham período de graça (`past_due`) antes de expirar; o código sempre tratou anual como compra avulsa (expira direto, igual semestral) — comportamento confirmado correto, só o comentário foi corrigido.
+
+### Testado
+- **34 testes novos**: os dois endpoints serverless de maior risco (`api/abacatepay-webhook.ts` 15, `api/pacs-provision.ts` 9) e `calculateAge` (10) — 411 testes no total (era 377).
+
+### Removido (04/07)
 - **Anthropic Claude** — provedor removido por completo (`api/anthropic.ts` excluído); a plataforma passa a usar exclusivamente **Google Gemini** como motor de IA. Corrige também IDs de modelo default e do copiloto que ainda apontavam para versões descontinuadas. As menções a "Anthropic/Claude" em versões anteriores deste changelog refletem o estado da época e não a versão atual.
 
 ---
