@@ -154,9 +154,10 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
         // Modo MOCK — simula a criação (tenant compartilhado ou VM dedicada).
         await new Promise((r) => setTimeout(r, 2600));
         const id = randomHex(4);
+        const relayAuthKey = `tskey-auth-demo${randomHex(8)}`;
         result = shared
-          ? { provider: 'shared', instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: plans[plan].disk, diskUsedGb: 0 }
-          : { provider: 'mock', instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: plans[plan].disk, diskUsedGb: 0 };
+          ? { provider: 'shared', instanceName: `tenant-${id}`, agentUrl: 'https://orthanc-server.tail861dda.ts.net', agentSecret: randomHex(24), tenantId: `t-${id}`, orthancVersion: '1.12.4', diskGb: plans[plan].disk, diskUsedGb: 0, relayAuthKey, relayTag: 'tag:pacs-client' }
+          : { provider: 'mock', instanceName: `pacs-${id}`, agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`, agentSecret: randomHex(24), orthancVersion: '1.12.4', diskGb: plans[plan].disk, diskUsedGb: 0, relayAuthKey, relayTag: 'tag:pacs-client' };
       }
 
       // Autoconfigura as settings DICOM (o usuário não digita nada).
@@ -177,6 +178,8 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
           tenantId: result.tenantId,
           agentUrl: result.agentUrl,
           dicomPort: result.dicomPort,
+          relayAuthKey: result.relayAuthKey,
+          relayTag: result.relayTag,
           orthancVersion: result.orthancVersion,
           diskGb: result.diskGb ?? plans[plan].disk,
           diskUsedGb: result.diskUsedGb ?? 0,

@@ -138,7 +138,7 @@ export interface ExamRequest {
  * derivados da máscara, integrados às calculadoras, compilados numa instrução
  * padronizada `[DADOS ESTRUTURADOS]` para a IA inserir nos compartimentos.
  */
-export type StructuredFieldKind = 'measure' | 'triplet' | 'text' | 'select' | 'toggle' | 'calc';
+export type StructuredFieldKind = 'measure' | 'triplet' | 'text' | 'select' | 'multiselect' | 'toggle' | 'calc';
 
 /** Chave de descritor para escore inline (ex.: ACR TI-RADS). */
 export type StructuredScoreKey = 'composition' | 'echogenicity' | 'shape' | 'margin' | 'foci';
@@ -161,6 +161,8 @@ export interface StructuredFieldDef {
   scoreKey?: StructuredScoreKey;
   /** Ocupa a linha inteira no grid. */
   fullWidth?: boolean;
+  /** Só exibe o campo quando outro campo estiver preenchido (ou com valor `equals`). */
+  showIf?: { field: string; equals?: string };
 }
 
 export interface StructuredSection {
@@ -178,7 +180,7 @@ export interface StructuredSection {
   /** Rótulo de cada item repetível (ex: 'Nódulo'). */
   itemLabel?: string;
   /** Escore/sugestão inline a partir dos descritores desta seção. */
-  score?: 'tirads' | 'birads' | 'orads';
+  score?: 'tirads' | 'birads' | 'orads' | 'bosniak';
 }
 
 export interface StructuredSchema {
@@ -288,6 +290,14 @@ export interface PacsInstance {
    * Limpo automaticamente se a assinatura for reativada antes desse prazo.
    */
   scheduledDeletionAt?: number;
+  /**
+   * Auth-key do Tailscale para o CLIENTE logar o PRÓPRIO relé (roteador
+   * GL.iNet ou PC) na tailnet, sem precisar da conta do operador. Gerada uma
+   * vez no provisionamento (tag `tag:pacs-client`, reutilizável).
+   */
+  relayAuthKey?: string;
+  /** Tag Tailscale associada à `relayAuthKey` (hoje sempre `tag:pacs-client`). */
+  relayTag?: string;
 }
 
 /** Configurações globais do aplicativo/usuário */

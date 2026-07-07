@@ -87,23 +87,35 @@ o provisionamento foi manual, edite-o lá (é editável).
 ## 4. Conectar o relé da clínica à tailnet (Tailscale)
 
 O relé é o que liga a rede local do cliente (onde está o ultrassom) à tailnet
-onde a VM já está. É sempre a **mesma conta Tailscale** em todos os nós (VM +
-relé) — contas diferentes formam tailnets diferentes, que não se enxergam.
+onde a VM já está. **O cliente NÃO precisa da sua conta Tailscale** — o
+provisionamento (`api/pacs-provision.ts`) já gera uma **auth-key própria por
+cliente** (tag `tag:pacs-client`), exibida no card "Conectar meu ultrassom".
+O cliente só cola essa chave no login do roteador/PC dele. Uma regra de ACL
+(ver `PACS_PROVISION_SETUP.md` §2) restringe essa tag a só alcançar a porta
+DICOM das VMs — o cliente nunca enxerga outros dispositivos da tailnet.
+
+> Isso só existe para tenants criados via **provisionamento automático** (o
+> endpoint gera a chave). Tenants criados manualmente (`pacs-tenant.sh create`
+> direto na VM, seção 2 acima) não têm essa chave — nesse caso, ou você gera
+> uma auth-key manualmente pro cliente (`tailscale.com` → Settings → Keys, tag
+> `tag:pacs-client`), ou usa sua própria conta mesmo (aceitável só se você é o
+> único usuário da VM).
 
 **Opção A — roteador GL.iNet (recomendado, sempre ligado, zero manutenção):**
 1. Painel admin do roteador (`192.168.8.1` por padrão) → **Mais Configurações
    → VPN → Tailscale** (nome do menu varia por firmware).
-2. Login/autorizar com a mesma conta Tailscale da VM (via link/QR code).
+2. Login/autorizar: cole a auth-key do cliente (se o firmware pedir uma) ou
+   use link/QR code com a conta apropriada.
 3. Habilitar **roteamento de sub-rede** ("Subnet Router" / "Advertise Routes"),
    marcando a faixa de IP da LAN do cliente (ex: `192.168.8.0/24`). **Não**
    habilitar "route all traffic" — só a LAN local.
 
 **Opção B — computador (Windows/Mac/Linux) sempre ligado na rede do aparelho:**
 ```bash
-# Linux
+# Linux — logando direto com a auth-key do cliente (sem conta)
 curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-# Windows/Mac: baixar em tailscale.com/download e logar com a mesma conta
+sudo tailscale up --authkey=<AUTH-KEY-DO-CLIENTE>
+# Windows/Mac: baixar em tailscale.com/download; na tela de conexão, usar a auth-key
 ```
 Duas formas de usar o PC como relé:
 - **Encaminhamento simples de porta** (netsh/socat — ver exemplos no guia

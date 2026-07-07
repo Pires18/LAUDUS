@@ -57,8 +57,11 @@ async function getGcpAccessToken(sa: any, scope: string): Promise<string> {
   return data.access_token;
 }
 
-// Cria uma auth-key preautorizada e com tag para a VM entrar no tailnet sozinha.
-async function createTailscaleAuthKey(): Promise<string> {
+// Cria uma auth-key preautorizada do Tailscale. Usada tanto para a VM entrar
+// sozinha no tailnet (tag:pacs, uso único) quanto para o RELÉ DO CLIENTE
+// (tag:pacs-client, reutilizável) — assim o cliente loga o próprio
+// roteador/PC na tailnet sem nunca precisar da conta/senha do operador.
+async function createTailscaleAuthKey(opts: { tags: string[]; reusable?: boolean; expirySeconds?: number }): Promise<string> {
   const tailnet = process.env.TAILSCALE_TAILNET!;
   const apiKey = process.env.TAILSCALE_API_KEY!;
   const res = await fetch(`https://api.tailscale.com/api/v2/tailnet/${encodeURIComponent(tailnet)}/keys`, {
@@ -68,13 +71,33 @@ async function createTailscaleAuthKey(): Promise<string> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      capabilities: { devices: { create: { reusable: false, ephemeral: false, preauthorized: true, tags: ['tag:pacs'] } } },
-      expirySeconds: 3600,
+      capabilities: { devices: { create: { reusable: !!opts.reusable, ephemeral: false, preauthorized: true, tags: opts.tags } } },
+      expirySeconds: opts.expirySeconds ?? 3600,
     }),
   });
   const data: any = await res.json();
   if (!data.key) throw new Error(`Tailscale key: ${data.message || JSON.stringify(data)}`);
   return data.key;
+}
+
+// Tag compartilhada por TODO relé de cliente (não dá para ter 1 tag por tenant
+// dinamicamente — o Tailscale exige que toda tag já exista em "tagOwners" da
+// ACL antes de poder ser usada numa auth-key). O isolamento entre clientes é
+// feito por uma regra de ACL restringindo esta tag só à porta DICOM das VMs
+// (tag:pacs) — ver docs/pacs/PACS_PROVISION_SETUP.md.
+const CLIENT_RELAY_TAG = 'tag:pacs-client';
+
+// Gera a auth-key do RELÉ do cliente — best-effort: se faltar credencial ou a
+// chamada falhar, retorna undefined em vez de derrubar o provisionamento
+// inteiro (o PACS em si já está pronto; o cliente pode configurar depois).
+async function tryCreateRelayAuthKey(): Promise<string | undefined> {
+  if (!process.env.TAILSCALE_API_KEY || !process.env.TAILSCALE_TAILNET) return undefined;
+  try {
+    return await createTailscaleAuthKey({ tags: [CLIENT_RELAY_TAG], reusable: true, expirySeconds: 60 * 60 * 24 * 365 });
+  } catch (err) {
+    console.error('[pacs-provision] falha ao gerar auth-key do relé (não bloqueia o provisionamento):', err);
+    return undefined;
+  }
 }
 
 // startup-script (roda na VM no 1º boot): Docker+Orthanc, Tailscale, Agente, Funnel.
@@ -221,6 +244,7 @@ export default async function handler(req: any, res: any) {
         instanceName: `tenant-${id}`, tenantId: `t-${id}`,
         agentUrl: 'https://orthanc-server.tailscale-demo.ts.net',
         agentSecret: rand(24), orthancVersion: '1.12.4', diskGb: spec.dataDiskGb, diskUsedGb: 0,
+        relayAuthKey: `tskey-auth-demo${rand(8)}`, relayTag: CLIENT_RELAY_TAG,
       }));
       return;
     }
@@ -236,12 +260,14 @@ export default async function handler(req: any, res: any) {
       clearTimeout(timeoutId);
       const d: any = await r.json();
       if (!r.ok || !d.success) throw new Error(d?.error || 'Falha ao criar tenant na VM compartilhada.');
+      const relayAuthKey = await tryCreateRelayAuthKey();
       res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         status: 'ready', provider: 'shared', plan, region,
         instanceName: `tenant-${d.tenantId}`, tenantId: d.tenantId,
         agentUrl: sharedUrl, agentSecret: d.secret, dicomPort: d.dicomPort,
         orthancVersion: '1.12.x', diskGb: spec.dataDiskGb, diskUsedGb: 0,
+        relayAuthKey, relayTag: relayAuthKey ? CLIENT_RELAY_TAG : undefined,
       }));
       return;
     } catch (err: any) {
@@ -262,6 +288,7 @@ export default async function handler(req: any, res: any) {
       agentUrl: `https://pacs-${id}.tailscale-demo.ts.net`,
       agentSecret: rand(24),
       orthancVersion: '1.12.4', diskGb: spec.dataDiskGb, diskUsedGb: 0,
+      relayAuthKey: `tskey-auth-demo${rand(8)}`, relayTag: CLIENT_RELAY_TAG,
     }));
     return;
   }
@@ -274,9 +301,10 @@ export default async function handler(req: any, res: any) {
     const shortUid = authed.uid.slice(0, 10).toLowerCase().replace(/[^a-z0-9]/g, '');
     const name = `pacs-${shortUid}-${rand(2)}`;
 
-    const [token, tsAuthkey] = await Promise.all([
+    const [token, tsAuthkey, relayAuthKey] = await Promise.all([
       getGcpAccessToken(sa, 'https://www.googleapis.com/auth/compute'),
-      createTailscaleAuthKey(),
+      createTailscaleAuthKey({ tags: ['tag:pacs'] }),
+      tryCreateRelayAuthKey(),
     ]);
 
     // Imagem dourada (Docker+Tailscale+Node+pydicom+Orthanc pré-instalados) →
@@ -317,6 +345,7 @@ export default async function handler(req: any, res: any) {
       instanceName: name, agentUrl, agentSecret,
       orthancVersion: '1.12.x', diskGb: spec.dataDiskGb, diskUsedGb: 0,
       note: 'VM criada — aguardando o Agente subir (1–4 min).',
+      relayAuthKey, relayTag: relayAuthKey ? CLIENT_RELAY_TAG : undefined,
     }));
   } catch (err: any) {
     console.error('[pacs-provision] erro:', err);

@@ -176,7 +176,23 @@ export function UltrasoundSetupCard() {
       <div className="p-3.5 rounded-xl bg-blue-50/40 border border-blue-100 flex gap-2.5">
         <Router size={15} className="text-blue-500 shrink-0 mt-0.5" />
         <div className="text-[11px] text-ink-700 leading-relaxed">
-          <strong className="text-blue-800">Passo 1 — o Relé:</strong> como o aparelho é físico na clínica, algo na sua rede leva ele até o PACS na nuvem. Use seu <strong>roteador GL.iNet</strong> (com Tailscale) ou o <strong>PC do dia a dia</strong>. Veja o passo a passo em <strong>Guias → Tailscale VPN &amp; SSL</strong>. O <strong>endereço (IP)</strong> que você vai digitar no aparelho é o do relé na sua rede local.
+          <strong className="text-blue-800">Passo 1 — o Relé:</strong> como o aparelho é físico na clínica, algo na sua rede leva ele até o PACS na nuvem. Use seu <strong>roteador GL.iNet</strong> (com Tailscale) ou o <strong>PC do dia a dia</strong>. Veja o passo a passo em <strong>Guias → Tailscale (VM ↔ seu PC/roteador)</strong>. O <strong>endereço (IP)</strong> que você vai digitar no aparelho é o do relé na sua rede local.
+          {settings.pacsInstance?.relayAuthKey && (
+            <div className="mt-2 p-2.5 rounded-lg bg-white border border-blue-200 space-y-1.5">
+              <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Chave para logar o relé (sem precisar da conta do suporte)</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 min-w-0 text-[11px] font-mono text-ink-800 truncate">{settings.pacsInstance.relayAuthKey}</code>
+                <button
+                  onClick={() => copy(settings.pacsInstance!.relayAuthKey!, 'relaykey')}
+                  className="shrink-0 h-7 px-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1 text-[9px] font-black uppercase tracking-wider transition-all"
+                >
+                  {copied === 'relaykey' ? <Check size={11} /> : <Copy size={11} />}
+                  {copied === 'relaykey' ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+              <p className="text-[10px] text-ink-400">Cole essa chave na tela de login do Tailscale do seu roteador/PC (em vez de logar com conta/senha). Ela já autoriza o dispositivo com o acesso certo — sem enxergar outros clientes.</p>
+            </div>
+          )}
           {vmTailnetIp && (
             <div className="mt-2 p-2.5 rounded-lg bg-white border border-blue-200">
               <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1">Regra de encaminhamento no relé (já com seus dados)</p>

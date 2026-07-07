@@ -1121,7 +1121,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
 
                       <div className="p-4 rounded-2xl bg-blue-50/40 border border-blue-100 space-y-2">
                         <div className="flex items-center gap-2 text-blue-800"><Info size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Como pensar nisso</span></div>
-                        <P>O Tailscale cria uma rede privada (uma "tailnet") entre dispositivos que fazem login com a <strong>mesma conta</strong>. Cada dispositivo vira um "nó" com um IP fixo tipo <code>100.x.y.z</code>, alcançável pelos outros nós como se estivessem na mesma rede local — mesmo estando em lugares diferentes do mundo. Aqui, 2 nós importam:</P>
+                        <P>O Tailscale cria uma rede privada (uma "tailnet") entre dispositivos autorizados. Cada dispositivo vira um "nó" com um IP fixo tipo <code>100.x.y.z</code>, alcançável pelos outros nós como se estivessem na mesma rede local — mesmo estando em lugares diferentes do mundo. Aqui, 2 nós importam:</P>
                         <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
                           <li><strong>A VM</strong> — já entrou na tailnet sozinha, pelo script turnkey (passo 1).</li>
                           <li><strong>O relé da clínica</strong> — o roteador GL.iNet OU um computador — que você ainda precisa conectar.</li>
@@ -1129,7 +1129,11 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <P>O <strong>ultrassom em si NÃO entra</strong> no Tailscale (a maioria dos aparelhos não suporta isso) — ele só fala com o relé pela rede local normal, como sempre fez. É o relé que faz a ponte até a VM.</P>
                       </div>
 
-                      <Step n={1} title="Ter uma conta Tailscale">
+                      <Note tone="emerald">
+                        <strong>Você é cliente de um PACS gerenciado (self-service)?</strong> Não precisa de conta Tailscale nenhuma — o card <strong>"Conectar meu ultrassom"</strong> já mostra uma <strong>chave de autenticação</strong> pronta (gerada no provisionamento). Cole ela na tela de login do seu roteador/PC (passo 2 ou 3 abaixo) em vez de criar conta — ela já autoriza só o necessário, sem enxergar outros clientes. O passo 1 abaixo (conta própria) só vale para quem monta a VM por conta própria.
+                      </Note>
+
+                      <Step n={1} title="Alternativa: ter sua própria conta Tailscale (só se você monta a VM você mesmo)">
                         <P>Se ainda não tem: entre em <strong>tailscale.com</strong> → "Get Started" → crie a conta (dá pra usar login do Google/Microsoft/e-mail, é gratuito para uso pessoal/pequenas equipes). <strong>Use a MESMA conta</strong> em todos os dispositivos — VM, relé, e qualquer outro nó. Contas diferentes formam tailnets diferentes, que não se enxergam entre si.</P>
                       </Step>
 
@@ -1138,7 +1142,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <ul className="text-[11px] text-ink-700 space-y-1.5 leading-relaxed list-disc pl-4">
                           <li>Acesse o painel do roteador pelo navegador (geralmente <code>192.168.8.1</code>), com o login de admin.</li>
                           <li>Vá em <strong>Mais Configurações → VPN → Tailscale</strong> (alguns firmwares chamam de "Applications → Tailscale" — o caminho exato varia por modelo).</li>
-                          <li>Clique em <strong>Ativar/Login</strong>. Ele mostra um link ou QR code: abra num celular ou PC já logado na sua conta Tailscale para autorizar o roteador.</li>
+                          <li>Clique em <strong>Ativar/Login</strong>. Se o firmware pedir uma <strong>Auth Key</strong>, cole a chave do card "Conectar meu ultrassom". Se só oferecer link/QR code (login interativo), use sua própria conta Tailscale (passo 1).</li>
                           <li>Depois de conectado, habilite o <strong>roteamento de sub-rede</strong> (nomes variam: "Subnet Router", "Advertise Routes", "Compartilhar rede local") e marque a faixa de IP da sua LAN (ex: <code>192.168.8.0/24</code>). É isso que deixa o ultrassom — que está nessa mesma rede local do roteador — alcançável pela VM através da tailnet.</li>
                         </ul>
                         <Note tone="amber">Não confunda com "Route all traffic" (isso faria TODO o tráfego da internet do roteador passar pela tailnet — não é o que você quer). O certo é só anunciar a própria LAN.</Note>
@@ -1146,12 +1150,9 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
 
                       <Step n={3} title="Conectar o relé — Opção B: computador (Windows/Mac/Linux)">
                         <P>Sem roteador com Tailscale? Um computador sempre ligado, na mesma rede do ultrassom, também funciona como relé.</P>
-                        <p className="text-[10px] text-ink-500 font-bold">Instalar o cliente:</p>
-                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                          <li><strong>Windows/Mac:</strong> baixe em <code>tailscale.com/download</code>, instale e faça login com a MESMA conta usada na VM.</li>
-                          <li><strong>Linux:</strong></li>
-                        </ul>
-                        <Cmd id="ts-install-linux" text={`curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up`} />
+                        <p className="text-[10px] text-ink-500 font-bold">Instalar e logar com a chave do card "Conectar meu ultrassom" (sem precisar de conta):</p>
+                        <Cmd id="ts-install-linux" text={`curl -fsSL https://tailscale.com/install.sh | sh\nsudo tailscale up --authkey=<CHAVE-DO-CARD>`} />
+                        <p className="text-[10px] text-ink-500 leading-relaxed">Windows/Mac: baixe em <code>tailscale.com/download</code>, instale e, na hora de conectar, escolha "usar chave" e cole a mesma chave (ou faça login com sua própria conta, se for o caso do passo 1).</p>
                         <P>A partir daí, o PC pode agir de duas formas — escolha uma:</P>
                         <ul className="text-[11px] text-ink-700 space-y-1.5 leading-relaxed list-disc pl-4">
                           <li><strong>Encaminhamento simples (mais fácil de configurar):</strong> o PC só redireciona a porta DICOM para a VM. Não precisa mexer em rotas — veja os comandos <code>netsh</code>/<code>socat</code> no passo "4 · Relé + ultrassom" (Modo A2).</li>
@@ -1161,10 +1162,10 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                         <Note>Troque <code>192.168.x.0/24</code> pela faixa real da sua rede local (confira no roteador ou nas configurações de rede do próprio PC).</Note>
                       </Step>
 
-                      <Step n={4} title="Aprovar a rota anunciada (admin da tailnet)">
-                        <P>Rotas anunciadas por um relé (subnet router) exigem aprovação manual por segurança — feita uma única vez:</P>
+                      <Step n={4} title="Aprovar a rota anunciada (admin da tailnet — só quem opera a VM faz isso)">
+                        <P>Rotas anunciadas por um relé (subnet router) exigem aprovação manual por segurança — feita uma única vez por relé, por quem administra a tailnet (o operador do PACS, não o cliente final):</P>
                         <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
-                          <li>Acesse <strong>login.tailscale.com/admin/machines</strong> (login com a mesma conta).</li>
+                          <li>Acesse <strong>login.tailscale.com/admin/machines</strong>.</li>
                           <li>Encontre o relé (o roteador GL.iNet ou o PC) na lista de dispositivos.</li>
                           <li>Clique nos <strong>"⋯"</strong> (três pontinhos) ao lado do nome dele → <strong>"Edit route settings"</strong>.</li>
                           <li>Marque a sub-rede anunciada (ex: <code>192.168.8.0/24</code>) como <strong>habilitada</strong>.</li>
@@ -1347,6 +1348,8 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                           ['AE Title', 'O "nome" de cada nó DICOM. O AE do aparelho e o do servidor precisam bater.'],
                           ['DicomModalities', 'Lista de aparelhos autorizados no Orthanc. C-ECHO funciona sem estar nela; consulta de Worklist não. O card "Conectar meu ultrassom" cadastra automaticamente.'],
                           ['Rotas de sub-rede', 'Como o Tailscale deixa a VM enxergar a LAN da clínica através do relé (GL.iNet/PC). Precisam ser aprovadas (admin da tailnet) E aceitas (--accept-routes na VM).'],
+                          ['Auth key (chave de autenticação)', 'Senha de uso único/reutilizável que autoriza um dispositivo a entrar na tailnet sem login interativo. O card "Conectar meu ultrassom" já traz uma pronta para o relé do cliente — sem precisar da conta do operador da VM.'],
+                          ['tag:pacs-client', 'Identidade do relé do cliente na tailnet. Uma regra de ACL restringe quem tem essa tag a só alcançar a porta DICOM das VMs — não enxerga outros clientes nem outros dispositivos do operador.'],
                         ].map(([term, desc]) => (
                           <div key={term} className="flex gap-3 p-2.5 rounded-lg bg-white border border-ink-150">
                             <span className="text-[11px] font-black text-emerald-700 shrink-0 w-28">{term}</span>

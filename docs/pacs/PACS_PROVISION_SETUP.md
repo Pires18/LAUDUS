@@ -44,16 +44,24 @@
 1. **API key:** em [login.tailscale.com](https://login.tailscale.com) → **Settings → Keys** → *Generate API key*. Guarde como `TAILSCALE_API_KEY`.
 2. **Tailnet:** use `-` (atalho para o tailnet do dono da chave) em `TAILSCALE_TAILNET`. (Ou o nome/org exato.)
 3. **Domínio MagicDNS:** em **DNS**, veja o sufixo `xxxxx.ts.net` do seu tailnet → `TAILSCALE_TS_NET` (ex: `tail861dda.ts.net`).
-4. **HTTPS + Funnel:** em **DNS**, clique **Enable HTTPS**. Em **Access controls (ACL)**, garanta o Funnel e a tag `tag:pacs`:
+4. **HTTPS + Funnel:** em **DNS**, clique **Enable HTTPS**. Em **Access controls (ACL)**, garanta o Funnel, a tag das VMs (`tag:pacs`) e a tag dos **relés dos clientes** (`tag:pacs-client`) — isolando o relé de cada cliente pra só alcançar a porta DICOM das VMs, nunca outros dispositivos da tailnet:
    ```jsonc
    {
-     "tagOwners": { "tag:pacs": ["autogroup:admin"] },
+     "tagOwners": {
+       "tag:pacs": ["autogroup:admin"],
+       "tag:pacs-client": ["autogroup:admin"]
+     },
      "nodeAttrs": [
        { "target": ["tag:pacs"], "attr": ["funnel"] }
+     ],
+     "acls": [
+       { "action": "accept", "src": ["tag:pacs-client"], "dst": ["tag:pacs:4242", "tag:pacs:4300-4399"] }
      ]
    }
    ```
-   (A tag `tag:pacs` é usada pela auth-key que o provisionador gera; o atributo `funnel` permite o `tailscale funnel` do agente.)
+   (`tag:pacs` é usada pela auth-key das VMs; `tag:pacs-client` é a auth-key que o provisionador gera **por cliente**, pra ele logar o próprio relé — GL.iNet ou PC — sem precisar da sua conta. A regra de `acls` restringe: quem tem `tag:pacs-client` só alcança a porta DICOM fixa das VMs dedicadas (4242) e a faixa de portas dos tenants na VM compartilhada (4300–4399) — nada além disso, nem SSH, nem outros dispositivos seus.)
+
+   > **Isolamento entre clientes:** hoje todos os relés de clientes compartilham a mesma tag (`tag:pacs-client`) — o Tailscale exige que toda tag já exista em `tagOwners` antes de virar uma auth-key, então não dá pra criar 1 tag por cliente automaticamente. Isso já impede um relé de cliente de alcançar qualquer coisa fora do PACS (seu Mac, outras VMs, etc.). Um cliente mal-intencionado ainda poderia, em teoria, tentar a porta DICOM de OUTRO tenant na VM compartilhada — mas o Orthanc de cada tenant só responde a aparelhos registrados em `DicomModalities` (feito pelo próprio cliente, via "Conectar meu ultrassom"), então isso funciona como uma segunda camada de defesa.
 
 ---
 
@@ -100,6 +108,7 @@ VITE_PACS_PROVISION_ENDPOINT=/api/pacs-provision
    - o card faz *polling* de `GET {agentUrl}/` por até 4 min até o Agente subir;
    - status vira **✅ Pronto** e as settings DICOM ficam preenchidas.
 3. **Valide:** aba Servidores → **Executar Diagnóstico** → Imagens e Worklist verdes.
+4. **Chave do relé:** no card "Conectar meu ultrassom", confirme que apareceu a caixa "Chave para logar o relé". Se não aparecer, a geração da auth-key do cliente falhou silenciosamente (é best-effort — não derruba o provisionamento do PACS em si) — confira `TAILSCALE_API_KEY`/`TAILSCALE_TAILNET` e a tag `tag:pacs-client` na ACL (seção 2).
 
 ---
 
@@ -111,6 +120,7 @@ VITE_PACS_PROVISION_ENDPOINT=/api/pacs-provision
 | `Tailscale key: ...` | API key inválida ou tag ausente | Regenere a key; adicione `tag:pacs` na ACL |
 | VM criada mas Agente não responde | Funnel/HTTPS não habilitados ou scripts não baixaram | Habilite HTTPS+Funnel; teste `PACS_SCRIPTS_URL`; veja `serial-port` logs da VM no GCP |
 | Card fica em "provisionando" | Boot demora (1ª vez ~3–4 min) | Aguarde; use "Tentar novamente"; veja logs de boot da VM |
+| Card não mostra a chave do relé | `tag:pacs-client` ausente na ACL, ou `TAILSCALE_API_KEY`/`TAILSCALE_TAILNET` faltando | Adicione a tag na ACL (seção 2); confira as env — a falha é silenciosa (best-effort), não trava o resto do provisionamento |
 
 ---
 
