@@ -13,7 +13,7 @@ import { generateNumericId } from '../store/db';
 import { getInitialReportContent } from '../modules/templates/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AreaIcon } from './AreaIcon';
-import { syncExamToOrthancWorklist } from '../utils/dicom';
+import { syncExamToOrthancWorklist, pickDefaultDicomDevice, getDevicesForClinic } from '../utils/dicom';
 import { logger } from '../utils/logger';
 
 interface CreateExamModalProps {
@@ -43,7 +43,19 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [hoveredTemplate, setHoveredTemplate] = useState<ReportTemplate | null>(null);
   const [anamnesis, setAnamnesis] = useState('');
   const [examDateStr, setExamDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(settings.dicomDevices?.[0]?.id || '');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const clinicDevices = useMemo(
+    () => getDevicesForClinic(settings.dicomDevices, selectedClinic?.id),
+    [settings.dicomDevices, selectedClinic?.id]
+  );
+
+  // Reaplica o aparelho principal daquela clínica sempre que a clínica muda
+  // (inclusive na primeira vez que ela é definida, abaixo).
+  useEffect(() => {
+    const picked = pickDefaultDicomDevice(settings.dicomDevices, selectedClinic?.id, settings.dicomDefaultDeviceIdByClinic, settings.dicomDefaultDeviceId);
+    setSelectedDeviceId(picked?.id || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClinic?.id]);
 
   // Configura clínica inicial
   useEffect(() => {
@@ -181,7 +193,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         { id: selectedPatient.id, name: selectedPatient.name, birthDate: selectedPatient.birthDate, gender: selectedPatient.gender },
         settings,
         selectedDeviceId,
-        examData.examDate
+        examData.examDate,
+        selectedClinic?.id
       );
 
       if (!success) {
@@ -693,7 +706,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                      />
                    </div>
 
-                   {settings.dicomDevices && settings.dicomDevices.length > 0 && (
+                   {clinicDevices.length > 0 && (
                      <div className="flex flex-col space-y-2.5">
                        <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Enviar Worklist Para</label>
                        <div className="relative">
@@ -702,7 +715,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                            onChange={(e) => setSelectedDeviceId(e.target.value)}
                            className="w-full h-14 px-4 bg-white border-2 border-ink-200 rounded-2xl focus:ring-2 focus:ring-ink-900/10 focus:border-ink-400 outline-none transition-all font-bold text-sm text-ink-900 shadow-sm appearance-none cursor-pointer"
                          >
-                           {settings.dicomDevices.map(device => (
+                           {clinicDevices.map(device => (
                              <option key={device.id} value={device.id}>{device.name} ({device.aeTitle})</option>
                            ))}
                          </select>

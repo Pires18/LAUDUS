@@ -231,30 +231,26 @@ export function EditorHeader({
           )}
         </div>
 
-        {/* DICOM viewer toggle — only when enabled */}
+        {/* DICOM viewer toggle — only when enabled. Continua clicável mesmo sem
+            imagens ainda: é como o usuário abre o painel pra importar um estudo
+            externo, atualizar a busca ou selecionar outro estudo manualmente —
+            desabilitar aqui deixava quem não tem imagem nenhuma sem como abrir
+            o painel de jeito nenhum. */}
         {settings.dicomSyncEnabled !== false && (
-          hasDicomImages ? (
-            <button
-              onClick={onToggleViewer}
-              className={classNames(
-                "h-9 w-9 rounded-xl transition-all flex items-center justify-center shrink-0 border",
-                viewerOpen
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
-              )}
-              title="Visualizador de Imagens DICOM"
-            >
-              <Play size={14} />
-            </button>
-          ) : (
-            <button
-              disabled
-              className="h-9 w-9 rounded-xl bg-ink-50 text-ink-400 border border-ink-200 opacity-60 cursor-not-allowed flex items-center justify-center shrink-0"
-              title="Nenhuma imagem disponível neste exame"
-            >
-              <ScanSearch size={14} />
-            </button>
-          )
+          <button
+            onClick={onToggleViewer}
+            className={classNames(
+              "h-9 w-9 rounded-xl transition-all flex items-center justify-center shrink-0 border",
+              viewerOpen
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                : hasDicomImages
+                  ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
+                  : "bg-ink-50 text-ink-500 hover:bg-ink-100 border-ink-200"
+            )}
+            title={hasDicomImages ? "Visualizador de Imagens DICOM" : "Abrir painel DICOM (nenhuma imagem encontrada ainda — dá pra importar um estudo externo, atualizar a busca ou trocar o estudo selecionado)"}
+          >
+            {hasDicomImages ? <Play size={14} /> : <ScanSearch size={14} />}
+          </button>
         )}
 
         {/* Ficha & Config */}

@@ -8,7 +8,7 @@ import {
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
   Copy, Check, ArrowRight, Monitor, Radio,
   Users, Image, RefreshCw, Sparkles,
-  SlidersHorizontal, ChevronDown
+  SlidersHorizontal, ChevronDown, Star, Upload, Printer
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
@@ -73,7 +73,7 @@ export function DicomControlCenter() {
   const [activeTab, setActiveTab] = useState<ControlTab>('config');
   // A VM autoconfigura tudo; os campos técnicos ficam recolhidos por padrão.
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedSection, setSelectedSection] = useState<'overview' | 'setup_vm' | 'app_config' | 'tailscale' | 'relay' | 'backup' | 'troubleshoot' | 'concepts'>('overview');
+  const [selectedSection, setSelectedSection] = useState<'overview' | 'setup_vm' | 'app_config' | 'tailscale' | 'relay' | 'devices' | 'workflow' | 'backup' | 'troubleshoot' | 'concepts'>('overview');
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [pacsTestState, setPacsTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -892,6 +892,8 @@ export function DicomControlCenter() {
                     { group: '▶ Para você (cliente do PACS)', items: [
                       { id: 'overview', label: 'Visão geral', icon: BookOpen },
                       { id: 'relay', label: 'Conectar relé + ultrassom', icon: Radio },
+                      { id: 'devices', label: 'Aparelhos por fabricante', icon: Monitor },
+                      { id: 'workflow', label: 'No dia a dia (laudo)', icon: Image },
                     ]},
                     { group: 'Avançado (infraestrutura / operador)', items: [
                       { id: 'setup_vm', label: 'Montar a VM (nuvem)', icon: Cloud },
@@ -1277,11 +1279,103 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
                       </Step>
 
                       <Note tone="amber">
-                        <strong>C-ECHO funciona mas a Worklist dá erro no aparelho ("query error")?</strong> Diferente do Echo, a consulta de Worklist exige o aparelho <strong>autorizado</strong> no Orthanc (AE Title + IP). Cadastre-o no card <strong>"Conectar meu ultrassom" → Passo 3 — meus aparelhos</strong> (ou no campo único de AE Title, com o IP do aparelho) — o app autoriza automaticamente, sem precisar de SSH.
+                        <strong>C-ECHO funciona mas a Worklist dá erro no aparelho ("query error")?</strong> Diferente do Echo, a consulta de Worklist exige o aparelho <strong>autorizado</strong> no Orthanc (AE Title + IP). Cadastre-o no card <strong>"Conectar meu ultrassom" → Passo 3 — meus aparelhos</strong> — o app autoriza automaticamente, sem precisar de SSH.
                       </Note>
                     </div>
                     );
                   })()}
+
+                  {selectedSection === 'devices' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Monitor size={16} className="text-emerald-600" /> Aparelhos por fabricante</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">A configuração DICOM é a mesma para qualquer marca — só muda onde os campos ficam no menu do aparelho.</p>
+                      </div>
+
+                      <Note tone="emerald">
+                        Todo aparelho DICOM pede os <strong>mesmos 4 dados</strong>, só com nomes diferentes: quem ele é (<strong>AE Title local/próprio</strong>), quem é o servidor (<strong>AE Title remoto</strong> = <code>ORTHANC</code>), onde está o servidor (<strong>IP + Porta</strong> do relé) — e depois um teste de conexão (<strong>C-ECHO / Verify</strong>). O que muda entre marcas é só o nome da tela; o raciocínio é sempre o mesmo.
+                      </Note>
+
+                      <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2.5">
+                        <div className="flex items-center gap-2 text-ink-800"><CheckCircle2 size={14} className="text-emerald-600" /><span className="text-[11px] font-black uppercase tracking-wider">Mindray MX7 — referência (já validado nesta clínica)</span></div>
+                        <P>Configuração testada e funcionando de ponta a ponta. Menu típico: <strong>Setup → Network → DICOM</strong> (o caminho exato varia conforme a versão do software).</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li><strong>Local AE Title:</strong> o valor cadastrado no Passo 3 (card "Conectar meu ultrassom") para este aparelho.</li>
+                          <li><strong>Server/Remote AE Title:</strong> <code>ORTHANC</code> (campo "AE Title do PACS", no Passo 2).</li>
+                          <li><strong>Server IP + Port:</strong> IP do relé (GL.iNet/PC) e a porta DICOM do seu tenant.</li>
+                          <li>Ative <strong>Worklist</strong> (Modality Worklist/MWL) e <strong>Storage (Send)</strong> — em alguns modelos Mindray ficam em abas separadas dentro do mesmo menu DICOM.</li>
+                        </ul>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-blue-50/30 border border-blue-100 space-y-2.5">
+                        <div className="flex items-center gap-2 text-blue-800"><Monitor size={14} /><span className="text-[11px] font-black uppercase tracking-wider">Samsung (HS30, HM70 EVO)</span></div>
+                        <P>A tela de rede DICOM costuma ficar em <strong>Setup → Connectivity → DICOM</strong> (ou <strong>System → Network → DICOM Setup</strong>, dependendo da versão).</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li>Cadastre primeiro o <strong>Local/My AE Title</strong> — o mesmo valor do Passo 3.</li>
+                          <li>Depois adicione o servidor em <strong>Remote/Server AE Title</strong> (às vezes um cadastro separado, chamado "Query/Retrieve" ou "Worklist Server"), com IP, Porta e o AE Title do PACS.</li>
+                          <li>A Samsung costuma exigir <strong>Verify (C-ECHO)</strong> antes de liberar o servidor cadastrado — rode-o logo após salvar.</li>
+                          <li>Worklist (MWL) e envio de imagens (Storage) às vezes são cadastros separados nesses aparelhos — confirme os dois.</li>
+                        </ul>
+                        <Note tone="blue">Os nomes exatos de tela variam entre HS30, HM70 EVO e versões de software — a lógica (Local AE, Remote AE, IP, Porta, Verify) é sempre a mesma. Confirme o texto exato no seu aparelho antes de cadastrar.</Note>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-indigo-50/30 border border-indigo-100 space-y-2.5">
+                        <div className="flex items-center gap-2 text-indigo-800"><Monitor size={14} /><span className="text-[11px] font-black uppercase tracking-wider">GE (Voluson, Versana)</span></div>
+                        <P>Configuração DICOM normalmente em <strong>Utility → Connectivity → Service/DICOM Setup</strong>, com sub-telas separadas para "Local", "Remote" (servidores) e "Services" (quais funções cada servidor oferece).</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li><strong>Local:</strong> AE Title do próprio aparelho — o do Passo 3.</li>
+                          <li><strong>Remote (novo servidor):</strong> AE Title <code>ORTHANC</code>, IP do relé e a porta do seu tenant.</li>
+                          <li><strong>Services:</strong> marque <strong>Storage</strong> e <strong>Worklist</strong> para esse servidor remoto — na GE é comum precisar habilitar cada um explicitamente, não vem tudo junto.</li>
+                          <li>Use o botão <strong>Verify</strong> da tela Remote para confirmar o C-ECHO antes de agendar o primeiro exame.</li>
+                        </ul>
+                        <Note tone="blue">Voluson e Versana têm interfaces parecidas mas não idênticas entre gerações — confirme os nomes exatos de tela na sua unidade antes de cadastrar.</Note>
+                      </div>
+
+                      <Note tone="amber">
+                        <strong>Pontos que derrubam qualquer marca:</strong> AE Title tem até <strong>16 caracteres</strong>, sem espaços (padrão DICOM) — o LAUD.US já força maiúsculas ao cadastrar. Se o Worklist "não aparecer" mas o Storage funcionar (ou vice-versa), é quase sempre porque só um dos dois serviços foi marcado no aparelho. E o <strong>AE Title digitado no menu do aparelho precisa ser idêntico, caractere por caractere</strong>, ao cadastrado no Passo 3 do card "Conectar meu ultrassom" — é isso que autoriza no PACS.
+                      </Note>
+
+                      <Note tone="emerald">
+                        Tem mais de um aparelho (ou mais de uma clínica)? Veja <strong>"No dia a dia"</strong>, ao lado, para aparelho principal por clínica, ver exames anteriores no laudo e importar estudo feito fora do sistema.
+                      </Note>
+                    </div>
+                  )}
+
+                  {selectedSection === 'workflow' && (
+                    <div className="space-y-5 animate-fade-in">
+                      <div className="pb-3 border-b border-ink-100">
+                        <h3 className="text-sm font-black text-ink-900 uppercase tracking-wider flex items-center gap-2"><Image size={16} className="text-emerald-600" /> No dia a dia (laudando um exame)</h3>
+                        <p className="text-[11px] text-ink-500 font-medium">Depois que o PACS está configurado, é isso que você usa todo dia dentro do laudo.</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
+                        <div className="flex items-center gap-2 text-ink-800"><Star size={14} className="text-amber-500" /><span className="text-[11px] font-black uppercase tracking-wider">Aparelho principal (por clínica)</span></div>
+                        <P>No card "Conectar meu ultrassom" → Passo 3, cada aparelho pode ser associado a uma clínica específica (se você tem mais de uma). Clique na <strong>estrela</strong> de um aparelho pra marcá-lo como principal — ele vem pré-selecionado ao criar exame ou confirmar agendamento <strong>daquela clínica</strong>, sem precisar escolher toda vez. Um aparelho sem clínica marcada fica <strong>compartilhado</strong> entre todas.</P>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
+                        <div className="flex items-center gap-2 text-ink-800"><SlidersHorizontal size={14} className="text-brand-500" /><span className="text-[11px] font-black uppercase tracking-wider">Ver o exame atual e os anteriores do paciente</span></div>
+                        <P>Dentro do laudo, o painel lateral do DICOM tem um botão <strong>"Exames (N)"</strong> sempre que há mais de um estudo localizado para o paciente — inclui o exame que você está laudando e os estudos anteriores dele no PACS, ordenados do mais recente pro mais antigo. O que é "este exame" vem marcado; clique em qualquer outro pra trocar a visualização e comparar rapidamente.</P>
+                        <Note>O botão que abre o painel lateral fica sempre clicável, mesmo quando o exame ainda não tem nenhuma imagem — é por ali que você acessa o "Importar" (abaixo) pra exames feitos fora do sistema.</Note>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
+                        <div className="flex items-center gap-2 text-ink-800"><Upload size={14} className="text-violet-500" /><span className="text-[11px] font-black uppercase tracking-wider">Importar estudo externo (sem aparelho conectado)</span></div>
+                        <P>Paciente fez o exame em outro lugar e trouxe os arquivos DICOM (pendrive/CD)? No painel lateral do DICOM, clique em <strong>"Importar"</strong>, selecione todos os arquivos <code>.dcm</code> do estudo de uma vez e envie. O sistema lê os dados do paciente gravados no arquivo pra você <strong>conferir antes de vincular</strong> — o PACS não faz essa checagem sozinho — e depois o estudo aparece no laudo como qualquer outro.</P>
+                        <ul className="text-[11px] text-ink-700 space-y-1 leading-relaxed list-disc pl-4">
+                          <li>Aceita vários arquivos de uma vez — um estudo real tem um <code>.dcm</code> por imagem/frame.</li>
+                          <li>Arquivo grande tem barra de progresso e tentativa automática de novo em caso de timeout; falhando de vez, dá pra clicar em "tentar novamente" só naquele arquivo.</li>
+                          <li>Se o <strong>Agente Local</strong> não estiver configurado com URL HTTPS, arquivos grandes podem esbarrar no limite de ~4,5MB do servidor da Vercel — configure-o (aba Servidores) pra enviar direto, sem esse limite.</li>
+                        </ul>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-ink-150 space-y-2">
+                        <div className="flex items-center gap-2 text-ink-800"><Printer size={14} className="text-ink-600" /><span className="text-[11px] font-black uppercase tracking-wider">Gerar o PDF das imagens</span></div>
+                        <P>No painel lateral, botão <strong>"PDF"</strong> abre a seleção de imagens e o layout de impressão (grade configurável). O download em si é o <strong>imprimir do navegador</strong> (Ctrl/Cmd+P → Salvar como PDF) — não um gerador de PDF separado.</P>
+                        <Note tone="amber">Se alguma imagem específica falhar ao carregar (rede instável, arquivo pesado), ela é <strong>pulada automaticamente</strong> e um aviso mostra quantas — o PDF sai normalmente com as demais, em vez de travar tudo por causa de uma imagem só.</Note>
+                      </div>
+                    </div>
+                  )}
 
                   {selectedSection === 'backup' && (
                     <div className="space-y-5 animate-fade-in">

@@ -131,6 +131,9 @@ export interface ExamRequest {
   calculatorData?: Record<string, any>;
   /** Valores preenchidos na aba "Estruturado" do Copiloto (por fieldId) */
   structuredValue?: Record<string, StructuredFieldValue>;
+  /** StudyInstanceUID(s) de estudos DICOM enviados manualmente (exame feito em
+   * local externo, sem aparelho conectado ao sistema) e vinculados a este exame. */
+  externalStudyInstanceUids?: string[];
 }
 
 /**
@@ -249,6 +252,8 @@ export interface DicomDevice {
   modality: string;
   /** IP local do aparelho — usado para autorizá-lo no Orthanc (DicomModalities). */
   ip?: string;
+  /** Clínica a que este aparelho pertence. Vazio/undefined = compartilhado entre todas as clínicas. */
+  clinicId?: string;
 }
 
 /** Estado do provisionamento do PACS gerenciado (VM/container por usuário). */
@@ -380,6 +385,10 @@ export interface AppSettings {
   dicomModalityIp?: string;
   dicomModalityType?: string;
   dicomDevices?: DicomDevice[];
+  /** id do aparelho marcado como principal quando ele NÃO pertence a uma clínica específica (compartilhado). */
+  dicomDefaultDeviceId?: string;
+  /** Aparelho principal por clínica: clinicId -> DicomDevice.id (pré-selecionado ao criar exame/confirmar agendamento daquela clínica). */
+  dicomDefaultDeviceIdByClinic?: Record<string, string>;
   dicomOrthancAETitle?: string;
   dicomViewerUrl?: string;
   dicomTailscalePublicUrl?: string;

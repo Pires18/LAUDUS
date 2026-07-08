@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 interface ConfirmAppointmentModalProps {
   appointment: Appointment;
   dicomDevices: { id: string; name: string; aeTitle: string }[];
+  /** id do aparelho marcado como principal — pré-selecionado quando existir na lista. */
+  defaultDeviceId?: string;
   onClose: () => void;
   onConfirm: (deviceId: string, autoRedirect: boolean) => Promise<void>;
 }
@@ -13,11 +15,14 @@ interface ConfirmAppointmentModalProps {
 export function ConfirmAppointmentModal({
   appointment,
   dicomDevices,
+  defaultDeviceId,
   onClose,
   onConfirm,
 }: ConfirmAppointmentModalProps) {
   const [loading, setLoading] = useState(false);
-  const [selectedDeviceId, setSelectedDeviceId] = useState(dicomDevices[0]?.id || '');
+  const [selectedDeviceId, setSelectedDeviceId] = useState(
+    dicomDevices.find((d) => d.id === defaultDeviceId)?.id || dicomDevices[0]?.id || ''
+  );
   const [autoRedirect, setAutoRedirect] = useState(true);
 
   const appTime = new Date(appointment.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });

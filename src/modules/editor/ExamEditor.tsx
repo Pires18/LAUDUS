@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useDocument } from '../../hooks/useFirestore';
-import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, logPatientAccess, deleteWorklistEntry } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess, deleteWorklistEntry } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
@@ -22,18 +22,19 @@ import { CalculatorModal } from '../calculators/CalculatorModal';
 import { DicomImagesModal } from './components/DicomImagesModal';
 import { PatientForm } from '../patients/PatientForm';
 import { PrintImagesLayout } from '../export/PrintImagesLayout';
-import { DicomThumbnail } from './components/DicomThumbnail';
 
 // Refactored Hooks
 import { useExamActions } from './hooks/useExamActions';
 import { useGoogleDocs } from './hooks/useGoogleDocs';
 import { useDicomSync } from './hooks/useDicomSync';
+import { useDicomInstancePreload } from './hooks/useDicomInstancePreload';
 import { useCopilotSuggestions } from './hooks/useCopilotSuggestions';
-import { getStudyInstanceUID } from '../../utils/dicom';
+import { getStudyInstanceUID, preloadDicomInstances } from '../../utils/dicom';
 
 import { useAdmin } from '../../hooks/useAdmin';
 // Refactored Components
 import { DicomViewerSidebar } from './components/DicomViewerSidebar';
+import { ExternalStudyUploadModal } from './components/ExternalStudyUploadModal';
 import { EditorHeader } from './components/EditorHeader';
 import { EditorToolbar } from './components/EditorToolbar';
 import { getInitialReportContent, sectionTogglesFromSettings } from '../templates/utils';
@@ -183,6 +184,7 @@ export function ExamEditor({ examId }: Props) {
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
   const [dicomRefreshKey, setDicomRefreshKey] = useState(0);
+  const [showExternalUpload, setShowExternalUpload] = useState(false);
 
   const noopChangeStudy = useCallback((id: string | null) => {}, []);
 
@@ -210,6 +212,17 @@ export function ExamEditor({ examId }: Props) {
     showDicomImages,
     isManualCheck: false
   });
+
+  // Pré-carrega todas as imagens do estudo atual como blobs locais — uma
+  // ÚNICA vez, compartilhado entre o painel lateral e a visualização em tela
+  // cheia (antes cada um buscava a mesma imagem separadamente da rede).
+  const {
+    urls: dicomPreloadedUrls,
+    failedIds: dicomFailedIds,
+    progress: dicomPreloadProgress,
+    ready: dicomInstancesReady,
+    retryOne: retryDicomInstance,
+  } = useDicomInstancePreload(dicomInstances, settings);
 
   // Ao trocar de estudo PACS, volta para a primeira imagem do novo estudo.
   useEffect(() => {
@@ -413,15 +426,15 @@ export function ExamEditor({ examId }: Props) {
   }, [clinic?.googleDocsTemplateId, exam, patient, createGoogleDoc, showToast, updateStatus]);
 
   const handleCopy = useCallback(async () => {
-    if (!exam || !patient || !reportContent) return;
+    if (!reportContent) return;
     try {
-      await copyReportToClipboard(reportContent, patient, exam, settings);
+      await copyReportToClipboard(reportContent);
       showToast('Laudo copiado para o clipboard', 'success');
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Erro desconhecido';
       showToast('Erro ao copiar: ' + message, 'error');
     }
-  }, [exam, patient, reportContent, settings, showToast]);
+  }, [reportContent, showToast]);
 
   // Corpus de Excelência (Fase 3): marca o laudo atual como exemplar.
   const [markingExcellent, setMarkingExcellent] = useState(false);
@@ -474,46 +487,52 @@ export function ExamEditor({ examId }: Props) {
   const [printProgress, setPrintProgress] = useState<string>('');
   const [printLocalUrls, setPrintLocalUrls] = useState<Record<string, string>>({});
 
+  // Quanto mais fotos por página, menor cada uma sai impressa — não faz
+  // sentido carregar/imprimir na resolução nativa do preview do Orthanc.
+  // Reduzir aqui deixa o PDF mais leve e a montagem mais rápida, principalmente
+  // com estudos grandes (muitas imagens ou imagens pesadas).
+  const PRINT_OPTIMIZE_BY_GRID: Record<string, { maxWidth: number; quality: number }> = {
+    '1x1': { maxWidth: 1600, quality: 0.88 },
+    '1x2': { maxWidth: 1200, quality: 0.85 },
+    '2x3': { maxWidth: 900, quality: 0.82 },
+    '2x4': { maxWidth: 700, quality: 0.8 },
+  };
+
   const handlePrintImages = async (instances: any[], gridType: string = '2x4') => {
     if (instances.length === 0) return;
     setIsPrintingImages(true);
     setPrintProgress(`Otimizando imagens (0/${instances.length})...`);
     showToast('Preparando imagens para a impressão...', 'info');
 
-    const localUrlsMap: Record<string, string> = {};
-    const primaryBaseUrl = getActivePacsUrl(settings, false);
-    const backupBaseUrl = getActivePacsUrl(settings, true);
-
+    let localUrlsMap: Record<string, string> = {};
     try {
-      // Baixa as imagens em paralelo (lote limitado, em vez de uma por vez) —
-      // com N fotos, o tempo total deixa de ser N × round-trip e passa a ser
-      // ~ (N / CONCURRENCY) × round-trip.
-      const CONCURRENCY = 6;
-      let completed = 0;
-      let cursor = 0;
-      const worker = async () => {
-        while (cursor < instances.length) {
-          const i = cursor++;
-          const instance = instances[i];
-          const isBackup = instance.serverSource === 'backup';
-          const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
-          const proxyPath = getProxyEndpoint(settings, isBackup);
-          // Inclui token Firebase (proxy Vercel) + agentSecret (agente seguro) além
-          // de user/senha — sem eles, o fetch para o PDF falha com 401/403 na nuvem.
-          const url = `${proxyPath}?url=${encodeURIComponent(`${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
+      // Mesma função de pré-carregamento usada no painel lateral: baixa tudo
+      // como blob local ANTES de imprimir, com timeout + 3 tentativas por
+      // imagem — imagem pesada ou rede instável não pode travar pra sempre,
+      // nem uma falha pontual (transiente, quase sempre passageira com mais
+      // tentativas) derrubar o PDF inteiro, mesmo com as outras 99% prontas.
+      // Também já otimiza (reduz/recomprime) cada imagem pro tamanho real que
+      // ela vai ocupar na página, no mesmo passo do carregamento.
+      const preloadResult = await preloadDicomInstances(instances, settings, {
+        maxAttempts: 3,
+        optimize: PRINT_OPTIMIZE_BY_GRID[gridType] || { maxWidth: 1000, quality: 0.82 },
+        onProgress: (done, total, failed) => {
+          setPrintProgress(`Otimizando imagens (${done}/${total})${failed ? ` — ${failed} falharam` : ''}...`);
+        },
+      });
+      localUrlsMap = preloadResult.urls;
+      const failedInstanceIds = preloadResult.failedIds;
 
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-          const blob = await res.blob();
-          localUrlsMap[instance.ID] = URL.createObjectURL(blob);
-          completed++;
-          setPrintProgress(`Otimizando imagens (${completed}/${instances.length})...`);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, instances.length) }, worker));
+      const printableInstances = instances.filter((inst) => localUrlsMap[inst.ID]);
+      if (printableInstances.length === 0) {
+        throw new Error('Nenhuma imagem pôde ser carregada.');
+      }
+      if (failedInstanceIds.length > 0) {
+        showToast(`${failedInstanceIds.length} de ${instances.length} imagem(ns) falharam mesmo após 3 tentativas e foram puladas — o PDF sai com as demais ${printableInstances.length}.`, 'error');
+      }
 
       setPrintLocalUrls(localUrlsMap);
-      setSelectedInstancesForPrint(instances);
+      setSelectedInstancesForPrint(printableInstances);
       setSelectedGridType(gridType);
       
       document.body.classList.add('print-mode-images');
@@ -746,6 +765,13 @@ export function ExamEditor({ examId }: Props) {
                 setActivePacsServer={setActivePacsServer}
                 externalViewerUrl={externalViewerUrl}
                 setShowDicomImages={setShowDicomImages}
+                onOpenExternalUpload={() => setShowExternalUpload(true)}
+                currentExamId={examId}
+                preloadedUrls={dicomPreloadedUrls}
+                failedInstanceIds={dicomFailedIds}
+                preloadProgress={dicomPreloadProgress}
+                instancesReady={dicomInstancesReady}
+                retryInstance={retryDicomInstance}
               />
             )}
 
@@ -1420,6 +1446,23 @@ export function ExamEditor({ examId }: Props) {
             handlePrintImages(instances, gridType);
           }}
           activePacsServer={activePacsServer}
+          preloadedUrls={dicomPreloadedUrls}
+          failedInstanceIds={dicomFailedIds}
+          preloadProgress={dicomPreloadProgress}
+          instancesReady={dicomInstancesReady}
+          retryInstance={retryDicomInstance}
+        />
+      )}
+
+      {showExternalUpload && exam && (
+        <ExternalStudyUploadModal
+          examId={exam.id}
+          currentUids={exam.externalStudyInstanceUids || []}
+          onClose={() => setShowExternalUpload(false)}
+          onLinked={() => {
+            setShowExternalUpload(false);
+            setDicomRefreshKey(prev => prev + 1);
+          }}
         />
       )}
 
@@ -1468,17 +1511,13 @@ export function ExamEditor({ examId }: Props) {
 
           {(() => {
             const activeInstance = dicomInstances[activeImageIndex];
-            const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
-            const activeServerSource = activeStudy?.serverSource || 'primary';
-            const isBackup = activeServerSource === 'backup';
-            const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-            const proxyPath = getProxyEndpoint(settings, isBackup);
-            const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
             const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
+            const activeUrl = dicomPreloadedUrls[activeInstance.ID];
+            const activeFailed = dicomFailedIds.includes(activeInstance.ID);
 
             return (
-              <div 
-                className="relative max-w-full max-h-full flex flex-col items-center gap-4" 
+              <div
+                className="relative max-w-full max-h-full flex flex-col items-center gap-4"
                 onClick={(e) => e.stopPropagation()}
                 onWheel={(e) => {
                   if (e.deltaY < 0) {
@@ -1488,13 +1527,29 @@ export function ExamEditor({ examId }: Props) {
                   }
                 }}
               >
-                <DicomThumbnail 
-                  src={previewUrl} 
-                  alt={`Instance ${instanceNum}`}
-                  className="max-w-[95vw] max-h-[85vh] rounded-lg shadow-2xl border border-white/5"
-                  containerClassName="bg-transparent"
-                  priority={true}
-                />
+                {!dicomInstancesReady ? (
+                  <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-2 text-white/70">
+                    <Loader2 size={28} className="animate-spin" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Carregando estudo ({dicomPreloadProgress.done}/{dicomPreloadProgress.total})...</span>
+                  </div>
+                ) : activeFailed ? (
+                  <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-3 text-white/70 border border-white/10 rounded-lg bg-white/5">
+                    <AlertCircle size={28} className="text-amber-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Imagem indisponível</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); retryDicomInstance(activeInstance.ID); }}
+                      className="h-8 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider transition-all"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : (
+                  <img
+                    src={activeUrl}
+                    alt={`Instance ${instanceNum}`}
+                    className="max-w-[95vw] max-h-[85vh] rounded-lg shadow-2xl border border-white/5"
+                  />
+                )}
                 <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-black tracking-widest text-white uppercase select-none z-10">
                   FOTO {activeImageIndex + 1} DE {dicomInstances.length} (INSTÂNCIA {instanceNum})
                 </div>

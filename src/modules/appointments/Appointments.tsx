@@ -11,7 +11,7 @@ import {
 import { classNames } from '../../utils/format';
 import { getInitialReportContent } from '../templates/utils';
 import { AnimatePresence, motion } from 'framer-motion';
-import { syncExamToOrthancWorklist } from '../../utils/dicom';
+import { syncExamToOrthancWorklist, getDevicesForClinic, pickDefaultDicomDevice } from '../../utils/dicom';
 import { PageHeader } from '../../components/PageHeader';
 import { logger } from '../../utils/logger';
 
@@ -236,7 +236,8 @@ export function Appointments() {
         patientData,
         settings,
         deviceId,
-        examData.examDate
+        examData.examDate,
+        confirmingApp.clinicId
       );
 
       if (!success) {
@@ -649,7 +650,8 @@ export function Appointments() {
         {state.confirmingApp && (
           <ConfirmAppointmentModal
             appointment={state.confirmingApp}
-            dicomDevices={settings.dicomDevices || []}
+            dicomDevices={getDevicesForClinic(settings.dicomDevices, state.confirmingApp.clinicId)}
+            defaultDeviceId={pickDefaultDicomDevice(settings.dicomDevices, state.confirmingApp.clinicId, settings.dicomDefaultDeviceIdByClinic, settings.dicomDefaultDeviceId)?.id}
             onClose={() => dispatch({ type: 'SET_CONFIRMING_APP', payload: null })}
             onConfirm={handleConfirmAppointment}
           />

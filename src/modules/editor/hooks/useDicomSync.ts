@@ -84,16 +84,14 @@ const locateStudies = async (
   }
 
   const exactResults = await Promise.all(exactQueries);
-  let hasExact = false;
   for (const list of exactResults) {
-    if (processResults(list)) hasExact = true;
+    processResults(list);
   }
 
-  // Aborta as buscas por PatientID para evitar lentidão
-  if (hasExact) {
-    return Array.from(candidatesMap.values());
-  }
-
+  // Fase 2 roda SEMPRE, mesmo com match exato — é ela que traz exames
+  // anteriores do mesmo paciente (outros StudyInstanceUID, um por exame) pro
+  // seletor de "Estudos", permitindo comparar com o atual rapidamente. Abortar
+  // aqui quando já achou o exame atual deixava o seletor sempre com 1 item só.
   // Phase 2: Patient ID Fallback
   const patientIds = new Set<string>();
   if (exam.patientId) patientIds.add(exam.patientId);
@@ -102,9 +100,21 @@ const locateStudies = async (
 
   const patientQueries = Array.from(patientIds).map(pid => queryOrthanc({ PatientID: pid }));
   const patientResults = await Promise.all(patientQueries);
-  
+
   for (const list of patientResults) {
     processResults(list);
+  }
+
+  // Phase 3: Estudos externos vinculados manualmente (upload de exame feito
+  // fora do sistema, sem aparelho conectado — não tem UID/AccessionNumber/
+  // PatientID batendo com nada das fases acima, só o UID salvo no exame).
+  if (exam.externalStudyInstanceUids && exam.externalStudyInstanceUids.length > 0) {
+    const externalResults = await Promise.all(
+      exam.externalStudyInstanceUids.map((uid) => queryOrthanc({ StudyInstanceUID: uid }))
+    );
+    for (const list of externalResults) {
+      processResults(list);
+    }
   }
 
   return Array.from(candidatesMap.values());

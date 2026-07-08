@@ -1,7 +1,5 @@
-import { Loader2, AlertCircle, AlertTriangle, Eye, X, Printer, RefreshCw, SlidersHorizontal, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, AlertCircle, AlertTriangle, Eye, X, Printer, RefreshCw, SlidersHorizontal, ExternalLink, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import { classNames } from '../../../utils/format';
-import { DicomThumbnail } from './DicomThumbnail';
-import { getProxyEndpoint, getActivePacsUrl, getDicomAuthParams } from '../../../store/db';
 import type { AppSettings } from '../../../types';
 
 interface DicomViewerSidebarProps {
@@ -27,6 +25,18 @@ interface DicomViewerSidebarProps {
   setActivePacsServer: (v: 'primary' | 'backup' | 'both') => void;
   externalViewerUrl: string | null;
   setShowDicomImages: (v: boolean) => void;
+  onOpenExternalUpload: () => void;
+  /** AccessionNumber do exame aberto no editor — usado só pra rotular no
+   * seletor qual estudo é "este exame" entre os anteriores do paciente. */
+  currentExamId?: string;
+  /** Pré-carregamento das imagens do estudo atual — calculado uma única vez
+   * no ExamEditor e compartilhado com a visualização em tela cheia, pra não
+   * buscar a mesma imagem duas vezes da rede. */
+  preloadedUrls: Record<string, string>;
+  failedInstanceIds: string[];
+  preloadProgress: { done: number; total: number };
+  instancesReady: boolean;
+  retryInstance: (instanceId: string) => void;
 }
 
 export function DicomViewerSidebar({
@@ -52,6 +62,13 @@ export function DicomViewerSidebar({
   setActivePacsServer,
   externalViewerUrl,
   setShowDicomImages,
+  onOpenExternalUpload,
+  currentExamId,
+  preloadedUrls,
+  failedInstanceIds: failedIds,
+  preloadProgress: progress,
+  instancesReady,
+  retryInstance: retryOne,
 }: DicomViewerSidebarProps) {
   return (
     <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-zinc-800/80 bg-[#0c0c0e] text-zinc-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0 font-sans">
@@ -125,10 +142,10 @@ export function DicomViewerSidebar({
                   ? "bg-brand-600 text-white border-brand-500 shadow-sm"
                   : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:text-white"
               )}
-              title="Vários estudos localizados para este paciente"
+              title="Estudos deste e de exames anteriores do mesmo paciente"
             >
               <SlidersHorizontal size={12} />
-              <span>Estudos ({candidateStudies.length})</span>
+              <span>Exames ({candidateStudies.length})</span>
             </button>
           )}
           <button
@@ -141,6 +158,14 @@ export function DicomViewerSidebar({
             title="Atualizar Imagens"
           >
             <RefreshCw size={14} />
+          </button>
+          <button
+            onClick={onOpenExternalUpload}
+            className="h-8 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-350 hover:text-white flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest transition-all border border-zinc-800 active:scale-95 shadow-sm select-none"
+            title="Vincular estudo DICOM de exame feito em local externo (sem aparelho conectado)"
+          >
+            <Upload size={12} className="text-violet-400" />
+            <span>Importar</span>
           </button>
           {externalViewerUrl && (
             <a
@@ -175,15 +200,21 @@ export function DicomViewerSidebar({
       {/* Candidate Studies Dropdown Selector Panel */}
       {showStudySelector && candidateStudies.length > 0 && (
         <div className="bg-[#09090b] border-b border-zinc-800/80 p-4 space-y-2 shrink-0 animate-slide-down">
-          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Selecione o Estudo DICOM correspondente:</span>
-          <div className="space-y-1.5 max-h-[140px] overflow-y-auto custom-scrollbar font-sans">
-            {candidateStudies.map((study) => {
+          <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Este exame e anteriores do mesmo paciente (mais recente primeiro):</span>
+          <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar font-sans">
+            {[...candidateStudies]
+              .sort((a, b) => {
+                const keyOf = (s: any) => `${s.MainDicomTags?.StudyDate || ''}${s.MainDicomTags?.StudyTime || ''}`;
+                return keyOf(b).localeCompare(keyOf(a));
+              })
+              .map((study) => {
               const date = study.MainDicomTags?.StudyDate || '';
               const time = study.MainDicomTags?.StudyTime || '';
               const desc = study.MainDicomTags?.StudyDescription || study.RequestedProcedureDescription || 'Sem descrição';
               const formattedDate = date ? `${date.substring(6, 8)}/${date.substring(4, 6)}/${date.substring(0, 4)}` : 'Data ignorada';
               const formattedTime = time ? `${time.substring(0, 2)}:${time.substring(2, 4)}` : '';
               const isCurrent = study.ID === selectedStudyId;
+              const isThisExam = !!currentExamId && study.MainDicomTags?.AccessionNumber === currentExamId;
 
               return (
                 <button
@@ -201,7 +232,12 @@ export function DicomViewerSidebar({
                 >
                   <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold truncate text-[11px]">{desc}</p>
+                      <p className="font-bold truncate text-[11px] flex items-center gap-1.5">
+                        {desc}
+                        {isThisExam && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30 text-[8px] font-black uppercase tracking-wider">Este exame</span>
+                        )}
+                      </p>
                       <p className="text-[9px] opacity-75 mt-0.5">{formattedDate} {formattedTime} • ID: {study.MainDicomTags?.PatientID || '—'}</p>
                     </div>
                     <span className={classNames(
@@ -225,10 +261,14 @@ export function DicomViewerSidebar({
 
       {/* Main Preview Area */}
       <div className="p-5 flex flex-col items-center justify-center shrink-0 border-b border-zinc-800/80 bg-[#09090b]/40">
-        {(() => {
+        {dicomInstances.length > 0 && !instancesReady ? (
+          <div className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-zinc-850 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-zinc-500 p-6 text-center gap-2">
+            <Loader2 size={26} className="animate-spin text-brand-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">Carregando estudo ({progress.done}/{progress.total})...</span>
+            <span className="text-[9px] text-zinc-600">As imagens só aparecem quando o estudo estiver completo</span>
+          </div>
+        ) : (() => {
           const activeInstance = dicomInstances[activeImageIndex];
-          const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId);
-          const activeServerSource = activeStudy?.serverSource || 'primary';
           if (!activeInstance) {
             return (
               <div
@@ -246,16 +286,14 @@ export function DicomViewerSidebar({
               </div>
             );
           }
-          const isBackup = activeServerSource === 'backup';
-          const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-          const proxyPath = getProxyEndpoint(settings, isBackup);
-          const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${activeInstance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
           const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
+          const activeUrl = preloadedUrls[activeInstance.ID];
+          const activeFailed = failedIds.includes(activeInstance.ID);
 
           return (
             <div className="w-full flex flex-col gap-3 font-sans">
               <div
-                onClick={() => setShowFullScreenImage(true)}
+                onClick={() => !activeFailed && setShowFullScreenImage(true)}
                 onWheel={(e) => {
                   if (e.deltaY < 0) {
                     handlePrevImage();
@@ -265,12 +303,24 @@ export function DicomViewerSidebar({
                 }}
                 className="relative aspect-[4/3] w-full bg-black rounded-2xl border border-zinc-800 overflow-hidden flex items-center justify-center group shadow-2xl cursor-zoom-in transition-all duration-300 hover:border-zinc-700"
               >
-                <DicomThumbnail
-                  src={previewUrl}
-                  alt={`Instance ${instanceNum}`}
-                  className="hover:scale-[1.01] transition-transform duration-500 max-h-full max-w-full object-contain"
-                  priority={true}
-                />
+                {activeFailed ? (
+                  <div className="flex flex-col items-center gap-2 text-center p-4">
+                    <AlertTriangle className="text-amber-500" size={22} />
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase">Imagem indisponível</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); retryOne(activeInstance.ID); }}
+                      className="h-7 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 active:scale-95 text-white text-[9px] font-black uppercase tracking-wider transition-all"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : (
+                  <img
+                    src={activeUrl}
+                    alt={`Instance ${instanceNum}`}
+                    className="hover:scale-[1.01] transition-transform duration-500 max-h-full max-w-full object-contain"
+                  />
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
                   className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-black/75 hover:bg-black/90 text-white/80 hover:text-white border border-zinc-800 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 active:scale-95 shadow-lg z-20 cursor-pointer"
@@ -324,39 +374,63 @@ export function DicomViewerSidebar({
             <span className="text-[10px] font-black uppercase tracking-wider block text-zinc-300">Nenhum Estudo Selecionado</span>
             <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2.5 font-sans">
-            {dicomInstances.map((instance, idx) => {
-              const isActive = idx === activeImageIndex;
-              const isBackup = instance.serverSource === 'backup';
-              const currentBaseUrl = getActivePacsUrl(settings, isBackup);
-              const proxyPath = getProxyEndpoint(settings, isBackup);
-              const previewUrl = `${proxyPath}?url=${encodeURIComponent(`${currentBaseUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`)}${getDicomAuthParams(settings, isBackup)}`;
-
-              return (
-                <button
-                  key={instance.ID}
-                  onClick={() => setActiveImageIndex(idx)}
-                  className={classNames(
-                    "relative aspect-[4/3] bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md cursor-pointer",
-                    isActive
-                      ? "border-brand-500 ring-2 ring-brand-500/25 scale-[0.98]"
-                      : "border-zinc-800 hover:border-zinc-600 hover:scale-[1.02]"
-                  )}
-                >
-                  <DicomThumbnail src={previewUrl} alt={`Instance ${idx + 1}`} />
-                  <div className={classNames(
-                    "absolute bottom-0 inset-x-0 py-0.5 text-center text-[7px] font-black tracking-widest uppercase border-t z-10 select-none",
-                    isActive
-                      ? "bg-brand-950/80 text-brand-400 border-brand-800"
-                      : "bg-zinc-950/80 text-zinc-500 border-zinc-800"
-                  )}>
-                    Foto {idx + 1}
-                  </div>
-                </button>
-              );
-            })}
+        ) : !instancesReady ? (
+          <div className="flex flex-col items-center justify-center py-16 text-zinc-500 text-center gap-2 font-sans">
+            <Loader2 size={22} className="animate-spin text-brand-500" />
+            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-300">Carregando {progress.total} imagem{progress.total > 1 ? 'ns' : ''} do estudo...</span>
+            <div className="w-40 h-1 bg-zinc-800 rounded-full overflow-hidden mt-1">
+              <div
+                className="h-full bg-brand-500 transition-all duration-200"
+                style={{ width: `${progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0}%` }}
+              />
+            </div>
           </div>
+        ) : (
+          <>
+            {failedIds.length > 0 && (
+              <div className="mb-3 p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/30 flex items-center gap-2 text-[10px] text-amber-300">
+                <AlertTriangle size={13} className="shrink-0" />
+                <span>{failedIds.length} de {dicomInstances.length} imagem(ns) não carregaram — clique nela pra tentar de novo.</span>
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2.5 font-sans">
+              {dicomInstances.map((instance, idx) => {
+                const isActive = idx === activeImageIndex;
+                const url = preloadedUrls[instance.ID];
+                const failed = failedIds.includes(instance.ID);
+
+                return (
+                  <button
+                    key={instance.ID}
+                    onClick={() => failed ? retryOne(instance.ID) : setActiveImageIndex(idx)}
+                    className={classNames(
+                      "relative aspect-[4/3] bg-black border rounded-xl overflow-hidden flex items-center justify-center transition-all group active:scale-95 shadow-md cursor-pointer",
+                      isActive
+                        ? "border-brand-500 ring-2 ring-brand-500/25 scale-[0.98]"
+                        : "border-zinc-800 hover:border-zinc-600 hover:scale-[1.02]"
+                    )}
+                  >
+                    {failed ? (
+                      <div className="flex flex-col items-center gap-1 text-center p-1">
+                        <AlertTriangle size={14} className="text-amber-500" />
+                        <span className="text-[7px] text-zinc-400 font-bold uppercase">Tentar de novo</span>
+                      </div>
+                    ) : (
+                      <img src={url} alt={`Instance ${idx + 1}`} className="max-w-full max-h-full object-contain" />
+                    )}
+                    <div className={classNames(
+                      "absolute bottom-0 inset-x-0 py-0.5 text-center text-[7px] font-black tracking-widest uppercase border-t z-10 select-none",
+                      isActive
+                        ? "bg-brand-950/80 text-brand-400 border-brand-800"
+                        : "bg-zinc-950/80 text-zinc-500 border-zinc-800"
+                    )}>
+                      Foto {idx + 1}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

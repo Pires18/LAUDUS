@@ -1,34 +1,79 @@
-import { ExamRequest, Patient, AppSettings } from '../../types';
-import { formatDate, calculateAge } from '../../utils/format';
+// Só negrito, alinhamento e espaçamento (entrelinha/entre letras) sobrevivem
+// no HTML copiado — o resto (fonte, tamanho, cor, itálico/sublinhado, etc.) é
+// removido para colar limpo em qualquer lugar (WhatsApp, Word, e-mail) com a
+// letra do destino.
+const FONT_STYLE_PROPS = [
+  'font-family', 'font-size', 'color', 'background-color',
+  'font-style', 'text-decoration',
+];
 
-export async function copyReportToClipboard(reportHtml: string, patient: Patient, exam: ExamRequest, settings: AppSettings): Promise<void> {
-  const header = `
-    <div style="text-align:center;font-family:Arial,sans-serif;">
-      ${settings.clinicName ? `<p style="font-weight:bold;font-size:14pt;margin:0;">${settings.clinicName}</p>` : ''}
-      ${settings.clinicAddress ? `<p style="font-size:9pt;color:#555;margin:0;">${settings.clinicAddress}</p>` : ''}
-    </div>
-    <hr/>
-    <p><strong>Paciente:</strong> ${patient.name}</p>
-    ${patient.birthDate ? `<p><strong>Nascimento:</strong> ${formatDate(patient.birthDate)} (${calculateAge(patient.birthDate)})</p>` : ''}
-    <p><strong>Data do exame:</strong> ${formatDate(exam.createdAt)}</p>
-    ${exam.requestingPhysician ? `<p><strong>Médico solicitante:</strong> ${exam.requestingPhysician}</p>` : ''}
-    ${exam.clinicalIndication ? `<p><strong>Indicação clínica:</strong> ${exam.clinicalIndication}</p>` : ''}
-    <hr/>
-  `;
-  const signature = settings.physicianName ? `
-    <br/><br/>
-    ${settings.signatureImageUrl ? `<div style="text-align:center;margin-bottom:8px;"><img src="${settings.signatureImageUrl}" alt="Assinatura" style="height:64px;max-height:64px;object-fit:contain;"/></div>` : '<hr style="width:300px;margin:0 auto;"/>'}
-    <p style="text-align:center;"><strong>${settings.physicianName}</strong><br/>
-    <small>CRM ${settings.physicianCRM || ''}${settings.physicianRQE ? ` · RQE ${settings.physicianRQE}` : ''}</small></p>
-  ` : '';
+function isBoldWeight(weight: string): boolean {
+  if (!weight) return false;
+  if (weight === 'bold' || weight === 'bolder') return true;
+  const n = parseInt(weight, 10);
+  return !isNaN(n) && n >= 600;
+}
 
-  const processedReportHtml = reportHtml.replace(/\(…\)/g, '( &nbsp;&nbsp;&nbsp;&nbsp; )');
-  const fullHtml = `<div style="font-family:Arial,sans-serif;font-size:11pt;line-height:1.5;">${header}${processedReportHtml}${signature}</div>`;
-  const plainText = (new DOMParser()).parseFromString(fullHtml, 'text/html').body.textContent || '';
+/**
+ * Reduz o HTML do corpo do laudo ao básico pra copiar/colar: mantém só
+ * negrito, alinhamento e espaçamento (entrelinha/entre letras), remove
+ * fonte/tamanho/cor/itálico/sublinhado/tachado, e converte títulos (h1-h6)
+ * em parágrafo negrito — sem isso o tamanho de título do navegador vazaria
+ * mesmo removendo o style.
+ */
+function buildPlainReportBody(reportHtml: string): string {
+  const container = document.createElement('div');
+  container.innerHTML = reportHtml.replace(/\(…\)/g, '( &nbsp;&nbsp;&nbsp;&nbsp; )');
+
+  container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+    const p = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.innerHTML = heading.innerHTML;
+    p.appendChild(strong);
+    const headingStyle = (heading as HTMLElement).style;
+    if (headingStyle.textAlign) p.style.textAlign = headingStyle.textAlign;
+    if (headingStyle.lineHeight) p.style.lineHeight = headingStyle.lineHeight;
+    if (headingStyle.letterSpacing) p.style.letterSpacing = headingStyle.letterSpacing;
+
+    // Uma linha em branco antes de cada seção (Título, Técnica, Análise,
+    // Conclusão, Recomendações, Observações Metodológicas) — exceto quando a
+    // seção é o primeiro elemento do laudo, que não tem nada antes pra separar.
+    if (heading.previousElementSibling) {
+      const spacer = document.createElement('p');
+      spacer.innerHTML = '<br>';
+      heading.parentNode?.insertBefore(spacer, heading);
+    }
+
+    heading.replaceWith(p);
+  });
+
+  // Desfaz ênfases além de negrito — mantém só o texto de dentro.
+  container.querySelectorAll('em, i, u, s, strike, mark').forEach((el) => {
+    el.replaceWith(...Array.from(el.childNodes));
+  });
+
+  container.querySelectorAll<HTMLElement>('[style]').forEach((el) => {
+    const bold = isBoldWeight(el.style.fontWeight);
+    FONT_STYLE_PROPS.forEach((prop) => el.style.removeProperty(prop));
+    el.style.removeProperty('font-weight');
+    if (bold) el.style.fontWeight = 'bold';
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+  });
+
+  container.querySelectorAll('[class]').forEach((el) => el.removeAttribute('class'));
+
+  return container.innerHTML;
+}
+
+/** Copia só o corpo do laudo (sem dados do paciente, anamnese ou assinatura),
+ * com formatação reduzida ao básico — negrito e alinhamento. */
+export async function copyReportToClipboard(reportHtml: string): Promise<void> {
+  const cleanedHtml = buildPlainReportBody(reportHtml);
+  const plainText = (new DOMParser()).parseFromString(cleanedHtml, 'text/html').body.textContent || '';
 
   await navigator.clipboard.write([
     new ClipboardItem({
-      'text/html': new Blob([fullHtml], { type: 'text/html' }),
+      'text/html': new Blob([cleanedHtml], { type: 'text/html' }),
       'text/plain': new Blob([plainText], { type: 'text/plain' }),
     }),
   ]);

@@ -1,7 +1,40 @@
-import { Patient } from '../types';
+import { Patient, DicomDevice } from '../types';
 import { logger } from './logger';
-import { getWorklistEndpoint } from '../store/db';
+import { getWorklistEndpoint, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams } from '../store/db';
 import { getIdToken } from '../lib/authToken';
+
+/**
+ * Aparelhos visíveis para uma clínica: os dela (clinicId igual) + os
+ * compartilhados (sem clinicId). Sem clínica informada, mostra todos.
+ */
+export function getDevicesForClinic(devices: DicomDevice[] | undefined, clinicId?: string | null): DicomDevice[] {
+  if (!devices) return [];
+  if (!clinicId) return devices;
+  return devices.filter((d) => !d.clinicId || d.clinicId === clinicId);
+}
+
+/**
+ * Escolhe o aparelho a usar quando nenhum foi selecionado explicitamente,
+ * já restrito aos aparelhos visíveis para a clínica. Prioridade: aparelho
+ * principal DAQUELA clínica > aparelho principal compartilhado/global >
+ * primeiro aparelho já associado à clínica > primeiro da lista.
+ */
+export function pickDefaultDicomDevice(
+  devices: DicomDevice[] | undefined,
+  clinicId?: string | null,
+  defaultByClinic?: Record<string, string>,
+  globalDefaultId?: string
+): DicomDevice | undefined {
+  const pool = getDevicesForClinic(devices, clinicId);
+  if (pool.length === 0) return undefined;
+  const clinicDefaultId = clinicId ? defaultByClinic?.[clinicId] : undefined;
+  return (
+    pool.find((d) => d.id === clinicDefaultId) ||
+    pool.find((d) => d.id === globalDefaultId) ||
+    (clinicId ? pool.find((d) => d.clinicId === clinicId) : undefined) ||
+    pool[0]
+  );
+}
 
 /**
  * Envia um exame para a Worklist do Orthanc (Primário e Backup)
@@ -12,7 +45,8 @@ export async function syncExamToOrthancWorklist(
   patient: Pick<Patient, 'id' | 'name' | 'birthDate' | 'gender'>,
   settings: any,
   deviceId?: string,
-  examDate?: number
+  examDate?: number,
+  clinicId?: string
 ): Promise<{ success: boolean; primarySuccess?: boolean; backupSuccess?: boolean; error?: string }> {
   try {
     // Formata o nome para DICOM (Mantendo ordem natural em maiúsculas sem acentos)
@@ -31,9 +65,10 @@ export async function syncExamToOrthancWorklist(
 
     const stepDescription = examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 
-    const targetDevice = deviceId 
-      ? settings.dicomDevices?.find((d: any) => d.id === deviceId) || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' }
-      : settings.dicomDevices?.[0] || { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
+    const legacyFallback = { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
+    const targetDevice = deviceId
+      ? settings.dicomDevices?.find((d: any) => d.id === deviceId) || legacyFallback
+      : pickDefaultDicomDevice(settings.dicomDevices, clinicId, settings.dicomDefaultDeviceIdByClinic, settings.dicomDefaultDeviceId) || legacyFallback;
 
     // Envia ao primário e ao backup EM PARALELO — assim um servidor lento ou caído
     // (ex.: agente do Mac fora do ar) não atrasa o envio ao outro.
@@ -167,4 +202,222 @@ export function getNumericUidFromFirestoreId(id: string): string {
 export function getStudyInstanceUID(examId: string): string {
   if (!examId) return '';
   return `1.2.276.0.7230010.3.1.2.${getNumericUidFromFirestoreId(examId)}`;
+}
+
+export interface ExternalDicomUploadResult {
+  fileName: string;
+  success: boolean;
+  error?: string;
+  studyInstanceUid?: string;
+  patientName?: string;
+  patientIdTag?: string;
+  studyDescription?: string;
+}
+
+/** Acima disso o envio é considerado "pesado" — menos concorrência e aviso de limite do Vercel. */
+export const DICOM_LARGE_FILE_BYTES = 15 * 1024 * 1024;
+
+/** Se o Agente Local está configurado com URL pública HTTPS, o upload vai direto
+ * pra ele (bypassa o limite de payload do servidor serverless da Vercel, ~4,5MB). */
+export function hasDirectDicomAgent(settings: any): boolean {
+  return !!(settings?.dicomLocalAgentUrl && /^https:\/\//i.test(settings.dicomLocalAgentUrl));
+}
+
+/** POST via XHR (não fetch) para conseguir progresso real de upload — o fetch
+ * não expõe evento de progresso do corpo enviado em navegadores hoje. */
+function xhrUpload(
+  url: string,
+  body: ArrayBuffer,
+  contentType: string,
+  timeoutMs: number,
+  onProgress?: (loadedBytes: number, totalBytes: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.timeout = timeoutMs;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(xhr.responseText ? JSON.parse(xhr.responseText) : {}); }
+        catch { resolve({}); }
+      } else {
+        reject(new Error(`PACS recusou (HTTP ${xhr.status})${xhr.responseText ? ': ' + xhr.responseText.slice(0, 150) : ''}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Falha de rede durante o envio — conexão instável ou agente fora do ar.'));
+    xhr.ontimeout = () => reject(new Error(`Tempo esgotado após ${Math.round(timeoutMs / 1000)}s — arquivo grande e/ou conexão lenta. Tente novamente.`));
+    xhr.send(body);
+  });
+}
+
+/**
+ * Envia um único arquivo DICOM (exame feito em local externo, sem aparelho
+ * conectado) direto pro Orthanc via `POST /instances` — mesmo proxy usado
+ * para autorizar aparelhos. Depois lê `GET /studies/{id}` pra pegar o
+ * StudyInstanceUID e os dados do paciente gravados no arquivo (o Orthanc já
+ * extrai as tags DICOM; não precisamos parsear o arquivo no navegador).
+ *
+ * `onProgress` reporta bytes enviados em tempo real — importante pra arquivos
+ * grandes (cine loop de US, séries de CT/MR), onde um simples spinner deixa
+ * o usuário sem noção se o envio travou ou só está demorando.
+ */
+export async function uploadExternalDicomFile(
+  file: File,
+  settings: any,
+  onProgress?: (loadedBytes: number, totalBytes: number) => void
+): Promise<ExternalDicomUploadResult> {
+  const baseUrl = getActivePacsUrl(settings, false).replace(/\/$/, '');
+  const auth = getDicomAuthParams(settings, false);
+  const proxyPath = getProxyEndpoint(settings, false);
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const uploadTarget = `${baseUrl}/instances`;
+    const uploadUrl = `${proxyPath}?url=${encodeURIComponent(uploadTarget)}${auth}`;
+    // Timeout escalado pelo tamanho (30s base + ~1s por MB, teto de 6min) — fixo
+    // e curto demais derrubava arquivo grande antes de terminar; longo demais
+    // deixava um erro real (agente caído) parecendo só "lento".
+    const timeoutMs = Math.min(360_000, 30_000 + Math.round(file.size / (1024 * 1024)) * 1000);
+    const uploadJson = await xhrUpload(uploadUrl, buffer, 'application/dicom', timeoutMs, onProgress);
+    const orthancStudyId = uploadJson.ParentStudy || uploadJson.ID;
+    if (!orthancStudyId) throw new Error('Orthanc aceitou o arquivo, mas não retornou o ID do estudo.');
+
+    const studyTarget = `${baseUrl}/studies/${orthancStudyId}`;
+    const studyUrl = `${proxyPath}?url=${encodeURIComponent(studyTarget)}${auth}`;
+    const studyRes = await fetch(studyUrl);
+    if (!studyRes.ok) throw new Error(`Arquivo enviado, mas falhou ao ler os dados do estudo (HTTP ${studyRes.status}).`);
+    const studyJson = await studyRes.json();
+    const studyInstanceUid = studyJson.MainDicomTags?.StudyInstanceUID;
+    if (!studyInstanceUid) throw new Error('Estudo enviado, mas sem StudyInstanceUID nas tags.');
+
+    return {
+      fileName: file.name,
+      success: true,
+      studyInstanceUid,
+      patientName: studyJson.PatientMainDicomTags?.PatientName,
+      patientIdTag: studyJson.PatientMainDicomTags?.PatientID,
+      studyDescription: studyJson.MainDicomTags?.StudyDescription,
+    };
+  } catch (err: any) {
+    return { fileName: file.name, success: false, error: err.message || 'Falha no upload.' };
+  }
+}
+
+export interface DicomInstancePreloadResult {
+  /** instanceId -> URL de blob local, pronta pra usar em <img src>. */
+  urls: Record<string, string>;
+  /** instanceIds que não carregaram mesmo após todas as tentativas. */
+  failedIds: string[];
+}
+
+/**
+ * Reduz um blob de imagem pro tamanho/qualidade pedidos (via canvas), gerando
+ * um JPEG bem mais leve — usado no PDF, onde a imagem sai bem menor na página
+ * (ex: 8 por folha no grid 2x4) e não precisa da resolução nativa do preview.
+ * Se o navegador não conseguir otimizar por algum motivo, devolve o blob
+ * original intacto — otimização é um bônus, nunca pode virar motivo de falha.
+ */
+async function optimizeImageBlob(blob: Blob, maxWidth: number, quality: number): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const scale = Math.min(1, maxWidth / bitmap.width);
+    // Já está menor que o alvo — não vale a pena reencodar (perderia qualidade à toa).
+    if (scale >= 1) return blob;
+    const targetW = Math.max(1, Math.round(bitmap.width * scale));
+    const targetH = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return blob;
+    ctx.drawImage(bitmap, 0, 0, targetW, targetH);
+    const optimized = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+    return optimized || blob;
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+/**
+ * Baixa o preview de uma lista de instâncias DICOM como blobs locais, com
+ * timeout + novas tentativas por imagem — usado tanto no painel lateral
+ * quanto na geração do PDF, pra só exibir/imprimir o estudo quando ele
+ * estiver completo, em vez de imagens aparecendo aos poucos com risco de
+ * quebrar/faltar por causa de uma rede instável ou um servidor lento.
+ */
+export async function preloadDicomInstances(
+  instances: any[],
+  settings: any,
+  options: {
+    concurrency?: number;
+    timeoutMs?: number;
+    maxAttempts?: number;
+    onProgress?: (done: number, total: number, failed: number) => void;
+    /** Se definido, reduz cada imagem (canvas → JPEG) pro tamanho do PDF final —
+     * mais leve pra montar/imprimir com muitas fotos por página. */
+    optimize?: { maxWidth: number; quality?: number };
+  } = {}
+): Promise<DicomInstancePreloadResult> {
+  const { concurrency = 6, timeoutMs = 16000, maxAttempts = 3, onProgress, optimize } = options;
+  const urls: Record<string, string> = {};
+  const failedIds: string[] = [];
+  if (!instances || instances.length === 0) return { urls, failedIds };
+
+  const primaryBaseUrl = getActivePacsUrl(settings, false);
+  const backupBaseUrl = getActivePacsUrl(settings, true);
+  let done = 0;
+  let cursor = 0;
+
+  const fetchOne = async (instance: any) => {
+    const isBackup = instance.serverSource === 'backup';
+    const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
+    const proxyPath = getProxyEndpoint(settings, isBackup);
+    const target = `${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`;
+    const url = `${proxyPath}?url=${encodeURIComponent(target)}${getDicomAuthParams(settings, isBackup)}`;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        let blob = await res.blob();
+        if (optimize) {
+          blob = await optimizeImageBlob(blob, optimize.maxWidth, optimize.quality ?? 0.85).catch((err) => {
+            logger.warn(`[PACS] Falha ao otimizar imagem ${instance.ID} — usando original:`, err);
+            return blob;
+          });
+        }
+        urls[instance.ID] = URL.createObjectURL(blob);
+        clearTimeout(timeoutId);
+        return;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (attempt === maxAttempts) {
+          failedIds.push(instance.ID);
+          logger.warn(`[PACS] Imagem ${instance.ID} falhou após ${maxAttempts} tentativas:`, err);
+        } else {
+          // Backoff simples entre tentativas — evita bater de novo instantaneamente
+          // num servidor/rede que acabou de engasgar.
+          await new Promise((r) => setTimeout(r, 500 * attempt));
+        }
+      }
+    }
+  };
+
+  const worker = async () => {
+    while (cursor < instances.length) {
+      const idx = cursor++;
+      await fetchOne(instances[idx]);
+      done++;
+      onProgress?.(done, instances.length, failedIds.length);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, instances.length) }, worker));
+  return { urls, failedIds };
 }
