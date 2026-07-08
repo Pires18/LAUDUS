@@ -1,9 +1,9 @@
 # 📘 Documentação Oficial — LAUD.US
 
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
-Versão do documento: 2026-07-07 (v4 — Vercel Pro, Aba Estruturado do Copiloto completa, LAUD.IA V2.0/backfill de qualidade) · Ambiente: produção (Vercel Pro + Firebase).
+Versão do documento: 2026-07-07 (v4.1 — Centro Financeiro Fases A-D, mapeamento final de pendências §17 verificado contra o sistema real) · Ambiente: produção (Vercel Pro + Firebase).
 
-**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa 07/07](AUDITORIA_COMPLETA_2026-07-07.md) · [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) · [Auditoria do Admin](AUDITORIA_ADMIN_2026-07.md) · [Plano de Finalização do Admin](PLANO_FINALIZACAO_ADMIN_2026-07.md) · [Auditoria do Financeiro](AUDITORIA_FINANCEIRO_2026-07.md) · [Proposta de Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · auditorias/planos anteriores em [`docs/archive/`](archive/).
+**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa 07/07](AUDITORIA_COMPLETA_2026-07-07.md) · [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) · [Auditoria do Admin](AUDITORIA_ADMIN_2026-07.md) · [Plano de Finalização do Admin](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) · [Auditoria do Financeiro](AUDITORIA_FINANCEIRO_2026-07.md) · [Proposta de Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · auditorias/planos anteriores em [`docs/archive/`](archive/).
 
 ---
 
@@ -124,7 +124,7 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 | **Agendamentos** | `Appointments.tsx`, `WeeklyCalendar`, `useAppointmentsState` | Agenda semanal, marcação, envio de worklist ao aparelho | add-on `appointments` |
 | **Editor de Laudo** | ver §4.1 | Núcleo: Tiptap + IA + Copiloto + PACS viewer + PDF/Docs | — |
 | **Máscaras** | `Templates.tsx`, `TemplateEditor.tsx` | Biblioteca de máscaras + catálogo do sistema | — |
-| **Calculadoras** | `Calculators.tsx`, `formulas.ts`, `classifiers.ts` | 20+ calculadoras clínicas (biometria fetal, dopplers, volumes) | add-on `calculators` |
+| **Calculadoras** | `Calculators.tsx`, `formulas.ts`, `classifiers.ts` | 20+ calculadoras clínicas (biometria fetal, dopplers, volumes). As 2 calculadoras FMF de 1º trimestre (trissomias + pré-eclâmpsia) estão **travadas** (`validated: false`, banner "EM VALIDAÇÃO") até serem conferidas contra casos-ouro — modelo já auditado dígito a dígito contra os papers-fonte (ver [FMF_COEFICIENTES_EXTRAIDOS.md](FMF_COEFICIENTES_EXTRAIDOS.md) e [FMF_DADOS_VALIDACAO.md](FMF_DADOS_VALIDACAO.md)) | add-on `calculators` |
 | **Clínicas** | `Clinics.tsx`, `ClinicDetail`, `ClinicForm`, `ClinicTeamCard` | Múltiplas clínicas, cabeçalhos de laudo por unidade, **convite de equipe** (ver §16) | add-on `clinics` |
 | **PACS/DICOM** | ver §6 | Config Orthanc, guia, armazenamento, **provisão self-service** | add-on `pacs` |
 | **Configurações** | `Settings.tsx`, `SubscriptionCenter.tsx`, `AuditDashboard.tsx` | Perfil, PACS, LAUD.IA, **Assinatura** | — |
@@ -404,15 +404,38 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 
 ## 17. Pendências conhecidas
 
+**Mapeamento consolidado em 07/07/2026** (varredura de todo o sistema: código, docs, `firestore.rules`/`indexes`, variáveis de ambiente da Vercel via `vercel env ls`, proteção de branch via `gh api`). Todo item abaixo foi verificado contra o estado real, não apenas contra memória de sessões anteriores.
+
+### Ação técnica pronta, só falta deploy/config (sem decisão de negócio)
+
+| Item | Descrição | Ação |
+|---|---|---|
+| `firestore.rules`/`indexes` desatualizados em produção | `price_history`, `general_expenses`, `transactions/{id}/nf` (regras novas do Centro Financeiro, ver §15) e o índice collection-group de `ai_usage`/`timestamp` (causa erro `COLLECTION_ASC index` visto em produção) estão no código mas não deployados | `firebase deploy --only firestore:rules,firestore:indexes` — pendente de confirmação explícita do usuário |
+| Branch `main` sem proteção | `gh api repos/.../branches/main/protection` retorna 404 ("Branch not protected") — nada impede merge direto sem o CI (`tsc`+testes+build) passar | GitHub → Settings → Branches → exigir status check antes de merge (ação só do usuário, fora do alcance de CLI) |
+| Sentry configurado no código mas não ativado | `logger.error` já reporta ao Sentry (`ErrorBoundary`, `beforeSend` redige PII) — mas `VITE_SENTRY_DSN` não aparece em nenhuma env var da Vercel (`vercel env ls`, checado 07/07/2026); hoje é no-op silencioso, sistema roda sem monitoramento de erro em produção | Criar projeto no Sentry + `vercel env add VITE_SENTRY_DSN` (produção) + `.env` local |
+| Variáveis de PACS dedicado/compartilhado ausentes na Vercel | `vercel env ls` (07/07/2026) mostra só 13 variáveis em produção — nenhuma de `GCP_SA_KEY`, `TAILSCALE_API_KEY`, `TAILSCALE_TS_NET` (plano Dedicado) nem `PACS_SHARED_AGENT_URL`, `PACS_ADMIN_SECRET` (plano Compartilhado) aparece na lista. O código já bloqueia com segurança (`shouldBlockMockInProduction`, ver §10) em vez de devolver uma VM falsa — mas **provisionamento real de PACS pode estar indisponível em produção agora**. Precisa confirmação do usuário: ou as env vars existem com outro nome, ou o self-service de PACS está de fato pausado | Usuário confirmar no dashboard da Vercel (só nomes, sem expor valor) — item não confirmável por mim sem acesso a segredo de produção |
+| Rate limit sem KV distribuído | `KV_REST_API_URL`/`KV_REST_API_TOKEN` também ausentes — `api/_rateLimit.ts` cai no fallback em memória (funciona, mas não é compartilhado entre instâncias serverless). Documentado como opcional desde a implementação | Provisionar Vercel KV/Upstash se o rate limit precisar ser realmente distribuído |
+
+### Bloqueado por decisão externa ao código (negócio, jurídico ou terceiro)
+
 | Item | Descrição | Bloqueador |
 |---|---|---|
-| Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário — usuário optou por decidir depois (07/07/2026) |
-| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11) — usuário confirma API/dataset ativos em 07/07/2026; falta confirmar se a 1ª tabela já tem linhas e então implementar a query server-side + ligar ao painel Financeiro | Confirmação do usuário de que a tabela `laudussys.gcp_billing_export_v1_*` já tem dados |
+| Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado. Desenho pronto em [`docs/roadmaps/ASSINATURA_ICP_BRASIL.md`](roadmaps/ASSINATURA_ICP_BRASIL.md) | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário — decisão adiada conscientemente (07/07/2026) |
+| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11); falta confirmar se a tabela `laudussys.gcp_billing_export_v1_*` já tem linhas (~24-48h após ativação) e então implementar a query server-side + ligar ao painel Financeiro (Fase D.3 do [Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md)) | Confirmação do usuário de que a tabela já tem dados |
+| Reconciliação automática AbacatePay vs Firestore | Schema do endpoint de listagem de transações da AbacatePay não confirmado — implementar contra campos adivinhados foi julgado arriscado demais (Fase C.3 do [Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md)) | Confirmar schema real do endpoint (docs oficiais da AbacatePay ou chamada de teste registrada) |
+| Calculadoras FMF (trissomias + pré-eclâmpsia) travadas | `validated: false`, banner "EM VALIDAÇÃO" — modelo já auditado dígito a dígito contra os papers-fonte, falta só os casos-ouro de validação clínica (ver [FMF_DADOS_VALIDACAO.md](FMF_DADOS_VALIDACAO.md)) | Usuário preencher os casos-ouro (dados clínicos reais para conferência) |
 | Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v3.0 sem identificação da operadora (razão social/CNPJ removida por decisão do responsável durante a fase de testes) — pacote em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) já sinaliza esse ponto como prioritário para o advogado | Validação por advogado especializado em LGPD/saúde digital |
-| Identificação da operadora nos documentos legais | Razão social/CNPJ removidos de todos os documentos e da interface durante a fase de testes — recomendável reintroduzir ao menos nos documentos legais antes da operação comercial plena (ver alerta em `PACOTE_REVISAO_JURIDICA.md`) | Decisão do responsável, a rever com o advogado |
-| Exclusão de usuário deixa órfãos | `deleteUserDocument` apaga só `users/{uid}` — `subscriptions`/`ai_usage` órfãos e conta Auth intocada (achado C7 da [Auditoria do Admin](AUDITORIA_ADMIN_2026-07.md)) | Decisão de retenção de dados (LGPD/financeiro) antes de implementar a limpeza |
+| Identificação da operadora nos documentos legais | Razão social/CNPJ removidos de todos os documentos e da interface durante a fase de testes — recomendável reintroduzir ao menos nos documentos legais antes da operação comercial plena | Decisão do responsável, a rever com o advogado |
 
-**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby). Auditoria completa do módulo Admin (8 abas + LAUD.IA) — 30 achados, a maior parte já corrigida (ver [Auditoria](AUDITORIA_ADMIN_2026-07.md) / [Plano de Finalização](PLANO_FINALIZACAO_ADMIN_2026-07.md)).
+### Adiado conscientemente (baixa prioridade, decisão já tomada)
+
+| Item | Descrição |
+|---|---|
+| Desativar conta no Firebase Auth ao excluir usuário | `deleteUserDocument` já apaga `users/{uid}` E `subscriptions/sub_{uid}` (achado C7, resolvido); a conta no Firebase Auth continua intocada — exigiria novo endpoint serverless (Admin SDK `deleteUser`/`updateUser({disabled:true})`), fora do escopo pedido na Fase 4 |
+| M2/M3 do Admin | Paginação do "Recalcular" de Transações (`getDocs` completo, sem paginação) e guarda de concorrência entre abas Features/Recursos Extras — baixa prioridade, ver [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado) |
+| Busca/paginação server-side em Usuários (Admin) | Lista carrega client-side sobre a coleção inteira — adiado por decisão consciente dado o estágio atual do produto (ver [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) Fase 3) |
+
+**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby). Auditoria completa do módulo Admin (8 abas + LAUD.IA) — 30 achados, todos corrigidos exceto os 3 itens de baixa prioridade listados acima (ver [Auditoria](AUDITORIA_ADMIN_2026-07.md) / [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md), arquivado). Centro Financeiro (Fases A-D) — 16 de 18 itens executados, ver §15.
 
 ---
 

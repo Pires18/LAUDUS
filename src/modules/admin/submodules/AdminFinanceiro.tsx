@@ -1455,9 +1455,9 @@ function IACostsTab() {
       return { ...prev, [tier]: { ...current, [field]: value } };
     });
 
-  if (loadingConfig) return <Spinner />;
-
-  // Aggregate
+  // Aggregate — calculado incondicionalmente (não pode vir depois de um
+  // `return` condicional, já que o hook `useEffect` abaixo depende dele e
+  // hooks precisam rodar na mesma ordem em todo render).
   const totalCalls    = statsLogs.length;
   const totalTokensIn = statsLogs.reduce((s, l) => s + (l.inputTokens  || 0), 0);
   const totalTokensOut= statsLogs.reduce((s, l) => s + (l.outputTokens || 0), 0);
@@ -1503,6 +1503,8 @@ function IACostsTab() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statsLogs]);
+
+  if (loadingConfig) return <Spinner />;
 
   return (
     <div className="space-y-5">

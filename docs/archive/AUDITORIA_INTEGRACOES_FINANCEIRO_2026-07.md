@@ -1,6 +1,6 @@
 # Auditoria — Documentação, Configuração, Admin, Integrações e Financeiro
 
-**Data:** 2026-07-05 · **Status:** vivo · **Complementares:** [Documentação Oficial](DOCUMENTACAO_OFICIAL.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md)
+**Data:** 2026-07-05 · **Status:** vivo · **Complementares:** [Documentação Oficial](../DOCUMENTACAO_OFICIAL.md) · [Auditoria Completa](AUDITORIA_COMPLETA_2026-07.md) · [Plano Final de Produção](PLANO_FINAL_PRODUCAO_2026-07.md)
 
 Levantamento factual pedido pelo usuário cobrindo: documentação, configuração, painel admin, todas as integrações externas (incluindo Google Cloud/Gemini) e controle financeiro. Sem implementação ainda — é a base para decidir prioridades.
 

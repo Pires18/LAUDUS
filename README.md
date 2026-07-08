@@ -197,7 +197,7 @@ Histórico completo de versões em [CHANGELOG.md](CHANGELOG.md).
 - [Arquitetura do repositório](src/ARCHITECTURE.md)
 - [Auditoria Completa 07/07](docs/AUDITORIA_COMPLETA_2026-07-07.md) — estado atual de dívida técnica, testes, performance e documentação
 - [Plano de Melhorias](docs/PLANO_MELHORIAS_2026-07.md) — board de execução ativo (substitui o Plano de Refinamento anterior)
-- [Auditoria do Admin](docs/AUDITORIA_ADMIN_2026-07.md) + [Plano de Finalização do Admin](docs/PLANO_FINALIZACAO_ADMIN_2026-07.md) — auditoria completa das 8 abas do painel administrativo
+- [Auditoria do Admin](docs/AUDITORIA_ADMIN_2026-07.md) + [Plano de Finalização do Admin](docs/archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado — 100% executado) — auditoria completa das 8 abas do painel administrativo
 - [Auditoria do Financeiro](docs/AUDITORIA_FINANCEIRO_2026-07.md) + [Proposta de Centro Financeiro](docs/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) — auditoria profunda das 9 abas do Financeiro (achou bugs de cálculo, não só falta de proteção); Fases A-D EXECUTADAS (16/18 itens)
 - `docs/roadmaps/` — specs prontas aguardando implementação
 - `docs/pacs/` — arquitetura e manuais de PACS/DICOM

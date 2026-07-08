@@ -1,6 +1,6 @@
 # 🚀 Plano — PACS individual por usuário: automação, self-service e simplificação
 
-> **Data:** 04/07/2026 · **Complementa:** [`PROJETO_PACS_NUVEM.md`](./PROJETO_PACS_NUVEM.md) (arquitetura VM+Tailscale, já implementada nas Fases 1–4).
+> **Data:** 04/07/2026 · **Complementa:** [`PROJETO_PACS_NUVEM.md`](../pacs/PROJETO_PACS_NUVEM.md) (arquitetura VM+Tailscale, já implementada nas Fases 1–4).
 >
 > **Objetivo desta fase:** transformar a montagem **manual** de VM em um sistema **automático e individual** — o usuário compra o add-on PACS, sua **VM dedicada nasce sozinha**, o app se **autoconfigura**, e ele faz apenas **ajustes pessoais simples** (apontar o ultrassom e, se quiser, ligar o backup local).
 

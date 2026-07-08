@@ -78,8 +78,7 @@ export function parseNonNegativeInt(value: string, fallback = 0): number {
 }
 
 /**
- * Cria uma versão debounced de uma função.
- * Atrasa a execução até que `ms` milissegundos tenham passado sem nova chamada.
+ * Formata CPF: 000.000.000-00
  */
 export function formatCPF(cpf: string): string {
   const digits = cpf.replace(/\D/g, '').slice(0, 11);
@@ -101,7 +100,7 @@ export function formatPhone(phone: string): string {
 }
 
 /**
- * Formata CEP: 00000-000
+ * Formata CNPJ: 00.000.000/0000-00
  */
 export function formatCNPJ(cnpj: string): string {
   const digits = cnpj.replace(/\D/g, '').slice(0, 14);

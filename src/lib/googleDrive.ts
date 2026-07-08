@@ -37,7 +37,7 @@ export async function copyFile(fileId: string, newName: string, folderId?: strin
 }
 
 /**
- * Cria uma pasta no Google Drive.
+ * Apaga um arquivo do Google Drive.
  */
 export async function deleteFile(fileId: string): Promise<void> {
   const token = await getGoogleAccessToken();

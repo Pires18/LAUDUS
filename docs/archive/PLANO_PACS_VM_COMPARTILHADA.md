@@ -1,6 +1,6 @@
 # 🏢 Plano — VM compartilhada multi-tenant + refactor do módulo PACS/DICOM
 
-> **Data:** 04/07/2026 · Complementa [`PLANO_PACS_AUTOMACAO_SELF_SERVICE.md`](./PLANO_PACS_AUTOMACAO_SELF_SERVICE.md).
+> **Data:** 04/07/2026 · Complementa [`PLANO_PACS_AUTOMACAO_SELF_SERVICE.md`](../roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md).
 >
 > **Objetivo:** transformar a **VM existente `orthanc-server`** no **host compartilhado** (planos Starter/Pro, muitos clientes isolados numa VM) e manter o plano **Dedicado** como **VM própria automática** (F2). Plano de segurança e **personificação** (isolamento por usuário) + refactor do módulo para os dois modelos coexistirem.
 

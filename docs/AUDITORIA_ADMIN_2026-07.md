@@ -2,9 +2,9 @@
 
 **Data:** 2026-07-07 · **Escopo:** todo o painel Admin — 8 abas (Geral, LAUD.IA, Central de Usuários, Financeiro, Auditoria, Suporte, Máscaras, Saúde), ~7.100 linhas em 16 arquivos + o painel de configuração do LAUD.IA (`SharedLaudIA.tsx`, 1.745 linhas).
 **Método:** leitura completa de cada arquivo (5 revisões paralelas independentes, uma por área), cruzando cada botão/formulário com o backend que ele deveria acionar (`store/db.ts`, `store/adminUsers.ts`, `api/*.ts`). Sem alteração de código — auditoria pura.
-**Complementares:** [Plano de Finalização do Admin](PLANO_FINALIZACAO_ADMIN_2026-07.md) · [Documentação Oficial](DOCUMENTACAO_OFICIAL.md) · [Auditoria Completa 07/07 (sistema geral)](AUDITORIA_COMPLETA_2026-07-07.md)
+**Complementares:** [Plano de Finalização do Admin](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado — 100% executado) · [Documentação Oficial](DOCUMENTACAO_OFICIAL.md) · [Auditoria Completa 07/07 (sistema geral)](AUDITORIA_COMPLETA_2026-07-07.md)
 
-> ✅ **Status (07/07/2026): a maior parte dos achados abaixo já foi corrigida** — ver [Plano de Finalização](PLANO_FINALIZACAO_ADMIN_2026-07.md) para o detalhe de cada item. Esta página fica como o registro do estado ANTES da correção (não foi reescrita retroativamente). Únicos itens ainda abertos: Fase 4 (C7, C8 — aguardando decisão de retenção de dados) e uma parte da Fase 6 (M2, M3 — baixa prioridade).
+> ✅ **Status (07/07/2026): TODOS os achados abaixo foram corrigidos** — ver [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado) para o detalhe de cada item, incluindo Fase 4 (C7/C8, já executada após decisão de retenção de dados). Esta página fica como o registro do estado ANTES da correção (não foi reescrita retroativamente). Únicos itens genuinamente abertos: M2/M3 da Fase 6 (baixa prioridade — paginação do recálculo de Transações e guarda de concorrência entre abas) e desativar a conta no Firebase Auth ao excluir usuário (exigiria novo endpoint serverless, fora do escopo pedido).
 
 ---
 
@@ -88,4 +88,4 @@ O que falta para "funcionamento total e final" **não é funcionalidade ausente 
 
 ---
 
-*Ver [PLANO_FINALIZACAO_ADMIN_2026-07.md](PLANO_FINALIZACAO_ADMIN_2026-07.md) para a correção priorizada de cada item acima.*
+*Ver [PLANO_FINALIZACAO_ADMIN_2026-07.md](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado) para a correção priorizada de cada item acima.*

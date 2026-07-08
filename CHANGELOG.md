@@ -7,6 +7,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não versionado] — 2026-07-07
 
+### Corrigido
+- **`IACostsTab` (`AdminFinanceiro.tsx`) quebrava ao abrir** — um `useEffect` estava declarado depois de um `return` condicional (`if (loadingConfig) return <Spinner />`), violando as Regras de Hooks do React (hooks precisam rodar na mesma ordem/quantidade em todo render). No primeiro render (carregando) o hook era pulado; no seguinte, aparecia — React derrubava o componente inteiro (`Uncaught Error: Rendered more hooks than during the previous render`). Corrigido movendo a agregação de dados + o `useEffect` para antes do `return` condicional.
+- **Comentários JSDoc trocados** em `src/utils/format.ts` (`formatCPF` tinha a descrição de uma função debounce inexistente; `formatCNPJ` tinha a descrição de CEP) e `src/lib/googleDrive.ts` (`deleteFile` tinha a descrição de "criar pasta").
+
+### Mapeamento e limpeza final do sistema (07/07/2026)
+Varredura completa do sistema (código morto, documentação, deploy) antes de fechar a rodada de finalização:
+- **Documentação:** `docs/PLANO_FINALIZACAO_ADMIN_2026-07.md` (100% executado) movido para `docs/archive/`, com todas as referências atualizadas; 3 links relativos quebrados encontrados e corrigidos em docs já arquivados (paths desatualizados de antes da reorganização em pastas); seção "Pendências conhecidas" (`DOCUMENTACAO_OFICIAL.md` §17) reescrita do zero com todo item verificado contra o estado real do sistema (não só memória de sessões anteriores) — inclui achados novos: `firestore.rules`/`indexes` do Centro Financeiro ainda não deployados, branch `main` sem proteção (confirmado via `gh api`), Sentry configurado no código mas `VITE_SENTRY_DSN` ausente em produção, variáveis de PACS dedicado/compartilhado (`GCP_SA_KEY`, `TAILSCALE_*`, `PACS_SHARED_AGENT_URL`, `PACS_ADMIN_SECRET`) ausentes da Vercel (confirmado via `vercel env ls`) — provisionamento real de PACS pode estar em modo mock em produção, pendente de confirmação do usuário.
+- **Código:** auditoria de código morto (subagente dedicado) não encontrou TODO/FIXME/HACK, `debugger`, ou arquivos órfãos — codebase considerado limpo; os únicos achados reais foram os 2 comentários trocados acima (corrigidos).
+
 ### Financeiro — correção de bugs de cálculo + Centro Financeiro (Fases A e B)
 Auditoria profunda do Financeiro (`docs/AUDITORIA_FINANCEIRO_2026-07.md`) encontrou números com fórmula errada sendo exibidos como corretos. Fase A (fundação, 6/6) + início da Fase B (Central reorganizada):
 - **MRR/ARR corrigido**: `api/cron-aggregate-metrics.ts` superestimava assinantes semestrais em 6x (só tratava `interval==='year'` como não-mensal) e usava o preço atual do catálogo em vez do preço travado na assinatura. Reescrito com `computeMrr()` (testável, usa `intervalMultiplier`).

@@ -1,6 +1,6 @@
 # 🎯 Plano de Finalização — Módulo Administrador (07/07/2026)
 
-**Base:** [AUDITORIA_ADMIN_2026-07.md](AUDITORIA_ADMIN_2026-07.md) — 30 achados em 8 abas + painel LAUD.IA.
+**Base:** [AUDITORIA_ADMIN_2026-07.md](../AUDITORIA_ADMIN_2026-07.md) — 30 achados em 8 abas + painel LAUD.IA.
 **Status: TOTALMENTE EXECUTADO em 07/07/2026** ("seguir com plano") — todas as 6 fases concluídas na mesma sessão, incluindo a Fase 4 (após o usuário decidir a política de retenção de dados na exclusão de usuário). `tsc` 0, testes verdes, `vite build` ok após cada fase. Único item que ficou de fora (fora do escopo da decisão pedida): desativar a conta no Firebase Auth ao excluir usuário — exigiria um novo endpoint serverless, ver Fase 4.
 
 ---
