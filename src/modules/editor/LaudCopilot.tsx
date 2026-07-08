@@ -1131,7 +1131,7 @@ export function LaudCopilot({
     msg += `\n\nDADOS DO FORMULÁRIO:\n${lines.join('\n')}`;
     const derivLines = derivationsToLines(structuredDerivations);
     if (derivLines.length) {
-      msg += `\n\nCÁLCULOS AUTOMÁTICOS (já calculados a partir dos dados — use exatamente estes valores, não recalcule):\n${derivLines.join('\n')}`;
+      msg += `\n\nCÁLCULOS AUTOMÁTICOS (já calculados a partir dos dados — use EXATAMENTE estes valores; NÃO recalcule e NÃO contradiga a categoria/escore nem a conduta aqui indicada: a classificação sistematizada [BI-RADS, TI-RADS, O-RADS, Bosniak, NASCET, FIGO etc.] e a recomendação de seguimento devem refletir fielmente estes resultados na CONCLUSÃO e nas RECOMENDAÇÕES):\n${derivLines.join('\n')}`;
     }
 
     setActiveTab('chat');

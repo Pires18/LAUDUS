@@ -165,6 +165,24 @@ describe('parseMaskSections — parser genérico da máscara', () => {
     expect(sections[1].fields[0].kind).toBe('measure');
     expect(sections[2].fields[0].kind).toBe('text');
   });
+
+  it('ignora linhas instrucionais (sem virar seção-fantasma)', () => {
+    const withInstruction =
+      '<p><strong>Tireoide:</strong> Ecotextura homogênea.</p>' +
+      '<p><em>(Repetir este item para cada nódulo clinicamente relevante)</em></p>' +
+      '<p>[Expandir aqui com descrição de cistos, cálculos ou massas.]</p>';
+    const sections = parseMaskSections(withInstruction);
+    expect(sections.length).toBe(1);
+    expect(sections[0].label).toBe('Tireoide');
+  });
+
+  it('limpa tokens [..] do rótulo do compartimento', () => {
+    const sections = parseMaskSections(
+      '<p><strong>Músculo(s) avaliado(s) [listar músculos]:</strong> Padrão fibrilar normal.</p>'
+    );
+    expect(sections.length).toBe(1);
+    expect(sections[0].label).toBe('Músculo avaliado');
+  });
 });
 
 describe('summarizeStructured — normal/alterado e repetível', () => {

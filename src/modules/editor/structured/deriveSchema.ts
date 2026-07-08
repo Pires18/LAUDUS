@@ -39,6 +39,11 @@ export function parseMaskSections(analysisTemplate: string): StructuredSection[]
   const sections: StructuredSection[] = [];
   const seen = new Set<string>();
 
+  // Linhas puramente instrucionais da máscara (não são compartimentos anatômicos):
+  // ex.: "(Repetir este item para cada nódulo…)", "[Expandir aqui…]", "[listar…]".
+  // Sem <strong> (rótulo de compartimento), viram seções-fantasma → devem ser ignoradas.
+  const INSTRUCTIONAL_RE = /^\s*[([]?\s*(repetir\b|expandir\b|preencher\b|listar\b|adicionar\b|incluir\b|inserir aqui|descrever aqui|para cada\b|se houver\b|quando aplic)/i;
+
   for (const block of blocks) {
     const bodyText = stripTags(block);
     if (!bodyText) continue; // pula <p> vazios (evita seções-fantasma)
@@ -46,9 +51,15 @@ export function parseMaskSections(analysisTemplate: string): StructuredSection[]
     // Rótulo: conteúdo do <strong> até o primeiro ':' (aceita rótulo com valor inline).
     const strongMatch =
       block.match(/<strong>\s*([^<:]+?)\s*:/i) || block.match(/<strong>\s*([^<]+?)\s*<\/strong>/i);
+    // Bloco sem rótulo de compartimento e com texto instrucional → não é seção.
+    if (!strongMatch && INSTRUCTIONAL_RE.test(bodyText)) continue;
     const rawLabel = strongMatch ? strongMatch[1].trim() : bodyText.split('.')[0].slice(0, 40);
-    // remove parênteses explicativos do rótulo (ex.: "(CCN)")
-    const label = rawLabel.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    // remove parênteses/colchetes explicativos do rótulo (ex.: "(CCN)", "[listar músculos]")
+    const label = rawLabel
+      .replace(/\s*\([^)]*\)\s*/g, ' ')
+      .replace(/\s*\[[^\]]*\]\s*/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!label) continue; // sem rótulo utilizável → ignora
 
     let id = slug(label);

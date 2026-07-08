@@ -82,7 +82,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
        ≤3 cm típico → US 6–12 meses. >3 cm ou atípico → RM dinâmica com Gd.
      Lesão sólida indeterminada: descrever segmento Couinaud, dimensão, ecogenicidade,
        halo, PD interno. → SEMPRE recomendar RM abdome com contraste dinâmico.
-     Paciente cirrótico / HBV sem cirrose (LI-RADS v2024 ao US):
+     Paciente cirrótico / HBV sem cirrose (ACR LI-RADS US, 2017, ao US):
        REGRA: ao US SEM contraste (convencional), NÃO atribuir categoria LI-RADS definitiva.
        Usar linguagem equivalente e recomendar TC/RM com contraste para classificação formal.
        Equivalências orientativas no US convencional:
@@ -93,7 +93,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
          LR-5 equiv.: nódulo >2 cm com padrão de lavagem ao CEUS/dinâmica ou vascularização interna exuberante.
          LR-M (malignidade): lesão com critérios atípicos para CHC (ex: rim hipoecoico com invasão vascular).
          LR-TIV: trombo portal com expansão e PD interno → ATIVAR R6.
-       Citar: "(equivalência LI-RADS v2024 — confirmação por TC/RM hepática com contraste dinâmico indicada)."
+       Citar: "(equivalência ACR LI-RADS US (2017) — confirmação por TC/RM hepática com contraste dinâmico indicada)."
 
    INDICAÇÃO DE CEUS (Contraste Ultrassonográfico — US-CEUS) — quando recomendar:
      Indicar CEUS ao invés de TC/RM imediata nas seguintes situações:
@@ -1871,7 +1871,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    */
   'mastologia': `DIRETRIZES CLÍNICAS — MASTOLOGIA (V2.0 — LAUD.IA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REFERÊNCIAS: ACR BI-RADS v2025 (extensão da 5ª ed.) · SBM · FEBRASGO · NCCN · ASCO
+REFERÊNCIAS: ACR BI-RADS 5ª ed. (2013) · SBM · FEBRASGO · NCCN · ASCO
              EUSOMA · ACR · CBR · SBUS · EUSOMA Linfonodos 2024
 
 MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
@@ -1882,8 +1882,8 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
   └────────────────────────────────────────────────────────────────────┘
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. CLASSIFICAÇÃO BI-RADS (ACR v2025) — OBRIGATÓRIA para toda formação mamária
-   [v2025: "microlobulada" fundida em "indistinta"; categoria 6 = seguimento com cirurgião/oncologista + terapia local definitiva; novos descritores de elastografia US]
+1. CLASSIFICAÇÃO BI-RADS (ACR 5ª ed., 2013) — OBRIGATÓRIA para toda formação mamária
+   [Léxico US da 5ª ed.: forma (oval/redonda/irregular); orientação (paralela/não-paralela); margem (circunscrita/indistinta/angulada/microlobulada/espiculada); padrão ecogênico; características acústicas posteriores. Categoria 6 = malignidade comprovada por biópsia. Elastografia = adjuvante, NÃO substitui a categoria BI-RADS.]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ┌──────────┬─────────────────────────────────────────────────────────────────┐
    │ CATEGORIA│ INTERPRETAÇÃO / CONDUTA                                         │
@@ -2847,8 +2847,9 @@ MAPA DE EXAMES DESTA ÁREA (6 templates de Camada 3):
    */
   'reumatologico': `DIRETRIZES CLÍNICAS — REUMATOLÓGICO / POWER DOPPLER (V2.0 — LAUD.IA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REFERÊNCIAS: EULAR 2017/2022 · OMERACT · SBR · GRAPPA · ACR
-             ASAS (SpA) · ESSR · Treat-to-Target · PDUS Working Group
+REFERÊNCIAS: EULAR-OMERACT (definições consensuais de sinovite/tenossinovite/
+             entesite; remissão por imagem EULAR 2022) · ASAS (SpA axial, 2009)
+             · GUESS (entesite) · SBR · GRAPPA · ESSR · Treat-to-Target
 
 MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
   ┌────────────────────────────────────────────────────────────────────┐
@@ -2909,6 +2910,18 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
      Calcificação entesopatia (doença crônica).
    ESCORE GUESS: 6 enteses bilaterais (patelar prox.+dist.+Aquiles × 2 = 12 locais).
    Score ≥4 = espondiloartropatia suspeita → N3.
+
+4B. TENOSSINOVITE — Escore OMERACT (GS + Power Doppler)
+   DEFINIÇÃO OMERACT: líquido/espessamento hipoecoico anormal na bainha tendínea
+   (peritendíneo), em dois planos, com ou sem sinal PD. Distinguir de simples
+   anisotropia e de bursa adjacente.
+   ESCORE GS (bainha — espessamento/líquido): Grau 0 normal; Grau 1 mínimo;
+   Grau 2 moderado (halo peritendíneo); Grau 3 acentuado (bainha exuberante).
+   ESCORE PD (peritendíneo): Grau 0 ausente; Grau 1 puntiforme; Grau 2 <50% da
+   circunferência; Grau 3 ≥50% da circunferência da bainha.
+   SÍTIOS-CHAVE: extensor ulnar do carpo e flexores dos dedos (AR); tibial
+   posterior (SpA/AR); fibulares (tornozelo). Tenossinovite PD ≥1 = inflamação
+   ativa → N3, correlação reumatológica. Frequente na AR precoce e na SpA.
 
 5. CRISTALOPATIAS
    GOTA (Depósito de Urato Monosódico — UMS):

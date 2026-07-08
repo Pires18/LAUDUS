@@ -107,4 +107,56 @@ describe('auditReportQuality', () => {
     const placeholder = result.issues.find(i => i.type === 'placeholder');
     expect(placeholder).toBeDefined();
   });
+
+  it('sinaliza cisto renal complexo sem Bosniak (medicina-interna)', () => {
+    const report = [
+      '<h1>ABDOME</h1>',
+      '<h2>TÉCNICA</h2><p>Convexo.</p>',
+      '<h2>ANÁLISE</h2><p>Cisto renal à direita com septos espessos e calcificação parietal.</p>',
+      '<h2>CONCLUSÃO</h2><p>Cisto renal a esclarecer.</p>',
+      '<h2>RECOMENDAÇÕES</h2><p>Complementar com TC.</p>',
+      '<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Limitado por gases.</p>',
+    ].join('');
+    const result = auditReportQuality(report, 'medicina-interna');
+    expect(result.issues.some(i => i.type === 'classification')).toBe(true);
+  });
+
+  it('não sinaliza cisto renal simples (medicina-interna)', () => {
+    const report = [
+      '<h1>ABDOME</h1>',
+      '<h2>TÉCNICA</h2><p>Convexo.</p>',
+      '<h2>ANÁLISE</h2><p>Cisto renal simples anecoico à direita, de paredes finas.</p>',
+      '<h2>CONCLUSÃO</h2><p>Cisto renal simples.</p>',
+      '<h2>RECOMENDAÇÕES</h2><p>Seguimento habitual.</p>',
+      '<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Limitado por gases.</p>',
+    ].join('');
+    const result = auditReportQuality(report, 'medicina-interna');
+    expect(result.issues.some(i => i.type === 'classification')).toBe(false);
+  });
+
+  it('sinaliza estenose carotídea sem graduação (vascular)', () => {
+    const report = [
+      '<h1>CARÓTIDAS</h1>',
+      '<h2>TÉCNICA</h2><p>Linear.</p>',
+      '<h2>ANÁLISE</h2><p>Placa calcificada com estenose na artéria carótida interna direita.</p>',
+      '<h2>CONCLUSÃO</h2><p>Estenose carotídea.</p>',
+      '<h2>RECOMENDAÇÕES</h2><p>Seguimento.</p>',
+      '<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Operador-dependente.</p>',
+    ].join('');
+    const result = auditReportQuality(report, 'vascular');
+    expect(result.issues.some(i => i.type === 'classification')).toBe(true);
+  });
+
+  it('aceita estenose carotídea graduada por percentual (vascular)', () => {
+    const report = [
+      '<h1>CARÓTIDAS</h1>',
+      '<h2>TÉCNICA</h2><p>Linear.</p>',
+      '<h2>ANÁLISE</h2><p>Placa na carótida interna direita com estenose de 50-69%.</p>',
+      '<h2>CONCLUSÃO</h2><p>Estenose de 50-69%.</p>',
+      '<h2>RECOMENDAÇÕES</h2><p>Seguimento.</p>',
+      '<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Operador-dependente.</p>',
+    ].join('');
+    const result = auditReportQuality(report, 'vascular');
+    expect(result.issues.some(i => i.type === 'classification')).toBe(false);
+  });
 });

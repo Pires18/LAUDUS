@@ -101,6 +101,20 @@ function checkMandatoryClassifications(html: string): VerificationIssue[] {
       label: 'Mioma sem classificação FIGO',
       severity: 'warning',
     },
+    {
+      // Cisto renal COMPLEXO (descritor de complexidade na mesma sentença) exige Bosniak (2019).
+      findingRe: /cisto[s]? rena(l|is)[^.]{0,90}(sept|calcific|parede espess|realce|conte[úu]do heterog|componente s[óo]lid|nodula[çr]|vegeta[çc]|complex)/,
+      classRe: /bosniak/i,
+      label: 'Cisto renal complexo sem categoria de Bosniak',
+      severity: 'warning',
+    },
+    {
+      // Estenose carotídea exige graduação NASCET/SRU (aceita percentual/severidade como grau).
+      findingRe: /(est[ée]nos)[^.]{0,45}(car[óo]tid|\baci\b|bulbo)|(car[óo]tid|\baci\b|bulbo car[óo]t)[^.]{0,70}(est[ée]nos)/,
+      classRe: /nascet|sru|\d{2}\s*[–\-a]\s*\d{2}\s*%|est[ée]nose\s+(leve|moderada|acentuada|importante|cr[íi]tica)|<\s*50\s*%|≥?\s*70\s*%/i,
+      label: 'Estenose carotídea sem graduação NASCET/SRU',
+      severity: 'warning',
+    },
   ];
 
   for (const rule of rules) {

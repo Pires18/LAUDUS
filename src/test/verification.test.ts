@@ -62,6 +62,46 @@ describe('verifyReport — classificações obrigatórias', () => {
     const r = verifyReport(html, { area: 'pequenas-partes' });
     expect(r.issues.some((i) => i.type === 'missing_classification')).toBe(true);
   });
+
+  it('reprova cisto renal complexo sem categoria de Bosniak', () => {
+    const html = `<h1>USG ABDOME</h1>
+<h2>ANÁLISE</h2><p>Cisto renal à direita com septos espessos e calcificação parietal.</p>
+<h2>CONCLUSÃO</h2><p>• Cisto renal a esclarecer.</p>`;
+    const r = verifyReport(html, { area: 'medicina-interna' });
+    expect(r.issues.some((i) => i.type === 'missing_classification')).toBe(true);
+  });
+
+  it('não dispara Bosniak em cisto renal simples', () => {
+    const html = `<h1>USG ABDOME</h1>
+<h2>ANÁLISE</h2><p>Cisto renal simples anecoico à direita, de paredes finas.</p>
+<h2>CONCLUSÃO</h2><p>• Cisto renal simples.</p>`;
+    const r = verifyReport(html, { area: 'medicina-interna' });
+    expect(r.issues.some((i) => i.type === 'missing_classification')).toBe(false);
+  });
+
+  it('aceita cisto renal complexo com Bosniak', () => {
+    const html = `<h1>USG ABDOME</h1>
+<h2>ANÁLISE</h2><p>Cisto renal à direita com septos espessos, Bosniak III.</p>
+<h2>CONCLUSÃO</h2><p>• Cisto renal Bosniak III.</p>`;
+    const r = verifyReport(html, { area: 'medicina-interna' });
+    expect(r.issues.some((i) => i.type === 'missing_classification')).toBe(false);
+  });
+
+  it('reprova estenose carotídea sem graduação NASCET/SRU', () => {
+    const html = `<h1>USG CARÓTIDAS</h1>
+<h2>ANÁLISE</h2><p>Placa calcificada com estenose na artéria carótida interna direita.</p>
+<h2>CONCLUSÃO</h2><p>• Estenose carotídea.</p>`;
+    const r = verifyReport(html, { area: 'vascular' });
+    expect(r.issues.some((i) => i.type === 'missing_classification')).toBe(true);
+  });
+
+  it('aceita estenose carotídea graduada por percentual (NASCET)', () => {
+    const html = `<h1>USG CARÓTIDAS</h1>
+<h2>ANÁLISE</h2><p>Placa na carótida interna direita com estenose de 50-69% (critérios NASCET/SRU).</p>
+<h2>CONCLUSÃO</h2><p>• Estenose carotídea de 50-69%.</p>`;
+    const r = verifyReport(html, { area: 'vascular' });
+    expect(r.issues.some((i) => i.type === 'missing_classification')).toBe(false);
+  });
 });
 
 describe('verifyReport — coerência', () => {
