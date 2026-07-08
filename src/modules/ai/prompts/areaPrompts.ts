@@ -1871,8 +1871,8 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    */
   'mastologia': `DIRETRIZES CLÍNICAS — MASTOLOGIA (V2.0 — LAUD.IA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REFERÊNCIAS: ACR BI-RADS 5ª ed. (2013) · SBM · FEBRASGO · NCCN · ASCO
-             EUSOMA · ACR · CBR · SBUS · EUSOMA Linfonodos 2024
+REFERÊNCIAS: ACR BI-RADS® v2025 (manual ilustrado; extensão da 5ª ed.) · SBM
+             FEBRASGO · NCCN · ASCO · EUSOMA · CBR · SBUS · EUSOMA Linfonodos 2024
 
 MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
   ┌────────────────────────────────────────────────────────────────────┐
@@ -1882,8 +1882,9 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
   └────────────────────────────────────────────────────────────────────┘
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. CLASSIFICAÇÃO BI-RADS (ACR 5ª ed., 2013) — OBRIGATÓRIA para toda formação mamária
-   [Léxico US da 5ª ed.: forma (oval/redonda/irregular); orientação (paralela/não-paralela); margem (circunscrita/indistinta/angulada/microlobulada/espiculada); padrão ecogênico; características acústicas posteriores. Categoria 6 = malignidade comprovada por biópsia. Elastografia = adjuvante, NÃO substitui a categoria BI-RADS.]
+1. CLASSIFICAÇÃO BI-RADS® (ACR v2025 — extensão da 5ª ed.) — OBRIGATÓRIA para toda formação mamária
+   [Léxico US v2025: forma (oval/redonda/LOBULADA/irregular — v2025 introduziu o descritor "lobulada": contorno ondulado com uma ou mais indentações, entre oval e irregular); orientação (paralela/não-paralela); margem (circunscrita/indistinta/angulada/MICROLOBULADA/espiculada); padrão ecogênico; características acústicas posteriores. Categoria 6 = malignidade comprovada por biópsia. Elastografia = adjuvante, NÃO substitui a categoria BI-RADS.]
+   [ATENÇÃO v2025 — harmonização de léxico entre modalidades: a fusão da margem "microlobulada" em "indistinta" vale para a MAMOGRAFIA. No ULTRASSOM, "microlobulada" PERMANECE como descritor de margem distinto — NÃO fundir no US. Categorias 0–6 e condutas inalteradas.]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ┌──────────┬─────────────────────────────────────────────────────────────────┐
    │ CATEGORIA│ INTERPRETAÇÃO / CONDUTA                                         │
@@ -1904,7 +1905,7 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
 
 2. DESCRITORES DE NÓDULOS SÓLIDOS — BI-RADS Lexicon (ACR)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   a) FORMA: oval (favorável) · redonda (favorável) · irregular (suspeita).
+   a) FORMA: oval (favorável) · redonda (favorável) · lobulada (contorno ondulado com uma ou mais indentações — descritor v2025, suspeita intermediária, entre oval e irregular) · irregular (suspeita).
    b) ORIENTAÇÃO: paralela ao plano da pele (favorável) · não paralela/vertical (suspeita).
    c) MARGENS:
       Circunscritas: bem definidas, abruptas → favorável (BI-RADS 2–3).

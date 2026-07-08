@@ -18,7 +18,10 @@ export interface GuidelineRef {
 
 export const CLASSIFICATION_REFS = {
   tirads: { short: 'TI-RADS', cite: 'ACR TI-RADS (2017)', link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Thyroid-Imaging-Reporting-and-Data-System' },
-  birads: { short: 'BI-RADS', cite: 'ACR BI-RADS 5ª ed. (2013)', link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Bi-Rads' },
+  // BI-RADS® v2025: manual ilustrado do ACR (eBook), extensão da 5ª ed. (2013), com
+  // léxico harmonizado entre modalidades. No ULTRASSOM a margem "microlobulada" PERMANECE
+  // distinta (a fusão em "indistinta" é mudança MAMOGRÁFICA); v2025 adicionou a forma "lobulada".
+  birads: { short: 'BI-RADS', cite: 'ACR BI-RADS® v2025 (extensão da 5ª ed.)', link: 'https://www.acr.org/Clinical-Resources/Clinical-Tools-and-Reference/Reporting-and-Data-Systems/BI-RADS' },
   orads: { short: 'O-RADS', cite: 'ACR O-RADS US (v2022)', link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/O-Rads' },
   bosniak: { short: 'Bosniak', cite: 'Bosniak (2019)', link: 'https://pubmed.ncbi.nlm.nih.gov/31063396/' },
   lirads: { short: 'LI-RADS', cite: 'ACR LI-RADS US (2017)', link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/LI-RADS' },
@@ -38,5 +41,10 @@ export const CLASSIFICATION_REFS = {
 
 export type ClassificationKey = keyof typeof CLASSIFICATION_REFS;
 
-/** Versões inventadas/incorretas que NÃO devem aparecer em nenhuma camada. */
-export const FORBIDDEN_REF_STRINGS = ['BI-RADS v2025', 'BI-RADS (ACR v2025)', 'LI-RADS v2024'];
+/**
+ * Versões inventadas/incorretas que NÃO devem aparecer em nenhuma camada.
+ * NOTA: 'BI-RADS v2025' É VÁLIDO (manual ilustrado real do ACR, extensão da 5ª ed.) e
+ * portanto NÃO consta aqui. O que permanece proibido para o BI-RADS é aplicar ao ULTRASSOM
+ * a fusão mamográfica de "microlobulada" em "indistinta".
+ */
+export const FORBIDDEN_REF_STRINGS = ['LI-RADS v2024', 'microlobulada fundida em indistinta (US)'];

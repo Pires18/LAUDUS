@@ -681,7 +681,7 @@ REGRAS DE FORMATAÇÃO DA ANÁLISE:
 
 REGRAS PARA SEÇÃO CLASSIFICAÇÃO — REGRA UNIFICADA:
   INCLUIR OBRIGATORIAMENTE quando houver QUALQUER achado focal que receba classificação sistematizada oficial:
-    • Nódulo mamário → BI-RADS (ACR 5ª ed., 2013);
+    • Nódulo mamário → BI-RADS (ACR v2025, extensão da 5ª ed.);
     • Nódulo tireoidiano → TI-RADS (ACR 2017);
     • Formação ovariana → O-RADS (ACR US, v2022);
     • Lesão hepática suspeita em cirrótico/HBV → LI-RADS US (ACR 2017);
@@ -692,7 +692,7 @@ REGRAS PARA SEÇÃO CLASSIFICAÇÃO — REGRA UNIFICADA:
     • Exames 100% normais sem achado focal classificável;
     • Laudos vasculares puros (TVP, Doppler arterial, carótidas) — Não existe sistema classificatório obrigatório; grau de estenose é citado na ANÁLISE, não em seção separada;
     • Laudos obstétricos — a biometria vai em tabela na ANÁLISE, não em seção CLASSIFICAÇÃO.
-  SEMPRE citar versão e entidade: "(ACR BI-RADS 5ª ed., 2013)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
+  SEMPRE citar versão e entidade: "(ACR BI-RADS® v2025, ext. 5ª ed.)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
 
 CABEÇALHO DE LAUDO OBSTÉTRICO — adicionar ANTES de <h2>TÉCNICA</h2>:
   <p><strong>DATA DE REFERÊNCIA:</strong> [data do exame]</p>
@@ -832,7 +832,7 @@ R5 — CLASSIFICAÇÕES SISTEMATIZADAS OFICIAIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Nunca atribuir categorias (BI-RADS, TI-RADS, O-RADS, LI-RADS, BOSNIAK, FIGO, PIRADS) sem dados morfológicos descritivos suficientes para justificar a categoria.
 Se dados insuficientes: declare — "Dados descritivos insuficientes para classificação sistematizada com segurança."
-Sempre cite a versão/sistema usado: "(ACR BI-RADS 5ª ed., 2013)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
+Sempre cite a versão/sistema usado: "(ACR BI-RADS® v2025, ext. 5ª ed.)", "(TI-RADS ACR 2017)", "(O-RADS ACR 2022)".
 Nunca misturar versões ou sistemas diferentes no mesmo laudo.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -895,7 +895,7 @@ Em pacientes com idade registrada como < 18 anos:
 R10 — SEGURANÇA EM VERSÕES DE CLASSIFICAÇÕES (V2.0)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Versões oficiais vigentes a utilizar EXCLUSIVAMENTE (não misturar):
-  BI-RADS: ACR 5ª ed. (2013) — mama (léxico US: forma/orientação/margem/eco/acústicas; categorias 0–6; elastografia adjuvante);
+  BI-RADS: ACR v2025 (extensão da 5ª ed.) — mama (léxico US: forma [oval/redonda/lobulada/irregular]; orientação; margem [circunscrita/indistinta/angulada/microlobulada/espiculada — microlobulada MANTIDA no US]; eco; acústicas; categorias 0–6; elastografia adjuvante);
   TI-RADS: ACR 2017 — único válido para tireoide;
   O-RADS: ACR 2022 — único válido para ovário/pelve;
   LI-RADS: ACR LI-RADS US (2017) — para fígado em risco de CHC (US convencional não atribui categoria definitiva; citar "(ACR LI-RADS US, 2017)");
