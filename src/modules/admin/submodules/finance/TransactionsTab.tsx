@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, doc, getDoc, getDocs, setDoc, query, orderBy, limit, startAfter, where } from 'firebase/firestore';
+import { collection, collectionGroup, doc, getDoc, getDocs, setDoc, query, orderBy, limit, startAfter, where } from 'firebase/firestore';
 import { firestore } from '../../../../lib/firebase';
 import { useApp } from '../../../../store/app';
 import { logger } from '../../../../utils/logger';
 import { classNames } from '../../../../utils/format';
+import { estimateNetRevenue, type GatewayFeeConfig } from '../../../../../api/_pricing';
 import {
   FileText, Loader2, RefreshCw, Search, Filter, Download,
   QrCode, CreditCard, Wallet, ChevronDown, X, TrendingUp,
-  RefreshCcw, Tag, Calendar,
+  RefreshCcw, Tag, Calendar, Receipt,
 } from 'lucide-react';
 import { Spinner } from './Spinner';
 
@@ -80,8 +81,10 @@ export function TransactionsTab() {
   const [recalculating, setRecalculating] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [nfMap, setNfMap] = useState<Record<string, string>>({});
+  const [gatewayFees, setGatewayFees] = useState<GatewayFeeConfig | null>(null);
   const lastDocRef = useRef<any>(null);
-  const { showToast } = useApp();
+  const { showToast, user } = useApp();
 
   // ── Filters ──
   const [search, setSearch] = useState('');
@@ -90,6 +93,7 @@ export function TransactionsTab() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPeriod, setFilterPeriod] = useState<number>(30);
   const [filterInterval, setFilterInterval] = useState<string>('all');
+  const [filterNf, setFilterNf] = useState<string>('all');
 
   const loadStats = useCallback(async () => {
     try {
@@ -97,6 +101,39 @@ export function TransactionsTab() {
       setStats(s.exists() ? (s.data() as FinanceStats) : null);
     } catch (err) { logger.error('Erro ao carregar métricas:', err); }
   }, []);
+
+  const loadNfAndFees = useCallback(async () => {
+    try {
+      const [nfSnap, abacateSnap] = await Promise.all([
+        getDocs(collectionGroup(firestore, 'nf')),
+        getDoc(doc(firestore, 'global_config', 'abacatepay_config')),
+      ]);
+      const map: Record<string, string> = {};
+      nfSnap.docs.forEach(d => {
+        const txId = d.ref.parent.parent?.id;
+        if (txId) map[txId] = (d.data() as any).status || 'pending';
+      });
+      setNfMap(map);
+      setGatewayFees(abacateSnap.exists() ? (abacateSnap.data() as GatewayFeeConfig) : null);
+    } catch (err) { logger.error('Erro ao carregar status de NF:', err); }
+  }, []);
+
+  const toggleNfStatus = useCallback(async (txId: string) => {
+    const current = nfMap[txId] || 'pending';
+    const next = current === 'issued' ? 'pending' : 'issued';
+    setNfMap(prev => ({ ...prev, [txId]: next }));
+    try {
+      await setDoc(doc(firestore, 'transactions', txId, 'nf', 'status'), {
+        status: next,
+        updatedAt: Date.now(),
+        updatedBy: user?.uid || 'unknown',
+      }, { merge: true });
+    } catch (err) {
+      logger.error('Erro ao atualizar status de NF:', err);
+      setNfMap(prev => ({ ...prev, [txId]: current }));
+      showToast('Falha ao atualizar status de NF.', 'error');
+    }
+  }, [nfMap, user, showToast]);
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
@@ -153,14 +190,34 @@ export function TransactionsTab() {
   const exportCsv = useCallback(async () => {
     setExporting(true);
     try {
-      const snap = await getDocs(query(collection(firestore, 'transactions'), orderBy('timestamp', 'desc')));
+      const [snap, nfSnap, abacateSnap] = await Promise.all([
+        getDocs(query(collection(firestore, 'transactions'), orderBy('timestamp', 'desc'))),
+        getDocs(collectionGroup(firestore, 'nf')),
+        getDoc(doc(firestore, 'global_config', 'abacatepay_config')),
+      ]);
+      const nfByTx: Record<string, string> = {};
+      nfSnap.docs.forEach(d => {
+        const txId = d.ref.parent.parent?.id;
+        if (txId) nfByTx[txId] = (d.data() as any).status || 'pending';
+      });
+      const fees: GatewayFeeConfig = abacateSnap.exists() ? (abacateSnap.data() as GatewayFeeConfig) : {};
       const cell = (v: unknown) => {
         const s = String(v ?? '');
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       };
-      const header = ['Data/Hora', 'Usuário', 'Tipo', 'Descrição', 'Intervalo', 'Parcelas', 'Valor (R$)', 'Método', 'Status'];
+      const header = [
+        'Data/Hora', 'Usuário', 'Tipo', 'Descrição', 'Intervalo', 'Parcelas',
+        'Valor Bruto (R$)', 'Taxa Gateway Estimada (R$)', 'Valor Líquido Estimado (R$)',
+        'Método', 'Status', 'Nota Fiscal',
+      ];
       const rows = snap.docs.map(d => {
         const t = d.data() as any;
+        const gross = t.amount || 0;
+        const net = t.status === 'paid'
+          ? estimateNetRevenue({ [t.paymentMethod || 'manual']: gross }, { [t.paymentMethod || 'manual']: 1 }, fees)
+          : gross;
+        const feeEst = gross - net;
+        const nfStatus = nfByTx[d.id] === 'issued' ? 'Emitida' : 'Pendente';
         return [
           t.timestamp ? new Date(t.timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '',
           t.userEmail || '',
@@ -168,9 +225,12 @@ export function TransactionsTab() {
           t.description || '',
           INTERVAL_LABELS[t.interval] || t.interval || '',
           t.installments ? `${t.installments}x` : '—',
-          (t.amount || 0).toFixed(2),
+          gross.toFixed(2),
+          feeEst.toFixed(2),
+          net.toFixed(2),
           METHOD_LABEL[t.paymentMethod] || t.paymentMethod || '',
           t.status || '',
+          nfStatus,
         ].map(cell).join(',');
       });
       const csv = '\ufeff' + [header.join(','), ...rows].join('\r\n');
@@ -187,7 +247,7 @@ export function TransactionsTab() {
     } finally { setExporting(false); }
   }, [showToast]);
 
-  useEffect(() => { loadStats(); loadFirstPage(); }, [loadStats, loadFirstPage]);
+  useEffect(() => { loadStats(); loadFirstPage(); loadNfAndFees(); }, [loadStats, loadFirstPage, loadNfAndFees]);
 
   // ── Filtering ──
   const cutoff = filterPeriod > 0 ? Date.now() - filterPeriod * 86400000 : 0;
@@ -197,6 +257,10 @@ export function TransactionsTab() {
     if (filterMethod !== 'all' && t.paymentMethod !== filterMethod) return false;
     if (filterType !== 'all' && t.type !== filterType) return false;
     if (filterInterval !== 'all' && t.interval !== filterInterval) return false;
+    if (filterNf !== 'all') {
+      const nfStatus = nfMap[t.id] === 'issued' ? 'issued' : 'pending';
+      if (nfStatus !== filterNf) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -212,11 +276,11 @@ export function TransactionsTab() {
     .reduce((a, t) => a + (t.amount || 0), 0);
 
   const hasActiveFilters = filterStatus !== 'all' || filterMethod !== 'all' ||
-    filterType !== 'all' || filterInterval !== 'all' || filterPeriod !== 30 || search;
+    filterType !== 'all' || filterInterval !== 'all' || filterNf !== 'all' || filterPeriod !== 30 || search;
 
   const clearFilters = () => {
     setSearch(''); setFilterStatus('all'); setFilterMethod('all');
-    setFilterType('all'); setFilterInterval('all'); setFilterPeriod(30);
+    setFilterType('all'); setFilterInterval('all'); setFilterNf('all'); setFilterPeriod(30);
   };
 
   if (loading) return <Spinner />;
@@ -341,6 +405,17 @@ export function TransactionsTab() {
             <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
           </div>
 
+          {/* Nota Fiscal */}
+          <div className="relative">
+            <select value={filterNf} onChange={e => setFilterNf(e.target.value)}
+              className="input h-9 pl-3 pr-7 text-xs appearance-none cursor-pointer min-w-[110px]">
+              <option value="all">Todas NF</option>
+              <option value="issued">NF emitida</option>
+              <option value="pending">NF pendente</option>
+            </select>
+            <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
+          </div>
+
           {hasActiveFilters && (
             <button onClick={clearFilters}
               className="flex items-center gap-1 h-9 px-3 rounded-xl border border-rose-200 text-rose-600 bg-rose-50 text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all">
@@ -379,6 +454,7 @@ export function TransactionsTab() {
                   <th className="px-4 py-3 text-right">Valor</th>
                   <th className="px-4 py-3 text-center">Método</th>
                   <th className="px-4 py-3 text-right">Status</th>
+                  <th className="px-4 py-3 text-center">NF</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-50">
@@ -430,6 +506,25 @@ export function TransactionsTab() {
                         <span className={classNames('px-1.5 py-0.5 rounded text-[8px] font-black uppercase border', statusCfg.cls)}>
                           {statusCfg.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {t.status === 'paid' ? (
+                          <button
+                            onClick={() => toggleNfStatus(t.id)}
+                            title="Clique para alternar status de nota fiscal"
+                            className={classNames(
+                              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase border transition-colors',
+                              nfMap[t.id] === 'issued'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                            )}
+                          >
+                            <Receipt size={9} />
+                            {nfMap[t.id] === 'issued' ? 'Emitida' : 'Pendente'}
+                          </button>
+                        ) : (
+                          <span className="text-ink-300">—</span>
+                        )}
                       </td>
                     </tr>
                   );

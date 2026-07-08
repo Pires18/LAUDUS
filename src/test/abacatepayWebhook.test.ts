@@ -1,6 +1,35 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import crypto from 'crypto';
-import { verifyWebhook, markEventProcessedOnce } from '../../api/abacatepay-webhook';
+import { verifyWebhook, markEventProcessedOnce, activateSubscription } from '../../api/abacatepay-webhook';
+
+/**
+ * Fake de Firestore Admin com get/set/add diretos (sem transação) — suficiente
+ * pro caminho de escrita de activateSubscription (users/subscriptions/
+ * saas_plans/transactions/global_config). Seed de dados via `store.set`.
+ */
+function fakeFirestoreDb(seed: Record<string, any> = {}) {
+  const store = new Map<string, any>(Object.entries(seed));
+  const ref = (path: string) => ({
+    path,
+    get: async () => ({ exists: store.has(path), data: () => store.get(path) }),
+    set: async (data: any, opts?: { merge?: boolean }) => {
+      const prev = opts?.merge ? (store.get(path) || {}) : {};
+      store.set(path, { ...prev, ...data });
+    },
+    update: async (data: any) => { store.set(path, { ...(store.get(path) || {}), ...data }); },
+  });
+  return {
+    store,
+    collection: (name: string) => ({
+      doc: (id: string) => ref(`${name}/${id}`),
+      add: async (data: any) => {
+        const id = `auto_${store.size}`;
+        store.set(`${name}/${id}`, data);
+        return { id };
+      },
+    }),
+  };
+}
 
 /**
  * Fake mínimo de Firestore Admin — só a fatia usada por markEventProcessedOnce
@@ -151,5 +180,57 @@ describe('markEventProcessedOnce (idempotência de webhook)', () => {
     ]);
     const duplicates = [a.duplicate, b.duplicate].filter(Boolean).length;
     expect(duplicates).toBe(1);
+  });
+});
+
+describe('activateSubscription — merge de add-ons (não sobrescrever avulsos)', () => {
+  it('assinatura NOVA (sem doc anterior) recebe só os add-ons do plano', async () => {
+    const db = fakeFirestoreDb({
+      'saas_plans/plan_pro': { name: 'Pro', price: 199, reportsQuota: 200, clinicsQuota: 10, includesCalculators: true },
+    });
+    await activateSubscription(db, 'u1', 'user@test.com', 'plan_pro', {
+      isRenewal: false, periodStart: Date.now(), paymentMethod: 'pix',
+    });
+    const sub = db.store.get('subscriptions/sub_u1');
+    expect(sub.addons).toEqual(['calculators']);
+  });
+
+  it('upgrade de plano PRESERVA add-on avulso comprado antes (regressão do bug real)', async () => {
+    const db = fakeFirestoreDb({
+      'saas_plans/plan_pro': { name: 'Pro', price: 199, reportsQuota: 200, clinicsQuota: 10, includesCalculators: true },
+      // Usuário já tinha comprado PACS avulso antes (plano Base não inclui PACS).
+      'subscriptions/sub_u1': { id: 'sub_u1', userId: 'u1', addons: ['pacs'], plan: 'Base', planId: 'plan_base' },
+    });
+    await activateSubscription(db, 'u1', 'user@test.com', 'plan_pro', {
+      isRenewal: false, periodStart: Date.now(), paymentMethod: 'pix',
+    });
+    const sub = db.store.get('subscriptions/sub_u1');
+    // Antes do fix: addons virava só ['calculators'], perdendo o 'pacs' pago.
+    expect(sub.addons).toEqual(expect.arrayContaining(['calculators', 'pacs']));
+    expect(sub.addons).toHaveLength(2);
+  });
+
+  it('não duplica um add-on que já estava presente E é concedido pelo novo plano também', async () => {
+    const db = fakeFirestoreDb({
+      'saas_plans/plan_pro': { name: 'Pro', price: 199, reportsQuota: 200, clinicsQuota: 10, includesCalculators: true },
+      'subscriptions/sub_u1': { id: 'sub_u1', userId: 'u1', addons: ['calculators'], plan: 'Base', planId: 'plan_base' },
+    });
+    await activateSubscription(db, 'u1', 'user@test.com', 'plan_pro', {
+      isRenewal: false, periodStart: Date.now(), paymentMethod: 'pix',
+    });
+    const sub = db.store.get('subscriptions/sub_u1');
+    expect(sub.addons).toEqual(['calculators']);
+  });
+
+  it('renovação (isRenewal:true) não mexe em addons — mantém o array atual intacto', async () => {
+    const db = fakeFirestoreDb({
+      'saas_plans/plan_pro': { name: 'Pro', price: 199, reportsQuota: 200, clinicsQuota: 10, includesCalculators: true },
+      'subscriptions/sub_u1': { id: 'sub_u1', userId: 'u1', addons: ['pacs', 'appointments'], plan: 'Pro', planId: 'plan_pro' },
+    });
+    await activateSubscription(db, 'u1', 'user@test.com', 'plan_pro', {
+      isRenewal: true, periodStart: Date.now(), paymentMethod: 'pix',
+    });
+    const sub = db.store.get('subscriptions/sub_u1');
+    expect(sub.addons).toEqual(['pacs', 'appointments']); // campo `addons` nem é tocado no patch
   });
 });

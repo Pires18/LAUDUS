@@ -171,7 +171,7 @@ async function activateAddonInDb(db: any, userId: string, email: string, addon: 
 }
 
 /** Ativa/renova uma assinatura a partir dos dados do plano (saas_plans). */
-async function activateSubscription(
+export async function activateSubscription(
   db: any,
   userId: string,
   email: string,
@@ -228,8 +228,20 @@ async function activateSubscription(
     updatedAt: now,
   };
   if (!opts.isRenewal) {
-    subData.addons = addons;
-    subData.createdAt = now;
+    // Merge com os add-ons já existentes (não substitui) — este caminho roda
+    // em toda assinatura nova/upgrade/downgrade, não só no cadastro inicial.
+    // Sobrescrever addons[] com só o que o NOVO plano inclui apagava
+    // silenciosamente um add-on comprado AVULSO antes (ex.: comprou PACS
+    // avulso, depois trocou de plano — o PACS pago sumia, sem estorno).
+    // Não há como distinguir hoje "veio do plano" de "comprado avulso" no
+    // array (achado da auditoria financeira, 07/07/2026) — a correção segura
+    // é nunca revogar um add-on que o usuário já tinha, mesmo que isso
+    // signifique manter um benefício de um plano anterior por mais tempo do
+    // que o estritamente necessário; perder acesso pago é o erro pior.
+    const existingSnap = await subRef.get();
+    const existingAddons: string[] = existingSnap.exists ? (existingSnap.data()?.addons || []) : [];
+    subData.addons = [...new Set([...addons, ...existingAddons])];
+    subData.createdAt = existingSnap.exists ? (existingSnap.data()?.createdAt || now) : now;
   }
   // Persiste o modo de cobrança para o CRON de renovação mensal:
   // 'subscription' = AbacatePay gerencia (PIX Aut. ou Cartão recorrente)

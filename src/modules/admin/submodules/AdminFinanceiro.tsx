@@ -8,7 +8,7 @@ import { FinanceOverviewTab } from './finance/FinanceOverviewTab';
 import { Spinner } from './finance/Spinner';
 import {
   collection, doc, getDoc, getDocs, setDoc, addDoc,
-  deleteDoc, updateDoc, query, orderBy, where, getCountFromServer,
+  deleteDoc, updateDoc, query, orderBy, where, getCountFromServer, limit,
 } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
@@ -18,6 +18,7 @@ import { getAllUsersAiUsageStats, groupAiUsageByUser } from '../../../store/db';
 import { classNames, parseNonNegativeNumber, parseNonNegativeInt } from '../../../utils/format';
 import type { Plan, SaasAddonsConfig } from '../../../types';
 import { planPrices, addonPrices } from '../../../../api/_pricing';
+import { GEMINI_MODEL_PRICING } from '../../ai/modelPricing';
 import { Modal } from '../../../components/Modal';
 import {
   DollarSign, Settings, Cpu, Loader2, Save, Plus, Trash2, Edit3,
@@ -94,17 +95,6 @@ const DEFAULT_ABACATE: AbacatePayConfig = {
   pixFeePercent: 0.99,
 };
 
-// ─── Gemini pricing reference table ──────────────────────────────────────────
-
-const GEMINI_PRICING: Record<string, { inputPer1M: number; outputPer1M: number; tier: 'lite' | 'pro' }> = {
-  'gemini-3.5-flash':       { inputPer1M: 0.075, outputPer1M: 0.30,  tier: 'lite' },
-  'gemini-2.5-flash':       { inputPer1M: 0.075, outputPer1M: 0.30,  tier: 'lite' },
-  'gemini-1.5-flash':       { inputPer1M: 0.075, outputPer1M: 0.30,  tier: 'lite' },
-  'gemini-3.1-pro-preview': { inputPer1M: 1.25,  outputPer1M: 5.00,  tier: 'pro'  },
-  'gemini-2.5-pro':         { inputPer1M: 1.25,  outputPer1M: 10.00, tier: 'pro'  },
-  'gemini-1.5-pro':         { inputPer1M: 1.25,  outputPer1M: 5.00,  tier: 'pro'  },
-};
-
 // ─── Shared helper components ─────────────────────────────────────────────────
 
 export function AdminFinanceiro() {
@@ -159,7 +149,7 @@ export function AdminFinanceiro() {
 // ─── Tab: Planos ──────────────────────────────────────────────────────────────
 
 function PlansTab() {
-  const { showToast } = useApp();
+  const { showToast, user } = useApp();
   const confirm = useConfirm();
   const [plans, setPlans]         = useState<(Plan & { id: string })[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -247,6 +237,26 @@ function PlansTab() {
         updatedAt: Date.now(),
       };
       if (editingId) {
+        // Histórico de preço: snapshot ANTES de sobrescrever, só quando o
+        // preço de fato mudou (edições só de descrição/features não geram
+        // entrada) — sem isso, mudar o preço do catálogo silenciosamente
+        // afeta a renovação de assinantes existentes sem nenhum rastro de
+        // quando/quanto mudou (achado C2/A4 da auditoria financeira).
+        const pricesChanged = originalPlan && JSON.stringify(originalPlan.prices || {}) !== JSON.stringify(prices);
+        if (pricesChanged) {
+          try {
+            await addDoc(collection(firestore, 'saas_plans', editingId, 'price_history'), {
+              before: originalPlan?.prices || null,
+              after: prices,
+              changedBy: user?.uid || 'unknown',
+              changedByName: user?.displayName || user?.email || 'Admin',
+              changedAt: Date.now(),
+            });
+          } catch (histErr) {
+            logger.error('[PLAN_PRICE_HISTORY] Falha ao gravar histórico de preço (ignorado):', histErr);
+          }
+        }
+
         await updateDoc(doc(firestore, 'saas_plans', editingId), data);
 
         // Propaga assincronamente as cotas para os usuários que assinam esse plano atualmente
@@ -421,6 +431,7 @@ function PlansTab() {
           onCancel={() => { setShowForm(false); setEditingId(null); }}
           saving={saving}
           isNew={!editingId}
+          planId={editingId}
         />
       )}
     </div>
@@ -528,14 +539,27 @@ function Pill({ label, on }: { label: string; on: boolean }) {
   );
 }
 
-function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
+function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew, planId }: {
   form: PlanForm; setForm: (f: PlanForm) => void;
   onSave: () => void; onCancel: () => void;
-  saving: boolean; isNew: boolean;
+  saving: boolean; isNew: boolean; planId: string | null;
 }) {
   const set = <K extends keyof PlanForm>(k: K, v: PlanForm[K]) => setForm({ ...form, [k]: v });
   const prices = form.prices || { month: form.price || 0, semester: (form.price || 0) * 6, year: (form.price || 0) * 12 };
   const setPrice = (k: 'month' | 'semester' | 'year', v: number) => set('prices', { ...prices, [k]: v });
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<Array<{ id: string; before: any; after: any; changedByName: string; changedAt: number }> | null>(null);
+  const loadHistory = async () => {
+    setShowHistory(true);
+    if (!planId || history !== null) return;
+    try {
+      const snap = await getDocs(query(collection(firestore, 'saas_plans', planId, 'price_history'), orderBy('changedAt', 'desc'), limit(10)));
+      setHistory(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+    } catch {
+      setHistory([]);
+    }
+  };
 
   const modalFooter = (
     <>
@@ -607,6 +631,34 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew }: {
             <Info size={12} className="shrink-0 mt-0.5" />
             Todos os intervalos são cobrados como assinatura recorrente na AbacatePay. Os IDs de produto são gerados automaticamente por intervalo.
           </p>
+          {!isNew && planId && (
+            <div>
+              <button type="button" onClick={loadHistory} className="text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-700">
+                {showHistory ? 'Ocultar' : 'Ver'} histórico de preço
+              </button>
+              {showHistory && (
+                <div className="mt-2 rounded-xl border border-ink-100 bg-ink-50/40 p-3 max-h-48 overflow-y-auto">
+                  {history === null ? (
+                    <p className="text-[10px] text-ink-400">Carregando...</p>
+                  ) : history.length === 0 ? (
+                    <p className="text-[10px] text-ink-400">Nenhuma mudança de preço registrada ainda (só passa a registrar a partir de 07/07/2026).</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {history.map(h => (
+                        <li key={h.id} className="text-[10px] text-ink-600">
+                          <span className="font-black text-ink-800">{new Date(h.changedAt).toLocaleString('pt-BR')}</span>
+                          {' '}por {h.changedByName}:{' '}
+                          {h.before ? `R$${h.before.month}/R$${h.before.semester}/R$${h.before.year}` : '(novo)'}
+                          {' → '}
+                          R${h.after?.month}/R${h.after?.semester}/R${h.after?.year}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Quotas */}
@@ -1513,8 +1565,9 @@ function IACostsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">
-              {Object.entries(GEMINI_PRICING).map(([model, p]) => {
-                const estUsd = (p.inputPer1M * 500 + p.outputPer1M * 500) / 1_000_000;
+              {Object.entries(GEMINI_MODEL_PRICING).map(([model, p]) => {
+                const isPro = /pro/i.test(model);
+                const estUsd = (p.input * 500 + p.output * 500) / 1_000_000;
                 const estBrl = estUsd * conversionRate;
                 return (
                   <tr key={model} className="hover:bg-ink-50/40">
@@ -1522,11 +1575,11 @@ function IACostsTab() {
                       <div className="font-mono text-[10px] text-ink-700">{model}</div>
                       <span className={classNames(
                         'text-[9px] font-black uppercase',
-                        p.tier === 'lite' ? 'text-indigo-500' : 'text-violet-600'
-                      )}>● {p.tier === 'lite' ? 'Lite' : 'Pro'}</span>
+                        isPro ? 'text-violet-600' : 'text-indigo-500'
+                      )}>● {isPro ? 'Pro' : 'Lite'}</span>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">${p.inputPer1M.toFixed(3)}</td>
-                    <td className="px-4 py-3 text-right font-mono">${p.outputPer1M.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-mono">${p.input.toFixed(3)}</td>
+                    <td className="px-4 py-3 text-right font-mono">${p.output.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right font-mono text-ink-600">${estUsd.toFixed(5)}</td>
                     <td className="px-4 py-3 text-right font-mono text-emerald-700 font-bold">R$ {estBrl.toFixed(4)}</td>
                   </tr>

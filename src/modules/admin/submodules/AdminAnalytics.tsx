@@ -5,6 +5,7 @@ import { getDailyMetrics, getMetricsSummary, type DailyMetric, type MetricsSumma
 import { logger } from '../../../utils/logger';
 import { classNames } from '../../../utils/format';
 import { TrendingUp, FileText, Users, Cpu, DollarSign, Loader2, Repeat } from 'lucide-react';
+import { AreaLine, StackedBars } from './components/MiniCharts';
 
 type FinanceStats = { totalRevenue?: number; paidCount?: number; pixCount?: number; ccCount?: number; manualCount?: number };
 
@@ -94,7 +95,7 @@ export function AdminAnalytics() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <ChartCard title="Laudos por dia" subtitle="Lite vs Pro">
-            <StackedBars data={daily} />
+            <StackedBars data={daily.map(d => ({ date: d.date, a: d.reportsLite || 0, b: d.reportsPro || 0 }))} />
             <Legend items={[{ label: 'Lite', color: '#6366f1' }, { label: 'Pro', color: '#a855f7' }]} />
           </ChartCard>
           <ChartCard title="Usuários ativos por dia">
@@ -136,63 +137,3 @@ function Legend({ items }: { items: { label: string; color: string }[] }) {
   );
 }
 
-const CHART_W = 520;
-const CHART_H = 150;
-const PAD = 4;
-
-/** Barras empilhadas (lite embaixo, pro em cima) — SVG, sem dependências. */
-function StackedBars({ data }: { data: DailyMetric[] }) {
-  const max = Math.max(1, ...data.map(d => (d.reportsLite || 0) + (d.reportsPro || 0)));
-  const n = data.length;
-  const bw = (CHART_W - PAD * 2) / n;
-  const barW = Math.max(2, bw * 0.7);
-  return (
-    <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" preserveAspectRatio="none">
-      {data.map((d, i) => {
-        const lite = d.reportsLite || 0;
-        const pro = d.reportsPro || 0;
-        const x = PAD + i * bw + (bw - barW) / 2;
-        const hLite = (lite / max) * (CHART_H - PAD * 2);
-        const hPro = (pro / max) * (CHART_H - PAD * 2);
-        const yLite = CHART_H - PAD - hLite;
-        const yPro = yLite - hPro;
-        return (
-          <g key={d.date}>
-            <rect x={x} y={yLite} width={barW} height={hLite} fill="#6366f1" rx={1}>
-              <title>{`${d.date}: ${lite} Lite`}</title>
-            </rect>
-            <rect x={x} y={yPro} width={barW} height={hPro} fill="#a855f7" rx={1}>
-              <title>{`${d.date}: ${pro} Pro`}</title>
-            </rect>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-/** Gráfico de área/linha simples — SVG. */
-function AreaLine({ data, color, money }: { data: { date: string; value: number }[]; color: string; money?: boolean }) {
-  const fmt = (v: number) => (money ? `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : `${v}`);
-  const max = Math.max(1, ...data.map(d => d.value));
-  const n = data.length;
-  const stepX = n > 1 ? (CHART_W - PAD * 2) / (n - 1) : 0;
-  const pts = data.map((d, i) => {
-    const x = PAD + i * stepX;
-    const y = CHART_H - PAD - (d.value / max) * (CHART_H - PAD * 2);
-    return { x, y, d };
-  });
-  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${CHART_H - PAD} L${pts[0].x.toFixed(1)},${CHART_H - PAD} Z`;
-  return (
-    <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" preserveAspectRatio="none">
-      <path d={area} fill={color} opacity={0.12} />
-      <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      {pts.map((p) => (
-        <circle key={p.d.date} cx={p.x} cy={p.y} r={2} fill={color}>
-          <title>{`${p.d.date}: ${fmt(p.d.value)}`}</title>
-        </circle>
-      ))}
-    </svg>
-  );
-}

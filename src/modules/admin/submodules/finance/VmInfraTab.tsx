@@ -148,12 +148,16 @@ export function VmInfraTab() {
   // ── Cálculos financeiros ──
   const revenueOf = (r: VmRow) => planPrices(pacsPlans[r.plan] || {}).month || 0;
   const costOf = (r: VmRow) => (costs.costByPlan[r.plan] || 0) + (r.diskGb * costs.storagePerGbMonth);
-  const active = rows.filter(r => r.status === 'ready');
-  const totalRevenue = active.reduce((a, r) => a + revenueOf(r), 0);
-  const totalCost = active.reduce((a, r) => a + costOf(r), 0);
+  // Receita só de VMs 'ready' (assinatura em dia — 'suspended' já perdeu a
+  // assinatura, não paga mais nada). Custo inclui 'ready' E 'suspended': a VM
+  // suspensa continua rodando e sendo cobrada pelo GCP durante os 14 dias de
+  // carência antes de ser destruída — excluí-la dos totais escondia
+  // exatamente o pior caso de margem (achado A4 da auditoria).
+  const billingRows = rows.filter(r => r.status === 'ready' || r.status === 'suspended');
+  const totalRevenue = billingRows.reduce((a, r) => a + (r.status === 'ready' ? revenueOf(r) : 0), 0);
+  const totalCost = billingRows.reduce((a, r) => a + costOf(r), 0);
   const totalMargin = totalRevenue - totalCost;
   const totalDisk = rows.reduce((a, r) => a + r.diskGb, 0);
-  const totalUsed = rows.reduce((a, r) => a + r.diskUsedGb, 0);
 
   const proj = costs.gcpProjectId;
   const consoleBase = 'https://console.cloud.google.com';
@@ -194,7 +198,7 @@ export function VmInfraTab() {
           { label: 'Receita / mês (ativas)', value: money(totalRevenue), icon: TrendingUp,  grad: 'from-emerald-500 to-teal-600' },
           { label: 'Custo GCP / mês',        value: money(totalCost),    icon: DollarSign,  grad: 'from-rose-500 to-pink-600' },
           { label: 'Margem / mês',           value: money(totalMargin),  icon: TrendingUp,  grad: totalMargin >= 0 ? 'from-brand-500 to-indigo-600' : 'from-rose-500 to-rose-700' },
-          { label: 'VMs ativas',             value: `${active.length}/${rows.length}`, icon: Server, grad: 'from-violet-500 to-purple-600' },
+          { label: 'VMs ativas',             value: `${rows.filter(r => r.status === 'ready').length}/${rows.length}`, icon: Server, grad: 'from-violet-500 to-purple-600' },
         ].map(m => (
           <div key={m.label} className={classNames('rounded-2xl p-4 text-white shadow-md bg-gradient-to-br', m.grad)}>
             <div className="flex items-start justify-between">
@@ -254,15 +258,13 @@ export function VmInfraTab() {
         </div>
       </div>
 
-      {/* Uso agregado de disco */}
+      {/* Armazenamento provisionado (cota, não uso real — ver nota na tabela abaixo) */}
       <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="font-black text-ink-700 flex items-center gap-1.5"><HardDrive size={13} /> Armazenamento agregado</span>
-          <span className="font-bold text-ink-600">{totalUsed.toFixed(1)} / {totalDisk} GB provisionados</span>
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-black text-ink-700 flex items-center gap-1.5"><HardDrive size={13} /> Armazenamento provisionado (cota)</span>
+          <span className="font-bold text-ink-600">{totalDisk} GB no total</span>
         </div>
-        <div className="h-2 w-full bg-ink-100 rounded-full overflow-hidden">
-          <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${totalDisk > 0 ? Math.min(100, (totalUsed / totalDisk) * 100) : 0}%` }} />
-        </div>
+        <p className="text-[10px] text-ink-400 mt-1.5">Uso real de disco por VM ainda não é sincronizado para o admin — não é possível mostrar % ocupado com confiança.</p>
       </div>
 
       {/* Tabela de VMs */}
@@ -298,10 +300,9 @@ export function VmInfraTab() {
               </thead>
               <tbody className="divide-y divide-ink-50">
                 {rows.map((r, i) => {
-                  const rev = revenueOf(r);
+                  const rev = r.status === 'ready' ? revenueOf(r) : 0;
                   const cost = costOf(r);
                   const margin = rev - cost;
-                  const pct = r.diskGb > 0 ? Math.min(100, Math.round((r.diskUsedGb / r.diskGb) * 100)) : 0;
                   const shared = r.provider === 'shared';
                   return (
                     <tr key={`${r.uid}-${i}`} className="hover:bg-ink-50/40">
@@ -317,13 +318,12 @@ export function VmInfraTab() {
                         <StatusPill status={r.status} />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-between text-[10px] mb-1">
-                          <span className="font-bold text-ink-700">{r.diskUsedGb.toFixed(1)} / {r.diskGb} GB</span>
-                          <span className={classNames('font-black', pct >= 90 ? 'text-rose-600' : 'text-ink-400')}>{pct}%</span>
-                        </div>
-                        <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
-                          <div className={classNames('h-full rounded-full', pct >= 90 ? 'bg-rose-500' : 'bg-emerald-500')} style={{ width: `${Math.max(2, pct)}%` }} />
-                        </div>
+                        {/* Uso real de disco não é sincronizado pro admin hoje (só o
+                            Agente do PACS sabe, via consulta ao vivo do Orthanc) —
+                            mostrar só a cota provisionada (real) em vez de fingir
+                            uma % de uso que sempre daria 0%. */}
+                        <span className="font-bold text-ink-700">{r.diskGb} GB provisionados</span>
+                        <p className="text-[9px] text-ink-400 mt-0.5">uso real não sincronizado</p>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-ink-600">{daysSince(r.createdAt)}d</td>
                       <td className="px-4 py-3 text-right font-bold text-emerald-700">{money(rev)}</td>
@@ -356,6 +356,10 @@ function StatusPill({ status }: { status: string }) {
     ready:        { cls: 'bg-emerald-50 text-emerald-700', icon: CheckCircle2, label: 'Ativa' },
     provisioning: { cls: 'bg-amber-50 text-amber-700',     icon: Clock,        label: 'Provisionando' },
     error:        { cls: 'bg-rose-50 text-rose-700',       icon: AlertTriangle, label: 'Erro' },
+    // Assinatura cancelada/expirada, mas a VM ainda está de pé (14 dias de
+    // carência antes de destruir) — ainda custa GCP, zero receita. Pior caso
+    // de margem; badge de alerta em vez de sumir dos KPIs (achado A4).
+    suspended:    { cls: 'bg-rose-100 text-rose-700 ring-1 ring-rose-300', icon: AlertTriangle, label: 'Suspensa (sem receita, ainda custando)' },
   };
   const s = map[status] || { cls: 'bg-ink-100 text-ink-500', icon: Server, label: status };
   const Icon = s.icon;

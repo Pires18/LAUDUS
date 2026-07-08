@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, planPrices, planPriceBrl, addonPrices, addonPriceBrl, ADDON_DEFAULTS } from '../../api/_pricing';
+import { mapAddonKey, resolveAddon, periodEndFrom, planToAddons, financeMethodKey, isRecurringInterval, intervalLabel, intervalMultiplier, planPrices, planPriceBrl, addonPrices, addonPriceBrl, ADDON_DEFAULTS, estimateNetRevenue, computeChurn30d } from '../../api/_pricing';
 
 /** Catálogo de preços compartilhado entre checkout e webhook — dinheiro, então testado. */
 describe('mapAddonKey', () => {
@@ -185,5 +185,94 @@ describe('intervalMultiplier', () => {
     expect(intervalMultiplier('semester')).toBe(6);
     expect(intervalMultiplier('year')).toBe(12);
     expect(intervalMultiplier(undefined)).toBe(1);
+  });
+});
+
+describe('estimateNetRevenue', () => {
+  const fees = { cardFeePercent: 3.5, cardFeeFixedBrl: 0.60, pixFeePercent: 0.99 };
+
+  it('desconta percentual + taxa fixa por transação no cartão', () => {
+    // 2 transações de cartão somando R$300 → 3,5% + R$0,60 por transação
+    const net = estimateNetRevenue({ credit_card: 300 }, { credit_card: 2 }, fees);
+    expect(net).toBe(288.3); // 300 - (300*0.035) - (2*0.60) = 300 - 10.5 - 1.2
+  });
+
+  it('desconta só percentual no PIX (sem taxa fixa)', () => {
+    const net = estimateNetRevenue({ pix: 100 }, { pix: 1 }, fees);
+    expect(net).toBe(99.01); // 100 - 0.99
+  });
+
+  it('método manual/desconhecido não tem taxa de adquirente', () => {
+    const net = estimateNetRevenue({ manual: 100 }, { manual: 1 }, fees);
+    expect(net).toBe(100);
+  });
+
+  it('soma corretamente uma mistura de métodos', () => {
+    const net = estimateNetRevenue(
+      { pix: 100, credit_card: 300, manual: 50 },
+      { pix: 1, credit_card: 2, manual: 1 },
+      fees,
+    );
+    expect(net).toBe(99.01 + 288.3 + 50);
+  });
+
+  it('sem revenueByMethod retorna 0, não lança', () => {
+    expect(estimateNetRevenue(undefined, undefined, fees)).toBe(0);
+  });
+
+  it('sem taxas configuradas (fees vazio), receita líquida = receita bruta', () => {
+    const net = estimateNetRevenue({ credit_card: 300, pix: 100 }, { credit_card: 2, pix: 1 }, {});
+    expect(net).toBe(400);
+  });
+
+  it('countByMethod ausente para um método → taxa fixa não aplicada (mas percentual sim)', () => {
+    const net = estimateNetRevenue({ credit_card: 300 }, {}, fees);
+    expect(net).toBe(289.5); // 300 - (300*0.035) - (0*0.60)
+  });
+});
+
+describe('computeChurn30d', () => {
+  const NOW = 1_800_000_000_000;
+  const DAY = 86400000;
+
+  it('cancelamento explícito dentro de 30 dias conta (usa canceledAt)', () => {
+    const r = computeChurn30d([{ status: 'canceled', canceledAt: NOW - 10 * DAY, price: 149, interval: 'month' }], NOW);
+    expect(r.churnedCount).toBe(1);
+    expect(r.lostMrr).toBe(149);
+  });
+
+  it('expiração automática dentro de 30 dias conta (usa updatedAt)', () => {
+    const r = computeChurn30d([{ status: 'expired', updatedAt: NOW - 5 * DAY, price: 894, interval: 'semester' }], NOW);
+    expect(r.churnedCount).toBe(1);
+    expect(r.lostMrr).toBe(149); // 894/6
+  });
+
+  it('cancelamento fora da janela de 30 dias NÃO conta', () => {
+    const r = computeChurn30d([{ status: 'canceled', canceledAt: NOW - 45 * DAY, price: 149, interval: 'month' }], NOW);
+    expect(r.churnedCount).toBe(0);
+    expect(r.lostMrr).toBe(0);
+  });
+
+  it('assinatura ativa/trialing não conta (não é churn)', () => {
+    const r = computeChurn30d([{ status: 'active', price: 149, interval: 'month' }], NOW);
+    expect(r.churnedCount).toBe(0);
+  });
+
+  it('canceled sem canceledAt (dado antigo/incompleto) é ignorado, não conta como churn de hoje', () => {
+    const r = computeChurn30d([{ status: 'canceled', price: 149, interval: 'month' }], NOW);
+    expect(r.churnedCount).toBe(0);
+  });
+
+  it('soma corretamente múltiplos cancelamentos de intervalos diferentes', () => {
+    const r = computeChurn30d([
+      { status: 'canceled', canceledAt: NOW - 1 * DAY, price: 149, interval: 'month' },
+      { status: 'expired', updatedAt: NOW - 2 * DAY, price: 1788, interval: 'year' }, // 149/mês
+    ], NOW);
+    expect(r.churnedCount).toBe(2);
+    expect(r.lostMrr).toBe(298);
+  });
+
+  it('lista vazia retorna zerado', () => {
+    expect(computeChurn30d([], NOW)).toEqual({ churnedCount: 0, lostMrr: 0 });
   });
 });

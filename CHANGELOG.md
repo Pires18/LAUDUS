@@ -7,6 +7,31 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ## [Não versionado] — 2026-07-07
 
+### Financeiro — correção de bugs de cálculo + Centro Financeiro (Fases A e B)
+Auditoria profunda do Financeiro (`docs/AUDITORIA_FINANCEIRO_2026-07.md`) encontrou números com fórmula errada sendo exibidos como corretos. Fase A (fundação, 6/6) + início da Fase B (Central reorganizada):
+- **MRR/ARR corrigido**: `api/cron-aggregate-metrics.ts` superestimava assinantes semestrais em 6x (só tratava `interval==='year'` como não-mensal) e usava o preço atual do catálogo em vez do preço travado na assinatura. Reescrito com `computeMrr()` (testável, usa `intervalMultiplier`).
+- **Preço de IA unificado**: existiam duas tabelas de preço por modelo Gemini desconectadas (uma real em `engine.ts`, uma só de exibição no Admin) — unificadas em `src/modules/ai/modelPricing.ts`. Modelo sem preço mapeado agora loga erro (Sentry) em vez de custar $0 em silêncio.
+- **Medidor de disco do PACS removido**: `diskUsedGb` nunca era atualizado após o provisionamento — era decorativo, sempre 0%. Substituído por exibição honesta da cota provisionada.
+- **VMs suspensas agora entram nos KPIs de custo** (`VmInfraTab.tsx`) — antes somiam dos totais mesmo continuando a custar no GCP sem gerar receita.
+- **Bug de dados real corrigido**: trocar de plano podia apagar um add-on avulso pago (ex.: comprar PACS avulso, depois fazer upgrade de plano apagava o PACS, sem estorno). `activateSubscription` agora faz merge em vez de substituir o array de add-ons.
+- **Taxas de gateway implementadas** como receita líquida estimada: novo `estimateNetRevenue()` usa a taxa configurada em AbacatePay → Config contra a receita quebrada por método de pagamento (`revenueByMethod`/`countByMethod`, novos campos diários do CRON) — mostrado na Central ao lado da receita bruta.
+- **Reconciliação MRR reformulada**: comparava MRR (mensal-equivalente) contra receita bruta de 30 dias, o que incluía compras avulsas semestrais/anuais e gerava falso-positivo garantido em mês de renovação. Agora compara só contra receita de assinaturas MENSAIS (`revenueByInterval`, novo campo do CRON).
+- **Série histórica**: gráficos de receita bruta diária e custo de IA diário (30 dias) na Central, reutilizando o componente de gráfico SVG já usado em Analytics (extraído para `components/MiniCharts.tsx`, sem nova dependência).
+- **AR aging unificado**: a lista de "cobranças" da Central agora mostra faturas a vencer em ≤7 dias E já vencidas (status `past_due`), antes só mostrava as futuras.
+- **Churn, ARPU, LTV, conversão trial→pago**: novos KPIs na Central — cancelamentos dos últimos 30 dias (clientes + MRR perdido), receita média por assinante, LTV estimado, e taxa de conversão do trial de 14 dias (cohort por `users.createdAt`, já que trials orgânicos não viram documento de assinatura).
+- **Alerta de margem negativa com limiar configurável**: a lista de "clientes dando prejuízo" ganhou um limiar (R$) editável — banner proeminente só quando alguém passa do limiar, tabela detalhada continua mostrando toda perda.
+- **+28 testes** cobrindo os bugs de dados corrigidos e os novos KPIs (MRR, merge de add-ons, receita líquida, churn).
+
+### Financeiro — Centro Financeiro, Fases C e D (rastreabilidade + compliance BR)
+Continuação da [Proposta de Centro Financeiro](docs/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md): 5/7 itens executados, 2 adiados conscientemente (dependem de informação externa indisponível hoje).
+- **Histórico de mudança de preço por plano**: `saas_plans/{id}/price_history` (subcoleção, apend-only) grava snapshot antes/depois a cada mudança de preço via `PlansTab`; modal de edição ganhou seção "Ver histórico de preço".
+- **Ledger de despesas gerais**: nova coleção `general_expenses` (descrição, categoria, valor, data) — lançamento manual na Central, últimos 30 dias somam ao custo total (VM + IA + despesas gerais), refletindo a margem líquida do negócio inteiro.
+- **Status de nota fiscal por transação**: `transactions/{id}/nf/status` (subcoleção — a transação em si permanece imutável fora do webhook); badge clicável (Pendente/Emitida) e filtro na aba Transações.
+- **Export CSV de contador**: colunas de Valor Bruto, Taxa de Gateway Estimada e Valor Líquido Estimado por transação, mais status de NF.
+- **Adiado — reconciliação automática AbacatePay vs Firestore**: schema do endpoint de listagem de transações da AbacatePay não está confirmado no código; implementar contra campos adivinhados foi julgado arriscado demais. Retomar só após confirmar o schema real.
+- **Adiado — billing export real do GCP**: bloqueado externamente (depende de ativação na conta GCP), fora do alcance de mudança de código.
+- **Pendente de deploy**: regras novas do Firestore (`price_history`, `general_expenses`, `transactions/{id}/nf`) escritas em `firestore.rules` mas não deployadas — rodar `firebase deploy --only firestore:rules` antes de usar em produção.
+
 ### Adicionado
 - **Aba Estruturado do Copiloto** — 3ª aba do editor (Chat/Formulário/Estruturado): formulário tipado derivado de cada máscara, cobrindo as 10 áreas clínicas, com cálculo em tempo real (`liveCompute.ts`: PFE Hadlock+percentil OMS, RCP, IG/DPP, ILA, Doppler renal bilateral, NASCET, ITB, BPP...), escores inline (TI-RADS aditivo, sugestões BI-RADS/O-RADS/Bosniak, Graf), seções normal/alterado, itens repetíveis e campos condicionais. Preview interativo dentro do editor de máscaras (`TemplateEditor`). Ver §4.1.1 da [Documentação Oficial](docs/DOCUMENTACAO_OFICIAL.md).
 - **LAUD.IA — backfill de qualidade** — `backfillQualityRecordsFromCorpus` calcula Score/Segurança retroativamente sobre o histórico do Corpus de Excelência (antes só populava com finalizações novas); botão "Calcular notas" no `TrainingDashboard`.

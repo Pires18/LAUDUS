@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
 import {
-  collection, collectionGroup, doc, getDoc, getDocs, setDoc, query, orderBy, limit, where,
+  collection, collectionGroup, doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, query, orderBy, limit, where,
 } from 'firebase/firestore';
 import { firestore } from '../../../../lib/firebase';
 import {
   getDailyMetrics, getMetricsSummary, getAiUsageByUser,
   type DailyMetric, type MetricsSummary,
 } from '../../../../store/db';
-import { intervalMultiplier } from '../../../../../api/_pricing';
+import { intervalMultiplier, estimateNetRevenue, computeChurn30d, type GatewayFeeConfig } from '../../../../../api/_pricing';
 import { logger } from '../../../../utils/logger';
 import { classNames, parseNonNegativeNumber } from '../../../../utils/format';
+import { useConfirm } from '../../../../hooks/useConfirm';
 import { Spinner } from './Spinner';
+import { AreaLine } from '../components/MiniCharts';
 import {
   DollarSign, TrendingUp, TrendingDown, Cpu, Server, RefreshCw, Loader2, Save,
   QrCode, CreditCard, Wallet, AlertTriangle, Gift, Calendar, Clock,
-  BarChart3, CheckCircle2, Users,
+  BarChart3, CheckCircle2, Users, Trash2, Plus,
 } from 'lucide-react';
 
 type FinanceStats = {
@@ -22,7 +24,8 @@ type FinanceStats = {
   ccCount?: number; manualCount?: number; otherCount?: number; updatedAt?: number;
 };
 type Plan = 'starter' | 'pro' | 'dedicado';
-type UpcomingInvoice = { userId: string; email: string; daysLeft: number; amount: number; planName: string };
+/** `daysLeft` positivo = vence em N dias; negativo = venceu há N dias (overdue). */
+type InvoiceAging = { userId: string; email: string; daysLeft: number; amount: number; planName: string; overdue: boolean };
 
 const money = (n: number) =>
   `R$ ${(n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -30,6 +33,7 @@ const money = (n: number) =>
 const INTERVAL_LABELS: Record<string, string> = { month: 'Mensal', semester: 'Semestral', year: 'Anual' };
 
 export function FinanceOverviewTab() {
+  const confirm = useConfirm();
   const [loading, setLoading]               = useState(true);
   const [refreshing, setRefreshing]         = useState(false);
   const [savingRate, setSavingRate]         = useState(false);
@@ -51,20 +55,51 @@ export function FinanceOverviewTab() {
   const [aggWarn, setAggWarn]               = useState<string | null>(null);
   const [lossyUsers, setLossyUsers]         = useState<{ userId: string; email: string; revenueBrl: number; costBrl: number }[]>([]);
   const [mrrByInterval, setMrrByInterval]   = useState<Record<string, number>>({});
-  const [upcomingInvoices, setUpcomingInvoices] = useState<UpcomingInvoice[]>([]);
+  const [invoiceAging, setInvoiceAging]     = useState<InvoiceAging[]>([]);
   const [subsCount, setSubsCount]           = useState({ active: 0, trialing: 0, pastDue: 0, canceled: 0 });
+  const [gatewayFees, setGatewayFees]       = useState<GatewayFeeConfig | null>(null);
+  const [churn, setChurn]                   = useState({ churnedCount: 0, lostMrr: 0 });
+  const [trialConversion, setTrialConversion] = useState<{ cohortSize: number; converted: number } | null>(null);
+  const [lossThresholdBrl, setLossThresholdBrl] = useState(0);
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [generalExpenses, setGeneralExpenses] = useState<Array<{ id: string; description: string; category: string; amountBrl: number; date: number }>>([]);
+  const [expenseForm, setExpenseForm] = useState({ description: '', category: 'other', amountBrl: 0, date: new Date().toISOString().slice(0, 10) });
+  const [savingExpense, setSavingExpense] = useState(false);
 
   const load = async () => {
     setAggWarn(null);
     try {
-      const [finSnap, sum, d, vmSnap, subsSnap, motorSnap] = await Promise.all([
+      // Cohort de conversão trial→pago: usuários cujo trial de 14 dias (ver
+      // useSubscription.ts) TERMINOU nos últimos 30 dias — createdAt entre
+      // 44 e 14 dias atrás. Trial orgânico é virtual (nunca vira doc em
+      // `subscriptions`, só `users.createdAt`+cálculo no cliente), então essa
+      // é a única forma de identificar a coorte a partir do Firestore.
+      const trialCohortStart = Date.now() - 44 * 86400000;
+      const trialCohortEnd = Date.now() - 14 * 86400000;
+
+      const expenseWindowStart = Date.now() - 90 * 86400000;
+
+      const [finSnap, sum, d, vmSnap, subsSnap, motorSnap, abacateSnap, trialCohortSnap, expensesSnap] = await Promise.all([
         getDoc(doc(firestore, 'global_config', 'finance_stats')),
         getMetricsSummary(),
         getDailyMetrics(30),
         getDoc(doc(firestore, 'global_config', 'vm_costs')),
         getDocs(collection(firestore, 'subscriptions')),
         getDoc(doc(firestore, 'global_config', 'motor_config')),
+        getDoc(doc(firestore, 'global_config', 'abacatepay_config')),
+        getDocs(query(collection(firestore, 'users'), where('createdAt', '>=', trialCohortStart), where('createdAt', '<=', trialCohortEnd))),
+        getDocs(query(collection(firestore, 'general_expenses'), where('date', '>=', expenseWindowStart), orderBy('date', 'desc'))),
       ]);
+      setGatewayFees(abacateSnap.exists() ? (abacateSnap.data() as GatewayFeeConfig) : null);
+      setGeneralExpenses(expensesSnap.docs.map(e => ({ id: e.id, ...(e.data() as any) })));
+
+      // "Convertido" = subscriptionStatus saiu de 'trialing' em algum momento
+      // (ativou plano pago, mesmo que hoje esteja past_due/canceled — isso é
+      // churn, medido separadamente, não "nunca converteu"). Aproximação:
+      // usuários admin-criados/legados sem createdAt não entram na coorte.
+      const cohortDocs = trialCohortSnap.docs;
+      const convertedCount = cohortDocs.filter(u => (u.data() as any).subscriptionStatus !== 'trialing').length;
+      setTrialConversion(cohortDocs.length > 0 ? { cohortSize: cohortDocs.length, converted: convertedCount } : null);
 
       setFin(finSnap.exists() ? (finSnap.data() as FinanceStats) : null);
       setSummary(sum);
@@ -72,6 +107,7 @@ export function FinanceOverviewTab() {
 
       const vc: any = vmSnap.exists() ? vmSnap.data() : {};
       const mc: any = motorSnap.exists() ? motorSnap.data() : {};
+      setLossThresholdBrl(Number(vc.lossThresholdBrl) || 0);
       const costByPlan: Record<Plan, number> = { starter: 70, pro: 70, dedicado: 140, ...(vc.costByPlan || {}) };
       const storagePerGbMonth = Number(vc.storagePerGbMonth) || 0.55;
       
@@ -93,36 +129,54 @@ export function FinanceOverviewTab() {
       });
       setSubsCount({ active: activeN, trialing: trialN, pastDue: pastDueN, canceled: canceledN });
 
+      // ── Churn (30 dias): clientes perdidos + MRR perdido ──
+      setChurn(computeChurn30d(subsSnap.docs.map(s => s.data() as any), Date.now()));
+
       // ── MRR breakdown por intervalo ──
       const mrrByIv: Record<string, number> = { month: 0, semester: 0, year: 0 };
       const now = Date.now();
       const SEVEN_DAYS = 7 * 86400000;
 
-      const upcoming: UpcomingInvoice[] = [];
+      // AR aging: cobranças próximas (a vencer em ≤7 dias) E já vencidas
+      // (status past_due — o CRON diário já marca isso quando currentPeriodEnd
+      // passa numa assinatura mensal). Antes só mostrava as "a vencer";
+      // faturas já vencidas e não pagas não apareciam em lugar nenhum
+      // (achado A5 da auditoria financeira, 07/07/2026).
+      const aging: InvoiceAging[] = [];
 
       subsSnap.docs.forEach(s => {
         const d: any = s.data() || {};
-        if (d.status !== 'active' && d.status !== 'trialing') return;
-        const iv = d.interval || 'month';
-        const monthlyRev = (d.price || 0) / intervalMultiplier(iv);
-        if (mrrByIv[iv] !== undefined) mrrByIv[iv] += monthlyRev;
+        if (d.status === 'active' || d.status === 'trialing') {
+          const iv = d.interval || 'month';
+          const monthlyRev = (d.price || 0) / intervalMultiplier(iv);
+          if (mrrByIv[iv] !== undefined) mrrByIv[iv] += monthlyRev;
+        }
+        if (d.billingMode !== 'invoice' || !d.currentPeriodEnd) return;
 
-        // Detecta cobranças próximas (billingMode: invoice, vence em ≤ 7 dias)
-        if (d.billingMode === 'invoice' && d.currentPeriodEnd && d.status === 'active') {
+        if (d.status === 'active') {
           const msLeft = d.currentPeriodEnd - now;
           if (msLeft > 0 && msLeft <= SEVEN_DAYS) {
-            upcoming.push({
+            aging.push({
               userId: d.userId, email: d.userEmail || d.userId,
               daysLeft: Math.ceil(msLeft / 86400000),
               amount: d.lastInvoiceAmount || d.price || 0,
-              planName: d.plan || 'Plano',
+              planName: d.plan || 'Plano', overdue: false,
             });
           }
+        } else if (d.status === 'past_due') {
+          const msOverdue = now - d.currentPeriodEnd;
+          aging.push({
+            userId: d.userId, email: d.userEmail || d.userId,
+            daysLeft: -Math.ceil(msOverdue / 86400000),
+            amount: d.lastInvoiceAmount || d.price || 0,
+            planName: d.plan || 'Plano', overdue: true,
+          });
         }
       });
 
       setMrrByInterval(mrrByIv);
-      setUpcomingInvoices(upcoming.sort((a, b) => a.daysLeft - b.daysLeft));
+      // Vencidas primeiro (mais antiga primeiro), depois a vencer (mais próxima primeiro).
+      setInvoiceAging(aging.sort((a, b) => a.daysLeft - b.daysLeft));
 
       // ── Alerta de prejuízo + custo de VMs ──
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
@@ -235,19 +289,103 @@ export function FinanceOverviewTab() {
     finally { setSavingRate(false); }
   };
 
+  const saveLossThreshold = async () => {
+    setSavingThreshold(true);
+    try {
+      await setDoc(doc(firestore, 'global_config', 'vm_costs'), { lossThresholdBrl, updatedAt: Date.now() }, { merge: true });
+    } catch (err) { logger.error('[FinanceOverview] salvar limiar de prejuízo:', err); }
+    finally { setSavingThreshold(false); }
+  };
+
+  // Ledger de despesas gerais (fora de VM/IA) — domínio, ferramentas,
+  // contratados, etc. Lançamento manual e pontual: pra uma despesa recorrente
+  // (ex.: assinatura mensal de uma ferramenta), o admin relança todo mês —
+  // não é um agendador de despesas, só um registro simples do que já foi pago.
+  const addExpense = async () => {
+    if (!expenseForm.description.trim() || expenseForm.amountBrl <= 0) {
+      logger.error('[FinanceOverview] despesa inválida (descrição vazia ou valor <= 0)');
+      return;
+    }
+    setSavingExpense(true);
+    try {
+      await addDoc(collection(firestore, 'general_expenses'), {
+        description: expenseForm.description.trim(),
+        category: expenseForm.category,
+        amountBrl: expenseForm.amountBrl,
+        date: new Date(expenseForm.date + 'T12:00:00').getTime(),
+        createdAt: Date.now(),
+      });
+      setExpenseForm({ description: '', category: 'other', amountBrl: 0, date: new Date().toISOString().slice(0, 10) });
+      await load();
+    } catch (err) { logger.error('[FinanceOverview] salvar despesa:', err); }
+    finally { setSavingExpense(false); }
+  };
+
+  const deleteExpense = async (id: string) => {
+    const ok = await confirm({ title: 'Excluir despesa', message: 'Remover este lançamento do ledger de despesas?', variant: 'danger', confirmLabel: 'Excluir' });
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(firestore, 'general_expenses', id));
+      await load();
+    } catch (err) { logger.error('[FinanceOverview] excluir despesa:', err); }
+  };
+
   if (loading) return <Spinner />;
 
   const mrr          = summary?.mrr ?? 0;
   const totalRevenue = fin?.totalRevenue ?? 0;
   const revenue30    = daily.reduce((a, d) => a + (d.revenue || 0), 0);
+  // Receita líquida ESTIMADA (desconta a taxa de gateway configurada, por
+  // método de pagamento) — usa a taxa que o admin digitou em AbacatePay →
+  // Config, não a taxa real cobrada pela AbacatePay em cada transação (essa
+  // não é exposta hoje). Só calculável a partir de 07/07/2026 (dias
+  // agregados antes disso não têm `revenueByMethod`).
+  const netRevenue30 = gatewayFees
+    ? daily.reduce((a, d) => a + estimateNetRevenue(d.revenueByMethod, d.countByMethod, gatewayFees), 0)
+    : null;
   const iaCostUsd30  = daily.reduce((a, d) => a + (d.costUsd || 0), 0);
   const iaCostBrl    = iaCostUsd30 * usdToBrl;
-  const totalCost    = vmCostBrl + iaCostBrl;
+  // Despesas gerais (ledger manual) dos últimos 30 dias — domínio, ferramentas,
+  // contratados etc. `generalExpenses` já vem filtrado a 90 dias da query.
+  const generalExpenses30 = generalExpenses.reduce((a, e) => a + (Date.now() - e.date <= 30 * 86400000 ? e.amountBrl : 0), 0);
+  const totalCost    = vmCostBrl + iaCostBrl + generalExpenses30;
   const netMargin    = mrr - totalCost;
   const marginPct    = mrr > 0 ? Math.round((netMargin / mrr) * 100) : 0;
 
-  const mrrDivergencePct = mrr > 0 ? Math.round(((mrr - revenue30) / mrr) * 100) : 0;
-  const showMrrWarning   = mrr > 0 && Math.abs(mrrDivergencePct) >= 20;
+  // ── Churn, ARPU, LTV (estimativas) ──
+  // Taxa de churn de 30d: sem snapshot histórico de base de assinantes, usa
+  // (ativos hoje + quem saiu) como denominador aproximado — não é uma coorte
+  // fechada de verdade, mas é a melhor aproximação possível com o dado atual.
+  const churnBase = subsCount.active + churn.churnedCount;
+  const churnRatePct = churnBase > 0 ? (churn.churnedCount / churnBase) * 100 : 0;
+  const arpu = subsCount.active > 0 ? mrr / subsCount.active : 0;
+  // LTV = ARPU / taxa de churn mensal — fórmula clássica de SaaS. Só calculável
+  // com churn > 0 (sem cancelamento na janela, LTV seria infinito/indefinido).
+  const ltv = churnRatePct > 0 ? arpu / (churnRatePct / 100) : null;
+  const trialConversionPct = trialConversion && trialConversion.cohortSize > 0
+    ? Math.round((trialConversion.converted / trialConversion.cohortSize) * 100)
+    : null;
+
+  // Alerta de margem negativa por cliente COM THRESHOLD (achado da auditoria:
+  // a lista de prejuízo já existia, mas mostrava qualquer perda — sem um
+  // corte configurável, um prejuízo de R$0,50 tinha o mesmo peso visual que
+  // um de R$500). `lossyUsers` continua mostrando todas as perdas na tabela
+  // detalhada; o banner proeminente só conta quem passa do limiar configurado.
+  const criticalLossyUsers = lossyUsers.filter(u => (u.costBrl - u.revenueBrl) > lossThresholdBrl);
+
+  // Reconciliação: compara MRR (mensal-equivalente recorrente) só contra a
+  // receita de assinaturas de INTERVALO MENSAL dos últimos 30 dias — não a
+  // receita bruta total, que incluía compras avulsas semestrais/anuais de
+  // valor cheio e disparava falso-positivo garantido em todo mês com
+  // renovação avulsa (achado A1 da auditoria financeira, 07/07/2026).
+  // `revenueByInterval` só existe em dias agregados a partir desta correção;
+  // dias antigos sem o campo contam como 0 — suprime o alerta se a maior
+  // parte da janela ainda não tem esse dado (evita falso alarme na transição).
+  const daysWithIntervalData = daily.filter(d => d.revenueByInterval !== undefined).length;
+  const hasEnoughIntervalData = daily.length > 0 && daysWithIntervalData >= daily.length / 2;
+  const monthlyRevenue30 = daily.reduce((a, d) => a + (d.revenueByInterval?.month || 0), 0);
+  const mrrDivergencePct = mrr > 0 ? Math.round(((mrr - monthlyRevenue30) / mrr) * 100) : 0;
+  const showMrrWarning   = hasEnoughIntervalData && mrr > 0 && Math.abs(mrrDivergencePct) >= 20;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -299,11 +437,131 @@ export function FinanceOverviewTab() {
         <div className="flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2.5">
           <AlertTriangle size={13} className="shrink-0 mt-0.5" />
           <span>
-            <strong>MRR teórico ({money(mrr)}) diverge {Math.abs(mrrDivergencePct)}% da receita real dos últimos 30 dias ({money(revenue30)})</strong>
-            {' '}— possível assinatura ativa sem pagamento correspondente (falha de webhook ou estorno não refletido).
+            <strong>MRR teórico ({money(mrr)}) diverge {Math.abs(mrrDivergencePct)}% da receita de assinaturas MENSAIS coletada nos últimos 30 dias ({money(monthlyRevenue30)})</strong>
+            {' '}— possível assinatura mensal ativa sem pagamento correspondente (falha de webhook ou estorno não refletido). Compras avulsas semestrais/anuais não entram nesta comparação (são lumpy por natureza, não indicam problema de cobrança).
           </span>
         </div>
       )}
+      {criticalLossyUsers.length > 0 && (
+        <div className="flex items-start gap-2 text-[11px] text-rose-800 bg-rose-50/60 border border-rose-200 rounded-xl px-3 py-2.5">
+          <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+          <span>
+            <strong>{criticalLossyUsers.length} cliente(s) com prejuízo de IA acima do limiar configurado ({money(lossThresholdBrl)})</strong>
+            {' '}— prejuízo total: {money(criticalLossyUsers.reduce((a, u) => a + (u.costBrl - u.revenueBrl), 0))}. Ver detalhes na tabela "Alerta de prejuízo" abaixo.
+          </span>
+        </div>
+      )}
+
+      {/* ── Séries históricas (30 dias) — receita bruta e custo de IA. MRR em
+          si não tem histórico diário hoje (o CRON só guarda o snapshot atual
+          em metrics_daily/_summary, sobrescrito a cada execução) — só as duas
+          séries abaixo são reconstituíveis a partir do que já é gravado. ── */}
+      {daily.length > 1 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+            <h4 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <TrendingUp size={13} className="text-emerald-600" /> Receita bruta diária (30 dias)
+            </h4>
+            <AreaLine data={daily.map(d => ({ date: d.date, value: d.revenue || 0 }))} color="#10b981" money />
+          </div>
+          <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+            <h4 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <Cpu size={13} className="text-violet-600" /> Custo de IA diário, USD (30 dias)
+            </h4>
+            <AreaLine data={daily.map(d => ({ date: d.date, value: d.costUsd || 0 }))} color="#8b5cf6" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Churn, ARPU, LTV, Conversão trial→pago (estimativas) ── */}
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+        <h4 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+          <TrendingDown size={13} className="text-rose-600" /> Churn, ARPU, LTV e Conversão (estimativas)
+        </h4>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-xl border border-ink-100 p-3" title="Assinantes que cancelaram ou expiraram nos últimos 30 dias. Taxa = churned / (ativos hoje + churned) — aproximação, não há histórico de base de assinantes por dia pra uma coorte exata.">
+            <p className="text-[9px] font-black uppercase tracking-widest text-ink-400">Churn (30d)</p>
+            <p className="text-lg font-black text-rose-700 mt-1">{churn.churnedCount} <span className="text-xs font-bold text-ink-400">({churnRatePct.toFixed(1)}%)</span></p>
+            <p className="text-[9px] text-ink-400 mt-0.5">MRR perdido: {money(churn.lostMrr)}</p>
+          </div>
+          <div className="rounded-xl border border-ink-100 p-3" title="ARPU = MRR / assinantes ativos.">
+            <p className="text-[9px] font-black uppercase tracking-widest text-ink-400">ARPU</p>
+            <p className="text-lg font-black text-ink-900 mt-1">{money(arpu)}</p>
+            <p className="text-[9px] text-ink-400 mt-0.5">por assinante ativo/mês</p>
+          </div>
+          <div className="rounded-xl border border-ink-100 p-3" title="LTV = ARPU / taxa de churn mensal — fórmula clássica de SaaS. Herda a imprecisão da taxa de churn (aproximada).">
+            <p className="text-[9px] font-black uppercase tracking-widest text-ink-400">LTV estimado</p>
+            <p className="text-lg font-black text-ink-900 mt-1">{ltv === null ? '—' : money(ltv)}</p>
+            <p className="text-[9px] text-ink-400 mt-0.5">{ltv === null ? 'sem churn na janela' : 'ARPU ÷ taxa de churn'}</p>
+          </div>
+          <div className="rounded-xl border border-ink-100 p-3" title="Usuários cujo trial de 14 dias terminou nos últimos 30 dias — quantos já têm subscriptionStatus diferente de 'trialing' (ativaram algum plano pago, mesmo que hoje cancelado/inadimplente).">
+            <p className="text-[9px] font-black uppercase tracking-widest text-ink-400">Conversão trial→pago</p>
+            <p className="text-lg font-black text-ink-900 mt-1">{trialConversionPct === null ? '—' : `${trialConversionPct}%`}</p>
+            <p className="text-[9px] text-ink-400 mt-0.5">{trialConversion ? `${trialConversion.converted}/${trialConversion.cohortSize} da coorte` : 'sem coorte na janela'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Ledger de despesas gerais (fora de VM/IA) ── */}
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+        <h4 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+          <Wallet size={13} className="text-amber-600" /> Despesas Gerais do Negócio (90 dias) — {money(generalExpenses30)} nos últimos 30d
+        </h4>
+        <p className="text-[10px] text-ink-400 mb-3">
+          Lançamento manual e pontual (domínio, ferramentas, contratados etc.) — já entra na Margem Líquida acima. Pra despesa recorrente, relance todo mês.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 mb-4">
+          <input type="text" placeholder="Descrição" value={expenseForm.description}
+            onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))}
+            className="input h-9 text-xs" />
+          <select value={expenseForm.category} onChange={e => setExpenseForm(f => ({ ...f, category: e.target.value }))} className="input h-9 text-xs">
+            <option value="domain">Domínio/Hosting</option>
+            <option value="tools">Ferramentas</option>
+            <option value="contractor">Contratado</option>
+            <option value="other">Outro</option>
+          </select>
+          <input type="number" min={0} step={0.01} placeholder="Valor (R$)" value={expenseForm.amountBrl || ''}
+            onChange={e => setExpenseForm(f => ({ ...f, amountBrl: parseNonNegativeNumber(e.target.value) }))}
+            className="input h-9 text-xs" />
+          <input type="date" value={expenseForm.date}
+            onChange={e => setExpenseForm(f => ({ ...f, date: e.target.value }))}
+            className="input h-9 text-xs" />
+          <button onClick={addExpense} disabled={savingExpense || !expenseForm.description.trim() || expenseForm.amountBrl <= 0}
+            className="h-9 px-3 rounded-xl bg-ink-900 hover:bg-ink-800 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 disabled:opacity-50">
+            {savingExpense ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Lançar
+          </button>
+        </div>
+        {generalExpenses.length > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-ink-100">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-ink-50/80 border-b border-ink-100 text-[9px] font-black uppercase text-ink-500 tracking-wider">
+                  <th className="px-4 py-2.5">Data</th>
+                  <th className="px-4 py-2.5">Descrição</th>
+                  <th className="px-4 py-2.5">Categoria</th>
+                  <th className="px-4 py-2.5 text-right">Valor</th>
+                  <th className="px-4 py-2.5 text-right"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-50">
+                {generalExpenses.map(e => (
+                  <tr key={e.id} className="hover:bg-ink-50/40">
+                    <td className="px-4 py-2 text-ink-500 font-mono">{new Date(e.date).toLocaleDateString('pt-BR')}</td>
+                    <td className="px-4 py-2 text-ink-700 font-medium">{e.description}</td>
+                    <td className="px-4 py-2 text-ink-500 capitalize">{e.category}</td>
+                    <td className="px-4 py-2 text-right font-mono font-bold text-ink-900">{money(e.amountBrl)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <button onClick={() => deleteExpense(e.id)} className="p-1 rounded text-ink-300 hover:text-rose-600 hover:bg-rose-50">
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* ── Grid: status assinaturas + breakdown por intervalo + entradas + custos ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -355,9 +613,13 @@ export function FinanceOverviewTab() {
             <h4 className="text-[11px] font-black text-ink-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
               <TrendingUp size={13} className="text-emerald-600" /> Entradas (30 dias)
             </h4>
-            <div className="flex items-baseline justify-between mb-3">
-              <span className="text-xs text-ink-500 font-bold">Receita real coletada</span>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-xs text-ink-500 font-bold">Receita real coletada (bruta)</span>
               <span className="text-lg font-black text-emerald-700">{money(revenue30)}</span>
+            </div>
+            <div className="flex items-baseline justify-between mb-3" title="Estimativa: usa a taxa configurada em AbacatePay → Config, não a taxa real cobrada pela adquirente em cada transação.">
+              <span className="text-[10px] text-ink-400 font-bold">Líquida de taxas (estimada)</span>
+              <span className="text-xs font-black text-ink-500">{netRevenue30 === null ? '—' : money(netRevenue30)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -420,15 +682,20 @@ export function FinanceOverviewTab() {
         </div>
       </div>
 
-      {/* ── Próximas cobranças (billingMode: invoice) ── */}
-      {upcomingInvoices.length > 0 && (
+      {/* ── AR Aging — faturas vencidas E a vencer (modo fatura) ── */}
+      {invoiceAging.length > 0 && (
         <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5">
           <h4 className="text-[11px] font-black text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-            <Clock size={13} /> Cobranças próximas — modo fatura ({upcomingInvoices.length})
+            <Clock size={13} /> Cobranças — modo fatura ({invoiceAging.length})
+            {invoiceAging.some(u => u.overdue) && (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] bg-rose-100 text-rose-700 border border-rose-200">
+                {invoiceAging.filter(u => u.overdue).length} vencida(s)
+              </span>
+            )}
           </h4>
           <p className="text-[10px] text-ink-500 mb-3">
-            Estas assinaturas mensais estão no modo invoice (CRON cria faturas).
-            Vencem em até 7 dias — o CRON de 03:45 UTC criará as faturas automaticamente.
+            Assinaturas mensais no modo invoice (CRON cria faturas). Mostra as que vencem em até 7 dias
+            e as que já venceram sem pagamento (status past_due — grace period até virar expired).
           </p>
           <div className="overflow-x-auto rounded-xl border border-amber-100">
             <table className="w-full text-xs">
@@ -436,23 +703,24 @@ export function FinanceOverviewTab() {
                 <tr className="bg-amber-50/80 border-b border-amber-100 text-[9px] font-black uppercase text-amber-600 tracking-wider">
                   <th className="px-4 py-2.5 text-left">Usuário</th>
                   <th className="px-4 py-2.5 text-left">Plano</th>
-                  <th className="px-4 py-2.5 text-center">Vence em</th>
+                  <th className="px-4 py-2.5 text-center">Status</th>
                   <th className="px-4 py-2.5 text-right">Valor</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-amber-50">
-                {upcomingInvoices.map(u => (
+                {invoiceAging.map(u => (
                   <tr key={u.userId} className="hover:bg-amber-50/40">
                     <td className="px-4 py-2.5 font-medium text-ink-800 max-w-[220px] truncate">{u.email}</td>
                     <td className="px-4 py-2.5 text-ink-600">{u.planName}</td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={classNames(
                         'px-1.5 py-0.5 rounded text-[8px] font-black border',
+                        u.overdue ? 'bg-rose-100 text-rose-700 border-rose-300' :
                         u.daysLeft <= 1 ? 'bg-rose-50 text-rose-700 border-rose-200' :
                         u.daysLeft <= 3 ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                          'bg-blue-50 text-blue-700 border-blue-100'
                       )}>
-                        {u.daysLeft === 0 ? 'Hoje' : `${u.daysLeft}d`}
+                        {u.overdue ? `Vencida há ${Math.abs(u.daysLeft)}d` : (u.daysLeft === 0 ? 'Vence hoje' : `Vence em ${u.daysLeft}d`)}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono font-black text-ink-900">{money(u.amount)}</td>
@@ -527,9 +795,24 @@ export function FinanceOverviewTab() {
       {/* ── Alerta de prejuízo ── */}
       {lossyUsers.length > 0 && (
         <div className="bg-white rounded-2xl border border-rose-200 shadow-sm p-5">
-          <h4 className="text-[11px] font-black text-rose-700 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-            <AlertTriangle size={13} /> Alerta de prejuízo — custo IA acima da receita ({lossyUsers.length})
-          </h4>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <h4 className="text-[11px] font-black text-rose-700 uppercase tracking-widest flex items-center gap-1.5">
+              <AlertTriangle size={13} /> Alerta de prejuízo — custo IA acima da receita ({lossyUsers.length})
+            </h4>
+            <div className="flex items-center gap-1.5">
+              <label className="text-[9px] font-black uppercase tracking-widest text-ink-400">Limiar do alerta (R$)</label>
+              <input type="number" min={0} step={1} value={lossThresholdBrl}
+                onChange={e => setLossThresholdBrl(parseNonNegativeNumber(e.target.value))}
+                className="input h-7 w-20 text-xs" />
+              <button onClick={saveLossThreshold} disabled={savingThreshold}
+                className="h-7 px-2 rounded-lg bg-ink-900 hover:bg-ink-800 text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-1 disabled:opacity-50">
+                {savingThreshold ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />} Salvar
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-ink-400 mb-3">
+            A tabela abaixo mostra TODA perda, mesmo pequena. O banner de alerta no topo da página só conta quem passa deste limiar — evita ruído de prejuízos triviais.
+          </p>
           <div className="overflow-x-auto rounded-xl border border-ink-100">
             <table className="w-full text-left text-xs">
               <thead>
@@ -541,14 +824,20 @@ export function FinanceOverviewTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-50">
-                {lossyUsers.map(u => (
-                  <tr key={u.userId} className="hover:bg-rose-50/30">
-                    <td className="px-4 py-3 text-ink-700 font-medium truncate max-w-[220px]">{u.email}</td>
-                    <td className="px-4 py-3 text-right font-mono">{money(u.revenueBrl)}</td>
-                    <td className="px-4 py-3 text-right font-mono">{money(u.costBrl)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-rose-700 font-bold">-{money(u.costBrl - u.revenueBrl)}</td>
-                  </tr>
-                ))}
+                {lossyUsers.map(u => {
+                  const isCritical = (u.costBrl - u.revenueBrl) > lossThresholdBrl;
+                  return (
+                    <tr key={u.userId} className={classNames('hover:bg-rose-50/30', isCritical && 'bg-rose-50/40')}>
+                      <td className="px-4 py-3 text-ink-700 font-medium truncate max-w-[220px]">
+                        {u.email}
+                        {isCritical && <span className="ml-1.5 px-1 py-0.5 rounded text-[8px] font-black bg-rose-200 text-rose-800">ACIMA DO LIMIAR</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono">{money(u.revenueBrl)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{money(u.costBrl)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-rose-700 font-bold">-{money(u.costBrl - u.revenueBrl)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

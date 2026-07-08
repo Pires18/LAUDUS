@@ -214,6 +214,13 @@ service cloud.firestore {
       // planos na tela de entrada, antes do login). Não contém dado sensível.
       allow read: if true;
       allow write: if isAdmin();
+
+      // Histórico de mudança de preço (snapshot antes/depois + quem mudou) —
+      // não é público como o catálogo em si; só admin (rastreabilidade financeira).
+      match /price_history/{entryId} {
+        allow read, create: if isAdmin();
+        allow update, delete: if false;
+      }
     }
 
     // ---- Logs de auditoria -------------------------------------------------
@@ -249,6 +256,12 @@ service cloud.firestore {
       allow read: if isAdmin()
         || (isSignedIn() && resource.data.userId == request.auth.uid);
       allow write: if false; // somente Admin SDK (webhooks) escreve
+
+      // Status de nota fiscal — metadado editável pelo admin, separado da
+      // transação em si (que continua imutável fora do webhook).
+      match /nf/{docId} {
+        allow read, write: if isAdmin();
+      }
     }
 
     // ---- Configuração global e mensagens de sistema -----------------------
@@ -272,6 +285,11 @@ service cloud.firestore {
     match /metrics_daily/{docId} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // ---- Ledger de despesas gerais do negócio (fora de VM/IA) -------------
+    match /general_expenses/{expenseId} {
+      allow read, write: if isAdmin();
     }
 
     // ---- Bloqueio padrão ---------------------------------------------------

@@ -34,6 +34,46 @@ export function financeMethodKey(paymentMethod: string | undefined): 'pixCount' 
         : 'otherCount';
 }
 
+/** Config de taxas de gateway (`global_config/abacatepay_config`) usada para
+ * estimar receita líquida — ver `estimateNetRevenue`. */
+export interface GatewayFeeConfig {
+  cardFeePercent?: number;
+  cardFeeFixedBrl?: number;
+  pixFeePercent?: number;
+}
+
+/**
+ * Estima a receita líquida de taxas de gateway a partir da receita bruta
+ * quebrada por método de pagamento (`revenueByMethod`/`countByMethod`,
+ * agregados diários) e da config de taxas do admin. É uma ESTIMATIVA — usa a
+ * taxa que o admin configurou manualmente, não a taxa real cobrada pela
+ * AbacatePay em cada transação (essa não é exposta hoje). `manual`/outros
+ * métodos não têm taxa de gateway (não passam pela adquirente).
+ */
+export function estimateNetRevenue(
+  revenueByMethod: Record<string, number> | undefined,
+  countByMethod: Record<string, number> | undefined,
+  fees: GatewayFeeConfig,
+): number {
+  if (!revenueByMethod) return 0;
+  let net = 0;
+  for (const [method, gross] of Object.entries(revenueByMethod)) {
+    const count = countByMethod?.[method] || 0;
+    if (method === 'credit_card') {
+      const pct = fees.cardFeePercent ?? 0;
+      const fixed = fees.cardFeeFixedBrl ?? 0;
+      net += gross - (gross * pct / 100) - (count * fixed);
+    } else if (method === 'pix') {
+      const pct = fees.pixFeePercent ?? 0;
+      net += gross - (gross * pct / 100);
+    } else {
+      // manual/outros: sem taxa de adquirente conhecida.
+      net += gross;
+    }
+  }
+  return Math.round(net * 100) / 100;
+}
+
 /** Mapeia a chave de add-on da API (snake_case) para a chave do Firestore (camelCase). */
 export function mapAddonKey(addon: string): string {
   const mapping: Record<string, string> = {
@@ -124,6 +164,34 @@ export function getAbacatePayCycle(interval?: string): string {
  */
 export function intervalMultiplier(interval?: string): number {
   return interval === 'year' ? 12 : interval === 'semester' ? 6 : 1;
+}
+
+/**
+ * Churn dos últimos 30 dias: quantos assinantes cancelaram/expiraram e quanto
+ * de MRR isso representa. `canceled` usa `canceledAt` (setado no cancelamento
+ * explícito); `expired` (avulso que não renovou) não tem timestamp dedicado —
+ * usa `updatedAt`, que o CRON de expiração grava no momento exato da transição
+ * de status (aproximação razoável: assinaturas expiradas não recebem mais
+ * updates depois disso). Assinaturas sem timestamp utilizável são ignoradas
+ * (contam como "não sabemos quando", não como churn de hoje).
+ */
+export function computeChurn30d(
+  subscriptions: Array<{ status?: string; canceledAt?: number; updatedAt?: number; price?: number; interval?: string }>,
+  now: number,
+): { churnedCount: number; lostMrr: number } {
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+  let churnedCount = 0;
+  let lostMrr = 0;
+  for (const d of subscriptions) {
+    let churnedAt: number | undefined;
+    if (d.status === 'canceled' && d.canceledAt) churnedAt = d.canceledAt;
+    else if (d.status === 'expired' && d.updatedAt) churnedAt = d.updatedAt;
+    if (churnedAt === undefined) continue;
+    if (now - churnedAt < 0 || now - churnedAt > THIRTY_DAYS) continue;
+    churnedCount += 1;
+    lostMrr += (Number(d.price) || 0) / intervalMultiplier(d.interval || 'month');
+  }
+  return { churnedCount, lostMrr: Math.round(lostMrr * 100) / 100 };
 }
 
 /**

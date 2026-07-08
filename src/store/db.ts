@@ -1337,7 +1337,19 @@ export interface DailyMetric {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
-  revenue: number;       // receita paga no dia (R$)
+  revenue: number;       // receita bruta paga no dia (R$)
+  /** Receita bruta do dia (R$), quebrada por método de pagamento — usada
+   * pra estimar taxa de gateway na Central Financeira (não confundir com
+   * a taxa real cobrada pela AbacatePay, que este número apenas aproxima). */
+  revenueByMethod?: Record<string, number>;
+  /** Contagem de transações pagas do dia, por método — usada junto com
+   * `revenueByMethod` pra estimar a taxa fixa por transação (ex.: cartão). */
+  countByMethod?: Record<string, number>;
+  /** Receita bruta de ASSINATURA (não add-on) do dia, quebrada por intervalo
+   * (month/semester/year) — usada pra reconciliar MRR contra caixa mensal
+   * de verdade, sem misturar com compra avulsa semestral/anual (que infla
+   * o mês em que cai sem significar problema de cobrança). */
+  revenueByInterval?: Record<string, number>;
   activeUsers: number;
 }
 

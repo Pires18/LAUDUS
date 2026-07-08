@@ -7,6 +7,7 @@ import { logAiUsage } from '../../store/db';
 import { logger } from '../../utils/logger';
 import { calculateAge } from '../../utils/format';
 import { getMotorProfile } from './motorProfiles';
+import { GEMINI_MODEL_PRICING } from './modelPricing';
 import { retrieveFewShotBlock } from './training/augment';
 import { scrubForGeneration } from './training/anonymize';
 
@@ -89,21 +90,24 @@ function hashPrompt(built: BuiltPrompt): string {
 
 export const callMetricsHistory: CallMetrics[] = [];
 
-const PRICING: Record<string, { input: number, output: number }> = {
-  // Gemini
-  'gemini-3.5-flash':               { input: 0.075, output: 0.30  },
-  'gemini-3.1-pro-preview':         { input: 1.25,  output: 5.0   },
-  'gemini-2.5-flash-preview-05-20': { input: 0.15,  output: 0.60  },
-  'gemini-2.5-pro-preview-06-05':   { input: 1.25,  output: 10.0  },
-};
+// Fonte única de preço por modelo: modelPricing.ts (também usada pela tabela
+// de referência do Admin, IACostsTab — evita duas cópias desincronizadas).
+const PRICING = GEMINI_MODEL_PRICING;
 
 function recordMetrics(m: CallMetrics) {
   callMetricsHistory.unshift(m);
   if (callMetricsHistory.length > 20) callMetricsHistory.pop();
 
   if (m.success && m.modelName) {
-    const prices = PRICING[m.modelName] || { input: 0, output: 0 };
-    const costUsd = ((m.estimatedInputTokens / 1000000) * prices.input) + ((m.estimatedOutputTokens / 1000000) * prices.output);
+    const prices = PRICING[m.modelName];
+    if (!prices) {
+      // Modelo sem preço mapeado custaria $0 em silêncio (a Gemini troca IDs de
+      // modelo preview com frequência) — melhor um erro visível (vai pro Sentry
+      // via logger.error) do que uma métrica de custo errada sem ninguém notar.
+      logger.error(`[engine] Modelo "${m.modelName}" sem preço mapeado em PRICING — custo desta chamada registrado como $0.`);
+    }
+    const { input, output } = prices || { input: 0, output: 0 };
+    const costUsd = ((m.estimatedInputTokens / 1000000) * input) + ((m.estimatedOutputTokens / 1000000) * output);
     
     // Log asynchronously
     logAiUsage({

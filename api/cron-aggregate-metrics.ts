@@ -1,4 +1,28 @@
 import { getDb } from './_firebase.js';
+import { intervalMultiplier } from './_pricing.js';
+
+/**
+ * MRR/ARR a partir das assinaturas — soma o preço mensal-equivalente de cada
+ * assinatura `active`/`trialing`, usando o preço/intervalo TRAVADOS na própria
+ * assinatura (nunca o preço vigente no catálogo `saas_plans`, que pode ter
+ * mudado desde a venda). Espelha a lógica já correta em produção no painel
+ * "Receita por Intervalo" (FinanceOverviewTab.tsx). Extraída p/ ser testável
+ * sem Firestore — antes o cálculo inline aqui só tratava `interval==='year'`
+ * como não-mensal (semestral contava o preço cheio como se fosse mensal, 6x
+ * de superestimação) e relia o preço atual do plano em vez do da assinatura.
+ */
+export function computeMrr(
+  subscriptions: Array<{ status?: string; price?: number; interval?: string }>
+): { mrr: number; activeSubscribers: number; trials: number } {
+  let mrr = 0, activeSubscribers = 0, trials = 0;
+  for (const d of subscriptions) {
+    if (d.status === 'active') activeSubscribers += 1;
+    else if (d.status === 'trialing') trials += 1;
+    else continue;
+    mrr += (Number(d.price) || 0) / intervalMultiplier(d.interval || 'month');
+  }
+  return { mrr: Math.round(mrr * 100) / 100, activeSubscribers, trials };
+}
 
 /**
  * CRON — Agregação diária de telemetria de IA para o painel admin.
@@ -37,12 +61,15 @@ export default async function handler(req: any, res: any) {
     type DayAgg = {
       reports: number; reportsLite: number; reportsPro: number;
       inputTokens: number; outputTokens: number; costUsd: number;
-      revenue: number; users: Set<string>;
+      revenue: number; revenueByMethod: Record<string, number>; countByMethod: Record<string, number>;
+      revenueByInterval: Record<string, number>;
+      users: Set<string>;
     };
     const byDay: Record<string, DayAgg> = {};
     const mkDay = (): DayAgg => ({
       reports: 0, reportsLite: 0, reportsPro: 0,
-      inputTokens: 0, outputTokens: 0, costUsd: 0, revenue: 0, users: new Set<string>(),
+      inputTokens: 0, outputTokens: 0, costUsd: 0, revenue: 0, revenueByMethod: {}, countByMethod: {},
+      revenueByInterval: {}, users: new Set<string>(),
     });
 
     snap.forEach((doc: any) => {
@@ -68,7 +95,19 @@ export default async function handler(req: any, res: any) {
       if (t.status !== 'paid') return;
       const day = new Date(typeof t.timestamp === 'number' ? t.timestamp : now).toISOString().slice(0, 10);
       const b = byDay[day] || (byDay[day] = mkDay());
-      b.revenue += Number(t.amount) || 0;
+      const amount = Number(t.amount) || 0;
+      b.revenue += amount;
+      const method = String(t.paymentMethod || 'unknown');
+      b.revenueByMethod[method] = (b.revenueByMethod[method] || 0) + amount;
+      b.countByMethod[method] = (b.countByMethod[method] || 0) + 1;
+      // Só transações de ASSINATURA têm `interval` (add-ons não são recorrentes
+      // por definição) — usado pra separar caixa mensal-recorrente de compra
+      // avulsa semestral/anual na reconciliação (evita falso-positivo em mês
+      // com renovação avulsa, ver FinanceOverviewTab).
+      if (t.type === 'subscription') {
+        const iv = String(t.interval || 'month');
+        b.revenueByInterval[iv] = (b.revenueByInterval[iv] || 0) + amount;
+      }
     });
 
     const batch = db.batch();
@@ -82,41 +121,27 @@ export default async function handler(req: any, res: any) {
         outputTokens: b.outputTokens,
         costUsd: Math.round(b.costUsd * 10000) / 10000,
         revenue: Math.round(b.revenue * 100) / 100,
+        revenueByMethod: Object.fromEntries(
+          Object.entries(b.revenueByMethod).map(([k, v]) => [k, Math.round(v * 100) / 100])
+        ),
+        countByMethod: b.countByMethod,
+        revenueByInterval: Object.fromEntries(
+          Object.entries(b.revenueByInterval).map(([k, v]) => [k, Math.round(v * 100) / 100])
+        ),
         activeUsers: b.users.size,
         updatedAt: Date.now(),
       }, { merge: true });
     }
     await batch.commit();
 
-    // MRR / ARR: soma o preço mensal-equivalente das assinaturas ativas.
-    // Grava um doc único (global_config/metrics_summary) que o painel lê barato.
+    // MRR / ARR — ver computeMrr() acima. Guardado em metrics_daily/_summary
+    // (mesma regra admin-only). Sem campo `date`, então não aparece nas
+    // consultas por intervalo de datas.
     try {
-      const [subsSnap, plansSnap] = await Promise.all([
-        db.collection('subscriptions').get(),
-        db.collection('saas_plans').get(),
-      ]);
-      const planPrice: Record<string, { price: number; interval: string }> = {};
-      plansSnap.forEach((p: any) => {
-        const d = p.data() || {};
-        const entry = { price: Number(d.price) || 0, interval: String(d.interval || 'month') };
-        planPrice[p.id] = entry;
-        if (d.name) planPrice[String(d.name).toLowerCase()] = entry;
-      });
-      let mrr = 0, activeSubscribers = 0, trials = 0;
-      subsSnap.forEach((s: any) => {
-        const d = s.data() || {};
-        if (d.status === 'active') {
-          activeSubscribers += 1;
-          const pl = planPrice[d.planId] || planPrice[String(d.plan || '').toLowerCase()];
-          if (pl) mrr += pl.interval === 'year' ? pl.price / 12 : pl.price;
-        } else if (d.status === 'trialing') {
-          trials += 1;
-        }
-      });
-      // Guardado em metrics_daily/_summary (mesma regra admin-only). Sem campo
-      // `date`, então não aparece nas consultas por intervalo de datas.
+      const subsSnap = await db.collection('subscriptions').get();
+      const { mrr, activeSubscribers, trials } = computeMrr(subsSnap.docs.map((s: any) => s.data() || {}));
       await db.collection('metrics_daily').doc('_summary').set({
-        mrr: Math.round(mrr * 100) / 100,
+        mrr,
         arr: Math.round(mrr * 12 * 100) / 100,
         activeSubscribers,
         trials,
