@@ -244,7 +244,7 @@ No menu DICOM do aparelho (Mindray, GE, Samsung…):
 | Aparelho: "No worklists found" | Pasta da worklist diverge OU sem `.wl` | Confira se `Worklists.Database` (Orthanc) == "Pasta da Worklist" (app); veja se o `.wl` foi criado |
 | **C-ECHO ok, mas Worklist dá "query error"** | Aparelho não registrado em `DicomModalities` — Echo é sempre liberado, Worklist não | Cadastre o aparelho (seção 2.2). No PACS gerenciado, isso é automático pelo card "Conectar meu ultrassom" |
 | Worklist falha com erro de Python | `pydicom` não instalado | `pip install pydicom` (ou `pip3`) |
-| Aparelho não conecta na 4242 | Firewall, OU rota de sub-rede Tailscale não aceita pelo servidor (se o relé for um subnet router) | Libere a porta **4242** (entrada) no firewall; se usar relé Tailscale (GL.iNet/roteador), rode `tailscale up --accept-routes` no servidor Orthanc |
+| Aparelho não conecta na 4242 | Firewall, OU rota de sub-rede Tailscale não aceita pelo servidor (se o relé for um subnet router) | Libere a porta **4242** (entrada) no firewall; se usar relé Tailscale (GL.iNet/roteador), rode `tailscale up --accept-routes` no servidor Orthanc. Se mesmo com tudo "certo" (rota aprovada, ACL liberando, firewall recarregado) o C-ECHO continuar travando em timeout — modo de falha conhecido do subnet-routing em alguns GL.iNet — use o plano B: `scripts/glinet-pacs-relay.sh` (DNAT via a conexão nativa do roteador). Roteiro completo em `docs/pacs/PACS_TENANT_SETUP.md` §"Diagnóstico" |
 | Mixed Content no console | App HTTPS tentando HTTP local | Use o método Tailscale Funnel (seção 5) |
 | Agente escreve `.wl` no lugar errado | Pasta padrão diferente do Orthanc | Preencha "Pasta da Worklist" no app **ou** defina `LAUDUS_WORKLIST_DIR` no agente |
 

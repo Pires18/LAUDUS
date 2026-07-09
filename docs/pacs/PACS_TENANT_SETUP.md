@@ -1,12 +1,20 @@
 # 🏢 Ops — VM compartilhada multi-tenant (`orthanc-server`)
 
+> **Ponto de entrada geral de PACS/DICOM:** [`PACS_CENTRAL_MESTRE.md`](./PACS_CENTRAL_MESTRE.md)
+> (checklist de configuração completo, hardening, bugs corrigidos, roadmap). Este
+> documento aqui é o runbook operacional específico da VM compartilhada.
+
 > Como migrar a VM `orthanc-server` para **multi-tenant** e criar tenants (planos
 > Starter/Pro). Cada tenant = 1 container Orthanc isolado. Ver desenho em
 > [PLANO_PACS_VM_COMPARTILHADA.md](../archive/PLANO_PACS_VM_COMPARTILHADA.md).
 
 > **Estado real (validado com aparelho físico em 06/07/2026):** este é o modelo
-> em produção. Duas pegadinhas que já causaram incidentes reais e não são
-> óbvias — confira sempre ao configurar um relé novo:
+> em produção. Relato completo de um incidente real (5 causas raiz empilhadas,
+> a maioria não óbvia) em
+> [INCIDENTE_2026-07-08_TIMEOUT_MX7.md](./INCIDENTE_2026-07-08_TIMEOUT_MX7.md)
+> — vale ler antes de investigar um "timeout" parecido. Pegadinhas que já
+> causaram incidentes reais e não são óbvias — confira sempre ao configurar um
+> relé novo:
 > 1. **Rotas de sub-rede:** aprovar a rota do relé no admin da tailnet NÃO
 >    basta — a **VM também precisa aceitá-la** (`sudo tailscale up --accept-routes`,
 >    já incluído no `pacs-vm-setup.sh`). Sem isso, o C-ECHO trava em *timeout*
@@ -18,6 +26,27 @@
 >    ultrassom" e ele mesmo chama `PUT /modalities/{id}` no Orthanc via o
 >    proxy do agente. Não precisa editar `orthanc.json` nem reiniciar
 >    container à mão.
+> 3. **`dicomTenantId` desalinhado do tenant que o relé físico alcança:** o
+>    app sempre registra/sincroniza o aparelho contra o tenant guardado em
+>    `settings.dicomTenantId` (client-side, sem checagem cruzada com pra
+>    onde o relé do cliente está de fato encaminhando o tráfego DICOM). Se
+>    esses dois divergirem — típico depois de um "Reprovisionar" que criou
+>    tenant novo em vez de reparar o existente — o app "funciona" sem erro
+>    (Echo passa, worklist é criada) mas tudo cai num tenant que ninguém
+>    olha. Sintoma: exames sobem só no Orthanc errado; `curl .../modalities`
+>    do tenant "certo" (o que o app mostra) vem vazio. Sempre confira, ao
+>    investigar um caso, se o `dicomTenantId` das settings do usuário bate
+>    com a porta que o relé físico dele está de fato alcançando (`sudo
+>    /opt/pacs-tenant.sh list` + qual tenant tem dado recente em
+>    `/opt/tenants/*/data`).
+> 4. **Subnet-routing via GL.iNet pode nunca fechar o ciclo, mesmo 100%
+>    configurado certo** (rota aprovada, `--accept-routes` na VM, ACL/`grants`
+>    liberando por CIDR, firewall recarregado) — o SYN sai do roteador, mas a
+>    resposta não completa a volta, sem nenhum erro explícito em lugar nenhum.
+>    Não é sempre reproduzível nem tem causa raiz confirmada nessa versão de
+>    firmware/Tailscale; **não insista indefinidamente**. Ver seção
+>    "Diagnóstico" abaixo pro roteiro completo e o **plano B** (`scripts/glinet-pacs-relay.sh`,
+>    DNAT usando a conexão nativa do roteador em vez de subnet-routing).
 
 ## Pré-requisitos
 - VM já montada pelo `setup-vm.sh` (Docker + Tailscale + Agente + Funnel).
@@ -159,11 +188,34 @@ sudo bash -c 'du -sh /opt/tenants/*/data'   # qual tenant tem dados reais (glob 
 ```
 
 ## Diagnóstico "aparelho não conecta" (ordem que funciona)
+
+**Camada VM/Orthanc — sempre confira primeiro (rápido, elimina metade dos casos):**
 1. `sudo docker ps --filter name=orthanc-<tid>` + `sudo ss -tlnp | grep <porta>` — container de pé e escutando?
 2. `nc -zv -w 3 <ip-tailnet-vm> <porta>` **rodado na própria VM** — a porta responde localmente?
-3. O mesmo `nc` rodado de **outro nó da tailnet** (ex: seu Mac) — isola ACL do Tailscale vs. problema de rota do relé.
+3. O mesmo `nc` rodado de **outro nó da tailnet** (ex: seu Mac, **com Tailscale ligado**) — isola "VM alcançável por peer nativo" vs. "problema é específico do relé/subnet-routing". ⚠️ Rodar esse teste com Tailscale **desligado** no dispositivo de teste é o que de fato isola o caminho do relé — ver passo 7.
 4. `tailscale status` na VM — procure "peers are advertising routes but --accept-routes is false".
 5. `sudo docker logs orthanc-<tid> --tail 50` **no momento exato da tentativa** — a causa real quase sempre aparece aqui (ex: rejeição de DicomModalities).
+6. `curl -s http://localhost:<httpPort>/modalities` — o aparelho está mesmo registrado nesse tenant específico? (Confira também se `dicomTenantId` do usuário bate com esse tenant — ver pegadinha nº3 acima.)
+
+**Se a VM está OK mas o aparelho físico ainda não conecta — isola o caminho relé→tailnet (mais demorado, mas decisivo):**
+
+7. **Teste "limpo" a partir da rede do cliente**: pegue um dispositivo **sem Tailscale rodando** (desligue-o se já tiver — `tailscale down`, ou celular sem o app), conectado na **mesma rede do relé** (mesmo Wi-Fi do GL.iNet, por exemplo), e rode `nc -zv -w 3 <ip-tailnet-vm> <porta>`. Só esse teste separa "subnet-routing funcionando" de "só peers nativos alcançam" — testar de um device que já tem Tailscale instalado (mesmo que na mesma rede física) dá **falso positivo**, porque ele usa a própria conexão dele, não a rota do relé.
+8. Se o passo 7 falhar, `tcpdump -i tailscale0 -n port <porta>` **na VM**, retestando em paralelo — confirma se o pacote sequer chega (problema é no relé/rede do cliente) ou se chega e não recebe resposta (problema é no retorno).
+9. No **relé (GL.iNet)**, via SSH (`ssh root@<ip-do-roteador>`, senha = a do painel; se o LuCI pedir senha separada, geralmente é a mesma):
+   - `tailscale status` — o peer da VM aparece `active`?
+   - `ip route | grep tailscale` e `iptables -t nat -L -n -v | grep -A3 tailscale` — rotas e NAT básicos.
+   - `iptables -L zone_lan_forward -n -v` e `iptables -L zone_tailscale0_forward -n -v` — **os dois sentidos**. Teste `nc`/`timeout nc` de novo enquanto olha os contadores de pacote: se `zone_lan_forward`→`zone_tailscale0_dest_ACCEPT` incrementa mas `zone_tailscale0_forward` (o **retorno**) fica sempre em zero, o pacote de ida sai mas a resposta nunca completa o ciclo — sintoma real observado em produção (08/07/2026), sem causa raiz 100% confirmada nessa combinação de firmware.
+   - Se as chains de zona parecerem "vazias"/desatualizadas mesmo com a config em `uci show firewall` correta, rode `/etc/init.d/firewall restart` — o toggle da UI amigável do GL.iNet nem sempre recarrega o firewall ativo.
+10. **Confira a ACL do Tailscale** (admin console → Access controls): rota aprovada **não basta**. Rode `tailscale status --json | grep -A10 "<hostname-do-relé>"` **na VM** e confirme se o `AllowedIPs` do peer relé inclui o CIDR da LAN dele. Se não incluir, falta um `grant` com `dst` explícito por CIDR — ver `PACS_PROVISION_SETUP.md` §2 (pegadinha documentada ali, com o exemplo de policy corrigido).
+
+**Se depois de tudo isso (passos 7–10) o subnet-routing ainda não fechar o ciclo — não insista mais.** É um modo de falha conhecido dessa combinação GL.iNet+Tailscale, sem reprodução 100% confiável. Use o **plano B**:
+
+```bash
+# baixa e roda direto no roteador (o script é publicado em /pacs junto com os
+# demais — agent.js, generate_wl.py etc. — via `npm run sync:pacs-scripts`)
+ssh root@<ip-do-roteador> "curl -fsSL https://laudus.vercel.app/pacs/glinet-pacs-relay.sh -o ~/glinet-pacs-relay.sh && chmod +x ~/glinet-pacs-relay.sh && ~/glinet-pacs-relay.sh install <ip-tailnet-vm> <porta-dicom-do-tenant> 4242"
+```
+Isso troca subnet-routing por um DNAT simples usando a **conexão nativa** do próprio roteador (que sempre funciona, ele é peer legítimo da tailnet) — muito mais robusto, e o aparelho passa a apontar pro **IP do próprio roteador** em vez do IP tailnet da VM.
 
 ## Atualizar `agent.js` na VM depois de um fix no código
 ```bash

@@ -44,18 +44,18 @@
 1. **API key:** em [login.tailscale.com](https://login.tailscale.com) → **Settings → Keys** → *Generate API key*. Guarde como `TAILSCALE_API_KEY`.
 2. **Tailnet:** use `-` (atalho para o tailnet do dono da chave) em `TAILSCALE_TAILNET`. (Ou o nome/org exato.)
 3. **Domínio MagicDNS:** em **DNS**, veja o sufixo `xxxxx.ts.net` do seu tailnet → `TAILSCALE_TS_NET` (ex: `tail861dda.ts.net`).
-4. **HTTPS + Funnel:** em **DNS**, clique **Enable HTTPS**. Em **Access controls (ACL)**, garanta o Funnel, a tag das VMs (`tag:pacs`) e a tag dos **relés dos clientes** (`tag:pacs-client`) — isolando o relé de cada cliente pra só alcançar a porta DICOM das VMs, nunca outros dispositivos da tailnet:
+4. **HTTPS + Funnel:** em **DNS**, clique **Enable HTTPS**. Em **Access controls (ACL)**, garanta o Funnel, a tag das VMs (`tag:pacs`) e a tag dos **relés dos clientes** (`tag:pacs-client`) — isolando o relé de cada cliente pra só alcançar a porta DICOM das VMs, nunca outros dispositivos da tailnet. Use `grants` (sintaxe atual do Tailscale, é o que roda em produção — `acls` é a sintaxe legada e não deve ser misturada com `grants` no mesmo policy file):
    ```jsonc
    {
      "tagOwners": {
        "tag:pacs": ["autogroup:admin"],
        "tag:pacs-client": ["autogroup:admin"]
      },
-     "nodeAttrs": [
-       { "target": ["tag:pacs"], "attr": ["funnel"] }
-     ],
-     "acls": [
-       { "action": "accept", "src": ["tag:pacs-client"], "dst": ["tag:pacs:4242", "tag:pacs:4300-4399"] }
+     "grants": [
+       { "src": ["autogroup:member"], "dst": ["autogroup:member"], "ip": ["*"] },
+       { "src": ["autogroup:member"], "dst": ["tag:pacs"], "ip": ["*"] },
+       { "src": ["tag:pacs-client"], "dst": ["tag:pacs"], "ip": ["tcp:4242", "tcp:4300-4399"] },
+       { "src": ["autogroup:member"], "dst": ["192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"], "ip": ["*"] }
      ],
      "autoApprovers": {
        "routes": {
@@ -63,13 +63,18 @@
          "10.0.0.0/8": ["tag:pacs-client"],
          "172.16.0.0/12": ["tag:pacs-client"]
        }
-     }
+     },
+     "nodeAttrs": [
+       { "target": ["tag:pacs"], "attr": ["funnel"] }
+     ]
    }
    ```
-   `autoApprovers` é o que elimina o passo manual de "aprovar a rota" **para o relé de cada cliente**: qualquer dispositivo com `tag:pacs-client` que anuncie uma sub-rede dentro das 3 faixas privadas padrão (RFC 1918 — cobre praticamente qualquer roteador doméstico/comercial, incluindo o `192.168.8.0/24` default do GL.iNet) é aprovado automaticamente, sem você precisar entrar no admin console toda vez que um cliente novo conecta o relé dele. Isso não amplia o que o cliente alcança — a regra de `acls` acima continua restringindo `tag:pacs-client` só à porta DICOM das VMs, independente da rota estar auto-aprovada.
-   (`tag:pacs` é usada pela auth-key das VMs; `tag:pacs-client` é a auth-key que o provisionador gera **por cliente**, pra ele logar o próprio relé — GL.iNet ou PC — sem precisar da sua conta. A regra de `acls` restringe: quem tem `tag:pacs-client` só alcança a porta DICOM fixa das VMs dedicadas (4242) e a faixa de portas dos tenants na VM compartilhada (4300–4399) — nada além disso, nem SSH, nem outros dispositivos seus.)
+   `autoApprovers` é o que elimina o passo manual de "aprovar a rota" **para o relé de cada cliente**: qualquer dispositivo com `tag:pacs-client` que anuncie uma sub-rede dentro das 3 faixas privadas padrão (RFC 1918 — cobre praticamente qualquer roteador doméstico/comercial, incluindo o `192.168.8.0/24` default do GL.iNet) é aprovado automaticamente, sem você precisar entrar no admin console toda vez que um cliente novo conecta o relé dele. Isso não amplia o que o cliente alcança — a regra de `grants` continua restringindo `tag:pacs-client` só à porta DICOM das VMs, independente da rota estar auto-aprovada.
+   (`tag:pacs` é usada pela auth-key das VMs; `tag:pacs-client` é a auth-key que o provisionador gera **por cliente**, pra ele logar o próprio relé — GL.iNet ou PC — sem precisar da sua conta. A regra de `grants` restringe: quem tem `tag:pacs-client` só alcança a porta DICOM fixa das VMs dedicadas (4242) e a faixa de portas dos tenants na VM compartilhada (4300–4399) — nada além disso, nem SSH, nem outros dispositivos seus.)
 
    > **Isolamento entre clientes:** hoje todos os relés de clientes compartilham a mesma tag (`tag:pacs-client`) — o Tailscale exige que toda tag já exista em `tagOwners` antes de virar uma auth-key, então não dá pra criar 1 tag por cliente automaticamente. Isso já impede um relé de cliente de alcançar qualquer coisa fora do PACS (seu Mac, outras VMs, etc.). Um cliente mal-intencionado ainda poderia, em teoria, tentar a porta DICOM de OUTRO tenant na VM compartilhada — mas o Orthanc de cada tenant só responde a aparelhos registrados em `DicomModalities` (feito pelo próprio cliente, via "Conectar meu ultrassom"), então isso funciona como uma segunda camada de defesa.
+
+   > **⚠️ A 4ª regra do `grants` acima é obrigatória, não cosmética** (causa raiz real de um incidente em produção — 08/07/2026, ver `PACS_TENANT_SETUP.md` §"Diagnóstico"). Rota de sub-rede **aprovada** no admin console **não é suficiente** pra ela aparecer no `AllowedIPs` dos outros peers — o Tailscale só propaga uma rota de sub-rede pra quem tem um `grant` cujo `dst` cobra explicitamente aquele CIDR (ou um superset dele). `"dst": ["autogroup:member"]` cobre o IP tailscale do **próprio nó**, não as sub-redes que ele anuncia atrás de si. Isso pega qualquer relé **pessoal/sem tag** (ex: um GL.iNet seu de teste/suporte, não provisionado via `tag:pacs-client`) — sem essa 4ª regra, a rota fica "aprovada" pra sempre sem nunca funcionar, e o sintoma é indistinguível de firewall/rede quebrada (C-ECHO trava em timeout, sem rejeitar).
 
 ---
 

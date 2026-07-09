@@ -103,7 +103,13 @@ export async function syncExamToOrthancWorklist(
             patientBirthDate: dicomBirthDate,
             patientSex: patient.gender || 'F',
             modality: targetDevice.modality,
-            aeTitle: settings.dicomOrthancAETitle || targetDevice.aeTitle,
+            // ScheduledStationAETitle precisa ser o AE Title do APARELHO
+            // selecionado (é o que o aparelho casa contra a própria identidade
+            // ao consultar a Worklist) — nunca o dicomOrthancAETitle (esse é a
+            // identidade do PACS/Orthanc em si, usado pro aparelho DISCAR, não
+            // pra filtrar worklist). Usar o do Orthanc aqui fazia todo exame
+            // gravar a mesma AE Title no .wl, não importa o aparelho escolhido.
+            aeTitle: targetDevice.aeTitle,
             stepDate,
             stepTime,
             stepDescription,
@@ -141,7 +147,9 @@ export async function syncExamToOrthancWorklist(
             patientBirthDate: dicomBirthDate,
             patientSex: patient.gender || 'F',
             modality: targetDevice.modality,
-            aeTitle: settings.dicomBackupOrthancAETitle || targetDevice.aeTitle,
+            // Mesmo motivo do envio primário acima — ScheduledStationAETitle
+            // é do aparelho, não do Orthanc de backup.
+            aeTitle: targetDevice.aeTitle,
             stepDate,
             stepTime,
             stepDescription,

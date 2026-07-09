@@ -20,7 +20,7 @@ Este documento consolida: (1) limpeza e padronização da documentação oficial
 | `AUDITORIA_GLOBAL_2026-07.md` | Snapshot pré-Fase 0 (02/07), superado pela Completa | **Arquivar** |
 | `IMPROVEMENT_PLAN.md` | Plano v2.0→3.0 concluído (29/Jun) | **Arquivar** (virou histórico, itens migram pro CHANGELOG) |
 | `ANALISE_BUGS.md` | Snapshot pontual (26/Jun), pré-Firestore rules | **Arquivar** |
-| `PLANO_PACS_VM_COMPARTILHADA.md` | Alternativa **descartada** (decisão tomada: 1 VM/usuário) | **Arquivar**, deixando nota de decisão em `PROJETO_PACS_NUVEM.md` |
+| `PLANO_PACS_VM_COMPARTILHADA.md` | Alternativa ~~descartada~~ **[correção 08/07/2026: essa foi a que venceu]** — a VM compartilhada multi-tenant é o modelo real em produção, não o "1 VM/usuário" desta linha. Ver `docs/pacs/PACS_TENANT_SETUP.md` (fonte da verdade operacional atual) | Mantido em `archive/` só por localização histórica do arquivo — o **conteúdo** dele descreve a arquitetura vigente, não descartada |
 | `ADMIN_IMPROVEMENT_PLAN.md` | Roadmap ativo (admin panel) | **Manter** |
 | `PLANO_REFINAMENTO.md` | Roadmap ativo, fases R1–R3 em execução | **Manter** — vira o "board" de execução corrente |
 | `PLANO_PLANOS_INTERVALOS_ABACATEPAY.md` | Spec pronta, não implantada | **Manter** até implementar; depois migra para CHANGELOG |

@@ -101,6 +101,35 @@ export function UltrasoundSetupCard() {
     return () => { cancelled = true; };
   }, [settings.dicomLocalAgentUrl]);
 
+  // Checagem de consistência: os aparelhos cadastrados no Passo 3 estão de
+  // fato registrados no PACS que `dicomTenantId`/`dicomLocalAgentUrl` apontam
+  // AGORA? `syncModalityInOrthanc` sempre grava no PACS "ativo" das settings,
+  // sem nenhuma garantia de que é o mesmo tenant que o relé físico do usuário
+  // alcança — depois de um reprovisionamento (tenant novo) ou uma settings
+  // desatualizada, o cadastro "parece" ok na tela mas nunca chegou no Orthanc
+  // certo (causa raiz real de um caso em produção — 08/07/2026, Worklist
+  // nunca via o aparelho mesmo com Echo/Storage funcionando). `null` = ainda
+  // não checou ou falhou a consulta (não vira aviso, evita falso-positivo).
+  const [registeredAeTitles, setRegisteredAeTitles] = useState<Set<string> | null>(null);
+  async function refreshRegisteredModalities() {
+    try {
+      const baseUrl = getActivePacsUrl(settings, false).replace(/\/$/, '');
+      const auth = getDicomAuthParams(settings, false);
+      const proxyPath = getProxyEndpoint(settings, false);
+      const target = `${baseUrl}/modalities?expand`;
+      const url = `${proxyPath}?url=${encodeURIComponent(target)}${auth}`;
+      const res = await fetch(url);
+      if (!res.ok) { setRegisteredAeTitles(null); return; }
+      const json = await res.json();
+      const aets = Object.values(json || {}).map((m: any) => String(m?.AET || '').toUpperCase()).filter(Boolean);
+      setRegisteredAeTitles(new Set(aets));
+    } catch { setRegisteredAeTitles(null); }
+  }
+  useEffect(() => {
+    refreshRegisteredModalities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.dicomTenantId, settings.dicomLocalAgentUrl, settings.dicomViewerUrl]);
+
   // Porta DICOM — editável. Necessário porque tenants criados numa VM
   // compartilhada usam uma porta exclusiva (43xx), nunca a 4242 padrão; e o
   // provisionamento pode ter salvo a instância antes de o campo existir.
@@ -138,6 +167,7 @@ export function UltrasoundSetupCard() {
     } catch (err: any) {
       showToast('Aparelho salvo, mas falha ao autorizar no PACS: ' + (err.message || ''), 'error');
     }
+    refreshRegisteredModalities();
   }
 
   async function removeDevice(device: DicomDevice) {
@@ -159,6 +189,7 @@ export function UltrasoundSetupCard() {
     try {
       await syncModalityInOrthanc(device.aeTitle, device.ip || '', 'delete');
     } catch { /* remoção no Orthanc é best-effort — não bloqueia a UI */ }
+    refreshRegisteredModalities();
   }
 
   // Aparelho principal: pré-selecionado ao criar exame/confirmar agendamento
@@ -186,7 +217,7 @@ export function UltrasoundSetupCard() {
       showToast('Aparelho autorizado no PACS.', 'success');
     } catch (err: any) {
       showToast('Falha ao autorizar no PACS: ' + (err.message || ''), 'error');
-    } finally { setResyncingId(null); }
+    } finally { setResyncingId(null); refreshRegisteredModalities(); }
   }
 
   // Edição dos dados de um aparelho já cadastrado (nome, AE Title, IP, modalidade).
@@ -225,7 +256,7 @@ export function UltrasoundSetupCard() {
         showToast('Aparelho salvo, mas falha ao autorizar no PACS: ' + (err.message || ''), 'error');
       }
       setEditingId(null);
-    } finally { setSavingEditId(null); }
+    } finally { setSavingEditId(null); refreshRegisteredModalities(); }
   }
 
   const CopyRow = ({ label, value, id, hint }: { label: string; value: string; id: string; hint?: string }) => (
@@ -419,6 +450,14 @@ export function UltrasoundSetupCard() {
                       )}
                       {hasMultipleClinics && (
                         <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-ink-100 text-ink-500 text-[8px] font-black uppercase tracking-wider">{clinicName(d.clinicId)}</span>
+                      )}
+                      {registeredAeTitles && !registeredAeTitles.has(d.aeTitle.toUpperCase()) && (
+                        <span
+                          className="shrink-0 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[8px] font-black uppercase tracking-wider"
+                          title="Não encontrado no PACS que as configurações apontam agora — a Worklist vai falhar mesmo com Echo/Storage funcionando. Clique em 'Reautorizar no PACS' (ícone de atualizar). Se persistir, o tenant configurado pode não ser o mesmo que o relé físico alcança."
+                        >
+                          Não registrado no PACS
+                        </span>
                       )}
                     </p>
                     <p className="text-[10px] font-mono text-ink-400">{d.aeTitle} · {d.modality}{d.ip ? ` · ${d.ip}` : ''}</p>

@@ -5,6 +5,22 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [Não versionado] — 2026-07-08
+
+### PACS — incidente real (MX7 timeout) + padronização pra evitar recorrência
+Investigação de suporte (usuário real, aparelho Mindray MX7 via relé GL.iNet)
+revelou 5 causas raiz empilhadas — relato completo em
+[`docs/pacs/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`](docs/pacs/INCIDENTE_2026-07-08_TIMEOUT_MX7.md).
+Fixes produtizados pra não repetir com outros usuários:
+- **ACL do Tailscale documentada com o `grant` que faltava** (`docs/pacs/PACS_PROVISION_SETUP.md`): rota de sub-rede *aprovada* no admin console não é suficiente pra propagar pro `AllowedIPs` dos peers — precisa de um `grant`/`acl` com `dst` cobrindo o CIDR explicitamente. Sem isso, C-ECHO trava em timeout sem nenhum erro explícito.
+- **`scripts/glinet-pacs-relay.sh` (novo)**: quando subnet-routing via GL.iNet não fecha o ciclo mesmo 100% configurado certo (modo de falha observado, sem causa raiz 100% confirmada), padroniza o contorno — DNAT usando a conexão nativa do próprio roteador em vez de rotear tráfego de terceiros pela tailnet. Publicado em `/pacs/glinet-pacs-relay.sh` (junto de `agent.js` etc., via `npm run sync:pacs-scripts`).
+- **`docs/pacs/PACS_TENANT_SETUP.md`**: seção "Diagnóstico" expandida de 5 pra 10 passos (firewall de zona do GL.iNet, teste "limpo" sem Tailscale local, checagem de `AllowedIPs`).
+- **`UltrasoundSetupCard.tsx`**: cada aparelho cadastrado agora mostra um badge "Não registrado no PACS" quando o AE Title dele não é encontrado no `GET /modalities` do PACS que as settings apontam *agora* — pega na hora um `dicomTenantId` desalinhado do tenant que o relé físico do usuário realmente alcança (causa raiz mais sutil do incidente — antes só aparecia quando o exame já tinha sumido).
+
+### PACS — auditoria pós-incidente encontrou bug adicional (separado do MX7)
+- **`src/utils/dicom.ts`**: o campo que vira `ScheduledStationAETitle` no `.wl` (identifica **qual aparelho** deve pegar aquele item da Worklist) usava `settings.dicomOrthancAETitle || targetDevice.aeTitle` — ou seja, a identidade do **PACS/Orthanc** (`'ORTHANC'`, sempre preenchida depois de qualquer provisionamento gerenciado) tinha prioridade sobre o AE Title do **aparelho selecionado** no formulário. Resultado: todo exame gravava a mesma AE Title no `.wl`, não importa qual aparelho fosse escolhido — o seletor de aparelho em `CreateExamModal`/`ConfirmAppointmentModal` era efetivamente decorativo em qualquer conta com mais de um aparelho cadastrado. Corrigido (envio primário e de backup): `aeTitle` agora é sempre `targetDevice.aeTitle`.
+- **`docs/pacs/PACS_CENTRAL_MESTRE.md`** (novo): documento mestre único — mapa de toda a documentação PACS/DICOM, checklist de configuração "do zero à produção" já incorporando todos os aprendizados do incidente, hardening de segurança consolidado, e roadmap de riscos residuais priorizado.
+
 ## [Não versionado] — 2026-07-07
 
 ### Corrigido

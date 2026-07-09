@@ -62,13 +62,22 @@ def main():
         patient_birth_date = data.get('patientBirthDate', '') # Formato: AAAAMMDD
         patient_sex = data.get('patientSex', 'F') # F, M, O
         modality = data.get('modality', 'US')
-        ae_title = data.get('aeTitle', 'MINDRAYMX7')
+        # Sem default silencioso aqui de propósito: esse valor vira o
+        # ScheduledStationAETitle do .wl, o que identifica QUAL aparelho deve
+        # atender aquele item da worklist. Um default hardcoded (era
+        # 'MINDRAYMX7') mascarava silenciosamente qualquer chamador que
+        # esquecesse de mandar o AE Title do aparelho selecionado — o exame
+        # ainda "funcionava" (arquivo .wl gerado sem erro), só que pro
+        # aparelho errado. Ver docs/pacs/PACS_CENTRAL_MESTRE.md secao 6.
+        ae_title = data.get('aeTitle')
         step_date = data.get('stepDate', '') # Formato: AAAAMMDD
         step_time = data.get('stepTime', '') # Formato: HHMMSS
         step_desc = data.get('stepDescription', 'US OBSTETRICA')
 
         if not exam_id:
             raise ValueError("O campo 'examId' e obrigatorio.")
+        if not ae_title:
+            raise ValueError("O campo 'aeTitle' e obrigatorio (AE Title do aparelho selecionado).")
 
         numeric_id = get_numeric_uid_from_firestore_id(exam_id)
 
