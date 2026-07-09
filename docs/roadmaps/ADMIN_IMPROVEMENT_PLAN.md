@@ -3,7 +3,26 @@
 **Escopo:** todos os submódulos do Admin **exceto LAUD.IA**.
 **Objetivo:** transformar o painel de "telas com contadores" em um **centro de controle de SaaS** de verdade — métricas confiáveis, séries temporais, visão 360º do cliente, exportações e saúde do sistema.
 
-> ⚠️ **Doc desatualizada — revisada em 07/07/2026, "Diagnóstico atual" (§1) abaixo NÃO reflete mais o código.** Confirmado no código real que já foram implementados: **Fase 0 completa** (`AdminUsers.tsx` morto removido; export CSV da Auditoria funcional, `AdminAudit.tsx`); **Fase 1 completa** (`metrics_daily` persistido via CRON `cron-aggregate-metrics.ts`, usado por `Admin.tsx`/`AdminAnalytics.tsx`/`AdminUsersSubscriptions.tsx`/`db.ts`); **Fase 2 em grande parte** (`AdminAnalytics.tsx`, 198 L, não existia quando este plano foi escrito); **Fase 3 parcial** (drawer "Visão 360º do cliente" existe em `AdminUsersSubscriptions.tsx`, mas a busca/filtro da lista ainda é client-side sobre a coleção carregada — sem paginação/busca server-side real, **adiado por decisão consciente em 07/07/2026** dado o estágio atual do produto, ver [`PLANO_MELHORIAS_2026-07.md`](../PLANO_MELHORIAS_2026-07.md) Fase 3); **Fase 5 quase completa** (`AdminHealth.tsx`, 154 L — status de webhook/Sentry; `AdminSupport.tsx` já calcula e exibe SLA de 1ª resposta/resolução/ticket mais antigo, só falta atribuição de responsável e latência de IA no painel de Saúde). Único gap genuinamente aberto: busca/paginação server-side em Usuários (Fase 3) — adiado, não esquecido; export de transações filtradas (Fase 4) segue não verificado.
+> ⚠️ **Doc majoritariamente CONCLUÍDA — "Diagnóstico atual" (§1) e a tabela de fases (§3)
+> abaixo descrevem o estado ANTES deste plano, não o código de hoje.** Confirmado no
+> código real que já foram implementados: ~~**Fase 0**~~ **[Concluída]** (`AdminUsers.tsx`
+> morto removido; export CSV da Auditoria funcional, `AdminAudit.tsx`); ~~**Fase 1**~~
+> **[Concluída]** (`metrics_daily` persistido via CRON `cron-aggregate-metrics.ts`, usado
+> por `Admin.tsx`/`AdminAnalytics.tsx`/`AdminUsersSubscriptions.tsx`/`db.ts`); ~~**Fase 2**~~
+> **[Concluída em grande parte]** (`AdminAnalytics.tsx`, 198 L, não existia quando este
+> plano foi escrito); ~~**Fase 5**~~ **[Quase completa]** (`AdminHealth.tsx`, 154 L —
+> status de webhook/Sentry; `AdminSupport.tsx` já calcula e exibe SLA de 1ª resposta/
+> resolução/ticket mais antigo, só falta atribuição de responsável e latência de IA no
+> painel de Saúde).
+>
+> **Fase 3 — PARCIAL, ainda aberta:** drawer "Visão 360º do cliente" existe em
+> `AdminUsersSubscriptions.tsx`, mas a busca/filtro da lista ainda é client-side sobre a
+> coleção carregada — sem paginação/busca server-side real, **adiado por decisão
+> consciente em 07/07/2026** dado o estágio atual do produto.
+> **Fase 4 — status não verificado:** export de transações filtradas.
+>
+> Ambos os itens abertos estão catalogados em [`docs/BACKLOG.md`](../BACKLOG.md) —
+> não é preciso reler este documento inteiro para saber o que falta.
 
 ---
 

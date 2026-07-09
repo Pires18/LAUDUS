@@ -4,7 +4,7 @@
 > LAUD.US — mapa da documentação, checklist de configuração "irretocável" (do
 > zero até produção segura), hardening, bugs corrigidos e riscos residuais.
 > Escrito em 08-09/07/2026, consolidando o incidente real de suporte do MX7
-> (ver `INCIDENTE_2026-07-08_TIMEOUT_MX7.md`) e a auditoria completa que ele
+> (ver `incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`) e a auditoria completa que ele
 > disparou. **Leia isto antes de tocar em qualquer coisa de PACS** — economiza
 > repetir um dia inteiro de troubleshooting.
 
@@ -15,14 +15,14 @@
 | Documento | Pra quê serve | Status |
 |---|---|---|
 | **`PACS_TENANT_SETUP.md`** | Runbook de operação da VM compartilhada multi-tenant (`orthanc-server`) — o modelo **real em produção**. Setup de tenant, relé, e o roteiro de diagnóstico de 10 passos. | 🟢 Autoritativo — leia primeiro se for mexer em infra |
-| **`PACS_PROVISION_SETUP.md`** | Variáveis de ambiente/credenciais do provisionador automático (`api/pacs-provision.ts`), plano **Dedicado** (1 VM por cliente), e a policy ACL canônica do Tailscale (com o fix de `grants`). | 🟢 Autoritativo — leia se for mexer em provisionamento ou ACL |
+| **`PACS_PROVISION_SETUP.md`** | Variáveis de ambiente/credenciais do provisionador automático (`api/pacs-provision.ts`), plano **Dedicado** (1 VM por cliente, com anexo da arquitetura da VM/docker-compose), e a policy ACL canônica do Tailscale (com o fix de `grants`). | 🟢 Autoritativo — leia se for mexer em provisionamento ou ACL |
 | **`PACS_MANUAL.md`** | Manual prático de setup **standalone** (Orthanc próprio, fora do PACS gerenciado). Só relevante pra quem NÃO usa o "Criar meu PACS" do app. | 🟢 Atual, mas escopo secundário — não confundir com o modelo gerenciado |
-| **`INCIDENTE_2026-07-08_TIMEOUT_MX7.md`** | Postmortem do incidente real que originou este documento — 5 causas raiz empilhadas, cada uma mascarando a próxima. | 🟢 Leitura obrigatória antes de investigar timeout/conexão |
-| **`PROJETO_PACS_NUVEM.md`** | Desenho arquitetural **histórico** (1 VM dedicada por usuário). | 🟡 Superado — o próprio arquivo já se marca como tal no topo. A VM compartilhada (`PACS_TENANT_SETUP.md`) é o que roda hoje |
-| `archive/PLANO_PACS_VM_COMPARTILHADA.md` | Desenho original da VM compartilhada — **essa é a arquitetura que venceu**, apesar de estar em `archive/` (localização não reflete relevância; corrigido em `archive/PLANO_FINAL_PRODUCAO_2026-07.md` em 08/07) | 🟡 Histórico, mas conteúdo ainda vigente |
-| `roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md` | Roadmap de automação self-service (provisionamento, admin fleet, pricing). Parcialmente executado. | 🟡 Planejamento, não operação — confira o CHANGELOG pra ver o que já foi feito |
+| **`PLANO_PACS_VM_COMPARTILHADA.md`** | Desenho original da VM compartilhada — **a arquitetura que roda em produção hoje**. Movido para `docs/pacs/` nesta reorganização (antes estava em `archive/`, o que escondia um documento vivo). | 🟢 Histórico, mas conteúdo ainda vigente |
+| **`incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`** | Postmortem do incidente real que originou este documento — 5 causas raiz empilhadas, cada uma mascarando a próxima. Primeiro de uma pasta dedicada a postmortems (`docs/pacs/incidents/`). | 🟢 Leitura obrigatória antes de investigar timeout/conexão |
+| `docs/roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md` | Roadmap de automação self-service (provisionamento, admin fleet, pricing). Itens concluídos marcados; só o que resta aberto está destacado. | 🟡 Planejamento, não operação — ver também [`docs/BACKLOG.md`](../BACKLOG.md) |
+| `docs/archive/PROJETO_PACS_NUVEM.md` | Desenho arquitetural **histórico** (1 VM dedicada por usuário). | 🔴 Arquivado — o próprio arquivo já se marca como tal no topo; o essencial da VM Dedicada foi resumido em `PACS_PROVISION_SETUP.md` |
 
-**Regra prática:** se o assunto é "como funciona hoje / como diagnosticar um problema real", vá em `PACS_TENANT_SETUP.md`. Se é "como configurar do zero", siga a seção 3 deste documento (que já incorpora tudo). Se é "por que essa decisão foi tomada", os docs históricos têm o contexto.
+**Regra prática:** se o assunto é "como funciona hoje / como diagnosticar um problema real", vá em `PACS_TENANT_SETUP.md`. Se é "como configurar do zero", siga a seção 3 deste documento (que já incorpora tudo). Se é "por que essa decisão foi tomada", os docs históricos têm o contexto. Se é "o que ainda falta fazer", veja [`docs/BACKLOG.md`](../BACKLOG.md).
 
 ---
 
@@ -110,7 +110,7 @@ chmod +x ~/glinet-pacs-relay.sh
   ```bash
   curl -s http://localhost:<httpPort-do-tenant>/modalities
   ```
-  Deve listar o aparelho.
+  Deve listar o aparelho. **Ou** clique **"Executar Diagnóstico"** (aba Servidores) — o chip **"Aparelhos registrados"** faz essa mesma checagem automaticamente e aponta exatamente quais AE Titles estão faltando.
 
 ### 3.5 — Configurar o aparelho físico
 ☐ **Worklist e Storage**, ambos apontando pro **IP do relé** (o roteador GL.iNet, não a VM) e a **porta local** escolhida no passo 3.2 (ex: `4242`).
@@ -124,7 +124,7 @@ chmod +x ~/glinet-pacs-relay.sh
 ☐ Confirme que o `.wl` foi gerado na pasta certa do tenant.
 ☐ No aparelho, busque a Worklist — o paciente de teste deve aparecer.
 ☐ Finalize o exame no aparelho — as imagens devem aparecer no editor do LAUD.US.
-☐ **Depois de qualquer troubleshooting que redirecionou o caminho físico do DICOM** (DNAT, subnet route, troca de tenant), **varra o tenant "errado" por estudos órfãos** antes de fechar o caso — exames reais podem ter subido lá silenciosamente durante a janela de configuração incorreta (foi exatamente o que aconteceu em 08/07 — 5 pacientes reais quase ficaram perdidos). Script rápido em `INCIDENTE_2026-07-08_TIMEOUT_MX7.md` §Desfecho.
+☐ **Depois de qualquer troubleshooting que redirecionou o caminho físico do DICOM** (DNAT, subnet route, troca de tenant), **varra o tenant "errado" por estudos órfãos** antes de fechar o caso — exames reais podem ter subido lá silenciosamente durante a janela de configuração incorreta (foi exatamente o que aconteceu em 08/07 — 5 pacientes reais quase ficaram perdidos). Script rápido em `incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md` §Desfecho.
 
 ---
 
@@ -147,7 +147,7 @@ chmod +x ~/glinet-pacs-relay.sh
 
 ## 5. O que foi corrigido nesta sessão (08-09/07/2026)
 
-Relato completo em `INCIDENTE_2026-07-08_TIMEOUT_MX7.md`. Resumo dos fixes que viraram produto (não ficam só no relato):
+Relato completo em `incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`. Resumo dos fixes que viraram produto (não ficam só no relato):
 
 | Fix | Onde | O que resolve |
 |---|---|---|
@@ -156,6 +156,8 @@ Relato completo em `INCIDENTE_2026-07-08_TIMEOUT_MX7.md`. Resumo dos fixes que v
 | `scripts/glinet-pacs-relay.sh` | Novo script, publicado em `/pacs/` | Contorno robusto quando subnet-routing falha silenciosamente — DNAT via conexão nativa do roteador |
 | Badge "Não registrado no PACS" | `UltrasoundSetupCard.tsx` | Detecta na hora quando `dicomTenantId` diverge do tenant que o app realmente alcança — causa raiz nº5 |
 | **`aeTitle` do Worklist usa o aparelho, não o Orthanc** | `src/utils/dicom.ts:106,144` | **Bug adicional achado na auditoria pós-incidente** (não fazia parte do incidente original): `settings.dicomOrthancAETitle` (identidade do PACS) tinha prioridade sobre `targetDevice.aeTitle` (identidade do aparelho selecionado) no campo que vira `ScheduledStationAETitle` do `.wl`. Assim que o PACS gerenciado é provisionado, `dicomOrthancAETitle` sempre tem valor (`'ORTHANC'`) — **todo exame gravava a mesma AE Title, não importa qual aparelho foi escolhido no formulário**, tornando o seletor de aparelho decorativo em qualquer conta com múltiplos aparelhos. Corrigido: `aeTitle` agora é sempre `targetDevice.aeTitle`, tanto no envio primário quanto no de backup |
+| `generate_wl.py` exige `aeTitle` explicitamente | `scripts/generate_wl.py` | Removido o fallback silencioso `'MINDRAYMX7'` — sem `aeTitle` no payload, agora falha alto (erro claro) em vez de gravar um `.wl` pro aparelho errado sem avisar ninguém |
+| Chip **"Aparelhos registrados"** no Diagnóstico de Rede | `DicomControlCenter.tsx` (`testDevices`) | "Executar Diagnóstico" agora também consulta `DicomModalities` do PACS ativo e aponta quais aparelhos cadastrados não estão lá — visibilidade ativa e central, não só o badge no card de aparelhos |
 
 ---
 
@@ -163,24 +165,43 @@ Relato completo em `INCIDENTE_2026-07-08_TIMEOUT_MX7.md`. Resumo dos fixes que v
 
 Ordenados por prioridade sugerida:
 
-1. **[Médio] Fallback oculto em `generate_wl.py:65`** — `ae_title = data.get('aeTitle', 'MINDRAYMX7')`: se qualquer chamador futuro de `/api/worklist` esquecer de mandar `aeTitle`, cai silenciosamente num AE Title hardcoded da Mindray, sem aviso nenhum. Hoje não é atingido (o frontend sempre manda o campo), mas é uma armadilha pra quem mexer nesse endpoint no futuro. **Sugestão:** trocar o default por uma falha explícita (erro 400) em vez de mascarar.
-2. **[Médio] Nenhuma verificação server-side de consistência de tenant** — o badge novo no app (seção 5) é um sinal client-side, só aparece se o usuário abrir a tela. Uma verificação mais forte seria o "Executar Diagnóstico" tentar uma consulta de Worklist de ponta a ponta (não só C-ECHO), que pegaria esse tipo de mismatch de forma ativa e nem exigiria o usuário notar um badge.
+1. ~~[Médio] Fallback oculto em `generate_wl.py:65`~~ **[Resolvido 09/07]** — agora exige `aeTitle` explicitamente, falha alto se ausente.
+2. ~~[Médio] Nenhuma verificação server-side de consistência de tenant~~ **[Mitigado 09/07]** — chip "Aparelhos registrados" no "Executar Diagnóstico" agora confere isso ativamente e centralmente, não só via o badge do card de aparelhos. (Ainda é client-side, não server-side — só roda quando o usuário clica; uma verificação real server-side segue como melhoria futura, não crítica.)
 3. **[Baixo] Subnet-routing via GL.iNet sem causa raiz 100% confirmada** — o contorno (DNAT) resolve na prática e virou o método recomendado, mas se o mesmo sintoma aparecer noutro cliente/firmware, vale investir tempo pra isolar a causa real (MTU, versão de firmware, bug conhecido do Tailscale com OpenWrt) em vez de só aplicar o plano B toda vez.
 4. **[Baixo] `syncModalityInOrthanc` sem fallback pro servidor de backup** — aceitável hoje (backup é redundância manual), mas revisitar se o backup passar a ser promovido automaticamente em algum fluxo futuro.
-5. **[Baixo] Docs históricos com decisões desatualizadas não sinalizadas** — achado durante a auditoria: `PROJETO_PACS_NUVEM.md` registra "1 VM por usuário" como decisão **aprovada/travada**, mas a arquitetura que realmente foi pra produção (VM compartilhada) está descrita num arquivo em `archive/` que uma triagem anterior rotulou como "descartado" — já corrigido nesta sessão (`archive/PLANO_FINAL_PRODUCAO_2026-07.md`), mas vale um passe geral por outros docs arquivados procurando o mesmo padrão (decisão registrada como final que depois mudou, sem nota de correção).
+5. **[Baixo] Docs históricos com decisões desatualizadas não sinalizadas** — achado durante a auditoria: `PROJETO_PACS_NUVEM.md` registra "1 VM por usuário" como decisão **aprovada/travada**, mas a arquitetura que realmente foi pra produção (VM compartilhada) está descrita num arquivo em `archive/` que uma triagem anterior rotulou como "descartado" — já corrigido nesta sessão (`archive/PLANO_FINAL_PRODUCAO_2026-07.md`). Passe geral pelo resto de `archive/` em andamento — ver seção 8.
 
 ---
 
 ## 7. Roadmap de aprimoramento sugerido
 
 **Curto prazo (baixo esforço, alto retorno):**
-- [ ] Endpoint `/api/worklist` (ou `generate_wl.py`) passa a **exigir** `aeTitle` explicitamente (erro claro em vez de fallback silencioso) — mitiga risco residual #1.
-- [ ] "Executar Diagnóstico" no app ganha um passo de **Worklist round-trip** (não só Echo) — mitiga risco residual #2.
-- [ ] Passe de revisão nos docs `archive/` procurando outras decisões desatualizadas — mitiga risco residual #5.
+- [x] Endpoint `/api/worklist` (ou `generate_wl.py`) passa a **exigir** `aeTitle` explicitamente (erro claro em vez de fallback silencioso) — mitigou risco residual #1. *(09/07)*
+- [x] "Executar Diagnóstico" no app ganha um passo de **checagem de aparelhos registrados** (`DicomModalities` do PACS ativo) — mitigou risco residual #2. *(09/07)*
+- [x] Correção pontual em `archive/PLANO_FINAL_PRODUCAO_2026-07.md` (decisão desatualizada sobre a arquitetura de VM). Passe geral pelo resto de `archive/` — ver seção 8. *(09/07)*
 
 **Médio prazo:**
 - [ ] Automatizar a varredura de "estudos órfãos" (seção 3.6) como um botão/rotina no painel admin, em vez de script manual — reduz risco de perder exames reais em futuros troubleshootings.
 - [ ] Investigar a causa raiz real do subnet-routing GL.iNet (risco residual #3) se o padrão se repetir em outro cliente — hoje é só contornado.
 - [ ] Considerar promover automaticamente o servidor de backup se o primário cair (hoje é 100% manual).
+- [ ] Tornar a checagem de "Aparelhos registrados" (seção 5) server-side/automática (ex: cron ou trigger pós-provisionamento), não só sob demanda quando o usuário clica em "Executar Diagnóstico".
 
 **Já coberto por este documento + os 4 docs canônicos** — não precisa replanejar: setup de tenant, relé (DNAT e subnet-routing), ACL, hardening básico, diagnóstico de conectividade, e o fluxo de cadastro de aparelho/Worklist.
+
+---
+
+## 8. Auditoria de docs históricos (decisões desatualizadas)
+
+Passe de revisão em `docs/archive/` procurando o mesmo padrão do item já corrigido (`PLANO_FINAL_PRODUCAO_2026-07.md`, seção 5): uma afirmação registrada como final/descartada/faltante que a realidade depois contradisse, sem nota de correção.
+
+**5 achados confirmados e já corrigidos** (2 rodadas de auditoria — a segunda cobriu os arquivos que a primeira não teve tempo de terminar):
+
+1. `archive/PLANO_FINAL_PRODUCAO_2026-07.md` — rotulava a arquitetura de VM compartilhada como "alternativa descartada" quando na verdade é o modelo real em produção.
+2. `archive/AUDITORIA_INTEGRACOES_FINANCEIRO_2026-07.md:56` — afirmava que o lifecycle de VM (suspender/reativar/destruir por assinatura) estava **faltando** ("Fase 6, não implementado"); já está implementado e em produção (`api/reset-monthly-reports.ts`, ✅ feito em `PACS_PROVISION_SETUP.md`).
+3. `archive/IMPROVEMENT_PLAN.md` (C6, ditado por voz) — dizia que a UI não estava acessível no editor; já está implementada (botão de microfone na toolbar do Copiloto, `LaudCopilot.tsx:1583-1592`).
+4. `archive/IMPROVEMENT_PLAN.md` (C2, histórico clínico) — dizia que o histórico do paciente não era exibido no editor; já está implementado (`PatientHistoryPanel`, `ExamEditor.tsx:49-80,985-987`).
+5. `archive/PLANO_PLANOS_INTERVALOS_ABACATEPAY.md` — registrava a opção (A) como escolhida e (B) como "fica pra depois"; na prática foi (B) que foi implementada (`Plan.prices: {month,semester,year}`, `types.ts:678-684`).
+
+*(todas corrigidas nesta sessão, com nota de correção inline no formato tachado + colchetes, sem reescrever o histórico)*
+
+**Cobertura completa:** todos os arquivos de `docs/archive/` com conteúdo de decisão/status foram revisados nas duas rodadas — `AUDITORIA_COMPLETA_2026-07.md`, `AUDITORIA_GLOBAL_2026-07.md`, `ANALISE_BUGS.md`, `PLANO_FINALIZACAO_ADMIN_2026-07.md`, `PLANO_REFINAMENTO.md`, `SYSTEM_DOCUMENTATION.md` e `plan_calculadoras_percentis_2026-06.md` foram revisados sem achados adicionais (status ali são snapshots pontuais precisos, ou itens genuinamente ainda pendentes — não afirmações "definitivas" que a realidade contradisse).

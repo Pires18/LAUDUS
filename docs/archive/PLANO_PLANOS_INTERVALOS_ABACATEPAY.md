@@ -20,8 +20,12 @@
 - `Plan.interval`: `'month' | 'semester' | 'year'`.
 - **Regra de recorrência:** `isRecurring = interval === 'year'`. Só o anual vira `SUBSCRIPTION` na AbacatePay; mensal/semestral = `ONE_TIME` (billing avulso).
 - **Preço por intervalo:** um plano pode ter **um preço por intervalo** (ex.: Pro Mensal R$149, Semestral R$799, Anual R$1.490). Duas opções:
-  - **(A) Recomendada — um doc `saas_plans` por (tier × intervalo)** com `tier`, `interval`, `price`. Simples, sem migração de schema; a vitrine agrupa por `tier`.
-  - (B) Um doc por tier com `prices: { month, semester, year }`. Menos docs, mas muda o schema e todas as leituras. **Fica para depois**; começamos com (A).
+  - ~~(A) Recomendada — um doc `saas_plans` por (tier × intervalo)~~ com `tier`, `interval`, `price`. Simples, sem migração de schema; a vitrine agrupa por `tier`.
+  - ~~(B) Um doc por tier com `prices: { month, semester, year }`. Menos docs, mas muda o schema e todas as leituras. **Fica para depois**; começamos com (A).~~
+  > **[CORREÇÃO 2026-07-08: na prática foi a opção (B) que foi implementada]** —
+  > `Plan.prices: { month, semester, year }` num único documento é o campo vigente;
+  > `Plan.interval`/`Plan.price` ficaram `@deprecated` (legado). Ver
+  > `src/types.ts:678-684` e `api/_pricing.ts:200-201`.
 
 ### 2.2 Expiração dos avulsos (mensal/semestral)
 Hoje não há expiração automática (só o trial é calculado no cliente). Para avulsos:

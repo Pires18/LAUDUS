@@ -16,7 +16,7 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
 | Banco de Dados | Firebase Firestore (realtime) |
 | Autenticação | Firebase Auth (Google + Email) |
 | IA | Google Gemini via proxy server-side (Lite: `gemini-3.5-flash` · Pro: `gemini-3.1-pro-preview`) |
-| PACS | Orthanc (primário + backup) via Proxy HTTP local |
+| PACS | Orthanc gerenciado (VM multi-tenant self-service na nuvem) ou standalone — via Agente/Proxy HTTP |
 | Editor | Tiptap (ProseMirror) |
 | Animações | Framer Motion |
 | PWA | Vite PWA Plugin (service worker, manifest) |
@@ -25,18 +25,27 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
 
 ## Módulos do Sistema
 
-### 1. Dashboard (`/src/modules/dashboard`)
-- KPIs em tempo real: exames pendentes, finalizados, pacientes
-- Gráficos de produtividade por área e período
-- Timeline de atividade
+14 módulos em `src/modules/`. Detalhamento completo de cada um em
+[`docs/DOCUMENTACAO_OFICIAL.md`](docs/DOCUMENTACAO_OFICIAL.md) §4 — aqui vai só um
+mapa rápido, com destaque para os que têm mais superfície (Editor, LAUD.IA).
 
-### 2. Worklist (`/src/modules/worklist`)
-- Fila de exames com filtros avançados (status, área, data, clínica)
-- Integração com Worklist DICOM (Orthanc): cria/remove arquivos `.wl` no servidor
-- Busca full-text em paciente, tipo de exame e ID amigável
-- Layout responsivo: tabela no desktop, cards no mobile
+| # | Módulo | Pasta | Resumo |
+|---|---|---|---|
+| 1 | Dashboard | `dashboard/` | KPIs, gráficos de produtividade, timeline |
+| 2 | Worklist | `worklist/` | Fila de exames, integração `.wl` DICOM, busca |
+| 3 | Agendamentos | `appointments/` | Agenda semanal, marcação, envio de worklist |
+| 4 | Editor de Laudos | `editor/` | Núcleo do sistema — ver detalhe abaixo |
+| 5 | LAUD.IA | `laud-ia/`, `ai/` | Command Center + motor de IA — ver detalhe abaixo |
+| 6 | Pacientes | `patients/` | CRUD, histórico clínico, acesso auditado (LGPD) |
+| 7 | Máscaras | `templates/` | Templates de laudo por especialidade + geração por IA |
+| 8 | Calculadoras | `calculators/` | 20+ calculadoras clínicas (add-on `calculators`) |
+| 9 | Clínicas | `clinics/` | Unidades, cabeçalho de impressão, equipe/convites |
+| 10 | PACS/DICOM | `dicom/` | Painel de conexão, provisão self-service, diagnóstico (add-on `pacs`) |
+| 11 | Configurações | `settings/` | Perfil, PACS, IA, assinatura |
+| 12 | Administração | `admin/` | Painel completo — usuários, financeiro, auditoria, suporte, saúde (role `admin`) |
+| 13 | Export | `export/` | PDF (paged.js) e Google Docs |
 
-### 3. Editor de Laudos (`/src/modules/editor`)
+### Editor de Laudos (`/src/modules/editor`)
 - **ExamEditor**: componente central — gerencia todo o ciclo de vida do laudo
 - **RichEditor**: Tiptap com atalhos, toolbar formatação, placeholder dinâmico
 - **LaudCopilot**: Chat IA por exame com streaming de resposta
@@ -53,38 +62,16 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
   - Visualizador integrado + lightbox fullscreen
   - Impressão de imagens: layout **1×2** (2 fotos/pág) ou **2×4** (8 fotos/pág)
 
-### 4. LAUD.IA (`/src/modules/laud-ia`)
-- **Command Center**: 5 abas — Prompts, Contexto, Treinamento, Modelos, Snippets
-- Prompt hierárquico: Master → Área → Template → Instrução
-- Training mode: contexto dos últimos N laudos do médico
+### LAUD.IA (`/src/modules/laud-ia`, `/src/modules/ai`)
+- **Command Center** (admin): Prompts, Contexto, Treinamento, Modelos, Snippets
+- Cascata de prompts: Sistema → Área → Exame (detalhe completo em [`docs/CASCADE_PROMPTS.md`](docs/CASCADE_PROMPTS.md))
+- Training mode: contexto dos últimos N laudos do médico (mimetismo de estilo)
 - Configuração de modelo por modo (geração, refinamento, copiloto, template)
 - Provedor de IA: Google Gemini (server-side, chave nunca exposta ao cliente)
 
-### 5. Pacientes (`/src/modules/patients`)
-- CRUD completo: cadastro, histórico clínico, laudos anteriores
-
-### 6. Máscaras (`/src/modules/templates`)
-- Templates de laudo por área médica (10 especialidades)
-- Editor de template com placeholders, anamnese, termo de consentimento
-- IA para geração automática de templates
-
-### 7. Calculadoras (`/src/modules/calculators`)
-- Hadlock (biometria fetal), IG, IMC, etc.
-- Dados salvos por exame no Firestore
-
-### 8. Clínicas (`/src/modules/clinics`)
-- CRUD de unidades de atendimento
-- Logotipo, cabeçalho/rodapé de impressão, Google Docs template
-- Seletor de clínica no Sidebar com filtro de worklist
-
-### 9. Configurações (`/src/modules/settings`)
-- Perfil do médico (nome, CRM, RQE, assinatura)
-- PACS/DICOM: URLs primário/backup, credenciais, tipo de viewer, proxy
-- IA: API keys, modelos, temperatura, prompts globais
-
-### 10. Administração (`/src/modules/admin`)
-- Painel admin: usuários, planos, licenças, auditoria, financeiro
-- Só acessível por usuários com role `admin`
+Os demais módulos (Pacientes, Máscaras, Calculadoras, Clínicas, PACS/DICOM,
+Configurações, Administração, Export) estão resumidos na tabela acima — detalhe
+completo de cada um em `docs/DOCUMENTACAO_OFICIAL.md` §4.
 
 ---
 
@@ -102,12 +89,14 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
 
 ## Integração PACS
 
-O sistema conecta-se a servidores Orthanc locais via um **agente proxy HTTP** que contorna restrições CORS do navegador.
+PACS/DICOM **gerenciado**: o Orthanc e o Agente rodam numa **VM na nuvem**
+provisionada self-service (Starter/Pro em VM compartilhada multi-tenant; Dedicado
+em VM própria), a clínica só mantém um relé Tailscale (roteador GL.iNet ou PC), e
+o navegador fala com a VM via Funnel HTTPS. Também é possível apontar para um
+Orthanc **standalone** fora do PACS gerenciado (setup manual).
 
-### Fluxo de Conexão
-```
-Browser → Agente Local (localhost:PORT) → Orthanc (localhost:8042 ou Tailscale)
-```
+Documentação completa: [`docs/pacs/PACS_CENTRAL_MESTRE.md`](docs/pacs/PACS_CENTRAL_MESTRE.md)
+(ponto de entrada), [`docs/pacs/PACS_MANUAL.md`](docs/pacs/PACS_MANUAL.md) (setup standalone).
 
 ### Localização de Estudos (Bifásica)
 1. **Fase 1 — Identificadores exatos**: `StudyInstanceUID` e `AccessionNumber`
@@ -193,15 +182,15 @@ Histórico completo de versões em [CHANGELOG.md](CHANGELOG.md).
 
 ## Documentação
 
-- [Documentação Oficial](docs/DOCUMENTACAO_OFICIAL.md) — documento técnico mestre (arquitetura, módulos, IA, dados, segurança, API)
-- [Arquitetura do repositório](src/ARCHITECTURE.md)
-- [Auditoria Completa 07/07](docs/AUDITORIA_COMPLETA_2026-07-07.md) — estado atual de dívida técnica, testes, performance e documentação
-- [Plano de Melhorias](docs/PLANO_MELHORIAS_2026-07.md) — board de execução ativo (substitui o Plano de Refinamento anterior)
-- [Auditoria do Admin](docs/AUDITORIA_ADMIN_2026-07.md) + [Plano de Finalização do Admin](docs/archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado — 100% executado) — auditoria completa das 8 abas do painel administrativo
-- [Auditoria do Financeiro](docs/AUDITORIA_FINANCEIRO_2026-07.md) + [Proposta de Centro Financeiro](docs/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) — auditoria profunda das 9 abas do Financeiro (achou bugs de cálculo, não só falta de proteção); Fases A-D EXECUTADAS (16/18 itens)
-- `docs/roadmaps/` — specs prontas aguardando implementação
-- `docs/pacs/` — arquitetura e manuais de PACS/DICOM
-- `docs/archive/` — planos e auditorias históricas (já concluídos/superados)
+- [Documentação Oficial](docs/DOCUMENTACAO_OFICIAL.md) — documento técnico mestre e fonte da verdade (arquitetura, módulos, IA, dados, segurança, API, pendências)
+- [Backlog](docs/BACKLOG.md) — lista única e viva de tudo que ainda está genuinamente aberto no sistema
+- [Arquitetura do repositório](src/ARCHITECTURE.md) — referência técnica enxuta de código
+- [Cascata de Prompts LAUD.IA](docs/CASCADE_PROMPTS.md) — referência canônica do sistema de prompts da IA
+- `docs/pacs/` — arquitetura, provisionamento e manuais de PACS/DICOM (entrada: `PACS_CENTRAL_MESTRE.md`)
+- `docs/legal/` + [Política de Retenção LGPD](docs/LGPD_POLITICA_RETENCAO.md) — Termos, Privacidade, retenção de dados
+- [Coeficientes FMF](docs/FMF_COEFICIENTES_EXTRAIDOS.md) — referência das calculadoras de 1º trimestre
+- `docs/roadmaps/` — specs de features ainda não implementadas ou parcialmente implementadas
+- `docs/archive/` — auditorias e planos já concluídos (histórico, não precisa ler para entender o estado atual)
 
 ---
 

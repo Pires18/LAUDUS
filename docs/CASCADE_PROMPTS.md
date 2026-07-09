@@ -524,7 +524,7 @@ Estes elementos são reais e afetam o output, mas não fazem parte do modelo ori
 | **Lei da Não-Invenção** | Proibição absoluta de fabricar valores numéricos |
 | **Unidade Órfã** | Placeholder numérico vazio (`___ cm`) — deve virar qualidade |
 | **Self-Audit** | Fase 7 de revisão interna da IA antes de fechar o scratchpad |
-| **R1–R8** | Regras Rígidas de Compliance (veja Bloco 4) |
+| **R1–R10** | Regras Rígidas de Compliance (veja Bloco 4) |
 | **N0–N4** | Escala de conduta (N0=normal, N4=urgência) |
 | **Elipsoide** | Fórmula de volume: D1 × D2 × D3 × 0,523 |
 | **Scratchpad** | Raciocínio interno da IA — nunca aparece no laudo final |

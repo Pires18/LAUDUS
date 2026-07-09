@@ -1,3 +1,10 @@
+> ⚠️ **ARQUIVADO — checklist majoritariamente concluído.** As Partes A, B, C, D, E
+> foram transcritas e auditadas dígito-a-dígito contra o código em
+> [`docs/FMF_COEFICIENTES_EXTRAIDOS.md`](../FMF_COEFICIENTES_EXTRAIDOS.md), que é a
+> referência atual dos coeficientes. Só a **Parte G (casos-ouro)** segue aberta —
+> ver [`docs/BACKLOG.md`](../BACKLOG.md). Mantido aqui como registro do processo de
+> coleta original.
+
 # Dados necessários para validar as calculadoras FMF (1º trimestre)
 
 > Objetivo: sair de `validated: false` (EM VALIDAÇÃO) para uso clínico.

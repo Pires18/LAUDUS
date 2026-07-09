@@ -1,6 +1,11 @@
 # Arquitetura do Sistema — LAUD.US v2.0
 
-**Última atualização:** Junho 2026
+**Última atualização:** 08/07/2026
+
+> Referência técnica enxuta para quem navega o código pela primeira vez. Para o
+> estado completo e mais atualizado do sistema (módulos, modelo de dados, PACS
+> multi-tenant, billing, segurança, pendências), a fonte da verdade é
+> [`docs/DOCUMENTACAO_OFICIAL.md`](../docs/DOCUMENTACAO_OFICIAL.md).
 
 ## Visão Geral
 
@@ -84,8 +89,9 @@ src/
     ├── clinics/               # Gestão de unidades/clínicas
     ├── calculators/           # 22+ calculadoras clínicas (Hadlock, TI-RADS, etc.)
     ├── appointments/          # Agendamentos com ShiftConfigPanel
+    ├── dicom/                 # Painel PACS/DICOM (DicomControlCenter, MyPacsCard, UltrasoundSetupCard)
     ├── settings/              # Configurações do usuário (PACS, IA, prompts)
-    ├── admin/                 # Painel admin (users, plans, licenses, audit, support)
+    ├── admin/                 # Painel admin (users, plans, financeiro, audit, support, saúde)
     └── export/                # Impressão e exportação
         ├── PrintLayout.tsx        # Layout de laudo para impressão
         ├── PrintImagesLayout.tsx  # Layout de imagens DICOM para impressão
@@ -152,11 +158,16 @@ interface AiProvider {
 
 ## Integração PACS/DICOM
 
+> Esta seção descreve os **mecanismos client-side** (proxy, busca, polling) — ainda
+> corretos. Para a **topologia de infraestrutura real** (VM multi-tenant self-service
+> na nuvem, não mais só agente local), ver
+> [`docs/pacs/PACS_CENTRAL_MESTRE.md`](../docs/pacs/PACS_CENTRAL_MESTRE.md).
+
 ### Conexão
 ```
 Browser
   → /api/orthanc-proxy (Vite dev middleware ou Vercel edge)
-    → LocalAgent (https://…:10443) — em produção Vercel
+    → Agente (local ou na VM provisionada, via Funnel HTTPS)
     → Orthanc Primário (configura via Settings)
     → Orthanc Backup (opcional, configura via Settings)
 ```
@@ -183,14 +194,18 @@ Timer base: 5s
 
 ---
 
-## Hierarquia de Prompts LAUD.IA (8 camadas)
+## Hierarquia de Prompts LAUD.IA (3 camadas + override de modo)
+
+> Referência canônica completa e sincronizada com o código:
+> [`docs/CASCADE_PROMPTS.md`](../docs/CASCADE_PROMPTS.md).
 
 ```
 Camada 1 — SISTEMA (universal)
   ├── aiMasterPrompt          ← Persona e lei de não-invenção
   ├── aiGlobalInstructions    ← Regras gerais de segurança
   ├── aiStructurePrompt       ← Estrutura HTML obrigatória (h1, h2 TÉCNICA, ANÁLISE, ...)
-  └── aiRigidRules            ← Regras nunca quebradas (R1–R9)
+  └── aiRigidRules            ← Regras nunca quebradas (R1–R10, inclui R9 Segurança
+                                 Pediátrica e R10 Versões de Classificações)
 
 Camada 2 — ÁREA (especialidade)
   └── aiAreaPrompts[area]     ← Diretriz da especialidade (customizável no Settings)
@@ -220,10 +235,23 @@ Mensagem do usuário (contexto clínico)
 | `recepcao` | ✅ | ✅ | view-only | ❌ | ❌ | ❌ | ❌ |
 
 > Recepção: não finaliza laudos, não acessa LAUD.IA, Templates, ou Clínicas.
+> Além dos 3 roles de conta acima, existe um RBAC **por clínica** independente:
+> `clinic_memberships` permite convidar um segundo usuário como `editor` ou
+> `viewer` de uma clínica específica (ver §16 de `docs/DOCUMENTACAO_OFICIAL.md`).
 
 ---
 
-## Sistema de Licenças
+## Sistema de Licenças — LEGADO, não ativo
+
+> Confirmado por grep em 08/07/2026: não existe código real de ativação/validação
+> de licença por código (`validateAndActivateLicense`/`checkUserLicenseStatus` não
+> são encontrados em `src/` nem `api/`). O único resquício são 2 filtros
+> defensivos de UI (`PricingPlans.tsx`, `PricingTeaser.tsx`) que apenas excluem
+> IDs de plano prefixados com `LICENSE_` da vitrine pública. O modelo de
+> entitlement real hoje é **assinatura/SaaS via AbacatePay** (`subscriptions/`,
+> `useSubscription`), documentado em §8 de `docs/DOCUMENTACAO_OFICIAL.md`. O
+> desenho abaixo é mantido só como registro histórico do que existiu antes do
+> pivot para SaaS por assinatura:
 
 ```
 Firestore: plans/LICENSE_{CODE}

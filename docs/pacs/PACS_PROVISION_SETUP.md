@@ -142,3 +142,52 @@ VITE_PACS_PROVISION_ENDPOINT=/api/pacs-provision
 - Custo por VM: ver §7 do [PLANO_PACS_AUTOMACAO_SELF_SERVICE.md](../roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md).
 - **F1 (imagem dourada):** ✅ feito e em produção — a VM dedicada sobe com Docker/Tailscale/Orthanc pré-instalados (boot ~3 min, era ~6 min).
 - **F6 (lifecycle):** ✅ feito — `api/reset-monthly-reports.ts` suspende o PACS quando a assinatura cancela/expira (período de graça), reativa se o cliente voltar antes do prazo, e destrói de vez (VM/tenant) se o prazo vencer.
+
+---
+
+## Anexo — arquitetura da VM Dedicada (o que a imagem dourada sobe)
+
+> Resumo do desenho original (`docs/archive/PROJETO_PACS_NUVEM.md`, decisões de 03/07/2026),
+> preservado aqui porque é a arquitetura que o plano **Dedicado** ainda usa hoje —
+> 1 VM por cliente (diferente do modelo compartilhado multi-tenant do Starter/Pro,
+> ver [PACS_TENANT_SETUP.md](./PACS_TENANT_SETUP.md)).
+
+**Topologia:** US (LAN da clínica) → relé (roteador GL.iNet com Tailscale, ou o PC do
+usuário com port-forward) → Tailscale → VM Debian no Google Cloud (`southamerica-east1`,
+`e2-small`, disco persistente para as imagens) rodando Orthanc (Docker) + Agente
+LAUD.US, exposto via **Tailscale Funnel** (HTTPS pública, sem portas abertas no GCP).
+
+`docker-compose.yml` do Orthanc na VM:
+```yaml
+services:
+  orthanc:
+    image: orthancteam/orthanc:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8042:8042"   # HTTP só localhost (agente acessa)
+      - "0.0.0.0:4242:4242"     # DICOM (Tailscale/relé alcança)
+    volumes:
+      - /opt/orthanc-data:/var/lib/orthanc/db
+      - /opt/orthanc/orthanc.json:/etc/orthanc/orthanc.json:ro
+      - /opt/orthanc-data/worklists:/var/lib/orthanc/worklists
+```
+
+`orthanc.json` correspondente (sem senha; a autenticação real fica no Tailscale):
+```jsonc
+{
+  "Name": "PACS LAUDUS CLOUD",
+  "StorageDirectory": "/var/lib/orthanc/db",
+  "IndexDirectory": "/var/lib/orthanc/db",
+  "HttpPort": 8042, "HttpServerEnabled": true,
+  "DicomServerEnabled": true, "DicomPort": 4242, "DicomAet": "ORTHANC",
+  "AuthenticationEnabled": false, "RemoteAccessAllowed": true,
+  "DicomAlwaysAllowEcho": true, "DicomAlwaysAllowStore": true, "DicomAlwaysAllowFind": true,
+  "Worklists": { "Enable": true, "Database": "/var/lib/orthanc/worklists" },
+  "DicomWeb": { "Enable": true }
+}
+```
+
+O Agente (`scripts/agent.js` + `scripts/generate_wl.py`) roda como serviço systemd na
+mesma VM, com `LAUDUS_WORKLIST_DIR` apontando para a mesma pasta do Orthanc, e é o único
+processo exposto via `tailscale funnel --bg 3000`. Diferença para o modelo compartilhado:
+a porta DICOM aqui é fixa (**4242**); no multi-tenant cada cliente tem a sua (4300–4399).

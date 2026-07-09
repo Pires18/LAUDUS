@@ -5,12 +5,49 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [Não versionado] — 2026-07-09
+
+### Documentação — auditoria completa e unificação
+Leitura integral de toda a documentação (34 arquivos em `docs/` + `README.md` +
+`CHANGELOG.md` + `src/ARCHITECTURE.md`) com cross-check contra o código real, seguida
+de reorganização estrutural:
+- **`docs/BACKLOG.md` (novo)**: lista única e viva de tudo que está genuinamente
+  aberto no sistema (admin, financeiro, PACS, legal, FMF, higiene técnica), com
+  origem citada — substitui a necessidade de vasculhar `docs/archive/` atrás de
+  pendências.
+- **5 auditorias/planos de 07/07** (`AUDITORIA_ADMIN`, `AUDITORIA_COMPLETA_2026-07-07`,
+  `AUDITORIA_FINANCEIRO`, `PLANO_MELHORIAS`, `PROPOSTA_CENTRO_FINANCEIRO`) movidos para
+  `docs/archive/` — estavam ~90% executados e já resumidos em `DOCUMENTACAO_OFICIAL.md`.
+- **`docs/archive/PLANO_PACS_VM_COMPARTILHADA.md` promovido para `docs/pacs/`** — é a
+  arquitetura real em produção, estava enterrado numa pasta chamada "archive".
+- **`docs/pacs/incidents/` (nova subpasta)** para postmortems, começando pelo
+  incidente MX7 de 08/07.
+- **`PROJETO_PACS_NUVEM.md`** arquivado (histórico, superado pela VM compartilhada);
+  seu conteúdo único (docker-compose/topologia da VM Dedicada) foi resumido em
+  `PACS_PROVISION_SETUP.md`.
+- **`FMF_DADOS_VALIDACAO.md`** arquivado — checklist majoritariamente concluído,
+  só a Parte G (casos-ouro) segue aberta, catalogada no BACKLOG.
+- **`docs/CASCADE_PROMPTS.md`**: corrigido glossário que ainda dizia "R1–R8" (o corpo
+  do documento já documentava R1–R10 corretamente).
+- **`src/ARCHITECTURE.md`**: atualizado (módulo `dicom` adicionado à árvore, contagem
+  de regras corrigida pra R1–R10, "Sistema de Licenças" marcado como legado/não-ativo
+  após confirmar por grep que não há código real de ativação por código — o
+  entitlement real hoje é 100% assinatura/SaaS).
+- **`README.md`**: lista completa dos 14 módulos, seção PACS atualizada (era descrita
+  como agente local único; hoje é VM multi-tenant self-service).
+- **`docs/roadmaps/ADMIN_IMPROVEMENT_PLAN.md`** e **`PLANO_PACS_AUTOMACAO_SELF_SERVICE.md`**
+  anotados com o que já foi concluído vs. o que segue genuinamente aberto (F5 — gestão
+  de frota de VMs no admin; F7 — nota de que o destino real de produção já corresponde
+  ao modelo M3, por um caminho diferente do planejado).
+
+---
+
 ## [Não versionado] — 2026-07-08
 
 ### PACS — incidente real (MX7 timeout) + padronização pra evitar recorrência
 Investigação de suporte (usuário real, aparelho Mindray MX7 via relé GL.iNet)
 revelou 5 causas raiz empilhadas — relato completo em
-[`docs/pacs/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`](docs/pacs/INCIDENTE_2026-07-08_TIMEOUT_MX7.md).
+[`docs/pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`](docs/pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md).
 Fixes produtizados pra não repetir com outros usuários:
 - **ACL do Tailscale documentada com o `grant` que faltava** (`docs/pacs/PACS_PROVISION_SETUP.md`): rota de sub-rede *aprovada* no admin console não é suficiente pra propagar pro `AllowedIPs` dos peers — precisa de um `grant`/`acl` com `dst` cobrindo o CIDR explicitamente. Sem isso, C-ECHO trava em timeout sem nenhum erro explícito.
 - **`scripts/glinet-pacs-relay.sh` (novo)**: quando subnet-routing via GL.iNet não fecha o ciclo mesmo 100% configurado certo (modo de falha observado, sem causa raiz 100% confirmada), padroniza o contorno — DNAT usando a conexão nativa do próprio roteador em vez de rotear tráfego de terceiros pela tailnet. Publicado em `/pacs/glinet-pacs-relay.sh` (junto de `agent.js` etc., via `npm run sync:pacs-scripts`).

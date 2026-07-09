@@ -155,7 +155,12 @@ Este plano foi gerado após análise estrutural completa e aprofundada do codeba
 
 ---
 
-### C2 — Histórico Clínico do Paciente não exibido no Editor
+### ~~C2 — Histórico Clínico do Paciente não exibido no Editor~~
+> **[CORREÇÃO 2026-07-08: já implementado]** — `PatientHistoryPanel` colapsável no
+> `ExamEditor`, com o comentário `{/* ── Histórico Clínico do Paciente (C2) ── */}`
+> referenciando explicitamente este item do plano. Ver
+> `src/modules/editor/ExamEditor.tsx:49-80,985-987`.
+
 **Arquivo:** `src/modules/editor/ExamEditor.tsx`
 **Problema:** O campo `patient.history` existe e é enviado para a IA como contexto, mas não é exibido de forma clara para o médico durante a edição do laudo.
 **Solução:** Adicionar aba ou seção colapsável no painel de informações do exame (EditorHeader) mostrando o histórico clínico do paciente, observações e convênio.
@@ -191,7 +196,11 @@ Este plano foi gerado após análise estrutural completa e aprofundada do codeba
 
 ---
 
-### C6 — Suporte a Ditado por Voz não implementado completamente
+### ~~C6 — Suporte a Ditado por Voz não implementado completamente~~
+> **[CORREÇÃO 2026-07-08: já implementado]** — botão de microfone funcional na toolbar
+> do Copiloto (`onClick={toggleListening}`, `title="Ditado por voz"`), consumindo
+> `useVoiceAnalyzer.ts`. Ver `src/modules/editor/LaudCopilot.tsx:1583-1592`.
+
 **Arquivo:** `src/modules/editor/hooks/useVoiceAnalyzer.ts`
 **Problema:** O hook `useVoiceAnalyzer` existe mas a UI de ativação do ditado por voz não está visível/acessível no editor. O plano menciona `voiceDictation: boolean` por plano.
 **Solução:** Adicionar botão de microfone na toolbar do editor para usuários com plano que inclui `voiceDictation`. Usar a Web Speech API para transcrição em tempo real inserindo texto no cursor do TipTap.

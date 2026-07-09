@@ -6,12 +6,12 @@
 
 > Como migrar a VM `orthanc-server` para **multi-tenant** e criar tenants (planos
 > Starter/Pro). Cada tenant = 1 container Orthanc isolado. Ver desenho em
-> [PLANO_PACS_VM_COMPARTILHADA.md](../archive/PLANO_PACS_VM_COMPARTILHADA.md).
+> [PLANO_PACS_VM_COMPARTILHADA.md](./PLANO_PACS_VM_COMPARTILHADA.md).
 
 > **Estado real (validado com aparelho físico em 06/07/2026):** este é o modelo
 > em produção. Relato completo de um incidente real (5 causas raiz empilhadas,
 > a maioria não óbvia) em
-> [INCIDENTE_2026-07-08_TIMEOUT_MX7.md](./INCIDENTE_2026-07-08_TIMEOUT_MX7.md)
+> [INCIDENTE_2026-07-08_TIMEOUT_MX7.md](./incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md)
 > — vale ler antes de investigar um "timeout" parecido. Pegadinhas que já
 > causaram incidentes reais e não são óbvias — confira sempre ao configurar um
 > relé novo:

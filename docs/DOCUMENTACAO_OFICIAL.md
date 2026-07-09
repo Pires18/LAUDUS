@@ -1,9 +1,9 @@
 # 📘 Documentação Oficial — LAUD.US
 
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
-Versão do documento: 2026-07-07 (v4.1 — Centro Financeiro Fases A-D, mapeamento final de pendências §17 verificado contra o sistema real) · Ambiente: produção (Vercel Pro + Firebase).
+Versão do documento: 2026-07-08 (v4.2 — reorganização/unificação da documentação: BACKLOG único, PACS incidente MX7 e fix de AE-Title incorporados em §6, pendências §17 realinhadas) · Ambiente: produção (Vercel Pro + Firebase).
 
-**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Auditoria Completa 07/07](AUDITORIA_COMPLETA_2026-07-07.md) · [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) · [Auditoria do Admin](AUDITORIA_ADMIN_2026-07.md) · [Plano de Finalização do Admin](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) · [Auditoria do Financeiro](AUDITORIA_FINANCEIRO_2026-07.md) · [Proposta de Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Central PACS/DICOM (ponto de entrada)](pacs/PACS_CENTRAL_MESTRE.md) · [Projeto PACS Nuvem](pacs/PROJETO_PACS_NUVEM.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · [Incidente MX7 08/07](pacs/INCIDENTE_2026-07-08_TIMEOUT_MX7.md) · auditorias/planos anteriores em [`docs/archive/`](archive/).
+**Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Backlog (itens abertos)](BACKLOG.md) · [Cascata de Prompts LAUD.IA](CASCADE_PROMPTS.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Central PACS/DICOM (ponto de entrada)](pacs/PACS_CENTRAL_MESTRE.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · [Incidente MX7 08/07](pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md) · [Coeficientes FMF](FMF_COEFICIENTES_EXTRAIDOS.md) · auditorias/planos concluídos em [`docs/archive/`](archive/).
 
 ---
 
@@ -124,7 +124,7 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 | **Agendamentos** | `Appointments.tsx`, `WeeklyCalendar`, `useAppointmentsState` | Agenda semanal, marcação, envio de worklist ao aparelho | add-on `appointments` |
 | **Editor de Laudo** | ver §4.1 | Núcleo: Tiptap + IA + Copiloto + PACS viewer + PDF/Docs | — |
 | **Máscaras** | `Templates.tsx`, `TemplateEditor.tsx` | Biblioteca de máscaras + catálogo do sistema | — |
-| **Calculadoras** | `Calculators.tsx`, `formulas.ts`, `classifiers.ts` | 20+ calculadoras clínicas (biometria fetal, dopplers, volumes). As 2 calculadoras FMF de 1º trimestre (trissomias + pré-eclâmpsia) estão **travadas** (`validated: false`, banner "EM VALIDAÇÃO") até serem conferidas contra casos-ouro — modelo já auditado dígito a dígito contra os papers-fonte (ver [FMF_COEFICIENTES_EXTRAIDOS.md](FMF_COEFICIENTES_EXTRAIDOS.md) e [FMF_DADOS_VALIDACAO.md](FMF_DADOS_VALIDACAO.md)) | add-on `calculators` |
+| **Calculadoras** | `Calculators.tsx`, `formulas.ts`, `classifiers.ts` | 20+ calculadoras clínicas (biometria fetal, dopplers, volumes). As 2 calculadoras FMF de 1º trimestre (trissomias + pré-eclâmpsia) estão **travadas** (`validated: false`, banner "EM VALIDAÇÃO") até serem conferidas contra casos-ouro — modelo já auditado dígito a dígito contra os papers-fonte (ver [FMF_COEFICIENTES_EXTRAIDOS.md](FMF_COEFICIENTES_EXTRAIDOS.md); só falta a Parte G, catalogada em [BACKLOG.md](BACKLOG.md)) | add-on `calculators` |
 | **Clínicas** | `Clinics.tsx`, `ClinicDetail`, `ClinicForm`, `ClinicTeamCard` | Múltiplas clínicas, cabeçalhos de laudo por unidade, **convite de equipe** (ver §16) | add-on `clinics` |
 | **PACS/DICOM** | ver §6 | Config Orthanc, guia, armazenamento, **provisão self-service** | add-on `pacs` |
 | **Configurações** | `Settings.tsx`, `SubscriptionCenter.tsx`, `AuditDashboard.tsx` | Perfil, PACS, LAUD.IA, **Assinatura** | — |
@@ -197,7 +197,9 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 **Componentes:**
 - **Agente Local (`scripts/agent.js`):** grava worklists (`generate_wl.py`/pydicom) e faz proxy REST do Orthanc (`/api/orthanc-proxy`). Segredo por-usuário (`x-agent-secret`), anti-SSRF (`ALLOWED_HOSTS`), **multi-tenant** via `tenantId` (query).
 - **Proxies Vercel** (`/api/worklist`, `/api/orthanc-proxy`): auth JWKS + **entitlement PACS** (`_entitlements.ts`); encaminham ao Agente.
-- **Painel (`DicomControlCenter.tsx`):** presets (Nuvem/Local), guia passo a passo, aba **Armazenamento & Exames** (estatísticas do Orthanc).
+- **Painel (`DicomControlCenter.tsx`):** presets (Nuvem/Local), guia passo a passo, aba **Armazenamento & Exames** (estatísticas do Orthanc), chip **"Aparelhos registrados"** no "Executar Diagnóstico" (`testDevices`) — confere se todo aparelho cadastrado no app também está em `DicomModalities` no PACS ativo.
+
+**Incidente real de produção (08/07/2026 — Mindray MX7, ver [postmortem completo](pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md) e [`PACS_CENTRAL_MESTRE.md`](pacs/PACS_CENTRAL_MESTRE.md)):** 5 causas-raiz empilhadas (VM sem `--accept-routes`, firewall de zona do GL.iNet não recarregado, ACL do Tailscale sem `grant` explícito por CIDR, aparelho não registrado em `DicomModalities`, `dicomTenantId` divergente do tenant realmente alcançado pelo relé) levaram a um timeout persistente e a 6 estudos (1 teste + 5 pacientes reais) parando no tenant errado — recuperados via download/upload. Todos os fixes viraram produto na mesma sessão: relé GL.iNet passou a usar DNAT nativo por padrão (`scripts/glinet-pacs-relay.sh`) em vez de subnet-routing; badge "Não registrado no PACS" no card de aparelhos; chip "Aparelhos registrados" no Diagnóstico (acima). **Bug adicional achado na auditoria pós-incidente** (não fazia parte da causa original): o `.wl` gravava sempre o AE Title do **Orthanc** (`settings.dicomOrthancAETitle`, sempre `'ORTHANC'` num PACS gerenciado) em vez do AE Title do **aparelho selecionado** (`targetDevice.aeTitle`) — tornando o seletor de aparelho decorativo em qualquer conta com múltiplos aparelhos. Corrigido em `src/utils/dicom.ts` (envio primário e de backup) e `scripts/generate_wl.py` (agora exige `aeTitle` explicitamente, sem fallback silencioso).
 
 ---
 
@@ -295,12 +297,14 @@ Quando `currentPeriodEnd` vence com status `active`/`past_due`:
 | `abacatepay-checkout.ts` | Node | `verifyAuth` + posse (ou admin p/ `test-key`) | Inicia checkout (plano/add-on); `action:'test-key'` testa chave AbacatePay (admin) |
 | `abacatepay-webhook.ts` | Node | HMAC `safeEqual` | Concede compra + grava `interval`/`price` + registra transação + agrega receita |
 | `abacatepay-cancel.ts` | Node | dono/admin | Cancela assinatura (gateway + local) |
+| `abacatepay-mock-gateway.ts` | Node | — (bloqueado em produção) | Simula o gateway de pagamento da AbacatePay para desenvolvimento/teste local do fluxo de checkout/webhook, sem depender da API real |
 | `clinic-invite.ts` | Node | dono da clínica/admin | Convida usuário (por e-mail) para `clinic_memberships` |
-| `reset-monthly-reports.ts` | Node | CRON_SECRET / auth | Reset mensal de cota + expiração de assinatura (past_due/expired) |
+| `reset-monthly-reports.ts` | Node | CRON_SECRET / auth | Reset mensal de cota + expiração de assinatura (past_due/expired) + lifecycle de VM PACS (suspensão/reativação/destruição, ver §6) |
 | `cron-aggregate-metrics.ts` | Node | CRON_SECRET | Agrega `metrics_daily` (uso+receita) + MRR/ARR |
+| `cron-monthly-billing.ts` | Node | CRON_SECRET | Rotina mensal de cobrança/consolidação de billing |
 | `promote-admin.ts` | Node | super-admin (trava tripla) | Promove o super-admin |
 | `health.ts` | Node | — | Health-check |
-| **Helpers** | — | — | `_auth`, `_edgeAuth` (JWKS), `_firebase` (Admin SDK), `_secure` (safeEqual), `_pricing`, `_entitlements`, `_rateLimit` (KV) |
+| **Helpers** | — | — | `_auth`, `_edgeAuth` (JWKS), `_firebase` (Admin SDK), `_secure` (safeEqual), `_pricing`, `_entitlements`, `_rateLimit` (KV), `_pacsLifecycle` (suspensão/destruição de VM/tenant), `_quota` (avaliação de cota de laudos) |
 
 **Vercel Pro ativo (desde 07/07/2026):** o projeto deixou o plano Hobby — o teto de 12 funções serverless não se aplica mais (14 hoje, ver §3). `abacatepay-checkout.ts` e `pacs-provision.ts` continuam consolidando `test-key`/`DELETE` por padrão de design (menos superfície, não mais por necessidade do teto), mas novas funções não quebram mais o deploy.
 
@@ -366,7 +370,7 @@ Cada geração grava `ai_usage` → CRON diário agrega `metrics_daily`/`_summar
 ## 14. Testes & qualidade
 - **377 testes (Vitest, 20 arquivos):** calculadoras (incl. FMF trissomias + pré-eclâmpsia), classificadores, motor de IA, verificação/evolução/aprendizado/treino, Aba Estruturada (schema/engine/live-compute), segurança (`safeEqual`), preços (`_pricing`), roteamento PACS + multi-tenant + `resolveGeminiModel`.
 - **Gate de build:** `tsc && vite build`. CI (GitHub Actions).
-- **Dívida conhecida (medida em 07/07/2026):** 248 usos de `any` (concentrados em fronteiras de integração — admin/pagamento/PACS), 13 arquivos > 800 linhas (maior: `areaPrompts.ts` 3.305 L, config de prompts), chunk `vendor-icons` 905 kB (maior do bundle). Só 3 de 16 endpoints serverless têm teste dedicado; 10 de 14 módulos de UI não têm teste dedicado (cobertura hoje é toda em lógica pura — calculadoras/engine/pricing). Plano priorizado: [PLANO_MELHORIAS_2026-07.md](PLANO_MELHORIAS_2026-07.md).
+- **Dívida conhecida:** ~183 usos de `any` (medido em 08/07/2026, caiu de 248 desde a auditoria de 04/07; concentrados em fronteiras de integração — admin/pagamento/PACS), arquivos grandes ainda não refatorados (`SharedLaudIA.tsx` 1766 L, `ExamEditor.tsx` 1574 L, `ai/engine.ts` 1282 L), chunk `vendor-icons` já corrigido (905 kB → 87,6 kB, ver [`docs/archive/PLANO_MELHORIAS_2026-07.md`](archive/PLANO_MELHORIAS_2026-07.md) Fase 2). Só 3 de 16 endpoints serverless têm teste dedicado; 10 de 14 módulos de UI não têm teste dedicado (cobertura hoje é toda em lógica pura — calculadoras/engine/pricing). Lista completa em [`docs/BACKLOG.md`](BACKLOG.md).
 
 ---
 
@@ -383,7 +387,7 @@ Painel **Financeiro** (`AdminFinanceiro.tsx`, 9 sub-abas: overview, plans, pacs-
 - **Export CSV de contador** (aba Transações): valor bruto, taxa de gateway estimada e valor líquido estimado por transação, mais status de NF.
 - **Custo de VM ainda é estimativa por tabela de preço fixa** (plano × disco) — a integração com o custo real do GCP está com o setup de infraestrutura pronto (BigQuery Billing Export configurado, ver §11), só falta o Google popular os dados (~24-48h) e então implementar a leitura no painel.
 - **Lifecycle automático de VM por cancelamento de assinatura:** implementado (ver §6) — não depende mais de ação manual do usuário.
-- **Auditoria profunda em 07/07/2026** encontrou 6 números com fórmula errada (MRR 6x superestimado em assinante semestral, custo de IA podendo zerar em silêncio, medidor de disco decorativo, VMs `suspended` somindo dos KPIs, taxas de gateway não aplicadas, overwrite de add-on avulso no troca-de-plano) — **todos os 6 corrigidos** (Fase A), mais Fases B/C/D de evolução (métricas de SaaS, histórico de preço, ledger de despesas, NF, export contábil) — **16 de 18 itens executados**. Restam 2, adiados por dependência externa: reconciliação automática AbacatePay vs Firestore (schema do endpoint não confirmado) e billing export real do GCP (aguarda ativação na conta). Ver [Auditoria do Financeiro](AUDITORIA_FINANCEIRO_2026-07.md) e [Proposta de Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) para detalhes completos.
+- **Auditoria profunda em 07/07/2026** encontrou 6 números com fórmula errada (MRR 6x superestimado em assinante semestral, custo de IA podendo zerar em silêncio, medidor de disco decorativo, VMs `suspended` somindo dos KPIs, taxas de gateway não aplicadas, overwrite de add-on avulso no troca-de-plano) — **todos os 6 corrigidos** (Fase A), mais Fases B/C/D de evolução (métricas de SaaS, histórico de preço, ledger de despesas, NF, export contábil) — **16 de 18 itens executados**. Restam 2, adiados por dependência externa: reconciliação automática AbacatePay vs Firestore (schema do endpoint não confirmado) e billing export real do GCP (aguarda ativação na conta). Ver [Auditoria do Financeiro](archive/AUDITORIA_FINANCEIRO_2026-07.md) e [Proposta de Centro Financeiro](archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md) (arquivados — ~90% executados) para detalhes completos.
 
 ---
 
@@ -404,7 +408,7 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 
 ## 17. Pendências conhecidas
 
-**Mapeamento consolidado em 07/07/2026** (varredura de todo o sistema: código, docs, `firestore.rules`/`indexes`, variáveis de ambiente da Vercel via `vercel env ls`, proteção de branch via `gh api`). Todo item abaixo foi verificado contra o estado real, não apenas contra memória de sessões anteriores.
+**Mapeamento consolidado em 07/07/2026** (varredura de todo o sistema: código, docs, `firestore.rules`/`indexes`, variáveis de ambiente da Vercel via `vercel env ls`, proteção de branch via `gh api`), **revisado em 08/07/2026** contra a auditoria documental completa. Todo item abaixo foi verificado contra o estado real, não apenas contra memória de sessões anteriores. Para itens de dívida técnica/produto (não deploy/config/decisão externa), ver a lista completa e viva em [`docs/BACKLOG.md`](BACKLOG.md) — as tabelas abaixo cobrem especificamente o que depende de deploy/config ou de decisão externa.
 
 ### Ação técnica pronta, só falta deploy/config (sem decisão de negócio)
 
@@ -421,21 +425,17 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 | Item | Descrição | Bloqueador |
 |---|---|---|
 | Assinatura digital ICP-Brasil | Hoje só imagem de assinatura escaneada; sem valor jurídico pleno de laudo assinado. Desenho pronto em [`docs/roadmaps/ASSINATURA_ICP_BRASIL.md`](roadmaps/ASSINATURA_ICP_BRASIL.md) | Escolha de fornecedor (ClickSign/D4Sign) + credenciais do usuário — decisão adiada conscientemente (07/07/2026) |
-| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11); falta confirmar se a tabela `laudussys.gcp_billing_export_v1_*` já tem linhas (~24-48h após ativação) e então implementar a query server-side + ligar ao painel Financeiro (Fase D.3 do [Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md)) | Confirmação do usuário de que a tabela já tem dados |
-| Reconciliação automática AbacatePay vs Firestore | Schema do endpoint de listagem de transações da AbacatePay não confirmado — implementar contra campos adivinhados foi julgado arriscado demais (Fase C.3 do [Centro Financeiro](PROPOSTA_CENTRO_FINANCEIRO_2026-07.md)) | Confirmar schema real do endpoint (docs oficiais da AbacatePay ou chamada de teste registrada) |
-| Calculadoras FMF (trissomias + pré-eclâmpsia) travadas | `validated: false`, banner "EM VALIDAÇÃO" — modelo já auditado dígito a dígito contra os papers-fonte, falta só os casos-ouro de validação clínica (ver [FMF_DADOS_VALIDACAO.md](FMF_DADOS_VALIDACAO.md)) | Usuário preencher os casos-ouro (dados clínicos reais para conferência) |
+| Billing API do GCP no Admin | Custo de VM é estimativa, não a fatura real. Setup do BigQuery Billing Export já feito (ver §11); falta confirmar se a tabela `laudussys.gcp_billing_export_v1_*` já tem linhas (~24-48h após ativação) e então implementar a query server-side + ligar ao painel Financeiro | Confirmação do usuário de que a tabela já tem dados |
+| Reconciliação automática AbacatePay vs Firestore | Schema do endpoint de listagem de transações da AbacatePay não confirmado — implementar contra campos adivinhados foi julgado arriscado demais | Confirmar schema real do endpoint (docs oficiais da AbacatePay ou chamada de teste registrada) |
+| Calculadoras FMF (trissomias + pré-eclâmpsia) travadas | `validated: false`, banner "EM VALIDAÇÃO" — modelo já auditado dígito a dígito contra os papers-fonte, falta só os casos-ouro de validação clínica (ver [BACKLOG.md](BACKLOG.md)) | Usuário preencher os casos-ouro (dados clínicos reais para conferência) |
 | Revisão jurídica dos Termos/Privacidade/Retenção | Documentos v3.0 sem identificação da operadora (razão social/CNPJ removida por decisão do responsável durante a fase de testes) — pacote em [`docs/legal/PACOTE_REVISAO_JURIDICA.md`](legal/PACOTE_REVISAO_JURIDICA.md) já sinaliza esse ponto como prioritário para o advogado | Validação por advogado especializado em LGPD/saúde digital |
 | Identificação da operadora nos documentos legais | Razão social/CNPJ removidos de todos os documentos e da interface durante a fase de testes — recomendável reintroduzir ao menos nos documentos legais antes da operação comercial plena | Decisão do responsável, a rever com o advogado |
 
-### Adiado conscientemente (baixa prioridade, decisão já tomada)
+### Dívida técnica e itens adiados conscientemente
 
-| Item | Descrição |
-|---|---|
-| Desativar conta no Firebase Auth ao excluir usuário | `deleteUserDocument` já apaga `users/{uid}` E `subscriptions/sub_{uid}` (achado C7, resolvido); a conta no Firebase Auth continua intocada — exigiria novo endpoint serverless (Admin SDK `deleteUser`/`updateUser({disabled:true})`), fora do escopo pedido na Fase 4 |
-| M2/M3 do Admin | Paginação do "Recalcular" de Transações (`getDocs` completo, sem paginação) e guarda de concorrência entre abas Features/Recursos Extras — baixa prioridade, ver [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md) (arquivado) |
-| Busca/paginação server-side em Usuários (Admin) | Lista carrega client-side sobre a coleção inteira — adiado por decisão consciente dado o estágio atual do produto (ver [Plano de Melhorias](PLANO_MELHORIAS_2026-07.md) Fase 3) |
+Ver a lista completa e sempre atualizada em [`docs/BACKLOG.md`](BACKLOG.md) — inclui: desativação de conta no Firebase Auth ao excluir usuário, M2/M3 do Admin (paginação de recálculo de transações, guarda de concorrência), busca/paginação server-side em Usuários, gap arquitetural de query multi-usuário, cron de expiração de assinatura avulsa ausente, gestão de frota de VMs PACS no admin, arquivos grandes ainda não refatorados e uso residual de `any`.
 
-**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby). Auditoria completa do módulo Admin (8 abas + LAUD.IA) — 30 achados, todos corrigidos exceto os 3 itens de baixa prioridade listados acima (ver [Auditoria](AUDITORIA_ADMIN_2026-07.md) / [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md), arquivado). Centro Financeiro (Fases A-D) — 16 de 18 itens executados, ver §15.
+**Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby). Auditoria completa do módulo Admin (8 abas + LAUD.IA) — 30 achados, todos corrigidos exceto os 3 itens de baixa prioridade em [`docs/BACKLOG.md`](BACKLOG.md) (ver [Auditoria](archive/AUDITORIA_ADMIN_2026-07.md) / [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md), ambos arquivados). Centro Financeiro (Fases A-D) — 16 de 18 itens executados, ver §15.
 
 ---
 
@@ -443,4 +443,4 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 **Add-on** — recurso pago avulso. **Orthanc** — servidor PACS. **Worklist** — lista de exames que o aparelho lê (`.wl`). **Agente** — programa que grava `.wl` e faz proxy do Orthanc. **Tenant** — instância isolada numa VM compartilhada (`tenantId`). **Tailscale/Funnel** — VPN privada + endereço HTTPS público. **MRR/ARR** — receita recorrente mensal/anual. **Entitlement** — direito de uso derivado do plano. **Fail-open** — se a checagem falha, libera (não derruba pagante). **Collection-group query** — consulta sobre todas as subcoleções de mesmo nome (ex.: `ai_usage`). **Clinic membership** — vínculo de um usuário convidado (não dono) a uma clínica, com papel `editor`/`viewer` (`clinic_memberships`). **Reconciliação financeira** — comparação entre receita/MRR teóricos e valores reais cobrados/consumidos, para detectar divergência.
 
 ---
-*Documentação oficial v4 (07/07/2026). Detalhamento de pendências e roadmap nos documentos complementares.*
+*Documentação oficial v4.2 (08/07/2026). Pendências vivas em [`docs/BACKLOG.md`](BACKLOG.md); detalhamento por área nos documentos complementares listados no topo.*

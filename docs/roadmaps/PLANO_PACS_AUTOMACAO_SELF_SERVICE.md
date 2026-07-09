@@ -1,8 +1,21 @@
 # 🚀 Plano — PACS individual por usuário: automação, self-service e simplificação
 
-> **Data:** 04/07/2026 · **Complementa:** [`PROJETO_PACS_NUVEM.md`](../pacs/PROJETO_PACS_NUVEM.md) (arquitetura VM+Tailscale, já implementada nas Fases 1–4).
+> **Data:** 04/07/2026 · **Complementa:** [`docs/archive/PROJETO_PACS_NUVEM.md`](../archive/PROJETO_PACS_NUVEM.md) (arquitetura VM+Tailscale, já implementada nas Fases 1–4).
 >
 > **Objetivo desta fase:** transformar a montagem **manual** de VM em um sistema **automático e individual** — o usuário compra o add-on PACS, sua **VM dedicada nasce sozinha**, o app se **autoconfigura**, e ele faz apenas **ajustes pessoais simples** (apontar o ultrassom e, se quiser, ligar o backup local).
+>
+> ⚠️ **Status em 08/07/2026 (confirmado em código/docs):** ~~**F1 — Imagem
+> dourada**~~ **[Concluída]** — `PACS_PROVISION_SETUP.md` §7. ~~**F2 — Provisionador**~~
+> **[Concluída]** — `api/pacs-provision.ts` em produção. ~~**F3 — UX "Meu PACS"**~~
+> **[Concluída]** — `src/modules/dicom/MyPacsCard.tsx`. ~~**F4 — Assistentes**~~
+> **[Concluída]** — `UltrasoundSetupCard.tsx` (device/relé). ~~**F6 — Lifecycle**~~
+> **[Concluída]** — `api/reset-monthly-reports.ts` + `api/_pacsLifecycle.ts`. **F5 —
+> Admin frota** e **F7 — Migração M2→M3** seguem **abertos** (ver
+> [`docs/BACKLOG.md`](../BACKLOG.md)) — nota sobre F7: a arquitetura que realmente foi
+> a produção para os planos Starter/Pro (`docs/pacs/PACS_TENANT_SETUP.md`, 1 container
+> Orthanc isolado por tenant numa VM compartilhada) já corresponde ao modelo **M3**
+> descrito em §7.1 abaixo, não à migração faseada M2→M3 que este plano previa — o
+> destino foi alcançado por um caminho diferente do planejado.
 
 ---
 
@@ -17,11 +30,11 @@
 | Preset "Servidor na Nuvem (VM)" + backup local opcional | ✅ Pronto | `DicomControlCenter.tsx` (`applyServerPreset`) |
 | Diagnóstico (imagens + worklist ping, princ.+backup) | ✅ Pronto | `handleTestPacsConnection` |
 | Manual didático + guia da VM | ✅ Pronto | aba "Guias" |
-| Bootstrap da VM (Docker+Orthanc+Agente+Tailscale+Funnel) | ⚠️ Semiautomático | `scripts/setup-vm.sh` (rodado **à mão** na VM) |
-| **Criar a VM / autenticar Tailscale / Funnel / copiar URL+segredo p/ o app** | ❌ **Manual** | — |
-| **Provisionamento automático por usuário (control plane)** | ❌ **Inexistente** | — |
-| **Gestão da frota de VMs no Admin** | ❌ **Inexistente** | — |
-| **Lifecycle (criar ao assinar / suspender ao cancelar)** | ❌ **Inexistente** | — |
+| Bootstrap da VM (Docker+Orthanc+Agente+Tailscale+Funnel) | ✅ Pronto (imagem dourada) | F1, ver `PACS_PROVISION_SETUP.md` §7 |
+| Criar a VM / autenticar Tailscale / Funnel / copiar URL+segredo p/ o app | ✅ **Automático** | F2, `api/pacs-provision.ts` |
+| Provisionamento automático por usuário (control plane) | ✅ **Pronto** | F2, `api/pacs-provision.ts` |
+| **Gestão da frota de VMs no Admin** | ❌ **Ainda inexistente** | F5 — ver `docs/BACKLOG.md` |
+| Lifecycle (criar ao assinar / suspender ao cancelar) | ✅ **Pronto** | F6, `api/_pacsLifecycle.ts` + `api/reset-monthly-reports.ts` |
 
 **Conclusão:** a *tecnologia de dados* está pronta e segura. Falta a *camada de automação e produto* — hoje cada usuário exige um setup de sysadmin. A sua visão ("ajustes simples pessoais") depende de eliminar esse trabalho manual.
 
@@ -190,15 +203,15 @@ O ultrassom é físico; algo na LAN precisa levá-lo até a VM. Assistente com 2
 
 ## 9. Plano faseado
 
-| Fase | Entregável | Esforço | Depende de |
-|---|---|---|---|
-| **F1 — Imagem dourada** | Transformar `setup-vm.sh` em builder de imagem; snapshot boot-rápido; parametrização 100% por *metadata* (secret, authkey) | 1–2 dias | conta GCP |
-| **F2 — Provisionador** | Função backend (admin) que cria a VM da imagem, injeta metadata, lê o Funnel e **grava as settings do usuário** | 2–4 dias | F1, Tailscale API |
-| **F3 — UX "Meu PACS"** | Card de status vivo (provisionando→pronto), campos infra read-only, botões (testar/reprovisionar) | 2–3 dias | F2 |
-| **F4 — Assistentes** | "Conectar ultrassom" (device wizard + teste) e "Relé" (GL.iNet/PC) e "Backup local" | 2–3 dias | F3 |
-| **F5 — Admin frota** | Submódulo admin: lista/ações/alertas/auditoria de VMs | 2–3 dias | F2 |
-| **F6 — Lifecycle + Ops** | Provisionar ao assinar / suspender ao cancelar (hook billing), backups, monitoramento, atualização blue/green | 3–5 dias | F2, F5 |
-| **F7 — Migração M2→M3** (ao escalar) | Container por tenant (sidecar Tailscale) em VMs compartilhadas; migrar volumes; provisionador passa a subir container em vez de VM | 5–8 dias | ~30–50 clínicas |
+| Fase | Entregável | Esforço | Depende de | Status |
+|---|---|---|---|---|
+| **F1 — Imagem dourada** | Transformar `setup-vm.sh` em builder de imagem; snapshot boot-rápido; parametrização 100% por *metadata* (secret, authkey) | 1–2 dias | conta GCP | ✅ Concluída |
+| **F2 — Provisionador** | Função backend (admin) que cria a VM da imagem, injeta metadata, lê o Funnel e **grava as settings do usuário** | 2–4 dias | F1, Tailscale API | ✅ Concluída |
+| **F3 — UX "Meu PACS"** | Card de status vivo (provisionando→pronto), campos infra read-only, botões (testar/reprovisionar) | 2–3 dias | F2 | ✅ Concluída |
+| **F4 — Assistentes** | "Conectar ultrassom" (device wizard + teste) e "Relé" (GL.iNet/PC) e "Backup local" | 2–3 dias | F3 | ✅ Concluída |
+| **F5 — Admin frota** | Submódulo admin: lista/ações/alertas/auditoria de VMs | 2–3 dias | F2 | ❌ Aberta |
+| **F6 — Lifecycle + Ops** | Provisionar ao assinar / suspender ao cancelar (hook billing), backups, monitoramento, atualização blue/green | 3–5 dias | F2, F5 | ✅ Concluída |
+| **F7 — Migração M2→M3** (ao escalar) | Container por tenant (sidecar Tailscale) em VMs compartilhadas; migrar volumes; provisionador passa a subir container em vez de VM | 5–8 dias | ~30–50 clínicas | ⚠️ Destino alcançado por outro caminho — ver nota no topo do documento |
 
 **Modelo por etapa:** lançamento em **M2 (dedicado, já pronto)**; migração para **M3 (container por tenant)** quando o custo por-VM justificar (§7.4). O provisionador (F2) e o card (F3) são escritos para servir aos **dois modelos**.
 
