@@ -55,10 +55,11 @@ type ServerStorage = {
 
 /** Resultado de um teste de capacidade (imagens ou worklist) de um servidor. */
 type CapResult = { ok: boolean; msg: string; skipped?: boolean };
-/** Matriz de diagnóstico: imagens e worklist, para principal e backup. */
+/** Matriz de diagnóstico: imagens, worklist e aparelhos, para principal e backup. */
 type DiagResults = {
   primaryImages: CapResult;
   primaryWorklist: CapResult;
+  primaryDevices: CapResult;
   backupImages: CapResult;
   backupWorklist: CapResult;
 };
@@ -260,6 +261,37 @@ export function DicomControlCenter() {
     }
   }
 
+  // Confere se os aparelhos cadastrados (Passo 3) estão de fato registrados
+  // no `DicomModalities` do PACS que as settings apontam AGORA. Pega ativamente
+  // a causa raiz mais sutil do incidente de 08/07/2026 (docs/pacs/
+  // INCIDENTE_2026-07-08_TIMEOUT_MX7.md): `dicomTenantId`/URL do agente podem
+  // "parecer" corretos (Imagens e Worklist testam OK) enquanto o relé físico
+  // do usuário na verdade encaminha o aparelho pra um tenant diferente —
+  // nesse caso, o aparelho nunca aparece no `/modalities` do tenant que o app
+  // está de fato consultando, e é exatamente isso que este teste expõe.
+  async function testDevices(): Promise<CapResult> {
+    const devices = draft.dicomDevices || [];
+    if (devices.length === 0) return { ok: true, msg: 'Nenhum aparelho cadastrado ainda (Passo 3)', skipped: true };
+    const baseUrl = getActivePacsUrl(draft, false);
+    const auth = getDicomAuthParams(draft, false);
+    const proxyPath = getProxyEndpoint(draft, false);
+    const target = `${baseUrl.replace(/\/$/, '')}/modalities?expand`;
+    try {
+      const res = await fetch(`${proxyPath}?url=${encodeURIComponent(target)}${auth}`);
+      if (!res.ok) return { ok: false, msg: `HTTP ${res.status} — não foi possível consultar os aparelhos registrados` };
+      const json = await res.json();
+      const registered = new Set(Object.values(json || {}).map((m: any) => String(m?.AET || '').toUpperCase()));
+      const missing = devices.filter((d) => !registered.has(d.aeTitle.toUpperCase()));
+      if (missing.length === 0) return { ok: true, msg: `${devices.length} aparelho(s) registrado(s) neste PACS` };
+      return {
+        ok: false,
+        msg: `${missing.map((d) => d.aeTitle).join(', ')} não registrado(s) aqui — Worklist vai falhar mesmo com Echo/Storage OK. Confira se dicomTenantId bate com o tenant que o relé físico alcança, ou clique "Reautorizar no PACS" no aparelho.`,
+      };
+    } catch (e: any) {
+      return { ok: false, msg: e.message || 'Falha ao consultar aparelhos registrados' };
+    }
+  }
+
   async function handleTestPacsConnection() {
     setPacsTestState('testing');
     setDiag(null);
@@ -267,16 +299,16 @@ export function DicomControlCenter() {
     const skipped: CapResult = { ok: false, msg: 'Backup desabilitado', skipped: true };
     try {
       setDiagStep('Testando servidor principal…');
-      const [primaryImages, primaryWorklist] = await Promise.all([testImages(false), testWorklist(false)]);
+      const [primaryImages, primaryWorklist, primaryDevices] = await Promise.all([testImages(false), testWorklist(false), testDevices()]);
       setDiagStep(backupOn ? 'Testando servidor de backup…' : '');
       const [backupImages, backupWorklist] = backupOn
         ? await Promise.all([testImages(true), testWorklist(true)])
         : [skipped, skipped];
 
-      const results: DiagResults = { primaryImages, primaryWorklist, backupImages, backupWorklist };
+      const results: DiagResults = { primaryImages, primaryWorklist, primaryDevices, backupImages, backupWorklist };
       setDiag(results);
 
-      const primaryOk = primaryImages.ok && primaryWorklist.ok;
+      const primaryOk = primaryImages.ok && primaryWorklist.ok && primaryDevices.ok;
       const backupOk = !backupOn || (backupImages.ok && backupWorklist.ok);
       setPacsTestState(primaryOk && backupOk ? 'success' : 'error');
 
@@ -821,7 +853,7 @@ export function DicomControlCenter() {
                     <Wifi size={16} className="text-emerald-500 animate-pulse" />
                     <h3 className="text-xs font-black text-ink-900 uppercase tracking-wider">Diagnóstico de Rede</h3>
                   </div>
-                  <p className="text-[10px] text-ink-500 leading-normal">Testa <strong>Imagens</strong> (REST do Orthanc) e <strong>Worklist</strong> (agente → Python → pasta) separadamente, no principal e no backup.</p>
+                  <p className="text-[10px] text-ink-500 leading-normal">Testa <strong>Imagens</strong> (REST do Orthanc), <strong>Worklist</strong> (agente → Python → pasta) e <strong>Aparelhos</strong> (registro no PACS ativo) separadamente, no principal e no backup.</p>
 
                   <button
                     type="button"
@@ -836,13 +868,13 @@ export function DicomControlCenter() {
                   {diag && (() => {
                     const backupConfigured = !!draft.dicomBackupSyncEnabled && !!(draft.dicomBackupViewerUrl || draft.dicomBackupTailscalePublicUrl);
                     const groups = [
-                      { title: 'Servidor Principal', dot: 'bg-emerald-500', images: diag.primaryImages, worklist: diag.primaryWorklist, show: true },
-                      { title: 'Servidor Backup', dot: 'bg-indigo-500', images: diag.backupImages, worklist: diag.backupWorklist, show: backupConfigured },
+                      { title: 'Servidor Principal', dot: 'bg-emerald-500', images: diag.primaryImages, worklist: diag.primaryWorklist, devices: diag.primaryDevices, show: true },
+                      { title: 'Servidor Backup', dot: 'bg-indigo-500', images: diag.backupImages, worklist: diag.backupWorklist, devices: null, show: backupConfigured },
                     ];
                     return (
                       <div className="space-y-3 pt-1 animate-fade-in">
                         {groups.filter(g => g.show).map(g => {
-                          const groupOk = g.images.ok && g.worklist.ok;
+                          const groupOk = g.images.ok && g.worklist.ok && (!g.devices || g.devices.ok);
                           return (
                             <div key={g.title} className="rounded-xl border border-ink-100 overflow-hidden">
                               <div className="flex items-center justify-between px-3 py-2 bg-ink-50/70 border-b border-ink-100">
@@ -857,12 +889,13 @@ export function DicomControlCenter() {
                               <div className="p-2 space-y-1.5">
                                 {renderCap('Imagens (PACS)', Server, g.images)}
                                 {renderCap('Worklist (.wl)', FileText, g.worklist)}
+                                {g.devices && renderCap('Aparelhos registrados', Radio, g.devices)}
                               </div>
                             </div>
                           );
                         })}
                         <p className="text-[9px] text-ink-400 leading-normal px-0.5">
-                          A Worklist é testada por <em>ping</em> (verifica agente, Python/pydicom e permissão de escrita na pasta) — nenhum arquivo é criado.
+                          A Worklist é testada por <em>ping</em> (verifica agente, Python/pydicom e permissão de escrita na pasta) — nenhum arquivo é criado. Aparelhos é testado consultando o <code>DicomModalities</code> do PACS ativo — pega na hora se as settings apontam pra um tenant diferente do que o relé físico realmente alcança.
                         </p>
                       </div>
                     );
