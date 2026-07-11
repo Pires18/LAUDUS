@@ -433,7 +433,7 @@ O modelo de dados é histórico **per-usuário** (`users/{uid}/{collection}/{doc
 
 ### Dívida técnica e itens adiados conscientemente
 
-Ver a lista completa e sempre atualizada em [`docs/BACKLOG.md`](BACKLOG.md) — inclui: desativação de conta no Firebase Auth ao excluir usuário, M2/M3 do Admin (paginação de recálculo de transações, guarda de concorrência), busca/paginação server-side em Usuários, gap arquitetural de query multi-usuário, cron de expiração de assinatura avulsa ausente, gestão de frota de VMs PACS no admin, arquivos grandes ainda não refatorados e uso residual de `any`.
+Ver a lista completa e sempre atualizada em [`docs/BACKLOG.md`](BACKLOG.md) — inclui: desativação de conta no Firebase Auth ao excluir usuário, M2/M3 do Admin (paginação de recálculo de transações, guarda de concorrência), busca/paginação server-side em Usuários, exportação de transações que ignora os filtros ativos, gestão de frota de VMs PACS no admin, verificação server-side de `dicomTenantId`, arquivos grandes ainda não refatorados e uso residual de `any`.
 
 **Resolvido em 07/07/2026:** teto de 12 funções serverless (Vercel Hobby) — projeto migrou para o **plano Pro**; sem mais limite de contagem de funções, cron de agregação de métricas agora roda horário (era 1×/dia no Hobby). Auditoria completa do módulo Admin (8 abas + LAUD.IA) — 30 achados, todos corrigidos exceto os 3 itens de baixa prioridade em [`docs/BACKLOG.md`](BACKLOG.md) (ver [Auditoria](archive/AUDITORIA_ADMIN_2026-07.md) / [Plano de Finalização](archive/PLANO_FINALIZACAO_ADMIN_2026-07.md), ambos arquivados). Centro Financeiro (Fases A-D) — 16 de 18 itens executados, ver §15.
 

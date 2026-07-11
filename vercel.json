@@ -9,6 +9,7 @@
     "api/cron-monthly-billing.ts":     { "maxDuration": 60 },
     "api/promote-admin.ts":  { "maxDuration": 15 },
     "api/clinic-invite.ts":  { "maxDuration": 15 },
+    "api/admin-set-user-auth-status.ts": { "maxDuration": 15 },
     "api/pacs-provision.ts": { "maxDuration": 30 },
     "api/gemini.ts":         { "maxDuration": 60 },
     "api/health.ts":         { "maxDuration": 5 }

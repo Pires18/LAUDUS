@@ -7,49 +7,20 @@
 > os documentos arquivados) conforme os itens forem sendo tratados.
 >
 > Para o estado atual completo do sistema, ver [`DOCUMENTACAO_OFICIAL.md`](./DOCUMENTACAO_OFICIAL.md).
-> Esta tarefa é de **documentação** — nenhum destes itens foi corrigido nesta sessão,
-> apenas confirmado e catalogado.
+>
+> **Correção em 09/07/2026:** ao começar a tratar estes itens, 2 se revelaram falsos
+> positivos ao verificar contra o código atual (não contra o plano arquivado que os
+> originou) — removidos daqui, ver "Itens fechados" no fim. Isso confirma que todo
+> item deste backlog deve ser re-verificado no código **antes** de qualquer trabalho,
+> não só confiado na origem histórica.
+>
+> **5 itens tratados em 09/07/2026** (implementação, não só documentação — ver "Itens
+> fechados" no fim para detalhe de cada um): desativação de conta no Firebase Auth ao
+> excluir usuário, paginação do recálculo de transações (M2), guarda de concorrência
+> Features/Recursos Extras (M3), export de transações respeitando filtros ativos,
+> verificação server-side (log, não bloqueante) de consistência de `dicomTenantId`.
 
 ---
-
-## 🔴 Admin
-
-- **Sem desativação de conta no Firebase Auth ao deletar usuário** — hoje o delete
-  remove dados do Firestore mas a conta de autenticação permanece ativa; precisa de
-  um endpoint serverless novo (ainda não existe).
-  Origem: `docs/archive/PLANO_FINALIZACAO_ADMIN_2026-07.md` (item deixado fora de escopo).
-- **M2 — recálculo de transações sem paginação** — pode ficar pesado com histórico grande.
-  Origem: `docs/archive/PLANO_FINALIZACAO_ADMIN_2026-07.md`.
-- **M3 — sem guarda de concorrência entre as abas "Features" e "Recursos Extras"** —
-  edições simultâneas podem se sobrescrever.
-  Origem: `docs/archive/PLANO_FINALIZACAO_ADMIN_2026-07.md`.
-- **Busca/paginação de usuários ainda client-side** (Fase 3 do plano de admin) —
-  deferido conscientemente até a base atingir ~1-2 mil usuários; não é bug, é gatilho
-  de revisão futura.
-  Origem: `docs/roadmaps/ADMIN_IMPROVEMENT_PLAN.md`.
-- **Exportação de transações filtradas** — status "não verificado" na última passada.
-  Origem: `docs/roadmaps/ADMIN_IMPROVEMENT_PLAN.md`.
-
-## 🔴 Arquitetura multi-usuário / clínicas
-
-- **Camada de query do client não roteia para o UID do owner em memberships
-  convidados** — mesmo com `clinic_memberships` implementado, o app ainda consulta
-  dados sob o UID de quem está logado, não do dono da clínica, para membros
-  convidados. Gap arquitetural real, não apenas de UX.
-  Origem: `docs/archive/PLANO_FINAL_PRODUCAO_2026-07.md` §2.1.
-
-## 🔴 Billing / Financeiro
-
-- **Cron de expiração de assinatura avulsa ausente** — `api/cron-expire-subscriptions.ts`
-  não existe no repositório (confirmado por `ls api/` em 2026-07-08). Planos fora do
-  ciclo mensal automático (avulsos) não são expirados automaticamente.
-  Origem: `docs/archive/PLANO_PLANOS_INTERVALOS_ABACATEPAY.md` (item P6).
-- **Reconciliação com a API de transações da AbacatePay** — deliberadamente adiada;
-  o schema da API não está documentado/confirmado.
-  Origem: `docs/archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md` (Fase C).
-- **Exportação real de billing do GCP** — bloqueado externamente, aguardando
-  confirmação de ativação do billing export pelo usuário.
-  Origem: `docs/archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md` (Fase D).
 
 ## 🟠 PACS/DICOM
 
@@ -57,9 +28,22 @@
   encontrado no código; provisionamento funciona, mas não há visão consolidada das
   VMs ativas para o time interno.
   Origem: `docs/roadmaps/PLANO_PACS_AUTOMACAO_SELF_SERVICE.md`.
-- **Verificação server-side de consistência do `dicomTenantId`** — hoje a checagem é
-  só client-side/sob demanda; foi uma das 5 causas-raiz do incidente MX7.
-  Origem: `docs/pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md`.
+
+## 🔴 Admin
+
+- **Busca/paginação de usuários ainda client-side** (Fase 3 do plano de admin) —
+  deferido conscientemente até a base atingir ~1-2 mil usuários; não é bug, é gatilho
+  de revisão futura.
+  Origem: `docs/roadmaps/ADMIN_IMPROVEMENT_PLAN.md`.
+
+## 🟡 Billing / Financeiro
+
+- **Reconciliação com a API de transações da AbacatePay** — deliberadamente adiada;
+  o schema da API não está documentado/confirmado.
+  Origem: `docs/archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md` (Fase C).
+- **Exportação real de billing do GCP** — bloqueado externamente, aguardando
+  confirmação de ativação do billing export pelo usuário.
+  Origem: `docs/archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md` (Fase D).
 
 ## 🟠 Legal / LGPD
 
@@ -108,3 +92,39 @@ removida por completo), rate limiting da IA, `global_config` restrito a admin,
 custo de IA zerando silenciosamente, VMs suspensas fora do KPI de custo, add-ons
 sobrescritos em upgrade de plano, `AdminUsers.tsx` morto, CSV de auditoria quebrado,
 AE-Title incorreto no worklist DICOM (fix do incidente MX7, 08/07/2026).
+
+**Corrigidos em 09/07/2026 (eram falsos positivos no backlog original):**
+- ~~Camada de query do client não roteia para o UID do owner em memberships
+  convidados~~ — **já implementado** (`resolveOwnerUid`, `src/store/clinicAccess.ts`,
+  usado por `useFirestore.ts` e `db.ts`); a fonte original (`archive/PLANO_FINAL_PRODUCAO_2026-07.md`)
+  é anterior ao wiring de 05/07/2026 documentado em §16 de `DOCUMENTACAO_OFICIAL.md`.
+- ~~Cron de expiração de assinatura avulsa ausente~~ — a *funcionalidade* existe,
+  só não como arquivo separado: `api/reset-monthly-reports.ts` (CRON diário) já
+  expira planos avulsos (`sub.interval` semestral/anual) que passam de
+  `currentPeriodEnd`, distinto do fluxo `past_due` dos planos mensais recorrentes.
+
+**Implementados em 09/07/2026:**
+- ~~Sem desativação de conta no Firebase Auth ao deletar usuário~~ — novo endpoint
+  `api/admin-set-user-auth-status.ts` (admin-only, `auth.updateUser(uid, {disabled})`
+  via Admin SDK — desativa, não apaga, pra ficar reversível). `deleteUserDocument`
+  (`src/store/adminUsers.ts`) chama antes de limpar o Firestore; best-effort (se
+  falhar, a limpeza segue e o audit log registra o aviso).
+- ~~M2 — recálculo de transações sem paginação~~ — `TransactionsTab.tsx#recalcStats`
+  agora lê em lotes de 500 (cursor `startAfter`) em vez de um `getDocs()` sobre a
+  coleção inteira.
+- ~~M3 — sem guarda de concorrência entre "Features" e "Recursos Extras"~~ —
+  `AdminFinanceiro.tsx`: cada aba agora grava só as próprias chaves
+  (`FEATURES_META`/`RESOURCES_META`) no `setDoc(..., {merge:true})`, em vez de
+  espalhar o estado local inteiro (que incluía uma cópia potencialmente
+  desatualizada das chaves da OUTRA aba, sobrescrevendo edições concorrentes).
+- ~~Exportação de transações exporta tudo, ignorando filtros~~ — extraído um
+  predicado único `matchesTxFilters` usado tanto pela tabela em tela quanto pelo
+  `exportCsv()`; o CSV agora reflete exatamente os filtros ativos na tela.
+- ~~Verificação server-side de consistência do `dicomTenantId`~~ — `api/worklist.ts`
+  agora compara o `tenantId` de cada requisição com o `dicomTenantId` salvo nas
+  settings do usuário (Firestore) e loga (`console.warn`) uma divergência, sem
+  bloquear a requisição (bloquear quebraria o fluxo legítimo de testar um
+  `tenantId` ainda não salvo antes de clicar "Salvar" no painel PACS). Não
+  aplicado a `orthanc-proxy.ts` — chamado a cada poll de imagem (5-30s), o custo
+  de uma leitura extra no Firestore por request não compensa pra um log
+  observacional; se quiser cobertura ali também, dá pra reusar o mesmo cache.

@@ -1,7 +1,8 @@
 import { doc, updateDoc, collection, addDoc } from 'firebase/firestore';
-import { firestore } from '../lib/firebase';
+import { firestore, auth } from '../lib/firebase';
 import { UserRole } from '../types';
 import { addAuditLog } from './db';
+import { logger } from '../utils/logger';
 
 /**
  * Atualiza o papel de um usuário no sistema.
@@ -77,6 +78,29 @@ export async function createUserDocument(
  */
 export async function deleteUserDocument(uid: string, adminId: string, adminName: string) {
   const { deleteDoc } = await import('firebase/firestore');
+
+  // Desativa a conta no Firebase Auth ANTES de apagar os dados — impede
+  // login com um uid que já não tem mais perfil no Firestore. Best-effort:
+  // se a chamada falhar (rede, endpoint fora do ar), a limpeza do Firestore
+  // segue normalmente (comportamento anterior), mas fica registrada no
+  // audit log pra o admin saber que precisa tentar desativar de novo.
+  let authDisabled = false;
+  let authWarning = '';
+  try {
+    const idToken = await auth.currentUser?.getIdToken();
+    const res = await fetch('/api/admin-set-user-auth-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}) },
+      body: JSON.stringify({ userId: uid, disabled: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) authDisabled = true;
+    else authWarning = data?.error || `HTTP ${res.status}`;
+  } catch (err: any) {
+    authWarning = err?.message || 'Falha de rede';
+  }
+  if (!authDisabled) logger.error('Não foi possível desativar a conta no Firebase Auth:', authWarning);
+
   const userRef = doc(firestore, 'users', uid);
   const subRef = doc(firestore, 'subscriptions', `sub_${uid}`);
   await deleteDoc(userRef);
@@ -86,7 +110,10 @@ export async function deleteUserDocument(uid: string, adminId: string, adminName
     userId: adminId,
     userName: adminName,
     action: 'DELETE_USER',
-    details: `Removido usuário ${uid} (e sua assinatura). Histórico de uso de IA/transações mantido por retenção financeira.`,
+    details: `Removido usuário ${uid} (e sua assinatura). Histórico de uso de IA/transações mantido por retenção financeira. `
+      + (authDisabled
+        ? 'Conta desativada no Firebase Auth.'
+        : `AVISO: conta NÃO desativada no Firebase Auth (${authWarning}) — usuário ainda consegue logar.`),
     module: 'ADMIN_USERS'
   });
 }

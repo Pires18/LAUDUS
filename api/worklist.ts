@@ -1,5 +1,43 @@
 import { verifyFirebaseIdToken } from './_edgeAuth.js';
 import { hasPacsEntitlement } from './_entitlements.js';
+import { getDb } from './_firebase.js';
+
+// Cache curto por instância — mesmo racional de `_entitlements.ts`: evita uma
+// leitura extra no Firestore em cada request de worklist só pra este log.
+const tenantCheckCache = new Map<string, { tenantId: string; expires: number }>();
+const TENANT_CHECK_TTL_MS = 60_000;
+
+/**
+ * Verificação server-side (observabilidade, não bloqueante) de que o
+ * `tenantId` de uma requisição bate com o `dicomTenantId` salvo nas settings
+ * do usuário autenticado. Uma das 5 causas-raiz do incidente MX7
+ * (docs/pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md) foi justamente
+ * um `dicomTenantId` divergente do tenant que o relé físico realmente
+ * alcançava — isso não deixava nenhum rastro em lugar nenhum até o exame já
+ * ter sumido. Isto NÃO bloqueia a requisição (o painel PACS testa `draft`
+ * com tenantId ainda não salvo antes de clicar "Salvar" — bloquear quebraria
+ * esse fluxo legítimo de teste), só deixa rastro no log server-side pra uma
+ * investigação futura ser mais rápida que vasculhar manualmente.
+ */
+async function logTenantMismatchIfAny(uid: string, requestTenantId: string | undefined): Promise<void> {
+  if (!requestTenantId || !uid) return;
+  try {
+    let saved = tenantCheckCache.get(uid);
+    if (!saved || Date.now() >= saved.expires) {
+      const db = await getDb();
+      const snap = await db.collection('users').doc(uid).collection('settings').doc('app').get();
+      const tenantId = snap.exists ? String(snap.data()?.dicomTenantId || '') : '';
+      saved = { tenantId, expires: Date.now() + TENANT_CHECK_TTL_MS };
+      tenantCheckCache.set(uid, saved);
+    }
+    if (saved.tenantId && saved.tenantId !== requestTenantId) {
+      console.warn(`[TENANT-CHECK] uid=${uid} requisitou tenantId=${requestTenantId} mas settings salvas apontam para tenantId=${saved.tenantId} — possível divergência (draft não salvo, ou config desalinhada).`);
+    }
+  } catch (err) {
+    // Fail-open: nunca atrasa/derruba a requisição real por causa deste log.
+    console.warn('[TENANT-CHECK] Falha ao verificar consistência de tenantId (ignorado):', (err as any)?.message);
+  }
+}
 
 export default async function handler(req: any, res: any) {
   // CORS Headers
@@ -12,6 +50,13 @@ export default async function handler(req: any, res: any) {
     res.statusCode = 200;
     res.end();
     return;
+  }
+
+  let body = req.body;
+  if (typeof body === 'string' && body.trim()) {
+    try {
+      body = JSON.parse(body);
+    } catch (e) {}
   }
 
   // Autenticação obrigatória na nuvem (o encaminhamento server-side para o
@@ -39,13 +84,8 @@ export default async function handler(req: any, res: any) {
       res.end(JSON.stringify({ success: false, error: 'O recurso PACS/DICOM não está incluído no seu plano.' }));
       return;
     }
-  }
-
-  let body = req.body;
-  if (typeof body === 'string' && body.trim()) {
-    try {
-      body = JSON.parse(body);
-    } catch (e) {}
+    // Não bloqueante — ver comentário em logTenantMismatchIfAny.
+    void logTenantMismatchIfAny(authed.uid, body?.tenantId ? String(body.tenantId) : undefined);
   }
 
   const localAgentUrl = body?.localAgentUrl;

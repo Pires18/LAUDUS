@@ -13,6 +13,7 @@ import {
 import { Spinner } from './Spinner';
 
 const TX_PAGE = 100;
+const RECALC_PAGE = 500;
 
 type FinanceStats = {
   totalRevenue: number; paidCount: number;
@@ -70,6 +71,32 @@ const PERIOD_OPTS = [
   { label: '6 meses',   days: 180 },
   { label: 'Tudo',      days: 0   },
 ];
+
+type TxFilters = {
+  period: number; status: string; method: string; type: string; interval: string; nf: string; search: string;
+};
+
+// Predicado único de filtro — usado tanto pela tabela em tela (sobre as
+// páginas já carregadas) quanto pelo export CSV (sobre a coleção inteira),
+// pra garantir que "exportar" sempre reflita exatamente o que está filtrado
+// na tela, nunca o banco inteiro por engano.
+function matchesTxFilters(t: Transaction, nfStatus: string, f: TxFilters): boolean {
+  const cutoff = f.period > 0 ? Date.now() - f.period * 86400000 : 0;
+  if (f.period > 0 && (t.timestamp || 0) < cutoff) return false;
+  if (f.status !== 'all' && t.status !== f.status) return false;
+  if (f.method !== 'all' && t.paymentMethod !== f.method) return false;
+  if (f.type !== 'all' && t.type !== f.type) return false;
+  if (f.interval !== 'all' && t.interval !== f.interval) return false;
+  if (f.nf !== 'all' && nfStatus !== f.nf) return false;
+  if (f.search) {
+    const q = f.search.toLowerCase();
+    return (
+      (t.userEmail || '').toLowerCase().includes(q) ||
+      (t.description || '').toLowerCase().includes(q)
+    );
+  }
+  return true;
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -167,20 +194,36 @@ export function TransactionsTab() {
   const recalcStats = useCallback(async () => {
     setRecalculating(true);
     try {
-      const snap = await getDocs(collection(firestore, 'transactions'));
-      const paid = snap.docs.map(d => d.data() as any).filter(t => t.status === 'paid');
-      const agg = {
-        totalRevenue: paid.reduce((a, t) => a + (t.amount || 0), 0),
-        paidCount: paid.length,
-        pixCount:    paid.filter(t => t.paymentMethod === 'pix').length,
-        ccCount:     paid.filter(t => t.paymentMethod === 'credit_card').length,
-        manualCount: paid.filter(t => t.paymentMethod === 'manual').length,
-        otherCount:  paid.filter(t => !['pix', 'credit_card', 'manual'].includes(t.paymentMethod)).length,
-        updatedAt: Date.now(),
-      };
+      // M2: lê em lotes (RECALC_PAGE por vez) em vez de um getDocs() sobre a
+      // coleção inteira — evita carregar todo o histórico de transações de
+      // uma vez em memória/rede conforme a base cresce. Os agregados são
+      // acumulados incrementalmente entre lotes.
+      let totalRevenue = 0, paidCount = 0, pixCount = 0, ccCount = 0, manualCount = 0, otherCount = 0;
+      let cursor: any = null;
+      let batchCount = 0;
+      for (;;) {
+        const base = query(collection(firestore, 'transactions'), orderBy('timestamp', 'desc'), limit(RECALC_PAGE));
+        const q = cursor ? query(base, startAfter(cursor)) : base;
+        const batchSnap = await getDocs(q);
+        if (batchSnap.empty) break;
+        for (const d of batchSnap.docs) {
+          const t = d.data() as any;
+          if (t.status !== 'paid') continue;
+          totalRevenue += t.amount || 0;
+          paidCount++;
+          if (t.paymentMethod === 'pix') pixCount++;
+          else if (t.paymentMethod === 'credit_card') ccCount++;
+          else if (t.paymentMethod === 'manual') manualCount++;
+          else otherCount++;
+        }
+        cursor = batchSnap.docs[batchSnap.docs.length - 1];
+        batchCount++;
+        if (batchSnap.docs.length < RECALC_PAGE) break;
+      }
+      const agg = { totalRevenue, paidCount, pixCount, ccCount, manualCount, otherCount, updatedAt: Date.now() };
       await setDoc(doc(firestore, 'global_config', 'finance_stats'), agg, { merge: true });
       setStats(agg);
-      showToast('Métricas recalculadas com sucesso.', 'success');
+      showToast(`Métricas recalculadas (${batchCount} lote${batchCount === 1 ? '' : 's'} de até ${RECALC_PAGE}).`, 'success');
     } catch (err) {
       logger.error('Erro ao recalcular:', err);
       showToast('Falha ao recalcular métricas.', 'error');
@@ -210,7 +253,20 @@ export function TransactionsTab() {
         'Valor Bruto (R$)', 'Taxa Gateway Estimada (R$)', 'Valor Líquido Estimado (R$)',
         'Método', 'Status', 'Nota Fiscal',
       ];
-      const rows = snap.docs.map(d => {
+      // Aplica o MESMO predicado de filtro usado na tabela em tela (busca,
+      // período, status, método, tipo, intervalo, NF) sobre a coleção
+      // inteira — antes exportava tudo, ignorando os filtros ativos.
+      const activeFilters: TxFilters = {
+        period: filterPeriod, status: filterStatus, method: filterMethod,
+        type: filterType, interval: filterInterval, nf: filterNf, search,
+      };
+      const rows = snap.docs
+        .filter(d => {
+          const t = d.data() as any;
+          const nfStatus = nfByTx[d.id] === 'issued' ? 'issued' : 'pending';
+          return matchesTxFilters(t, nfStatus, activeFilters);
+        })
+        .map(d => {
         const t = d.data() as any;
         const gross = t.amount || 0;
         const net = t.status === 'paid'
@@ -233,6 +289,10 @@ export function TransactionsTab() {
           nfStatus,
         ].map(cell).join(',');
       });
+      if (rows.length === 0) {
+        showToast('Nenhuma transa\u00e7\u00e3o corresponde aos filtros ativos \u2014 nada exportado.', 'error');
+        return;
+      }
       const csv = '\ufeff' + [header.join(','), ...rows].join('\r\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -241,34 +301,23 @@ export function TransactionsTab() {
       a.download = `transacoes_laudus_${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+      showToast(`${rows.length} transa\u00e7${rows.length === 1 ? '\u00e3o exportada' : '\u00f5es exportadas'} (conforme filtros ativos).`, 'success');
     } catch (err) {
       logger.error('Erro ao exportar:', err);
       showToast('Falha ao exportar CSV.', 'error');
     } finally { setExporting(false); }
-  }, [showToast]);
+  }, [showToast, filterPeriod, filterStatus, filterMethod, filterType, filterInterval, filterNf, search]);
 
   useEffect(() => { loadStats(); loadFirstPage(); loadNfAndFees(); }, [loadStats, loadFirstPage, loadNfAndFees]);
 
-  // ── Filtering ──
-  const cutoff = filterPeriod > 0 ? Date.now() - filterPeriod * 86400000 : 0;
+  // ── Filtering ── (mesmo predicado usado pelo export CSV, ver matchesTxFilters)
+  const activeFilters: TxFilters = {
+    period: filterPeriod, status: filterStatus, method: filterMethod,
+    type: filterType, interval: filterInterval, nf: filterNf, search,
+  };
   const filtered = allTransactions.filter(t => {
-    if (filterPeriod > 0 && (t.timestamp || 0) < cutoff) return false;
-    if (filterStatus !== 'all' && t.status !== filterStatus) return false;
-    if (filterMethod !== 'all' && t.paymentMethod !== filterMethod) return false;
-    if (filterType !== 'all' && t.type !== filterType) return false;
-    if (filterInterval !== 'all' && t.interval !== filterInterval) return false;
-    if (filterNf !== 'all') {
-      const nfStatus = nfMap[t.id] === 'issued' ? 'issued' : 'pending';
-      if (nfStatus !== filterNf) return false;
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        (t.userEmail || '').toLowerCase().includes(q) ||
-        (t.description || '').toLowerCase().includes(q)
-      );
-    }
-    return true;
+    const nfStatus = nfMap[t.id] === 'issued' ? 'issued' : 'pending';
+    return matchesTxFilters(t, nfStatus, activeFilters);
   });
 
   const filteredRevenue = filtered

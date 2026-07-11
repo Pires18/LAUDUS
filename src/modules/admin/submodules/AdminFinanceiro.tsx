@@ -755,11 +755,18 @@ function FeaturesTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // `price` (mensal) espelha prices.month para compat com quem lê só price.
-      const synced: any = { ...extras };
+      // M3: grava só as chaves que esta aba realmente edita (FEATURES_META).
+      // Antes gravava `extras` inteiro — que inclui também as chaves de
+      // ExtraResourcesTab, carregadas no mount desta aba e potencialmente
+      // desatualizadas. Se a outra aba salvasse enquanto esta estava aberta,
+      // este save reescrevia as chaves dela de volta pro valor antigo
+      // (merge:true funde por campo, então isso sobrescreve silenciosamente
+      // uma edição concorrente, não só duplica a escrita).
+      const synced: any = {};
       (['calculators', 'pacs', 'appointments', 'clinics'] as const).forEach(k => {
-        const e: any = synced[k];
-        if (e?.prices) synced[k] = { ...e, price: e.prices.month };
+        const e: any = extras[k];
+        // `price` (mensal) espelha prices.month para compat com quem lê só price.
+        synced[k] = e?.prices ? { ...e, price: e.prices.month } : e;
       });
       await setDoc(doc(firestore, 'global_config', 'addons_config'), { ...synced, updatedAt: Date.now() }, { merge: true });
       showToast('Configuração de funcionalidades salva!', 'success');
@@ -878,7 +885,14 @@ function ExtraResourcesTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(firestore, 'global_config', 'addons_config'), { ...extras, updatedAt: Date.now() }, { merge: true });
+      // M3: grava só as chaves desta aba (RESOURCES_META) — ver o mesmo
+      // comentário em FeaturesTab.handleSave. Sem isso, salvar aqui podia
+      // reverter silenciosamente uma edição concorrente feita em Funcionalidades.
+      const synced: any = {};
+      (['extraReport', 'tokenLite', 'extraClinic'] as const).forEach(k => {
+        synced[k] = extras[k];
+      });
+      await setDoc(doc(firestore, 'global_config', 'addons_config'), { ...synced, updatedAt: Date.now() }, { merge: true });
       showToast('Configuração de recursos extras salva!', 'success');
     } catch { showToast('Erro ao salvar.', 'error'); }
     finally { setSaving(false); }
