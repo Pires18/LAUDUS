@@ -125,3 +125,22 @@ export function calcHadlockEfw(bpdMm: number, hcMm: number, acMm: number, flMm: 
   const logEfw = 1.3596 + 0.0064 * h + 0.0424 * a + 0.174 * f + 0.00061 * b * a - 0.00386 * a * f;
   return Math.pow(10, logEfw);
 }
+
+/**
+ * Mediana do Pico de Velocidade Sistólica da ACM (PSV-ACM), em cm/s, por IG (Mari, 2000).
+ * Ajuste log-linear às medianas publicadas (1,00 MoM): mediana = e^(2,3129 + 0,0463·IG).
+ * Anchors validados: 20 sem ≈ 25,5 · 24 ≈ 30,7 · 28 ≈ 36,9 · 32 ≈ 44,4 · 36 ≈ 53,5 cm/s.
+ */
+export function mcaPsvMedianCmS(gaWeeks: number): number {
+  const g = Math.max(15, Math.min(42, gaWeeks));
+  return Math.exp(2.3129 + 0.0463 * g);
+}
+
+/**
+ * PSV-ACM em Múltiplos da Mediana (MoM) = valor medido ÷ mediana da IG (Mari, 2000).
+ * > 1,5 MoM = anemia fetal moderada a grave (sensibilidade ~100%). Usar SEMPRE MoM,
+ * nunca o cm/s absoluto isolado (o mesmo cm/s muda de MoM conforme a IG).
+ */
+export function mcaPsvMoM(psvCmS: number, gaWeeks: number): number {
+  return psvCmS / mcaPsvMedianCmS(gaWeeks);
+}

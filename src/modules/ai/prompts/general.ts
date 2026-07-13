@@ -327,7 +327,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 4.6 ESTIMATIVA DE PESO FETAL — FÓRMULA DE HADLOCK (4 parâmetros):
     Log₁₀(EPF) = 1,3596 + 0,0064(CC) + 0,0424(CA) + 0,174(CF) + 0,00061(DBP)(CA) − 0,00386(CA)(CF)
     onde: CC = circunferência cefálica; CA = circunferência abdominal; CF = comprimento do fêmur; DBP = diâmetro biparietal (todos em mm).
-    Reporte: "Estimativa de Peso Fetal (Hadlock, 4 parâmetros): XXX g — Percentil XX pela curva INTERGROWTH-21st para XXsXXd."
+    Reporte: "Estimativa de Peso Fetal (Hadlock, 4 parâmetros): XXX g — Percentil XX pela curva OMS/Kiserud (2017) para XXsXXd."
     Se dados incompletos: "Dados biométricos insuficientes para estimativa de peso fetal."
 
 4.7 ÍNDICE DE LÍQUIDO AMNIÓTICO (ILA / AFI):
@@ -356,7 +356,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 4.11 CERVICOMETRIA (COMPRIMENTO DO COLO UTERINO):
     Medição transvaginal, no plano sagital médio do útero, ao longo do canal endocervical fechado (de orifício interno a externo).
     Valores de referência (ISUOG 2020 — coerentes com as Camadas de Área e de Exame):
-      — Normal: ≥25 mm entre 18–24 semanas (≥30 mm após 24 semanas);
+      — Normal: ≥25 mm (o corte de colo curto é <25 mm em QUALQUER IG; ≥30 mm após 24 sem é achado tranquilizador, mas não altera o corte de anormalidade);
       — Colo curto: <25 mm (18–24 sem) — risco aumentado de parto prematuro; conduta conforme histórico
         (progesterona vaginal se sem prematuridade prévia; discutir cerclagem se PPT prévio <34 sem) → encaminhar MFM;
       — Alto risco: <20 mm antes de 24 semanas → internação/avaliação perinatal → ATIVAR N4/R6.
@@ -365,7 +365,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 
 4.12 DUCTUS VENOSUS (DV) — VELOCIMETRIA:
     O DV conecta a veia umbilical à veia cava inferior fetal, refletindo pré-carga cardíaca direita.
-    IP_DV normal: <1,0 (entre 20–34 semanas) — usar nomogramas por IG.
+    IP_DV: interpretar por PERCENTIL da IG (>P95 = anormal), nomograma Hecher 1994 — o motor calcula o percentil. NÃO usar corte absoluto fixo (ex.: "<1,0" pode subnotificar valores acima do P95).
     Onda "a" do DV (componente atrial):
       — Positiva (normal): pré-carga adequada;
       — Ausente (zero, "a" = 0): comprometimento hemodinâmico grave → classificar N3, encaminhar MFM prioritário;
@@ -390,7 +390,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
       — CC/CA alto (>1,0 após 36 sem): macrossomia com poupamento cefálico; confirmar com EPF;
       — CC/CA baixo (<1,0 antes de 32 sem): suspeita de CIR simétrico (restrição global de crescimento) — correlacionar com ILA, Doppler de AU e DV;
       — CC/CA elevado + CA pequeno + CF pequeno para IG: CIR assimétrico com poupamento cefálico — ATENÇÃO para hipóxia crônica.
-    Reporte: "Relação CC/CA = X,XX — [proporcional / desproporcional para a IG atual] — correlacionar com curvas INTERGROWTH-21st."
+    Reporte: "Relação CC/CA = X,XX — [proporcional / desproporcional para a IG atual] — correlacionar com curvas OMS/Kiserud (2017)."
 
 4.15 RAZÃO DE PICOS SISTÓLICOS DA ARTÉRIA OFTÁLMICA (RASTREIO DE PRÉ-ECLÂMPSIA):
     A onda espectral da artéria oftálmica materna exibe DOIS picos sistólicos. Calcular:
@@ -1166,5 +1166,5 @@ Protocolo obrigatório:
   Exemplos corretos de CONVERSA pós-calculadora:
     "Próstata atualizada via Calculadora Prostática: 52,30 cm³ — HPB moderada."
     "TI-RADS calculado: nódulo de 1,2 cm recebe score 4 pontos — categoria TI-RADS 4."
-    "Biometria fetal integrada: PFE 1.888 g — P45 INTERGROWTH-21st para 30s2d."
+    "Biometria fetal integrada: PFE 1.888 g — P45 OMS/Kiserud (2017) para 30s2d."
 ═══════════════════════════════════════════════════════════════`;

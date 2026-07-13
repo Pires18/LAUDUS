@@ -5,6 +5,8 @@ import {
   getWhoPercentile,
   getRef,
   UA_REF,
+  mcaPsvMedianCmS,
+  mcaPsvMoM,
 } from '../modules/calculators/constants/fetalReferences';
 
 describe('zToPercentile (z-score → percentil)', () => {
@@ -62,5 +64,25 @@ describe('getRef (interpolação de tabela normativa)', () => {
     expect(Number.isFinite(ref[1])).toBe(true);
     // Abaixo do mínimo: clampa ao primeiro valor da tabela.
     expect(getRef(UA_REF, 0)).toEqual(getRef(UA_REF, 1));
+  });
+});
+
+describe('PSV-ACM — mediana e MoM (Mari, 2000)', () => {
+  it('mediana bate com os anchors publicados (~±1 cm/s)', () => {
+    expect(mcaPsvMedianCmS(20)).toBeCloseTo(25.5, 0);
+    expect(mcaPsvMedianCmS(24)).toBeCloseTo(30.7, 0);
+    expect(mcaPsvMedianCmS(28)).toBeCloseTo(36.9, 0);
+    expect(mcaPsvMedianCmS(32)).toBeCloseTo(44.4, 0);
+    expect(mcaPsvMedianCmS(36)).toBeCloseTo(53.5, 0);
+  });
+  it('mediana é monotônica crescente com a IG', () => {
+    expect(mcaPsvMedianCmS(30)).toBeGreaterThan(mcaPsvMedianCmS(24));
+  });
+  it('MoM = medido ÷ mediana; 1,00 MoM na mediana', () => {
+    expect(mcaPsvMoM(mcaPsvMedianCmS(28), 28)).toBeCloseTo(1.0, 5);
+  });
+  it('> 1,5 MoM sinaliza anemia (ex.: 60 cm/s em 28 sem)', () => {
+    // mediana 28 sem ≈ 36,9 → 60/36,9 ≈ 1,63 MoM
+    expect(mcaPsvMoM(60, 28)).toBeGreaterThan(1.5);
   });
 });

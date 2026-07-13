@@ -11,7 +11,7 @@ import {
   dopplerIndices,
 } from '../../calculators/formulas';
 import {
-  calcHadlockEfw, getWhoPercentile,
+  calcHadlockEfw, getWhoPercentile, mcaPsvMoM,
   UA_REF, MCA_REF, UTA_REF, getRef, zToPercentile, DOPPLER_GA_MIN, DOPPLER_GA_MAX,
 } from '../../calculators/constants/fetalReferences';
 
@@ -298,6 +298,20 @@ export function computeDerivations(
       const alert = lowBad ? p < 5 : p > 95;
       out.push({ id: `dop_${fieldId}`, sectionId: 'doppler', label, text: `p${p}`, alert });
     }
+  }
+
+  // ── Fetal: PSV-ACM em MoM (anemia se > 1,5 MoM) — Mari 2000; requer IG pela DUM ──
+  const psvAcm = num(v['psv_acm']);
+  if (psvAcm != null && psvAcm > 0 && weeksGA != null) {
+    const mom = mcaPsvMoM(psvAcm, weeksGA);
+    out.push({ id: 'psv_acm__mom', sectionId: 'doppler', label: 'PSV-ACM (MoM)', text: `${fmt(mom)} MoM${mom > 1.5 ? ' — anemia fetal provável (> 1,5)' : ''}`, alert: mom > 1.5 });
+  }
+
+  // ── Fetal: razão P2/P1 da artéria oftálmica (risco de PE se ≥ 0,65) — Sarno/Nicolaides 2020 ──
+  const oftP1 = num(v['oft_p1']), oftP2 = num(v['oft_p2']);
+  if (oftP1 != null && oftP1 > 0 && oftP2 != null && oftP2 > 0) {
+    const ratio = oftP2 / oftP1;
+    out.push({ id: 'oft__ratio', sectionId: 'doppler', label: 'Razão P2/P1 oftálmica', text: `${fmt(ratio)}${ratio >= 0.65 ? ' — risco aumentado de pré-eclâmpsia (≥ 0,65)' : ''}`, alert: ratio >= 0.65 });
   }
 
   // ── Fetal: BPP (soma dos 5 parâmetros; alerta se < 8/10) ──
