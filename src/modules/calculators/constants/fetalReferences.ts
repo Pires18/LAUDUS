@@ -144,3 +144,121 @@ export function mcaPsvMedianCmS(gaWeeks: number): number {
 export function mcaPsvMoM(psvCmS: number, gaWeeks: number): number {
   return psvCmS / mcaPsvMedianCmS(gaWeeks);
 }
+
+/** Inversa da normal padrão (probit / quantil) — algoritmo de Acklam. */
+function probit(p: number): number {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2, -3.066479806614716e1, 2.506628277459239e0];
+  const b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+  const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838e0, -2.549732539343734e0, 4.374664141464968e0, 2.938163982698783e0];
+  const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996e0, 3.754408661907416e0];
+  const plow = 0.02425, phigh = 1 - plow;
+  if (p < plow) { const q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p <= phigh) { const q = p - 0.5, r = q * q; return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1); }
+  const q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+}
+
+/** Avalia os quantis OMS (valor por quantil) para a dimensão/IG informadas. */
+function whoQuantiles(dimension: WHODimension, gaWeeks: number): { z: number; val: number }[] | null {
+  const coeffs = WHO_COEFFICIENTS[dimension];
+  if (!coeffs) return null;
+  return coeffs
+    .map((c) => ({
+      z: probit(c.q),
+      val: Math.exp(c.b0 + c.b1 * gaWeeks + c.b2 * gaWeeks ** 2 + c.b3 * gaWeeks ** 3 + c.b4 * gaWeeks ** 4),
+    }))
+    .sort((p, q) => p.val - q.val);
+}
+
+/** Z-score contínuo OMS (Kiserud, 2017) — interpolação em log(valor) entre quantis. */
+export function getWhoZScore(dimension: WHODimension, gaWeeks: number, value: number): number | null {
+  if (gaWeeks < 14 || gaWeeks > 40 || value <= 0) return null;
+  const q = whoQuantiles(dimension, gaWeeks);
+  if (!q) return null;
+  const clamp = (z: number) => Math.max(-4, Math.min(4, z));
+  if (value <= q[0].val) return clamp(q[0].z);
+  const last = q[q.length - 1];
+  if (value >= last.val) return clamp(last.z);
+  for (let i = 0; i < q.length - 1; i++) {
+    if (value >= q[i].val && value <= q[i + 1].val) {
+      const frac = (Math.log(value) - Math.log(q[i].val)) / (Math.log(q[i + 1].val) - Math.log(q[i].val));
+      return clamp(q[i].z + frac * (q[i + 1].z - q[i].z));
+    }
+  }
+  return null;
+}
+
+/** Inversa: valor OMS esperado para um dado z-score na IG (para projeção de crescimento). */
+export function getWhoValueAtZ(dimension: WHODimension, gaWeeks: number, z: number): number | null {
+  if (gaWeeks < 14 || gaWeeks > 40) return null;
+  const q = whoQuantiles(dimension, gaWeeks);
+  if (!q) return null; // já ordenado por val (⇒ por z, ambos monotônicos)
+  if (z <= q[0].z) return q[0].val;
+  const last = q[q.length - 1];
+  if (z >= last.z) return last.val;
+  for (let i = 0; i < q.length - 1; i++) {
+    if (z >= q[i].z && z <= q[i + 1].z) {
+      const frac = (z - q[i].z) / (q[i + 1].z - q[i].z);
+      return Math.exp(Math.log(q[i].val) + frac * (Math.log(q[i + 1].val) - Math.log(q[i].val)));
+    }
+  }
+  return null;
+}
+
+export type FetalSex = 'male' | 'female' | 'unknown';
+export interface GrowthVelocityInput {
+  efw1: number; ga1Weeks: number; // exame anterior
+  efw2: number; ga2Weeks: number; // exame atual
+  sex?: FetalSex;
+}
+export interface GrowthVelocityResult {
+  intervalWeeks: number;
+  z1: number; z2: number;
+  zVelocityPerWeek: number;   // Δz-score de EPF por semana
+  projectedEfw2: number;      // EPF projetada (mesmo z do exame anterior)
+  pctVsProjected: number;     // desvio % vs. a projeção
+  pctRaw: number;             // variação bruta de peso entre exames
+  percentile1: number; percentile2: number;
+  centileDrop: number;        // queda de percentil (p1 − p2)
+  classification: 'deceleration' | 'adequate' | 'acceleration';
+  reliable: boolean;          // false se intervalo < 2 semanas
+  alert: boolean;             // true na desaceleração significativa
+}
+
+/**
+ * Velocidade de crescimento fetal entre dois exames (perinatal.org.uk — Hugh & Gardosi, UOG 2022).
+ * Métrica primária: Δz-score de EPF por semana; limiar patológico < −0,13 z/semana
+ * (associado a ~6× mais risco de óbito perinatal, mesmo com EPF ≥ P10).
+ * Métricas de apoio: desvio % vs. a projeção no mesmo percentil (lento ≈ −8%, acelerado ≈ +9,3%)
+ * e queda de percentil (>2 quartis = desaceleração no critério Delphi).
+ */
+export function computeGrowthVelocity(input: GrowthVelocityInput): GrowthVelocityResult | null {
+  const { efw1, ga1Weeks, efw2, ga2Weeks } = input;
+  if (!(efw1 > 0) || !(efw2 > 0)) return null;
+  const intervalWeeks = ga2Weeks - ga1Weeks;
+  if (!(intervalWeeks > 0)) return null;
+
+  const dim: WHODimension = input.sex === 'male' ? 'EFW_M' : input.sex === 'female' ? 'EFW_F' : 'EFW';
+  const z1 = getWhoZScore(dim, ga1Weeks, efw1);
+  const z2 = getWhoZScore(dim, ga2Weeks, efw2);
+  const p1 = getWhoPercentile(dim, ga1Weeks, efw1);
+  const p2 = getWhoPercentile(dim, ga2Weeks, efw2);
+  if (z1 == null || z2 == null || p1 == null || p2 == null) return null;
+
+  const zVelocityPerWeek = (z2 - z1) / intervalWeeks;
+  const projectedEfw2 = getWhoValueAtZ(dim, ga2Weeks, z1) ?? efw1;
+  const pctVsProjected = ((efw2 - projectedEfw2) / projectedEfw2) * 100;
+  const pctRaw = ((efw2 - efw1) / efw1) * 100;
+  const centileDrop = p1 - p2;
+
+  let classification: GrowthVelocityResult['classification'] = 'adequate';
+  if (zVelocityPerWeek < -0.13 || pctVsProjected <= -8) classification = 'deceleration';
+  else if (pctVsProjected >= 9.3) classification = 'acceleration';
+
+  return {
+    intervalWeeks, z1, z2, zVelocityPerWeek, projectedEfw2, pctVsProjected, pctRaw,
+    percentile1: p1, percentile2: p2, centileDrop,
+    classification, reliable: intervalWeeks >= 2, alert: classification === 'deceleration',
+  };
+}

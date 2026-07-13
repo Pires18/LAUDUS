@@ -7,6 +7,9 @@ import {
   UA_REF,
   mcaPsvMedianCmS,
   mcaPsvMoM,
+  getWhoZScore,
+  getWhoValueAtZ,
+  computeGrowthVelocity,
 } from '../modules/calculators/constants/fetalReferences';
 
 describe('zToPercentile (z-score → percentil)', () => {
@@ -84,5 +87,52 @@ describe('PSV-ACM — mediana e MoM (Mari, 2000)', () => {
   it('> 1,5 MoM sinaliza anemia (ex.: 60 cm/s em 28 sem)', () => {
     // mediana 28 sem ≈ 36,9 → 60/36,9 ≈ 1,63 MoM
     expect(mcaPsvMoM(60, 28)).toBeGreaterThan(1.5);
+  });
+});
+
+describe('Z-score OMS contínuo e projeção (getWhoZScore / getWhoValueAtZ)', () => {
+  it('z=0 devolve a mediana; round-trip valor→z≈0', () => {
+    const median = getWhoValueAtZ('EFW', 28, 0)!;
+    expect(median).toBeGreaterThan(0);
+    expect(getWhoZScore('EFW', 28, median)!).toBeCloseTo(0, 1);
+  });
+  it('valor maior → z maior (monotônico)', () => {
+    const lo = getWhoValueAtZ('EFW', 30, -1)!;
+    const hi = getWhoValueAtZ('EFW', 30, 1)!;
+    expect(hi).toBeGreaterThan(lo);
+    expect(getWhoZScore('EFW', 30, hi)!).toBeGreaterThan(getWhoZScore('EFW', 30, lo)!);
+  });
+  it('fora da janela OMS (14–40 sem) → null', () => {
+    expect(getWhoZScore('EFW', 12, 500)).toBeNull();
+  });
+});
+
+describe('Velocidade de crescimento fetal (Hugh & Gardosi, 2022)', () => {
+  it('feto que mantém o percentil → velocidade ≈ 0 e "adequada"', () => {
+    const efw1 = getWhoValueAtZ('EFW', 28, 0.5)!;
+    const efw2 = getWhoValueAtZ('EFW', 34, 0.5)!;
+    const r = computeGrowthVelocity({ efw1, ga1Weeks: 28, efw2, ga2Weeks: 34 })!;
+    expect(Math.abs(r.zVelocityPerWeek)).toBeLessThan(0.05);
+    expect(r.classification).toBe('adequate');
+    expect(r.alert).toBe(false);
+  });
+  it('queda de z (0,5 → −1,0 em 6 sem) → desaceleração significativa (< −0,13/sem)', () => {
+    const efw1 = getWhoValueAtZ('EFW', 28, 0.5)!;
+    const efw2 = getWhoValueAtZ('EFW', 34, -1.0)!;
+    const r = computeGrowthVelocity({ efw1, ga1Weeks: 28, efw2, ga2Weeks: 34 })!;
+    expect(r.zVelocityPerWeek).toBeLessThan(-0.13);
+    expect(r.classification).toBe('deceleration');
+    expect(r.alert).toBe(true);
+    expect(r.centileDrop).toBeGreaterThan(0);
+  });
+  it('intervalo não positivo ou EPF inválido → null', () => {
+    expect(computeGrowthVelocity({ efw1: 1000, ga1Weeks: 30, efw2: 1200, ga2Weeks: 30 })).toBeNull();
+    expect(computeGrowthVelocity({ efw1: 0, ga1Weeks: 28, efw2: 1200, ga2Weeks: 32 })).toBeNull();
+  });
+  it('intervalo < 2 semanas marca reliable=false', () => {
+    const efw1 = getWhoValueAtZ('EFW', 28, 0)!;
+    const efw2 = getWhoValueAtZ('EFW', 29, 0)!;
+    const r = computeGrowthVelocity({ efw1, ga1Weeks: 28, efw2, ga2Weeks: 29 })!;
+    expect(r.reliable).toBe(false);
   });
 });
