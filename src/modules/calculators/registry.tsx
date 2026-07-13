@@ -9,6 +9,7 @@ import { CrlCalculator } from './components/CrlCalculator';
 import { WhoFetalBiometryCalculator } from './components/WhoFetalBiometryCalculator';
 import { DopplerCalculator } from './components/DopplerCalculator';
 import { BarcelonaFetalGrowthCalculator } from './components/BarcelonaFetalGrowthCalculator';
+import { GrowthVelocityCalculator } from './components/GrowthVelocityCalculator';
 import { ProstateWeightCalculator } from './components/ProstateWeightCalculator';
 import { ImtCalculator } from './components/ImtCalculator';
 import { AmnioticFluidCalculator } from './components/AmnioticFluidCalculator';
@@ -160,9 +161,20 @@ export const CALCULATORS: CalculatorDef[] = [
       link: 'https://www.medicinafetalbarcelona.org/'
     }
   },
-  { 
-    id: 'gestational-age', 
-    name: 'Idade Gestacional (DUM/USG)', 
+  {
+    id: 'growth-velocity',
+    name: 'Velocidade de Crescimento Fetal',
+    description: 'Compara dois exames: Δz-score de EPF por semana e projeção no mesmo percentil (desaceleração < −0,13/semana).',
+    component: GrowthVelocityCalculator,
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Hugh O, Gardosi J. Fetal weight projection model to define growth velocity and validation against pregnancy outcome. Ultrasound Obstet Gynecol 2022. Z-score de EPF pela curva OMS/Kiserud (2017); limiar de desaceleração −0,13 z/semana.',
+      link: 'https://perinatal.org.uk/growthvelocity'
+    }
+  },
+  {
+    id: 'gestational-age',
+    name: 'Idade Gestacional (DUM/USG)',
     description: 'Calcula a IG atual e DPP baseada na DUM ou USG anterior.', 
     component: GestationalAgeCalculator,
     areas: ['medicina-fetal'],
@@ -229,22 +241,22 @@ export const CALCULATORS: CalculatorDef[] = [
   {
     id: 'fmf-trisomy-risk',
     name: 'Risco de Cromossomopatia (EM VALIDAÇÃO)',
-    description: 'Rastreamento combinado de 1º trimestre para T21/18/13 (idade, TN, bioquímica e marcadores). Coeficientes em validação.',
+    description: 'Rastreamento combinado de 1º trimestre para T21/18/13 (idade, TN, bioquímica e marcadores). Implementação auditada; validação de saída pendente.',
     component: TrisomyRiskCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'EM VALIDAÇÃO — apoio à decisão baseado em modelos publicados (Snijders/Nicolaides; Kagan et al., UOG 2008). NÃO é a calculadora oficial da Fetal Medicine Foundation; não usar para decisão clínica.',
+      text: 'Implementação AUDITADA e fiel aos modelos publicados (Snijders/Nicolaides 1999; Wright 2008; Kagan et al., UOG 2008), com testes de referência ponta-a-ponta. Validação de saída contra a calculadora OFICIAL da FMF ainda pendente — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
       link: 'https://obgyn.onlinelibrary.wiley.com/doi/10.1002/uog.5331'
     }
   },
   {
     id: 'fmf-preeclampsia-risk',
     name: 'Risco de Pré-eclâmpsia (EM VALIDAÇÃO)',
-    description: 'Rastreamento de 1º trimestre por fatores maternos + MAP, IP uterinas e PlGF (modelo de riscos competitivos). Biomarcadores em validação.',
+    description: 'Rastreamento de 1º trimestre por fatores maternos + MAP, IP uterinas e PlGF (modelo de riscos competitivos). Implementação auditada; validação de saída pendente.',
     component: PreeclampsiaRiskCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'EM VALIDAÇÃO — fatores maternos por Wright D et al. (AJOG 2015); biomarcadores por Tan et al. (UOG 2018); conduta AAS por ASPRE (Rolnik et al., NEJM 2017). NÃO é a calculadora oficial da FMF; não usar para decisão clínica.',
+      text: 'Implementação AUDITADA e fiel aos modelos publicados (fatores maternos Wright D et al., AJOG 2015; riscos competitivos O\'Gorman 2016; medianas Tan et al., UOG 2018; PSV oftálmico Gana 2022; conduta AAS por ASPRE, Rolnik et al., NEJM 2017), com testes de referência ponta-a-ponta. Validação de saída contra a calculadora OFICIAL da FMF ainda pendente — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/25724400/'
     }
   },

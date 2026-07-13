@@ -348,7 +348,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
    */
   'medicina-fetal': `DIRETRIZES CLÍNICAS — MEDICINA FETAL / OBSTÉTRICA (V2.0 — LAUD.IA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REFERÊNCIAS: ISUOG 2022 · ACOG · INTERGROWTH-21st · FMF · CBR · FEBRASGO
+REFERÊNCIAS: ISUOG 2022 · ACOG · OMS/Kiserud 2017 · FMF · CBR · FEBRASGO
              SMFM · FIGO · Protocolo de Barcelona (Figueras-Gratacós) · NICE
 AUTOCÁLCULOS (FASE 4 de general.ts — NÃO duplicar aqui):
   FASE 4.3 = IP médio artérias uterinas   FASE 4.4 = RCP
@@ -391,7 +391,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
      CRL 45 mm = 11+0 sem · CRL 55 mm = 11+6 · CRL 65 mm = 12+4
      CRL 73 mm = 13+0 · CRL 79 mm = 13+3 · CRL 84 mm = 13+6
 
-2. BIOMETRIA FETAL — Referências por trimestre (INTERGROWTH-21st)
+2. BIOMETRIA FETAL — Referências por trimestre (OMS/Kiserud 2017 — curva efetivamente calculada pelo motor)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    MEDIDAS PADRÃO (todas em mm): DBP · DOF · CC · CA · CF · (CU)
    FÓRMULA EPF: Hadlock → FASE 4.6 de general.ts (não recalcular aqui).
@@ -412,7 +412,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    40       │ 329–365     │ 298–355     │ 71–82       │ 3000–4000
 
    PERCENTIL DO EPF: P10–P90 = adequado. <P10 = PIG/SGA. <P3 = grave.
-   >P90 = GIG. Calcular via FASE 4.6 para percentil exato.
+   >P90 = GIG. O percentil exato é calculado pelo motor (OMS/Kiserud 2017) e injetado no contexto — use o valor fornecido; NÃO recalcule. FASE 4.6 fornece o PESO (g), não o percentil.
 
 3. RASTREIO DO 1º TRIMESTRE (11+0–13+6 sem | CRL 45–84 mm — FMF)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -615,7 +615,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
      Valores de PVS ACM por IG (MoM): usar tabelas de Mari et al.
 
    DUCTUS VENOSUS (DV) — pré-carga cardíaca direita:
-     IP_DV normal: <1,0 (usar nomogramas por IG entre 20–34 semanas).
+     IP_DV: normal <P95 para a IG (nomograma Hecher 1994; o motor calcula o percentil). Evitar corte absoluto fixo — "<1,0" pode subnotificar valores já acima do P95 (P95 ≈ 0,72 em 20–24 sem; 0,60 em 28–34; 0,52 >34).
      IP_DV >P95 = pré-carga cardíaca aumentada → N3 (medicina fetal prioritária).
      Onda "a" DO DV (componente atrial — final da diástole):
        Positiva e anterógrada = pré-carga adequada → NORMAL.

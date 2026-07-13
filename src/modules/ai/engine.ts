@@ -311,6 +311,11 @@ function buildSpecificContext(
   // Camada 3 — Instruções Específicas do Exame
   if (template?.aiInstructions && template.aiInstructions.trim()) {
     parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions.trim()}`);
+  } else if (template && area === 'medicina-fetal') {
+    // Degradação silenciosa (auditoria D5): exame fetal sem Camada 3 gera laudo só com
+    // Camadas 1+2. Sinalizar para não passar despercebido (o template no Firestore pode
+    // estar sem aiInstructions — reexecutar o deploy: scripts/deploy-templates.mjs).
+    console.warn(`[LAUD.IA] Template de medicina-fetal sem aiInstructions (Camada 3 ausente): "${template.name || template.id}". Laudo será gerado apenas com as Camadas Universal + Área.`);
   }
 
   return parts.join('\n\n');
@@ -580,6 +585,14 @@ export function buildPrompt({
 }: GenerateReportParams): BuiltPrompt {
   const universalContext = buildUniversalContext(settings);
   const areaContext = buildSpecificContext(template, settings);
+  // Guarda de tamanho de contexto (auditoria D3): as 3 camadas (Universal + Área + Exame)
+  // são enviadas inteiras, sem truncagem. Avisar se o contexto de sistema ficar grande
+  // demais para a janela do modelo — o corte ocorreria no proxy, sem sinal ao usuário.
+  const SYSTEM_CONTEXT_TOKEN_WARN = 250_000;
+  const systemTokens = estimateTokens(universalContext) + estimateTokens(areaContext);
+  if (systemTokens > SYSTEM_CONTEXT_TOKEN_WARN) {
+    console.warn(`[LAUD.IA] Contexto de sistema grande (~${Math.round(systemTokens / 1000)}k tokens) para o exame "${template.name}". Risco de exceder a janela do modelo — revise as camadas de prompt (Universal + Área + Exame).`);
+  }
   const maskHtml = buildMaskHtml(template, settings);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);

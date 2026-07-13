@@ -86,9 +86,16 @@ const ENRICHERS: Enricher[] = [
   // Vitalidade / vasos Doppler específicos (mapeia cada vaso ao seu IP)
   { areas: ['medicina-fetal'], match: /batimentos|\bbcf\b|\bbce\b|frequ[êe]ncia card/i, canonical: true, fields: [{ id: 'bcf', label: 'BCF / FC', kind: 'measure', unit: 'bpm' }] },
   { areas: ['medicina-fetal'], match: /art[ée]ria umbilical/i, canonical: true, fields: [{ id: 'ip_au', label: 'IP Umbilical', kind: 'measure', hint: 'alterado se > p95' }] },
-  { areas: ['medicina-fetal'], match: /art[ée]ria cerebral m[ée]dia/i, canonical: true, fields: [{ id: 'ip_acm', label: 'IP ACM', kind: 'measure', hint: 'redistribuição se < p5' }] },
+  { areas: ['medicina-fetal'], match: /art[ée]ria cerebral m[ée]dia/i, canonical: true, fields: [
+    { id: 'ip_acm', label: 'IP ACM', kind: 'measure', hint: 'redistribuição se < p5' },
+    { id: 'psv_acm', label: 'PSV ACM', kind: 'measure', unit: 'cm/s', hint: 'anemia se > 1,5 MoM (auto)' },
+  ] },
   { areas: ['medicina-fetal'], match: /c[ée]rebro.?placent|\brcp\b/i, canonical: true, fields: [{ id: 'rcp', label: 'RCP (ACM/AU)', kind: 'measure', hint: 'auto; reduzida se < 1' }] },
   { areas: ['medicina-fetal'], match: /art[ée]rias uterinas/i, canonical: true, fields: [{ id: 'ip_uta', label: 'IP Uterinas (média)', kind: 'measure', hint: 'risco se > p95 / notch' }] },
+  { areas: ['medicina-fetal'], match: /art[ée]rias? oft[áa]lmic/i, canonical: true, fields: [
+    { id: 'oft_p1', label: 'PSV 1º pico (P1)', kind: 'measure', unit: 'cm/s', hint: 'média dos dois olhos' },
+    { id: 'oft_p2', label: 'PSV 2º pico (P2)', kind: 'measure', unit: 'cm/s', hint: 'razão P2/P1 ≥ 0,65 = risco de PE (auto)' },
+  ] },
   // Marcadores de 1º trimestre
   { areas: ['medicina-fetal'], match: /transluc[êe]ncia nucal|\btn\b/i, canonical: true, fields: [{ id: 'nt', label: 'TN', kind: 'measure', unit: 'mm', hint: 'alterada se > 3,5 mm' }] },
   { areas: ['medicina-fetal'], match: /osso nasal/i, fields: [{ id: 'on', label: 'Osso nasal', kind: 'select', options: ['presente', 'ausente', 'hipoplásico'] }] },

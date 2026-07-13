@@ -12,11 +12,10 @@ import { getIdToken } from '../../../lib/authToken';
 function resolveGeminiModelId(rawModel: string): string {
   const raw = (rawModel || '').toLowerCase();
 
+  // IDs 2.5/1.5 antigos foram removidos: eram inválidos na API (404). Qualquer entrada
+  // legada cai no mapeamento por 'pro'/'flash' abaixo, resolvendo para os modelos atuais.
   if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
   if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
-  if (raw.includes('2.5') && raw.includes('pro'))   return 'gemini-2.5-pro-preview-06-05';
-  if (raw.includes('2.5') && raw.includes('flash')) return 'gemini-2.5-flash-preview-05-20';
-  if (raw.includes('2.5'))                           return 'gemini-2.5-flash-preview-05-20';
   if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
   if (raw.includes('flash'))                         return 'gemini-3.5-flash';
 
