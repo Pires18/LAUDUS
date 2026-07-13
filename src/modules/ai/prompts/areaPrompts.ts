@@ -433,6 +433,32 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    Risco 1:100–1:1000 = risco intermediário → cfDNA (NIPT).
    REGRA: TN ≥3,5 mm ou DV reverso → R6 → medicina fetal urgente.
 
+   ─────────────────────────────────────────────────────────────
+   3.1 ACONSELHAMENTO BIOQUÍMICO-GENÉTICO — padrões séricos → hipótese → conduta
+   ─────────────────────────────────────────────────────────────
+   Rastreio combinado 1T = idade/história materna + TN + PAPP-A + β-hCG livre (algoritmo FMF).
+   Interpretar SEMPRE em conjunto (nunca marcador isolado). Valores em MoM.
+   ┌──────────────────────────────┬───────────────────────────────┬──────────────────────────────┐
+   │ PADRÃO BIOQUÍMICO            │ HIPÓTESE PRINCIPAL            │ CONDUTA / ACONSELHAMENTO      │
+   ├──────────────────────────────┼───────────────────────────────┼──────────────────────────────┤
+   │ PAPP-A ↓ + β-hCG livre ↑     │ Trissomia 21 (Down)          │ Integrar ao risco combinado;  │
+   │ (+ TN ↑ / ON ausente)        │                              │ cfDNA (NIPT) ou invasivo p/ risco│
+   ├──────────────────────────────┼───────────────────────────────┼──────────────────────────────┤
+   │ PAPP-A ↓ + β-hCG livre ↓     │ Trissomia 18 (Edwards) /      │ Alto risco → aconselhamento    │
+   │ (+ TN ↑↑, malformações)      │ Trissomia 13 (Patau)         │ MFM; invasivo (microarray)     │
+   ├──────────────────────────────┼───────────────────────────────┼──────────────────────────────┤
+   │ PAPP-A <0,4 MoM ISOLADO      │ Risco de insuf. placentária:  │ Mesmo com cariótipo normal:    │
+   │ (cariótipo/NIPT normais)     │ RCIU, PE, óbito, prematuridade│ vigilância de crescimento +    │
+   │                              │                              │ Doppler; considerar AAS + AUt  │
+   ├──────────────────────────────┼───────────────────────────────┼──────────────────────────────┤
+   │ β-hCG livre muito ↑ isolado  │ Marcador inespecífico         │ Correlação; sem conduta isolada│
+   └──────────────────────────────┴───────────────────────────────┴──────────────────────────────┘
+   CUT-OFFS DE RISCO (risco combinado FMF): ≥1:100 = ALTO → oferecer invasivo (BVC/amniocentese) e/ou cfDNA;
+   1:101–1:1.000 = INTERMEDIÁRIO → cfDNA (NIPT) para refinamento (S >99% p/ T21); <1:1.000 = BAIXO → rotina.
+   PRINCÍPIOS: (a) apresentar risco QUANTITATIVO só se calculado por software FMF certificado — senão, aconselhamento
+   qualitativo/condicional; (b) cfDNA alterado É rastreio, deve ser CONFIRMADO por invasivo; (c) diagnóstico
+   pré-natal é direito da paciente (respeitar autonomia — decisão informada, não impositiva).
+
 4. MARCADORES SECUNDÁRIOS DE ANEUPLOIDIA — 2T (18–24 semanas)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    Relatar sistematicamente nos morfológicos 2T; nunca omitir achados:
@@ -513,6 +539,37 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    Estadio IV:  DV onda "a" reversa OU desacelerações espontâneas na CTG.
    → Estadio III–IV: ATIVAR R6.
 
+   ─────────────────────────────────────────────────────────────
+   6.1 RCIU PRECOCE (<32 sem) × RCIU TARDIA (≥32 sem) — Delphi 2016 (fronteira: 32 semanas)
+   ─────────────────────────────────────────────────────────────
+   ┌───────────────────┬──────────────────────────────┬──────────────────────────────┐
+   │ CARACTERÍSTICA    │ RCIU PRECOCE (<32 sem)        │ RCIU TARDIA (≥32 sem)         │
+   ├───────────────────┼──────────────────────────────┼──────────────────────────────┤
+   │ Frequência        │ Rara (~1%); grave            │ Comum (~5–10%); leve          │
+   │ Doppler dominante │ AU (IP >P95 → AEDV → REDF) + │ ACM/RCP (AU frequentemente    │
+   │                   │ artérias uterinas; depois DV  │ NORMAL); RCP/ICP <P5 pode ser │
+   │                   │                              │ o ÚNICO sinal precoce          │
+   │ Sequência de      │ AU → ACM (centralização) →   │ Deterioração sutil; risco de  │
+   │ deterioração      │ DV/istmo aórtico → CTG        │ morte súbita a termo           │
+   │ Associação com PE │ Forte (insuf. placentária)   │ Fraca                         │
+   │ Base do manejo    │ Estadiamento de Barcelona +  │ RCP/ICP <P5 + velocidade de   │
+   │                   │ tolerância vs. prematuridade  │ crescimento; resolução ≥37 sem │
+   │ Diagnóstico       │ EPF/CA <P3 isolado; OU diást. │ EPF/CA <P3 isolado; OU ≥2 de: │
+   │ (Delphi)          │ zero AU; OU EPF/CA <P10 +     │ EPF/CA <P10 · queda >2 quartis│
+   │                   │ (IP AU >P95 OU IP AUT >P95)   │ · (RCP <P5 OU IP AU >P95)     │
+   └───────────────────┴──────────────────────────────┴──────────────────────────────┘
+   REGRA TARDIA (≥34 sem): não aguardar alteração da AU — RCP/ICP <P5 com AU normal + EPF P3–P10 já é
+   critério autônomo (Delphi critério 3) → vigilância SEMANAL + aconselhamento de via de parto ≥37 sem.
+
+   6.2 VELOCIDADE DE CRESCIMENTO (perinatal.org.uk/growthvelocity — Hugh & Gardosi, UOG 2022):
+   O crescimento pode desacelerar de forma patológica MESMO com EPF ainda ≥P10 (tamanho "normal").
+   Cálculo → FASE 4.16 de general.ts (Δ% ponderal e Δz-score/semana).
+     — Desaceleração significativa: Δz < −0,13 z-scores de EPF/semana (≈ Δ ponderal −8,0% para o intervalo)
+       → associada a ~6× mais risco de óbito perinatal, independentemente do percentil de tamanho atual.
+     — Queda >2 quartis de percentil entre exames = desaceleração (critério Delphi).
+   CONDUTA: desaceleração confirmada → intensificar vigilância e Doppler, mesmo em feto AIG/PIG; comparar
+   sempre com o exame anterior. Exige ≥2 EPF com intervalo adequado (idealmente ≥2 semanas); exame único → não avaliável.
+
 7. LÍQUIDO AMNIÓTICO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ILA (índice dos 4 quadrantes): Normal 8–24 cm.
@@ -574,6 +631,17 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
 
    VEIA UMBILICAL (VU):
      Não pulsátil = normal. Pulsatilidade = achado de alto risco (CIR avançado, IC fetal).
+
+   ARTÉRIA OFTÁLMICA MATERNA (AO) — rastreio de pré-eclâmpsia (11–13+6 sem e 20–28 sem):
+     Método: transdutor linear, pálpebra fechada, insonação da AO junto ao nervo óptico, ângulo <60°.
+     A onda tem DOIS picos sistólicos. Parâmetro-chave = RAZÃO P2/P1 (2º pico ÷ 1º pico) → FASE 4.15.
+     Interpretação (integrar ao rastreio combinado de PE, não isolar):
+       Razão P2/P1 média <0,65 = abaixo do limiar → sem sinal Doppler oftálmico de risco aumentado.
+       Razão P2/P1 média ≥0,65 = risco aumentado para PE (maior para PE precoce) → N2/N3:
+         correlacionar com PAM, IP médio das artérias uterinas e PlGF; considerar AAS 150 mg/dia
+         idealmente antes de 16 sem (profilaxia), conforme protocolo assistente.
+     Fisiopatologia: a elevação de P2/P1 reflete a hiperperfusão/baixa resistência cerebral da PE.
+     Referência: Sarno/Nicolaides (FMF), Am J Obstet Gynecol 2020 — corte ≥0,65 (AUROC ~0,88).
 
 9. CENTRALIZAÇÃO FETAL — Graus (Protocolo de Barcelona)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -689,6 +757,16 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    ÍNDICE CARDIOTORÁCICO: normal 0,25–0,35 (área coração/área tórax).
    EIXO CARDÍACO: normal 45° ± 20° (apontando para hemitórax E).
 
+   RECOMENDAÇÃO DE ECOCARDIOGRAFIA FETAL — DOIS NÍVEIS (aplicar em todo exame de 1T/2T):
+     ► NÍVEL ROTINA (todas as gestantes): recomendar ecocardiografia fetal de rotina entre 24–28 semanas
+       como complemento do rastreio cardíaco (que se inicia no morfológico 2T). Redigir como recomendação de
+       seguimento, não como urgência. (Alinha-se ao acesso ampliado do rastreio cardíaco no pré-natal — MS/Lei
+       14.598/2023; a triagem cardíaca básica ocorre no morfológico 2T.)
+     ► NÍVEL INDICAÇÃO FORMAL (torna a eco PRIORITÁRIA/mandatória, não apenas recomendada): TN ≥3,5 mm/>P99,
+       DV com onda "a" alterada, regurgitação tricúspide, malformação extracardíaca, DM pré-gestacional/mau
+       controle, cardiopatia congênita familiar, teratógenos, gemelar monocoriônica, arritmia fetal, hidropsia.
+       Nesses casos: "ecocardiografia fetal formalmente indicada" (FEBRASGO 2023/SBC), preferencialmente 24–28 sem.
+
 15. NEUROSSONOGRAFIA FETAL — Estruturas-chave
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    (Protocolo avançado no template de Camada 3 — NEUROSSONOGRAFIA FETAL)
@@ -745,6 +823,9 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    PBF (Manning)           │ 8–10 pontos               │ ≤4 → R6
    Dist. placenta ao OI    │ ≥20 mm                    │ <10 mm = pl. prévia → R6
    Espessura placenta      │ 2–4,5 cm                  │ >5 cm = investigar
+   Razão P2/P1 oftálmica   │ <0,65                     │ ≥0,65 = risco de PE
+   Velocidade crescimento  │ Δz ≥ −0,13/sem            │ Δz < −0,13/sem = desaceleração
+   PAPP-A (MoM)            │ ≥0,4 MoM                  │ <0,4 MoM = risco placentário
 
 18. FRASEOLOGIA PADRÃO — Biblioteca de Recomendações V2.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -771,6 +852,15 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    STFF Estadio II–V: ATIVAR R6 — "ALERTA OBSTÉTRICO: STFF avançado — fetosc. a laser em centro de ref. urgente."
    Colo curto (<25 mm): "Avaliação perinatológica — cervicagem ou progesterona vaginal conforme IG e indicação."
    Colo <10 mm: ATIVAR R6 — "ALERTA OBSTÉTRICO: colo muito curto — internação e avaliação obstétrica."
+   Eco fetal de rotina: "Recomenda-se ecocardiografia fetal entre 24–28 semanas como complemento do rastreio cardíaco."
+   Eco fetal indicada (gatilho formal): "Ecocardiografia fetal formalmente indicada por [achado] (FEBRASGO/SBC) — priorizar entre 24–28 semanas."
+   Doppler oftálmico normal (<0,65): "Razão P2/P1 da artéria oftálmica abaixo do limiar — sem sinal Doppler de risco aumentado para pré-eclâmpsia."
+   Doppler oftálmico alterado (≥0,65): "[ALERTA DE RISCO OBSTÉTRICO] Razão P2/P1 da artéria oftálmica ≥0,65 — risco aumentado para pré-eclâmpsia; integrar ao rastreio combinado (PAM, IP das uterinas, PlGF) e considerar AAS 150 mg antes de 16 sem."
+   PAPP-A baixo isolado (<0,4 MoM): "PAPP-A reduzida com cariótipo/rastreio normais — risco aumentado de insuficiência placentária (RCIU/PE); vigilância de crescimento e Doppler; considerar AAS."
+   Velocidade de crescimento adequada: "Velocidade de crescimento adequada em relação ao exame anterior (sem desaceleração significativa)."
+   Desaceleração de crescimento (Δz < −0,13/sem ou queda >2 quartis): "Desaceleração significativa da velocidade de crescimento em relação ao exame anterior, mesmo com peso ainda dentro da faixa — intensificar vigilância e Doppler; avaliação em medicina fetal."
+   RCIU precoce (<32 sem): "RCIU de início precoce — estadiar pelo protocolo de Barcelona; vigilância conforme estágio; ponderar prematuridade vs. deterioração."
+   RCIU tardia (≥32 sem): "RCIU de início tardio — valorizar RCP/ICP <P5 mesmo com AU normal; vigilância semanal; aconselhamento de via de parto ≥37 sem."
 
 19. REGRAS TRANSVERSAIS — APLICÁVEIS A TODOS OS 9 EXAMES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

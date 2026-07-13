@@ -392,6 +392,41 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
       — CC/CA elevado + CA pequeno + CF pequeno para IG: CIR assimétrico com poupamento cefálico — ATENÇÃO para hipóxia crônica.
     Reporte: "Relação CC/CA = X,XX — [proporcional / desproporcional para a IG atual] — correlacionar com curvas INTERGROWTH-21st."
 
+4.15 RAZÃO DE PICOS SISTÓLICOS DA ARTÉRIA OFTÁLMICA (RASTREIO DE PRÉ-ECLÂMPSIA):
+    A onda espectral da artéria oftálmica materna exibe DOIS picos sistólicos. Calcular:
+      Razão P2/P1 = PSV do 2º pico sistólico ÷ PSV do 1º pico sistólico
+    (P1 = primeiro pico, obtido automaticamente pelo equipamento; P2 = segundo pico, medido manualmente.)
+    Reportar a razão de CADA olho e a MÉDIA das duas: Razão_média = (P2/P1 direito + P2/P1 esquerdo) / 2.
+    Interpretação (aplicável a 11–13+6 sem e a 20–28 sem):
+      — Razão média <0,65: abaixo do limiar de risco — sem sinal Doppler oftálmico de risco aumentado para PE;
+      — Razão média ≥0,65: risco aumentado para pré-eclâmpsia (desempenho maior para PE precoce). Integrar
+        ao rastreio combinado de PE (idade/história materna + PAM + IP médio das artérias uterinas + PlGF) e
+        considerar AAS 150 mg/dia idealmente antes de 16 semanas, conforme protocolo assistente.
+    Formatação: razão P2/P1 com 2 casas decimais; separador decimal = vírgula.
+    ⚠ Só interpretar se os picos forem fornecidos; nunca inventar P1/P2. Referência: Sarno/Nicolaides (FMF),
+    Am J Obstet Gynecol 2020; corte de razão de picos ≥0,65 (AUROC ~0,88).
+    Reporte: "Artéria oftálmica: razão P2/P1 = X,XX (direita) / X,XX (esquerda), média X,XX — [abaixo / igual ou acima] do limiar de risco (0,65)."
+
+4.16 VELOCIDADE DE CRESCIMENTO FETAL (entre exames seriados — perinatal.org.uk/growthvelocity):
+    Complementa a avaliação por TAMANHO (percentil de EPF): o crescimento pode desacelerar de forma
+    patológica MESMO com EPF ainda ≥P10. Exige ≥2 estimativas de peso com intervalo adequado (idealmente ≥2 semanas).
+    (a) VARIAÇÃO PONDERAL PERCENTUAL (rápida, sem z-score disponível):
+        Δ% = (EPF_atual − EPF_projetada) / EPF_projetada × 100
+        onde EPF_projetada = EPF do exame anterior projetada ao longo do MESMO percentil até a IG atual.
+        Limiares específicos do intervalo (Hugh & Gardosi, UOG 2022; FP 10%):
+          — Crescimento lento: Δ ≈ −8,0% (abaixo do esperado para o intervalo) → sinal de alerta;
+          — Crescimento acelerado: Δ ≈ +9,3% → investigar macrossomia/DM.
+    (b) VARIAÇÃO DE Z-SCORE POR SEMANA (preferida quando há z-score de EPF):
+        Δz/sem = (z_EPF_atual − z_EPF_anterior) / (intervalo em semanas)
+        Limiar patológico: Δz/sem < −0,13 z-scores de EPF por semana = DESACELERAÇÃO SIGNIFICATIVA
+        (associada a ~6× mais risco de óbito perinatal, mesmo com EPF ≥P10 — Hugh & Gardosi 2022).
+    CONDUTA: desaceleração < −0,13 z/sem OU queda >2 quartis de percentil (critério Delphi) → intensificar
+    vigilância e Doppler MESMO em feto de tamanho normal; correlacionar com AU, ACM/RCP e artérias uterinas.
+    Formatação: Δ% com 1 casa decimal; Δz/sem com 2 casas decimais; separador = vírgula.
+    ⚠ Só calcular com pelo menos DUAS medidas de EPF e o intervalo entre elas; sem exame anterior → declarar
+    "velocidade de crescimento não avaliável (exame único)".
+    Reporte: "Velocidade de crescimento: variação de X,X% desde [DD/MM/AAAA] (Δz = X,XX/sem) — [adequada / desaceleração significativa]."
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 FASE 5 — EXPANSÃO MORFOLÓGICA E TRADUÇÃO SEMÂNTICA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
