@@ -37,13 +37,32 @@ die(){ printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
 log "1/6 Baixando scripts do app ($SCRIPTS_URL)"
 mkdir -p "$AGENT_DIR"
-curl -fsSL "$SCRIPTS_URL/agent.js"        -o "$AGENT_DIR/agent.js"
-curl -fsSL "$SCRIPTS_URL/generate_wl.py"  -o "$AGENT_DIR/generate_wl.py"
-curl -fsSL "$SCRIPTS_URL/pacs-tenant.sh"  -o /opt/pacs-tenant.sh
-curl -fsSL "$SCRIPTS_URL/pacs-harden.sh"  -o /opt/pacs-harden.sh
-curl -fsSL "$SCRIPTS_URL/pacs-import.sh"  -o /opt/pacs-import.sh
+# Download com validação de conteúdo: domínio errado/parking devolve uma página
+# HTML de lander com HTTP 200 — o curl "funciona" e sobrescreve o script com
+# HTML, quebrando o agente/worklist silenciosamente (caso real, 15/07/2026:
+# generate_wl.py virou <!DOCTYPE html> e todo envio de exame passou a falhar
+# com SyntaxError). Baixa num .part, valida e só então substitui — o arquivo
+# antigo continua intacto se o download vier errado.
+fetch(){
+  url="$1"; dest="$2"
+  curl -fsSL "$url" -o "${dest}.part" || { rm -f "${dest}.part"; die "Falha ao baixar $url"; }
+  if head -c 300 "${dest}.part" | grep -qi '<!doctype html\|<html'; then
+    rm -f "${dest}.part"
+    die "$url devolveu uma página HTML em vez do script — SCRIPTS_URL aponta pro domínio errado (lander/parking). Arquivo local preservado."
+  fi
+  mv "${dest}.part" "$dest"
+}
+fetch "$SCRIPTS_URL/agent.js"        "$AGENT_DIR/agent.js"
+fetch "$SCRIPTS_URL/generate_wl.py"  "$AGENT_DIR/generate_wl.py"
+fetch "$SCRIPTS_URL/pacs-tenant.sh"  /opt/pacs-tenant.sh
+fetch "$SCRIPTS_URL/pacs-harden.sh"  /opt/pacs-harden.sh
+fetch "$SCRIPTS_URL/pacs-import.sh"  /opt/pacs-import.sh
 chmod +x /opt/pacs-tenant.sh /opt/pacs-harden.sh /opt/pacs-import.sh
-ok "Scripts atualizados."
+# (python3 pode ainda não existir aqui — instalado no passo 2; valida se der)
+if command -v python3 >/dev/null; then
+  python3 -m py_compile "$AGENT_DIR/generate_wl.py" || die "generate_wl.py baixado não é Python válido — abortando."
+fi
+ok "Scripts atualizados e validados."
 
 log "2/6 Dependências (Docker / Node / Python / pydicom)"
 command -v docker >/dev/null || { curl -fsSL https://get.docker.com | sh; }

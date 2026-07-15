@@ -73,6 +73,8 @@ remove_rules(){
   iptables -t nat -D PREROUTING -i "$LAN_IF" -p tcp --dport "$local_port" -j DNAT --to-destination "${vm_ip}:${vm_port}" 2>/dev/null || true
   iptables -t nat -D POSTROUTING -p tcp -d "$vm_ip" --dport "$vm_port" -j MASQUERADE 2>/dev/null || true
   iptables -D FORWARD -p tcp -d "$vm_ip" --dport "$vm_port" -j ACCEPT 2>/dev/null || true
+  iptables -t mangle -D FORWARD -o tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
+  iptables -t mangle -D FORWARD -i tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
 }
 
 # Remove só as linhas desse relé específico do /etc/firewall.user (mantém as
@@ -80,7 +82,7 @@ remove_rules(){
 remove_persisted(){
   vm_ip="$1"; vm_port="$2"; local_port="$3"
   [ -f "$FW_USER" ] || return 0
-  grep -v -- "--dport ${local_port} -j DNAT --to-destination ${vm_ip}:${vm_port}\|-d ${vm_ip} --dport ${vm_port}" "$FW_USER" > "${FW_USER}.tmp" 2>/dev/null || true
+  grep -v -- "--dport ${local_port} -j DNAT --to-destination ${vm_ip}:${vm_port}\|-d ${vm_ip} --dport ${vm_port}\|clamp-mss-to-pmtu" "$FW_USER" > "${FW_USER}.tmp" 2>/dev/null || true
   mv "${FW_USER}.tmp" "$FW_USER"
 }
 
@@ -97,6 +99,12 @@ cmd_install(){
   iptables -t nat -I PREROUTING -i "$LAN_IF" -p tcp --dport "$local_port" -j DNAT --to-destination "${vm_ip}:${vm_port}"
   iptables -t nat -I POSTROUTING -p tcp -d "$vm_ip" --dport "$vm_port" -j MASQUERADE
   iptables -I FORWARD -p tcp -d "$vm_ip" --dport "$vm_port" -j ACCEPT
+  # MSS clamp: o túnel Tailscale tem MTU 1280 e a LAN 1500 — sem o clamp, o
+  # handshake e o C-ECHO passam mas o ENVIO DE IMAGENS estanca no meio
+  # ("DIMSE Read PDV failed" / "DUL network read timeout" no Orthanc — caso
+  # real em 15/07/2026, pior quando a conexão cai pra relay DERP).
+  iptables -t mangle -I FORWARD -o tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+  iptables -t mangle -I FORWARD -i tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
   ok "Regras aplicadas (ativas até o próximo reboot/firewall reload)."
 
   log "Tornando permanente em ${FW_USER}..."
@@ -109,8 +117,36 @@ cmd_install(){
     echo "iptables -t nat -I POSTROUTING -p tcp -d ${vm_ip} --dport ${vm_port} -j MASQUERADE"
     echo "iptables -C FORWARD -p tcp -d ${vm_ip} --dport ${vm_port} -j ACCEPT 2>/dev/null || \\"
     echo "iptables -I FORWARD -p tcp -d ${vm_ip} --dport ${vm_port} -j ACCEPT"
+    echo "iptables -t mangle -C FORWARD -o tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \\"
+    echo "iptables -t mangle -I FORWARD -o tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
+    echo "iptables -t mangle -C FORWARD -i tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || \\"
+    echo "iptables -t mangle -I FORWARD -i tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
   } >> "$FW_USER"
-  ok "Persistido — sobrevive a reboot e a '/etc/init.d/firewall restart'."
+  ok "Regras persistidas em ${FW_USER}."
+
+  # ── Boot + watchdog ─────────────────────────────────────────────────────────
+  # Firmwares GL.iNet 4.x (OpenWrt 21+/fw4) NÃO executam /etc/firewall.user no
+  # boot — sem isto, uma queda de luz apaga o relé em silêncio e o aparelho
+  # "para de conectar" (caso real: GL-MT3000, 15/07/2026). Duas defesas:
+  #   1) init script que reaplica as regras no boot;
+  #   2) cron a cada 5 min reaplicando (as regras usam `-C || -I`, então rodar
+  #      de novo é sempre inofensivo) — cobre também um reload de firewall que
+  #      limpe as chains no meio do expediente.
+  log "Instalando reaplicação no boot + watchdog (5 min)..."
+  cat > /etc/init.d/pacs-relay <<'INIT'
+#!/bin/sh /etc/rc.common
+# Reaplica as regras do relé PACS (glinet-pacs-relay.sh) no boot.
+START=99
+start() {
+    ( sleep 15; [ -f /etc/firewall.user ] && sh /etc/firewall.user ) &
+}
+INIT
+  chmod +x /etc/init.d/pacs-relay
+  /etc/init.d/pacs-relay enable 2>/dev/null || true
+  ( crontab -l 2>/dev/null | grep -v 'firewall\.user' ; echo '*/5 * * * * sh /etc/firewall.user' ) | crontab -
+  /etc/init.d/cron enable 2>/dev/null || true
+  /etc/init.d/cron start 2>/dev/null || true
+  ok "Boot (init.d/pacs-relay) e watchdog (cron 5min) instalados — sobrevive a reboot, queda de luz e reload de firewall."
 
   router_lan_ip="$(uci get network.lan.ipaddr 2>/dev/null || echo '192.168.8.1')"
   log "Pronto. Configure NO APARELHO (menu DICOM):"
@@ -127,15 +163,25 @@ cmd_remove(){
   log "Removendo relé LAN:${local_port} -> ${vm_ip}:${vm_port}"
   remove_rules "$vm_ip" "$vm_port" "$local_port"
   remove_persisted "$vm_ip" "$vm_port" "$local_port"
-  ok "Removido (ativo e persistido)."
+  # Desliga boot + watchdog (um roteador atende um relé por vez).
+  /etc/init.d/pacs-relay disable 2>/dev/null || true
+  rm -f /etc/init.d/pacs-relay
+  ( crontab -l 2>/dev/null | grep -v 'firewall\.user' ) | crontab - 2>/dev/null || true
+  ok "Removido (regras, persistência, boot e watchdog)."
 }
 
 cmd_status(){
   local_port="${1:-4242}"
   log "Regras DNAT ativas na porta local ${local_port}:"
   iptables -t nat -L PREROUTING -n -v | grep -- "dpt:${local_port}" || echo "  (nenhuma)"
+  log "MSS clamp ativo (túnel tailscale):"
+  iptables -t mangle -L FORWARD -n -v 2>/dev/null | grep -c "TCPMSS" || echo "  (nenhum)"
   log "Persistido em ${FW_USER}:"
   grep -- "--dport ${local_port}" "$FW_USER" 2>/dev/null || echo "  (nenhuma)"
+  log "Reaplicação no boot (init.d/pacs-relay):"
+  [ -x /etc/init.d/pacs-relay ] && echo "  instalado" || echo "  NAO instalado (regras morrem no reboot em firmware 4.x!)"
+  log "Watchdog (cron):"
+  crontab -l 2>/dev/null | grep -- 'firewall\.user' || echo "  NAO instalado"
 }
 
 case "${1:-}" in
