@@ -9,6 +9,7 @@ import { useConfirm } from '../../../hooks/useConfirm';
 import { useAdmin } from '../../../hooks/useAdmin';
 import { getInitialReportContent } from '../../templates/utils';
 import { PatientForm } from '../../patients/PatientForm';
+import { toDateInputValue, parseDateInputValue } from '../../../utils/format';
 
 interface Props {
   open: boolean;
@@ -51,12 +52,14 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const [requestingPhysician, setRequestingPhysician] = useState(exam.requestingPhysician || '');
   const [clinicId, setClinicId] = useState(exam.clinicId || '');
   const [examTemplateId, setExamTemplateId] = useState(exam.templateId || '');
+  const [examDateStr, setExamDateStr] = useState(toDateInputValue(exam.examDate ?? exam.createdAt));
   const [loadingMetadata, setLoadingMetadata] = useState(false);
 
   useEffect(() => {
     setRequestingPhysician(exam.requestingPhysician || '');
     setClinicId(exam.clinicId || '');
     setExamTemplateId(exam.templateId || '');
+    setExamDateStr(toDateInputValue(exam.examDate ?? exam.createdAt));
   }, [patient, exam]);
 
   // Sync with exam data updates
@@ -143,9 +146,11 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     try {
       setLoadingMetadata(true);
       // Fix 12: use deleteField() for empty clinicId to keep Firestore clean
+      const parsedExamDate = parseDateInputValue(examDateStr);
       await updateItem('exams', exam.id, {
         requestingPhysician: requestingPhysician,
-        clinicId: clinicId || deleteField()
+        clinicId: clinicId || deleteField(),
+        ...(parsedExamDate !== null ? { examDate: parsedExamDate } : {})
       });
       showToast('Dados do exame atualizados com sucesso!', 'success');
     } catch (err) {
@@ -317,6 +322,20 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     disabled={!isEditable}
                   />
                 </div>
+
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Data do Exame</label>
+                <input
+                  type="date"
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60"
+                  value={examDateStr}
+                  onChange={e => setExamDateStr(e.target.value)}
+                  disabled={!isEditable}
+                />
+                <p className="text-[9px] text-ink-400 mt-1 ml-1 italic">
+                  * Data real de realização do exame — usada no laudo impresso e no cálculo de idade.
+                </p>
+              </div>
 
               <div className="flex flex-col space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Clínica</label>

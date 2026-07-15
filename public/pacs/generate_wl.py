@@ -127,9 +127,16 @@ def main():
 
         ds.ScheduledProcedureStepSequence = Sequence([sps_dataset])
 
-        # 4. Gravacao Direta
+        # 4. Gravacao ATOMICA: escreve num .tmp (que o plugin de worklist do
+        # Orthanc ignora, ele so le *.wl) e move por cima com os.replace, que e
+        # atomico no mesmo filesystem. Um .wl parcialmente escrito (processo
+        # interrompido ou dois envios concorrentes do mesmo exame — primario e
+        # backup rodam em paralelo no app) derruba a consulta de worklist
+        # INTEIRA do aparelho, nao so a entrada defeituosa.
         # O argumento write_like_original=False e CRUCIAL para forcar a criacao correta do cabecalho de compatibilidade
-        ds.save_as(caminho_destino, write_like_original=False)
+        caminho_tmp = caminho_destino + '.tmp'
+        ds.save_as(caminho_tmp, write_like_original=False)
+        os.replace(caminho_tmp, caminho_destino)
         
         print(json.dumps({"success": True, "path": caminho_destino}))
     except Exception as e:

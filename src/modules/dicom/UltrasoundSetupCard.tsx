@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../store/app';
 import { classNames } from '../../utils/format';
 import type { DicomDevice } from '../../types';
@@ -130,6 +130,37 @@ export function UltrasoundSetupCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.dicomTenantId, settings.dicomLocalAgentUrl, settings.dicomViewerUrl]);
 
+  // Auto-recuperação: se um aparelho cadastrado sumiu do DicomModalities do
+  // PACS (edição cujo re-registro falhou, tenant reprovisionado, container
+  // recriado…), re-autoriza sozinho ao abrir o Centro de Controle — sem
+  // depender de alguém reparar no badge vermelho. Uma tentativa por montagem
+  // (healAttemptedRef): se o put "funcionar" mas o aparelho continuar fora da
+  // listagem (ex.: settings apontando pro tenant errado), o badge permanece e
+  // não entramos em loop de retentativas.
+  const healAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (healAttemptedRef.current || !registeredAeTitles) return;
+    const missing = (settings.dicomDevices || []).filter(
+      (d) => d.aeTitle && !registeredAeTitles.has(d.aeTitle.toUpperCase())
+    );
+    if (missing.length === 0) return;
+    healAttemptedRef.current = true;
+    (async () => {
+      let healed = 0;
+      for (const d of missing) {
+        try {
+          await syncModalityInOrthanc(d.aeTitle, d.ip || '', 'put');
+          healed++;
+        } catch { /* badge continua sinalizando; reautorização manual disponível */ }
+      }
+      if (healed > 0) {
+        showToast(`${healed} aparelho(s) estavam fora do PACS e foram re-autorizados automaticamente.`, 'success');
+        refreshRegisteredModalities();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registeredAeTitles]);
+
   // Porta DICOM — editável. Necessário porque tenants criados numa VM
   // compartilhada usam uma porta exclusiva (43xx), nunca a 4242 padrão; e o
   // provisionamento pode ter salvo a instância antes de o campo existir.
@@ -245,12 +276,16 @@ export function UltrasoundSetupCard() {
     try {
       await updateSettings({ dicomDevices: devices.map((d) => (d.id === original.id ? updated : d)) });
       try {
-        // O AE Title muda o id da entrada no Orthanc (derivado dele) — revoga a
-        // entrada antiga antes de autorizar a nova, senão ela fica órfã lá.
+        // Autoriza o NOVO registro PRIMEIRO e só depois revoga o antigo (quando
+        // o AE Title mudou — o id da entrada no Orthanc deriva dele). A ordem
+        // inversa (delete → put) já deixou um aparelho des-registrado em
+        // produção quando o put falhou depois do delete: o Orthanc passa a
+        // rejeitar a Worklist com "not listed in DicomModalities" mesmo com
+        // Echo/Storage funcionando (incidente de 15/07/2026).
+        await syncModalityInOrthanc(aeTitle, ip, 'put');
         if (aeTitle !== original.aeTitle) {
           await syncModalityInOrthanc(original.aeTitle, original.ip || '', 'delete').catch(() => {});
         }
-        await syncModalityInOrthanc(aeTitle, ip, 'put');
         showToast('Aparelho atualizado e autorizado no PACS.', 'success');
       } catch (err: any) {
         showToast('Aparelho salvo, mas falha ao autorizar no PACS: ' + (err.message || ''), 'error');

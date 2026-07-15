@@ -18,7 +18,7 @@ export interface CopilotParams {
   instruction: string;
   currentReport: string;
   patient: Patient | null;
-  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string; createdAt?: number };
+  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string; createdAt?: number; examDate?: number };
   settings: AppSettings;
   previousExams?: string[];
   template?: ReportTemplate | null;

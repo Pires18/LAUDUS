@@ -54,8 +54,12 @@ export async function syncExamToOrthancWorklist(
     const dicomBirthDate = patient.birthDate ? patient.birthDate.replace(/[^0-9]/g, '') : '';
     
     const now = new Date();
-    const stepDateObj = examDate ? new Date(examDate) : now;
-    
+    // A data do .wl é a data em que o APARELHO vai realizar o exame — ele só
+    // lista entradas de HOJE na consulta MWL. examDate editado para o passado
+    // (correção da data do laudo) não pode vazar pra cá, senão o exame "some"
+    // do aparelho com toast de sucesso. Futuro é permitido (agendamento).
+    const stepDateObj = examDate && examDate > now.getTime() ? new Date(examDate) : now;
+
     const stepDate = stepDateObj.getFullYear() + 
       String(stepDateObj.getMonth() + 1).padStart(2, '0') + 
       String(stepDateObj.getDate()).padStart(2, '0');

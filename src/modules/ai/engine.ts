@@ -32,7 +32,7 @@ interface CopilotParams {
   instruction: string;
   currentReport: string;
   patient: Patient | null;
-  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string; createdAt?: number };
+  exam: { examType: string; area: string; clinicalIndication?: string; requestingPhysician?: string; anamnesis?: string; createdAt?: number; examDate?: number };
   settings: AppSettings;
   previousExams?: string[];
   patientPreviousExams?: string[];
@@ -728,7 +728,7 @@ function buildCopilotPrompt({
     requestingPhysician: exam.requestingPhysician,
     previousExams: safePreviousExams,
     patientPreviousExams: safePatientExams,
-    examDateMs: exam.createdAt,
+    examDateMs: exam.examDate ?? exam.createdAt,
   });
 
   const userMessage = `${refinementRules}

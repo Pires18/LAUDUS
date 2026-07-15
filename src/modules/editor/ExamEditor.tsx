@@ -142,7 +142,7 @@ export function ExamEditor({ examId }: Props) {
     if (isPrinting || !patient || !exam) return;
     setIsPrinting(true);
     try {
-      const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
+      const footerId = `${patient?.name || '—'} · ${formatDate(exam.examDate ?? exam.createdAt)}`;
       await printLaudo(settings, footerId);
     } finally {
       setIsPrinting(false);
@@ -358,7 +358,7 @@ export function ExamEditor({ examId }: Props) {
     clinicalIndication: exam?.clinicalIndication,
     requestingPhysician: exam?.requestingPhysician,
     anamnesis: exam?.anamnesis,
-    examDateMs: exam?.createdAt
+    examDateMs: exam?.examDate ?? exam?.createdAt
   });
 
   const { suggestions: copilotSuggestions, generateSuggestions, clearSuggestions } = useCopilotSuggestions(settings);
@@ -1338,7 +1338,7 @@ export function ExamEditor({ examId }: Props) {
           <CalculatorModal
             initialCalcId={calcModalInitialId || undefined}
             area={exam.area}
-            examDateMs={exam.createdAt}
+            examDateMs={exam.examDate ?? exam.createdAt}
             onClose={() => { setShowCalculators(false); setCalcTargetField(null); }}
             structuredTargetLabel={calcTargetField?.label}
             onApplyToField={(result) => {
@@ -1386,7 +1386,7 @@ export function ExamEditor({ examId }: Props) {
         examType={exam.examType}
         reportContent={reportContentRef.current}
         physicianName={exam.requestingPhysician}
-        examDate={exam.createdAt}
+        examDate={exam.examDate ?? exam.createdAt}
       />
 
       {/* Modal de Pré-visualização — prévia fiel do PDF (ReportDocument) */}
@@ -1429,7 +1429,7 @@ export function ExamEditor({ examId }: Props) {
                 examType={exam.examType}
                 reportContent={reportContent}
                 physicianName={exam.requestingPhysician}
-                examDate={exam.createdAt}
+                examDate={exam.examDate ?? exam.createdAt}
               />
             </div>
           </div>
@@ -1476,7 +1476,7 @@ export function ExamEditor({ examId }: Props) {
           clinic={clinic}
           settings={settings}
           examType={exam.examType}
-          examDate={exam.createdAt}
+          examDate={exam.examDate ?? exam.createdAt}
           selectedInstances={selectedInstancesForPrint}
           gridType={selectedGridType}
           localUrls={printLocalUrls}
