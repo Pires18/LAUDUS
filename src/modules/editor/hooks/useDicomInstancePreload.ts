@@ -18,8 +18,15 @@ interface PreloadProgress {
  * baixada nunca é buscada de novo só porque o array foi recriado; só as
  * instâncias realmente novas disparam fetch.
  */
+/** Teto do cache de previews (LRU): segura vários estudos do mesmo paciente
+ * quentes na memória — trocar entre exames e voltar não re-baixa nada — sem
+ * deixar a memória crescer sem limite (previews são JPEGs pequenos). */
+const MAX_CACHED_PREVIEWS = 400;
+
 export function useDicomInstancePreload(instances: any[], settings: any) {
   const cacheRef = useRef<Record<string, string>>({});
+  // Ordem de uso dos IDs em cache (mais recente no fim) — base da poda LRU.
+  const lruRef = useRef<string[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [failedIds, setFailedIds] = useState<string[]>([]);
   const [progress, setProgress] = useState<PreloadProgress>({ done: instances.length, total: instances.length });
@@ -34,16 +41,35 @@ export function useDicomInstancePreload(instances: any[], settings: any) {
 
   useEffect(() => {
     let cancelled = false;
+    // Cancela downloads do estudo anterior ao trocar de estudo — sem isso eles
+    // continuam ocupando os workers/banda e atrasam o estudo que o usuário
+    // está olhando agora.
+    const abortController = new AbortController();
     const currentIds = new Set(instances.map((i) => i.ID));
 
-    // Descarta do cache/estado o que não pertence mais ao estudo atual
-    // (troca de estudo) — evita crescimento sem limite de memória.
-    for (const id of Object.keys(cacheRef.current)) {
-      if (!currentIds.has(id)) {
+    const touch = (id: string) => {
+      const i = lruRef.current.indexOf(id);
+      if (i !== -1) lruRef.current.splice(i, 1);
+      lruRef.current.push(id);
+    };
+
+    // Poda LRU: só descarta quando estoura o teto, nunca do estudo aberto.
+    // (Antes, TUDO que não era do estudo atual era revogado — alternar entre
+    // exames do paciente re-baixava o estudo inteiro a cada volta.)
+    const evictOverflow = () => {
+      while (lruRef.current.length > MAX_CACHED_PREVIEWS) {
+        const idx = lruRef.current.findIndex((id) => !currentIds.has(id));
+        if (idx === -1) break;
+        const [id] = lruRef.current.splice(idx, 1);
         URL.revokeObjectURL(cacheRef.current[id]);
         delete cacheRef.current[id];
       }
-    }
+    };
+
+    instances.forEach((i) => { if (cacheRef.current[i.ID]) touch(i.ID); });
+    // Poda no início de cada ciclo (nunca no .then de um ciclo cancelado, que
+    // teria um `currentIds` velho e poderia revogar URLs do estudo recém-aberto).
+    evictOverflow();
     setFailedIds((prev) => prev.filter((id) => currentIds.has(id)));
 
     const pending = instances.filter((i) => !cacheRef.current[i.ID]);
@@ -60,21 +86,26 @@ export function useDicomInstancePreload(instances: any[], settings: any) {
     setProgress({ done: alreadyCached, total: instances.length });
 
     preloadDicomInstances(pending, settings, {
+      signal: abortController.signal,
       onProgress: (done, total) => {
         if (!cancelled) setProgress({ done: alreadyCached + done, total: instances.length });
       },
     }).then(({ urls: newUrls, failedIds: failed }) => {
-      if (cancelled) {
-        Object.values(newUrls).forEach((u) => URL.revokeObjectURL(u));
-        return;
-      }
+      // Mesmo num ciclo cancelado (troca de estudo), os blobs que chegaram a
+      // baixar continuam válidos — entram no cache pra quando o usuário voltar.
       Object.assign(cacheRef.current, newUrls);
+      Object.keys(newUrls).forEach(touch);
+      if (cancelled) return;
+      evictOverflow();
       setUrls({ ...cacheRef.current });
       setFailedIds((prev) => Array.from(new Set([...prev, ...failed])));
       setReady(true);
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instanceKey]);
 
@@ -89,6 +120,7 @@ export function useDicomInstancePreload(instances: any[], settings: any) {
     const { urls: singleUrlMap, failedIds: singleFailed } = await preloadDicomInstances([instance], settings);
     if (singleFailed.length > 0) return;
     Object.assign(cacheRef.current, singleUrlMap);
+    lruRef.current.push(...Object.keys(singleUrlMap).filter((id) => !lruRef.current.includes(id)));
     setUrls({ ...cacheRef.current });
     setFailedIds((prev) => prev.filter((id) => id !== instanceId));
   }

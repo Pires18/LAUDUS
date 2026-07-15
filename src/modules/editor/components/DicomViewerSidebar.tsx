@@ -261,13 +261,7 @@ export function DicomViewerSidebar({
 
       {/* Main Preview Area */}
       <div className="p-5 flex flex-col items-center justify-center shrink-0 border-b border-zinc-800/80 bg-[#09090b]/40">
-        {dicomInstances.length > 0 && !instancesReady ? (
-          <div className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl border border-zinc-850 overflow-hidden shadow-2xl flex flex-col items-center justify-center text-zinc-500 p-6 text-center gap-2">
-            <Loader2 size={26} className="animate-spin text-brand-500" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">Carregando estudo ({progress.done}/{progress.total})...</span>
-            <span className="text-[9px] text-zinc-600">As imagens só aparecem quando o estudo estiver completo</span>
-          </div>
-        ) : (() => {
+        {(() => {
           const activeInstance = dicomInstances[activeImageIndex];
           if (!activeInstance) {
             return (
@@ -313,6 +307,13 @@ export function DicomViewerSidebar({
                     >
                       Tentar novamente
                     </button>
+                  </div>
+                ) : !activeUrl ? (
+                  <div className="flex flex-col items-center gap-2 text-center p-4 text-zinc-500">
+                    <Loader2 size={22} className="animate-spin text-brand-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                      Carregando imagem{!instancesReady ? ` (${progress.done}/${progress.total})` : ''}...
+                    </span>
                   </div>
                 ) : (
                   <img
@@ -374,20 +375,21 @@ export function DicomViewerSidebar({
             <span className="text-[10px] font-black uppercase tracking-wider block text-zinc-300">Nenhum Estudo Selecionado</span>
             <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-tight mt-1">Verifique o identificador do paciente ou clique em "Estudos" acima para selecionar manualmente.</p>
           </div>
-        ) : !instancesReady ? (
-          <div className="flex flex-col items-center justify-center py-16 text-zinc-500 text-center gap-2 font-sans">
-            <Loader2 size={22} className="animate-spin text-brand-500" />
-            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-300">Carregando {progress.total} imagem{progress.total > 1 ? 'ns' : ''} do estudo...</span>
-            <div className="w-40 h-1 bg-zinc-800 rounded-full overflow-hidden mt-1">
-              <div
-                className="h-full bg-brand-500 transition-all duration-200"
-                style={{ width: `${progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0}%` }}
-              />
-            </div>
-          </div>
         ) : (
           <>
-            {failedIds.length > 0 && (
+            {!instancesReady && (
+              <div className="mb-3 p-2.5 rounded-lg bg-zinc-900/70 border border-zinc-800 flex items-center gap-2.5 text-[10px] text-zinc-300 font-sans">
+                <Loader2 size={13} className="animate-spin text-brand-500 shrink-0" />
+                <span className="font-black uppercase tracking-wider">Carregando imagens ({progress.done}/{progress.total})...</span>
+                <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-brand-500 transition-all duration-200"
+                    style={{ width: `${progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {instancesReady && failedIds.length > 0 && (
               <div className="mb-3 p-2.5 rounded-lg bg-amber-950/20 border border-amber-900/30 flex items-center gap-2 text-[10px] text-amber-300">
                 <AlertTriangle size={13} className="shrink-0" />
                 <span>{failedIds.length} de {dicomInstances.length} imagem(ns) não carregaram — clique nela pra tentar de novo.</span>
@@ -415,6 +417,8 @@ export function DicomViewerSidebar({
                         <AlertTriangle size={14} className="text-amber-500" />
                         <span className="text-[7px] text-zinc-400 font-bold uppercase">Tentar de novo</span>
                       </div>
+                    ) : !url ? (
+                      <Loader2 size={14} className="animate-spin text-zinc-600" />
                     ) : (
                       <img src={url} alt={`Instance ${idx + 1}`} className="max-w-full max-h-full object-contain" />
                     )}

@@ -262,10 +262,18 @@ const server = http.createServer((req, res) => {
         res.statusCode = response.status;
         response.headers.forEach((value, key) => {
           const k = key.toLowerCase();
-          if (k !== 'transfer-encoding' && k !== 'www-authenticate' && k !== 'content-encoding' && k !== 'connection' && k !== 'keep-alive') {
+          if (k !== 'transfer-encoding' && k !== 'www-authenticate' && k !== 'content-encoding' && k !== 'connection' && k !== 'keep-alive' && k !== 'cache-control') {
             res.setHeader(key, value);
           }
         });
+        // Pixels de uma instância DICOM (preview/file/frame) são imutáveis no
+        // Orthanc (mesmo ID == mesmo conteúdo pra sempre) — cache longo no
+        // navegador evita re-baixar o estudo inteiro a cada abertura do editor.
+        // Mesma regra do proxy do Vercel (api/orthanc-proxy.ts).
+        if (req.method === 'GET' && response.ok &&
+            /\/instances\/[^/]+\/(preview|file|frames\/\d+(\/(preview|raw))?)$/.test(targetUrlObj.pathname)) {
+          res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+        }
         const arrayBuffer = await response.arrayBuffer();
         res.end(Buffer.from(arrayBuffer));
       } catch (err) {

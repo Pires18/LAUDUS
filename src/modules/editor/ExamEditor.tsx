@@ -513,8 +513,12 @@ export function ExamEditor({ examId }: Props) {
       // tentativas) derrubar o PDF inteiro, mesmo com as outras 99% prontas.
       // Também já otimiza (reduz/recomprime) cada imagem pro tamanho real que
       // ela vai ocupar na página, no mesmo passo do carregamento.
+      // `sourceUrls`: imagens já pré-carregadas no painel são lidas do blob
+      // local (instantâneo) em vez de re-baixadas da rede — só o que ainda
+      // não chegou vai ao PACS.
       const preloadResult = await preloadDicomInstances(instances, settings, {
         maxAttempts: 3,
+        sourceUrls: dicomPreloadedUrls,
         optimize: PRINT_OPTIMIZE_BY_GRID[gridType] || { maxWidth: 1000, quality: 0.82 },
         onProgress: (done, total, failed) => {
           setPrintProgress(`Otimizando imagens (${done}/${total})${failed ? ` — ${failed} falharam` : ''}...`);
@@ -1527,10 +1531,12 @@ export function ExamEditor({ examId }: Props) {
                   }
                 }}
               >
-                {!dicomInstancesReady ? (
+                {!activeUrl && !activeFailed ? (
                   <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-2 text-white/70">
                     <Loader2 size={28} className="animate-spin" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Carregando estudo ({dicomPreloadProgress.done}/{dicomPreloadProgress.total})...</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                      Carregando imagem{!dicomInstancesReady ? ` (${dicomPreloadProgress.done}/${dicomPreloadProgress.total})` : ''}...
+                    </span>
                   </div>
                 ) : activeFailed ? (
                   <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-3 text-white/70 border border-white/10 rounded-lg bg-white/5">

@@ -1083,7 +1083,7 @@ export function getProxyEndpoint(settings: AppSettings, isBackup = false): strin
  * (via query porque `<img src>` não suporta headers).
  */
 export function getDicomAuthParams(
-  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword' | 'dicomAgentSecret' | 'dicomBackupAgentSecret' | 'dicomTenantId'>,
+  settings: Pick<AppSettings, 'dicomUsername' | 'dicomPassword' | 'dicomBackupUsername' | 'dicomBackupPassword' | 'dicomAgentSecret' | 'dicomBackupAgentSecret' | 'dicomTenantId' | 'dicomLocalAgentUrl' | 'dicomBackupLocalAgentUrl'>,
   isBackup = false
 ): string {
   const username = isBackup ? settings.dicomBackupUsername : settings.dicomUsername;
@@ -1094,7 +1094,14 @@ export function getDicomAuthParams(
   // tenantId (VM compartilhada): só no primário; o backup é o Orthanc local
   // single-tenant do próprio cliente.
   const tenantId = isBackup ? '' : settings.dicomTenantId;
-  const token = getCachedIdToken();
+  // Token Firebase: só quando a requisição passa pelo proxy do Vercel, que o
+  // exige. Indo direto ao Agente (getProxyEndpoint retorna o Funnel HTTPS), a
+  // autenticação é o agentSecret/tenant — anexar o token só variava a URL a
+  // cada renovação (~1h), quebrando o cache HTTP das imagens, e expunha o
+  // token nos logs do agente sem necessidade.
+  const agentUrl = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
+  const viaAgent = !!(agentUrl && agentUrl.startsWith('https'));
+  const token = viaAgent ? '' : getCachedIdToken();
   return `&username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
     + (token ? `&token=${encodeURIComponent(token)}` : '')
     + (agentSecret ? `&agentSecret=${encodeURIComponent(agentSecret)}` : '')
