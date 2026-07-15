@@ -615,7 +615,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
      Valores de PVS ACM por IG (MoM): usar tabelas de Mari et al.
 
    DUCTUS VENOSUS (DV) — pré-carga cardíaca direita:
-     IP_DV: normal <P95 para a IG (nomograma Hecher 1994; o motor calcula o percentil). Evitar corte absoluto fixo — "<1,0" pode subnotificar valores já acima do P95 (P95 ≈ 0,72 em 20–24 sem; 0,60 em 28–34; 0,52 >34).
+     IP_DV: normal <P95 para a IG (nomograma Hecher 1994 — PIV; o motor calcula o percentil). Evitar corte absoluto fixo — "<1,0" pode subnotificar valores já acima do P95 (Hecher P95 ≈ 0,95 em 20 sem; 0,82 em 24; 0,73 em 28; 0,66 em 32; 0,59 em 38).
      IP_DV >P95 = pré-carga cardíaca aumentada → N3 (medicina fetal prioritária).
      Onda "a" DO DV (componente atrial — final da diástole):
        Positiva e anterógrada = pré-carga adequada → NORMAL.

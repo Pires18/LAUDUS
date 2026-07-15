@@ -301,8 +301,10 @@ export function computeDerivations(
   }
 
   // ── Fetal: PSV-ACM em MoM (anemia se > 1,5 MoM) — Mari 2000; requer IG pela DUM ──
+  // Válido apenas ~18–40 sem (a mediana de Mari é definida a partir de 18 sem); sem
+  // gate, o 1º trimestre produziria MoM extrapolado/enganoso.
   const psvAcm = num(v['psv_acm']);
-  if (psvAcm != null && psvAcm > 0 && weeksGA != null) {
+  if (psvAcm != null && psvAcm > 0 && weeksGA != null && weeksGA >= 18 && weeksGA <= DOPPLER_GA_MAX) {
     const mom = mcaPsvMoM(psvAcm, weeksGA);
     out.push({ id: 'psv_acm__mom', sectionId: 'doppler', label: 'PSV-ACM (MoM)', text: `${fmt(mom)} MoM${mom > 1.5 ? ' — anemia fetal provável (> 1,5)' : ''}`, alert: mom > 1.5 });
   }
