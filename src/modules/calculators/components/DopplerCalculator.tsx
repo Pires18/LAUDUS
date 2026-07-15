@@ -45,10 +45,10 @@ export function DopplerCalculator({ value, onChange }: CalculatorProps) {
       rec='Onda "a" reversa no DV. Morte fetal iminente — parto imediato se viabilidade.';
     } else if (auFlow==='redf' || (dvP !== null && dvP > 95)) {
       stage=3; stageDesc='ESTÁGIO III';
-      rec='Diástole reversa na AU (REDF) ou DV > p95. Risco de acidose. Internação. Parto em 24-48h.';
+      rec='Diástole reversa na AU (REDF) ou DV > p95. Risco de acidose. Internação. Cesárea ≥ 30 semanas (antes se deterioração aguda).';
     } else if (auFlow==='aedf') {
       stage=2; stageDesc='ESTÁGIO II';
-      rec='Diástole zero na AU (AEDF). Insuf. placentária grave. Monitoramento 2-3×/semana.';
+      rec='Diástole zero na AU (AEDF). Insuf. placentária grave. Monitoramento 2-3×/semana. Resolução ≥ 34 semanas.';
     } else if (
       (efwPercentile && Number(efwPercentile)<3) ||
       (auP!==null && auP>95) ||

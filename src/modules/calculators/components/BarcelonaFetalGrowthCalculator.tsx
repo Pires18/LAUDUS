@@ -144,8 +144,8 @@ export function BarcelonaFetalGrowthCalculator({ value, onChange }: CalculatorPr
   const stageDescs = [
     'Biometria e Doppler dentro dos padrões de normalidade. Seguimento habitual.',
     'Insuficiência placentária leve. AU PI > p95, RCP < p5, ACM < p5 ou Peso < p3. Monitoramento semanal. Parto ≥ 37s.',
-    'Insuficiência placentária grave. AU com diástole zero (AEDF). Monitoramento 2-3x/semana. Parto ≥ 28-30s.',
-    'Risco de acidose fetal. AU com diástole reversa (REDF) ou DV PI > p95. Internação. Parto em 48h se > 26s.',
+    'Insuficiência placentária grave. AU com diástole zero (AEDF). Monitoramento 2-3x/semana. Resolução ≥ 34s.',
+    'Risco de acidose fetal. AU com diástole reversa (REDF) ou DV PI > p95. Internação. Cesárea ≥ 30s.',
     'Morte fetal iminente. DV onda "a" reversa. Parto IMEDIATO se viabilidade fetal.'
   ];
 

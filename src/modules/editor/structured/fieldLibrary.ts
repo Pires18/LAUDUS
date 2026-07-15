@@ -76,7 +76,10 @@ const ENRICHERS: Enricher[] = [
     { id: 'dbp', label: 'DBP', kind: 'measure', unit: 'mm' }, { id: 'dof', label: 'DOF', kind: 'measure', unit: 'mm' },
     { id: 'cc', label: 'CC', kind: 'measure', unit: 'mm' }, { id: 'ca', label: 'CA', kind: 'measure', unit: 'mm' },
     { id: 'cf', label: 'CF', kind: 'measure', unit: 'mm' }, { id: 'pfe', label: 'PFE / Percentil', kind: 'calc', calcId: 'who-fetal-biometry' },
+    { id: 'sexo_fetal', label: 'Sexo (curva OMS)', kind: 'select', options: ['indeterminado', 'masculino', 'feminino'] },
   ] },
+  { areas: ['medicina-fetal'], match: /peso fetal estimado 1/i, fields: [{ id: 'pfe1', label: 'PFE Feto 1', kind: 'measure', unit: 'g' }] },
+  { areas: ['medicina-fetal'], match: /peso fetal estimado 2/i, fields: [{ id: 'pfe2', label: 'PFE Feto 2', kind: 'measure', unit: 'g' }] },
   { areas: ['medicina-fetal'], match: /idade gestacional de refer|data[çc][ãa]o|^refer[êe]ncia/i, canonical: true, fields: [
     { id: 'dum', label: 'DUM', kind: 'text', placeholder: 'dd/mm/aaaa' },
   ] },
@@ -99,7 +102,10 @@ const ENRICHERS: Enricher[] = [
   // Marcadores de 1º trimestre
   { areas: ['medicina-fetal'], match: /transluc[êe]ncia nucal|\btn\b/i, canonical: true, fields: [{ id: 'nt', label: 'TN', kind: 'measure', unit: 'mm', hint: 'alterada se > 3,5 mm' }] },
   { areas: ['medicina-fetal'], match: /osso nasal/i, fields: [{ id: 'on', label: 'Osso nasal', kind: 'select', options: ['presente', 'ausente', 'hipoplásico'] }] },
-  { areas: ['medicina-fetal'], match: /ducto venoso/i, fields: [{ id: 'dv', label: 'Onda A', kind: 'select', options: ['positiva', 'ausente', 'reversa'] }] },
+  { areas: ['medicina-fetal'], match: /ducto venoso/i, fields: [
+    { id: 'dv', label: 'Onda A', kind: 'select', options: ['positiva', 'ausente', 'reversa'] },
+    { id: 'ip_dv', label: 'IP DV', kind: 'measure', hint: '>P95 = pré-carga aumentada (auto)' },
+  ] },
   { areas: ['medicina-fetal'], match: /valva tric[úu]spide|regurgita/i, fields: [{ id: 'tricuspide', label: 'Regurgitação', kind: 'select', options: ['ausente', 'presente'] }] },
   // Líquido / cervicometria
   { areas: ['medicina-fetal'], match: /l[íi]quido amni/i, canonical: true, fields: [

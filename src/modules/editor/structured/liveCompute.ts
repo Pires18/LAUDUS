@@ -11,8 +11,8 @@ import {
   dopplerIndices,
 } from '../../calculators/formulas';
 import {
-  calcHadlockEfw, getWhoPercentile, mcaPsvMoM,
-  UA_REF, MCA_REF, UTA_REF, getRef, zToPercentile, DOPPLER_GA_MIN, DOPPLER_GA_MAX,
+  calcHadlockEfw, getWhoPercentile, mcaPsvMoM, getCprRef,
+  UA_REF, MCA_REF, UTA_REF, DV_REF, getRef, zToPercentile, DOPPLER_GA_MIN, DOPPLER_GA_MAX,
 } from '../../calculators/constants/fetalReferences';
 
 /**
@@ -73,6 +73,16 @@ export function computeDerivations(
   const v = values || {};
   const out: Derivation[] = [];
   const ref = examDateMs ? new Date(examDateMs) : new Date();
+
+  // F2 — mapa campo→seção: garante que o chip de "cálculo automático" apareça no
+  // compartimento certo (o slug real do heading, ex.: "biometria-fetal"/"dopplerfluxometria",
+  // não o literal genérico). Não afeta o prompt (todas as derivações vão para CÁLCULOS AUTOMÁTICOS).
+  const fieldSection: Record<string, string> = {};
+  for (const s of schema.sections) {
+    if (s.repeatable) continue;
+    for (const f of s.fields) if (!(f.id in fieldSection)) fieldSection[f.id] = s.id;
+  }
+  const secOf = (fieldId: string, fallback: string) => fieldSection[fieldId] || fallback;
 
   // DUM parseada uma vez (usada por IG/DPP e pelos percentis fetais).
   const dumStr = fieldValueToText(v['dum']);
@@ -210,9 +220,12 @@ export function computeDerivations(
   const bpdN = num(v['dbp']), ccN = num(v['cc']), caN = num(v['ca']), cfN = num(v['cf']);
   if (bpdN && ccN && caN && cfN && bpdN > 0 && ccN > 0 && caN > 0 && cfN > 0) {
     const efw = calcHadlockEfw(bpdN, ccN, caN, cfN);
-    const pct = weeksGA != null ? getWhoPercentile('EFW', weeksGA, efw) : null;
+    // F7 — usa a curva OMS por sexo quando informado (senão a unissex).
+    const sexo = fieldValueToText(v['sexo_fetal']);
+    const efwDim = /mascul/i.test(sexo) ? 'EFW_M' : /femin/i.test(sexo) ? 'EFW_F' : 'EFW';
+    const pct = weeksGA != null ? getWhoPercentile(efwDim, weeksGA, efw) : null;
     const pctTxt = pct != null ? ` · p${pct}${pct < 10 ? ' (PIG)' : pct > 90 ? ' (GIG)' : ''}` : '';
-    out.push({ id: 'pfe__hadlock', sectionId: 'biometria', label: 'PFE (Hadlock IV)', text: `${Math.round(efw)} g${pctTxt}`, alert: pct != null && (pct < 10 || pct > 90) });
+    out.push({ id: 'pfe__hadlock', sectionId: secOf('ca', 'biometria'), label: 'PFE (Hadlock IV)', text: `${Math.round(efw)} g${pctTxt}`, alert: pct != null && (pct < 10 || pct > 90) });
   }
 
   // ── Fetal: percentil OMS por medida biométrica (quando há IG pela DUM) ──
@@ -223,20 +236,20 @@ export function computeDerivations(
       const val = num(v[fieldId]);
       if (val == null || val <= 0) continue;
       const p = getWhoPercentile(dim, weeksGA, val);
-      if (p != null) out.push({ id: `pct_${fieldId}`, sectionId: 'biometria', label: `${label} percentil`, text: `p${p}`, alert: p < 3 || p > 97 });
+      if (p != null) out.push({ id: `pct_${fieldId}`, sectionId: secOf(fieldId, 'biometria'), label: `${label} percentil`, text: `p${p}`, alert: p < 3 || p > 97 });
     }
   }
 
   // ── Fetal: cervicometria (colo curto se < 25 mm) ──
   const colo = num(v['colo']);
   if (colo != null) {
-    out.push({ id: 'colo__cervico', sectionId: 'datacao', label: 'Cervicometria', text: `${fmt(colo, 0)} mm${colo < 25 ? ' — colo curto (< 25)' : ''}`, alert: colo < 25 });
+    out.push({ id: 'colo__cervico', sectionId: secOf('colo', 'datacao'), label: 'Cervicometria', text: `${fmt(colo, 0)} mm${colo < 25 ? ' — colo curto (< 25)' : ''}`, alert: colo < 25 });
   }
 
   // ── Fetal: translucência nucal (alterada se > 3,5 mm) ──
   const nt = num(v['nt']);
   if (nt != null) {
-    out.push({ id: 'nt__marker', sectionId: 'datacao', label: 'Translucência Nucal', text: `${fmt(nt, 1)} mm${nt > 3.5 ? ' — aumentada (> p95)' : ''}`, alert: nt > 3.5 });
+    out.push({ id: 'nt__marker', sectionId: secOf('nt', 'datacao'), label: 'Translucência Nucal', text: `${fmt(nt, 1)} mm${nt > 3.5 ? ' — aumentada (> p95)' : ''}`, alert: nt > 3.5 });
   }
 
   // ── Ginecologia: morfologia de SOP (CFA ≥ 20 ou volume ovariano > 10 cm³) ──
@@ -296,7 +309,17 @@ export function computeDerivations(
       if (!s) continue;
       const p = zToPercentile((val - m) / s);
       const alert = lowBad ? p < 5 : p > 95;
-      out.push({ id: `dop_${fieldId}`, sectionId: 'doppler', label, text: `p${p}`, alert });
+      out.push({ id: `dop_${fieldId}`, sectionId: secOf(fieldId, 'doppler'), label, text: `p${p}`, alert });
+    }
+  }
+
+  // ── Fetal: IP do ducto venoso por percentil (Hecher 1994) — F7 ──
+  const ipDv = num(v['ip_dv']);
+  if (ipDv != null && ipDv > 0 && weeksGA != null && weeksGA >= DOPPLER_GA_MIN && weeksGA <= DOPPLER_GA_MAX) {
+    const [m, s] = getRef(DV_REF, weeksGA);
+    if (s) {
+      const p = zToPercentile((ipDv - m) / s);
+      out.push({ id: 'dv_ip__pct', sectionId: secOf('ip_dv', 'doppler'), label: 'IP DV percentil', text: `p${p}`, alert: p > 95 });
     }
   }
 
@@ -306,30 +329,22 @@ export function computeDerivations(
   const psvAcm = num(v['psv_acm']);
   if (psvAcm != null && psvAcm > 0 && weeksGA != null && weeksGA >= 18 && weeksGA <= DOPPLER_GA_MAX) {
     const mom = mcaPsvMoM(psvAcm, weeksGA);
-    out.push({ id: 'psv_acm__mom', sectionId: 'doppler', label: 'PSV-ACM (MoM)', text: `${fmt(mom)} MoM${mom > 1.5 ? ' — anemia fetal provável (> 1,5)' : ''}`, alert: mom > 1.5 });
+    out.push({ id: 'psv_acm__mom', sectionId: secOf('psv_acm', 'doppler'), label: 'PSV-ACM (MoM)', text: `${fmt(mom)} MoM${mom > 1.5 ? ' — anemia fetal provável (> 1,5)' : ''}`, alert: mom > 1.5 });
   }
 
   // ── Fetal: razão P2/P1 da artéria oftálmica (risco de PE se ≥ 0,65) — Sarno/Nicolaides 2020 ──
   const oftP1 = num(v['oft_p1']), oftP2 = num(v['oft_p2']);
   if (oftP1 != null && oftP1 > 0 && oftP2 != null && oftP2 > 0) {
     const ratio = oftP2 / oftP1;
-    out.push({ id: 'oft__ratio', sectionId: 'doppler', label: 'Razão P2/P1 oftálmica', text: `${fmt(ratio)}${ratio >= 0.65 ? ' — risco aumentado de pré-eclâmpsia (≥ 0,65)' : ''}`, alert: ratio >= 0.65 });
+    out.push({ id: 'oft__ratio', sectionId: secOf('oft_p1', 'doppler'), label: 'Razão P2/P1 oftálmica', text: `${fmt(ratio)}${ratio >= 0.65 ? ' — risco aumentado de pré-eclâmpsia (≥ 0,65)' : ''}`, alert: ratio >= 0.65 });
   }
 
-  // ── Fetal: BPP (soma dos 5 parâmetros; alerta se < 8/10) ──
-  const bppFields = ['mov_resp', 'mov_corp', 'tonus', 'la_bpp', 'cardiotoco'];
-  const bppVals = bppFields.map((f) => fieldValueToText(v[f]));
-  if (bppVals.some(Boolean)) {
-    const score = bppVals.reduce((a, t) => a + (parseInt(t.trim()[0], 10) || 0), 0);
-    out.push({ id: 'bpp__score', sectionId: 'bpp', label: 'Escore BPP', text: `${score}/10${score < 8 ? ' — alterado' : ''}`, alert: score < 8 });
-  }
-
-  // ── Fetal gemelar: discordância de peso ((maior−menor)/maior × 100) ──
+  // ── Fetal gemelar: discordância de peso ((maior−menor)/maior × 100) — F1: campos pfe1/pfe2 ──
   const pfe1 = num(v['pfe1']);
   const pfe2 = num(v['pfe2']);
   if (pfe1 != null && pfe2 != null && Math.max(pfe1, pfe2) > 0) {
     const disc = (Math.abs(pfe1 - pfe2) / Math.max(pfe1, pfe2)) * 100;
-    out.push({ id: 'gemelar__disc', sectionId: 'discordancia', label: 'Discordância', text: `${fmt(disc, 0)}%${disc > 20 ? ' — significativa (> 20%)' : ''}`, alert: disc > 20 });
+    out.push({ id: 'gemelar__disc', sectionId: secOf('pfe1', 'discordancia'), label: 'Discordância', text: `${fmt(disc, 0)}%${disc > 20 ? ' — significativa (> 20%)' : ''}`, alert: disc > 20 });
   }
 
   // ── Pediatria: estenose hipertrófica do piloro / apendicite ──
@@ -367,28 +382,40 @@ export function computeDerivations(
     }
   }
 
-  // ── Fetal: RCP = IP ACM / IP AU (alerta se < 1) ──
+  // ── Fetal: RCP = IP ACM / IP AU — percentil por IG (F5, getCprRef); alerta se < p5 ou < 1 ──
   const ipAcm = num(v['ip_acm']);
   const ipAu = num(v['ip_au']);
   if (ipAcm != null && ipAu != null && ipAu > 0) {
     const rcp = ipAcm / ipAu;
-    out.push({ id: 'rcp__calc', sectionId: 'doppler', label: 'RCP (ACM/AU)', text: `${fmt(rcp)}${rcp < 1 ? ' — reduzida (< 1)' : ''}`, alert: rcp < 1 });
+    let text = fmt(rcp);
+    let alert = rcp < 1;
+    if (weeksGA != null && weeksGA >= DOPPLER_GA_MIN && weeksGA <= DOPPLER_GA_MAX) {
+      const [m, s] = getCprRef(weeksGA);
+      const p = zToPercentile((rcp - m) / s);
+      text = `${fmt(rcp)} · p${p}`;
+      alert = p < 5 || rcp < 1;
+      if (p < 5) text += ' — reduzida (< p5)';
+      else if (rcp < 1) text += ' — reduzida (< 1)';
+    } else if (rcp < 1) {
+      text += ' — reduzida (< 1)';
+    }
+    out.push({ id: 'rcp__calc', sectionId: secOf('ip_acm', 'doppler'), label: 'RCP (ACM/AU)', text, alert });
   }
 
   // ── Fetal: IG/DPP pela DUM; IG pelo CCN; IG pelo DMSG ──
   if (dum) {
     const ga = gaFromLMP(dum, ref);
-    if (ga) out.push({ id: 'ig__dum', sectionId: 'datacao', label: 'IG (DUM)', text: `${ga.label} · DPP ${fmtDate(ga.edd)}` });
+    if (ga) out.push({ id: 'ig__dum', sectionId: secOf('dum', 'datacao'), label: 'IG (DUM)', text: `${ga.label} · DPP ${fmtDate(ga.edd)}` });
   }
   const ccn = num(v['ccn']);
   if (ccn != null) {
     const ga = crlToGestationalAge(ccn);
-    if (ga) out.push({ id: 'ig__ccn', sectionId: 'datacao', label: 'IG (CCN)', text: ga.label });
+    if (ga) out.push({ id: 'ig__ccn', sectionId: secOf('ccn', 'datacao'), label: 'IG (CCN)', text: ga.label });
   }
   const dmsg = num(v['dmsg']);
   if (dmsg != null) {
     const ga = gaFromMsd(dmsg);
-    out.push({ id: 'ig__dmsg', sectionId: 'datacao', label: 'IG (DMSG)', text: ga.label });
+    out.push({ id: 'ig__dmsg', sectionId: secOf('dmsg', 'datacao'), label: 'IG (DMSG)', text: ga.label });
   }
 
   // ── Fetal: classificação do líquido amniótico (ILA em cm; MBV em mm) ──
@@ -400,7 +427,7 @@ export function computeDerivations(
     else if (ilaCm <= 18) c = 'volume normal';
     else if (ilaCm <= 24) c = 'líquido aumentado';
     else c = 'polidrâmnio';
-    out.push({ id: 'la__ila', sectionId: 'liquido-amniotico', label: 'ILA', text: `${fmt(ilaCm, 1)} cm — ${c}`, alert: ilaCm < 5 || ilaCm > 24 });
+    out.push({ id: 'la__ila', sectionId: secOf('ila', 'liquido-amniotico'), label: 'ILA', text: `${fmt(ilaCm, 1)} cm — ${c}`, alert: ilaCm < 5 || ilaCm > 24 });
   }
 
   // ── Vascular genérico: índices Doppler (IR / S/D) a partir de VPS e VDF ──

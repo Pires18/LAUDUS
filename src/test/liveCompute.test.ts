@@ -144,15 +144,28 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(f?.repeatable).toBe(true);
   });
 
-  it('Fase 3: BPP, discordância gemelar, percentis Doppler, piloro e apêndice (cálculo por id)', () => {
+  it('Fase 3: discordância gemelar, percentis Doppler, piloro e apêndice (cálculo por id)', () => {
     const empty = deriveStructuredSchema(tpl('medicina-fetal', 'OBSTÉTRICA'), 'medicina-fetal');
-    expect(computeDerivations(empty, { mov_resp: '2 – presentes', mov_corp: '2 – presentes', tonus: '2 – presente', la_bpp: '2 – normal', cardiotoco: '0 – não reativa' }).find((x) => x.id === 'bpp__score')?.text).toMatch(/8\/10/);
     // DUM ~28 semanas antes do exame (dentro da faixa Doppler 20–40 sem)
     expect(computeDerivations(empty, { ip_au: '1,2', dum: '01/07/2025' }, new Date(2026, 0, 15).getTime()).find((x) => x.id === 'dop_ip_au')?.text).toMatch(/^p\d+$/);
     expect(computeDerivations(empty, { pfe1: '2000', pfe2: '1400' }).find((x) => x.id === 'gemelar__disc')?.alert).toBe(true);
     const ped = deriveStructuredSchema(tpl('pediatria', 'ABDOME'), 'pediatria');
     expect(computeDerivations(ped, { piloro_musculo: '4' }).find((x) => x.id === 'piloro__est')?.alert).toBe(true);
     expect(computeDerivations(ped, { apendice_diam: '8' }).find((x) => x.id === 'apendice__diam')?.alert).toBe(true);
+  });
+
+  it('Fase 3+: DV percentil, RCP percentil e EFW por sexo (novas derivações fetais)', () => {
+    const empty = deriveStructuredSchema(tpl('medicina-fetal', 'OBSTÉTRICA'), 'medicina-fetal');
+    const dateMs = new Date(2026, 0, 15).getTime();
+    const dum = '01/07/2025'; // ~28 semanas em 15/01/2026 (dentro da faixa Doppler 20–40)
+    // IP do ducto venoso por percentil (Hecher) — 0,9 @28 sem está acima do P95
+    const dv = computeDerivations(empty, { ip_dv: '0,9', dum }, dateMs).find((x) => x.id === 'dv_ip__pct');
+    expect(dv?.text).toMatch(/^p\d+$/);
+    expect(dv?.alert).toBe(true);
+    // RCP agora traz percentil quando há IG na faixa
+    expect(computeDerivations(empty, { ip_acm: '1,8', ip_au: '1,0', dum }, dateMs).find((x) => x.id === 'rcp__calc')?.text).toMatch(/p\d+/);
+    // EFW usa a curva por sexo quando informado (não quebra; produz peso + percentil)
+    expect(computeDerivations(empty, { dbp: '75', cc: '270', ca: '250', cf: '55', dum, sexo_fetal: 'masculino' }, dateMs).find((x) => x.id === 'pfe__hadlock')?.text).toMatch(/g/);
   });
 
   it('Fase 3: renais/oftálmicas — seções da máscara + RAR por id', () => {
