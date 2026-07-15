@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CollectionError } from '../../components/CollectionError';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem, countExamsByStatus, type ExamStatusCounts } from '../../store/db';
-import { formatDateTime, classNames } from '../../utils/format';
+import { formatDateTime, classNames, toDateInputValue, parseDateInputValue } from '../../utils/format';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2, FileText,
@@ -40,7 +40,8 @@ export function Worklist() {
     requestingPhysician: '',
     clinicalIndication: '',
     clinicId: '',
-    status: 'pendente' as ExamStatus
+    status: 'pendente' as ExamStatus,
+    examDate: ''
   });
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [syncingExamId, setSyncingExamId] = useState<string | null>(null);
@@ -203,11 +204,16 @@ export function Worklist() {
     if (syncingExamId) return;
     try {
       setSyncingExamId(exam.id);
+      // examDate fica de fora de propósito: reenviar é "quero o exame na fila
+      // do aparelho AGORA" — o .wl sai com a data de hoje (o aparelho só lista
+      // entradas de hoje), independente da data do exame editada para o laudo.
       const { success, primarySuccess, backupSuccess, error } = await syncExamToOrthancWorklist(
         exam.id, exam.examType,
         { id: exam.patientId, name: patientName, birthDate: patientBirthDate, gender: patientSex },
         settings,
-        exam.dicomDeviceId
+        exam.dicomDeviceId,
+        undefined,
+        exam.clinicId
       );
       if (!success) {
         showToast('Erro ao sincronizar: ' + (error || 'Desconhecido'), 'error');
@@ -229,12 +235,14 @@ export function Worklist() {
     if (!editExamId) return;
     try {
       setLoadingMetadata(true);
+      const parsedExamDate = parseDateInputValue(editData.examDate);
       await updateItem('exams', editExamId, {
         requestingPhysician: editData.requestingPhysician,
         clinicalIndication: editData.clinicalIndication,
         clinicId: editData.clinicId,
         status: editData.status as ExamStatus,
-        finalizedAt: editData.status === 'finalizado' ? Date.now() : null
+        finalizedAt: editData.status === 'finalizado' ? Date.now() : null,
+        ...(parsedExamDate !== null ? { examDate: parsedExamDate } : {})
       });
       if (editData.status === 'finalizado') {
         deleteWorklistEntry(editExamId, settings).catch(err => {
@@ -502,7 +510,7 @@ export function Worklist() {
                     </td>
 
                     <td className="px-4 py-3.5">
-                      <p className="text-xs font-black text-ink-800 leading-none">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
+                      <p className="text-xs font-black text-ink-800 leading-none">{formatDateTime(exam.examDate ?? exam.createdAt).split(' - ')[0]}</p>
                       <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
                     </td>
 
@@ -525,7 +533,8 @@ export function Worklist() {
                               requestingPhysician: exam.requestingPhysician || '',
                               clinicalIndication: exam.clinicalIndication || '',
                               clinicId: exam.clinicId || '',
-                              status: exam.status
+                              status: exam.status,
+                              examDate: toDateInputValue(exam.examDate ?? exam.createdAt)
                             });
                             setEditExamId(exam.id);
                           }}
@@ -633,7 +642,7 @@ export function Worklist() {
                       {area && <span className={classNames('inline-block text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border mt-1', area.color)}>{area.label}</span>}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-black text-ink-800 text-xs">{formatDateTime(exam.createdAt).split(' - ')[0]}</p>
+                      <p className="font-black text-ink-800 text-xs">{formatDateTime(exam.examDate ?? exam.createdAt).split(' - ')[0]}</p>
                       <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
                     </div>
                   </div>
@@ -651,7 +660,7 @@ export function Worklist() {
                           <FileText size={14} />
                         </a>
                       )}
-                      <button onClick={() => { setEditData({ requestingPhysician: exam.requestingPhysician || '', clinicalIndication: exam.clinicalIndication || '', clinicId: exam.clinicId || '', status: exam.status }); setEditExamId(exam.id); }}
+                      <button onClick={() => { setEditData({ requestingPhysician: exam.requestingPhysician || '', clinicalIndication: exam.clinicalIndication || '', clinicId: exam.clinicId || '', status: exam.status, examDate: toDateInputValue(exam.examDate ?? exam.createdAt) }); setEditExamId(exam.id); }}
                         className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
                         <UserCog size={14} />
                       </button>
@@ -716,6 +725,15 @@ export function Worklist() {
                   placeholder="Indicação diagnóstica..."
                   value={editData.clinicalIndication}
                   onChange={e => setEditData({ ...editData, clinicalIndication: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase text-ink-400 mb-1.5 block tracking-widest">Data do Exame</label>
+                <input
+                  type="date"
+                  className="input h-11"
+                  value={editData.examDate}
+                  onChange={e => setEditData({ ...editData, examDate: e.target.value })}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

@@ -29,6 +29,29 @@ export function formatDateTime(date: number | undefined): string {
 }
 
 /**
+ * Converte timestamp (ms) para o formato YYYY-MM-DD de <input type="date">,
+ * usando o fuso local (toISOString deslocaria o dia em fusos negativos).
+ */
+export function toDateInputValue(timestamp: number | undefined): string {
+  if (!timestamp) return '';
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Converte o valor YYYY-MM-DD de <input type="date"> para timestamp (ms)
+ * à meia-noite local — mesma convenção usada na criação do exame.
+ */
+export function parseDateInputValue(value: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  const ts = new Date(year, month - 1, day).getTime();
+  return isNaN(ts) ? null : ts;
+}
+
+/**
  * Calcula a idade a partir da data de nascimento. Abaixo de 1 ano mostra em
  * meses (nunca "0 anos" — importante em pediatria: usada também em laudos
  * impressos/PDF/docx e no prompt enviado à IA, ver ai/engine.ts).

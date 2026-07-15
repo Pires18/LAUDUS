@@ -142,7 +142,7 @@ export function ExamEditor({ examId }: Props) {
     if (isPrinting || !patient || !exam) return;
     setIsPrinting(true);
     try {
-      const footerId = `${patient?.name || '—'} · ${formatDate(exam.createdAt)}`;
+      const footerId = `${patient?.name || '—'} · ${formatDate(exam.examDate ?? exam.createdAt)}`;
       await printLaudo(settings, footerId);
     } finally {
       setIsPrinting(false);
@@ -358,7 +358,7 @@ export function ExamEditor({ examId }: Props) {
     clinicalIndication: exam?.clinicalIndication,
     requestingPhysician: exam?.requestingPhysician,
     anamnesis: exam?.anamnesis,
-    examDateMs: exam?.createdAt
+    examDateMs: exam?.examDate ?? exam?.createdAt
   });
 
   const { suggestions: copilotSuggestions, generateSuggestions, clearSuggestions } = useCopilotSuggestions(settings);
@@ -513,8 +513,12 @@ export function ExamEditor({ examId }: Props) {
       // tentativas) derrubar o PDF inteiro, mesmo com as outras 99% prontas.
       // Também já otimiza (reduz/recomprime) cada imagem pro tamanho real que
       // ela vai ocupar na página, no mesmo passo do carregamento.
+      // `sourceUrls`: imagens já pré-carregadas no painel são lidas do blob
+      // local (instantâneo) em vez de re-baixadas da rede — só o que ainda
+      // não chegou vai ao PACS.
       const preloadResult = await preloadDicomInstances(instances, settings, {
         maxAttempts: 3,
+        sourceUrls: dicomPreloadedUrls,
         optimize: PRINT_OPTIMIZE_BY_GRID[gridType] || { maxWidth: 1000, quality: 0.82 },
         onProgress: (done, total, failed) => {
           setPrintProgress(`Otimizando imagens (${done}/${total})${failed ? ` — ${failed} falharam` : ''}...`);
@@ -1334,7 +1338,7 @@ export function ExamEditor({ examId }: Props) {
           <CalculatorModal
             initialCalcId={calcModalInitialId || undefined}
             area={exam.area}
-            examDateMs={exam.createdAt}
+            examDateMs={exam.examDate ?? exam.createdAt}
             onClose={() => { setShowCalculators(false); setCalcTargetField(null); }}
             structuredTargetLabel={calcTargetField?.label}
             onApplyToField={(result) => {
@@ -1382,7 +1386,7 @@ export function ExamEditor({ examId }: Props) {
         examType={exam.examType}
         reportContent={reportContentRef.current}
         physicianName={exam.requestingPhysician}
-        examDate={exam.createdAt}
+        examDate={exam.examDate ?? exam.createdAt}
       />
 
       {/* Modal de Pré-visualização — prévia fiel do PDF (ReportDocument) */}
@@ -1425,7 +1429,7 @@ export function ExamEditor({ examId }: Props) {
                 examType={exam.examType}
                 reportContent={reportContent}
                 physicianName={exam.requestingPhysician}
-                examDate={exam.createdAt}
+                examDate={exam.examDate ?? exam.createdAt}
               />
             </div>
           </div>
@@ -1472,7 +1476,7 @@ export function ExamEditor({ examId }: Props) {
           clinic={clinic}
           settings={settings}
           examType={exam.examType}
-          examDate={exam.createdAt}
+          examDate={exam.examDate ?? exam.createdAt}
           selectedInstances={selectedInstancesForPrint}
           gridType={selectedGridType}
           localUrls={printLocalUrls}
@@ -1527,10 +1531,12 @@ export function ExamEditor({ examId }: Props) {
                   }
                 }}
               >
-                {!dicomInstancesReady ? (
+                {!activeUrl && !activeFailed ? (
                   <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-2 text-white/70">
                     <Loader2 size={28} className="animate-spin" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Carregando estudo ({dicomPreloadProgress.done}/{dicomPreloadProgress.total})...</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">
+                      Carregando imagem{!dicomInstancesReady ? ` (${dicomPreloadProgress.done}/${dicomPreloadProgress.total})` : ''}...
+                    </span>
                   </div>
                 ) : activeFailed ? (
                   <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-3 text-white/70 border border-white/10 rounded-lg bg-white/5">

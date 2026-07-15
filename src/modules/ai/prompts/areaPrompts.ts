@@ -387,9 +387,9 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
      CRL 1T: discordância >5d. DBP/CC 2T: discordância >10d.
      CC 3T: NÃO corrigir — US 3T é impreciso para datação.
 
-   CRL → IG (tabela FMF — 11–13+6 sem):
-     CRL 45 mm = 11+0 sem · CRL 55 mm = 11+6 · CRL 65 mm = 12+4
-     CRL 73 mm = 13+0 · CRL 79 mm = 13+3 · CRL 84 mm = 13+6
+   CRL → IG (Robinson-Fleming — padrão NICE/RCOG/ISUOG — 11–13+6 sem):
+     CRL 45 mm = 11+2 sem · CRL 55 mm = 12+1 · CRL 65 mm = 12+6
+     CRL 73 mm = 13+3 · CRL 79 mm = 13+6 · CRL 84 mm = 14+1
 
 2. BIOMETRIA FETAL — Referências por trimestre (OMS/Kiserud 2017 — curva efetivamente calculada pelo motor)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -424,7 +424,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    Ducto Venoso (DV)      │ Onda "a" positiva                │ Ausente = risco aum.
                           │                                  │ Reversa → R6
    Regurgitação Tricúspide│ Ausente                          │ Presente = risco aumentado
-   FC Fetal               │ 150–180 bpm (11–13+6 sem)        │ <110 bpm ou >200 bpm → R6
+   FC Fetal               │ 150–170 bpm (11–13+6 sem)        │ <110 bpm ou >200 bpm → R6
    FCF em <8 semanas      │ 100–170 bpm (escalonado por IG)  │ <100 bpm → vigilância
 
    RASTREIO COMBINADO 1T (risco de T21, T18, T13):
@@ -580,7 +580,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    │ Oligodrâmnio grave │ <5                       │ <2                       │
    │ Oligodrâmnio limít.│ 5–8                      │ 2–3 (vigilância)         │
    │ Normal             │ 8–24                     │ 2–8                      │
-   │ Polihidrâmnio mod. │ 25–35                    │ 8–11                     │
+   │ Polihidrâmnio mod. │ >24–35                   │ 8–11                     │
    │ Polihidrâmnio grave│ >35                      │ >11                      │
    └────────────────────┴──────────────────────────┴──────────────────────────┘
    Oligodrâmnio grave (<5 / MBA <2): ATIVAR R6.
@@ -615,7 +615,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
      Valores de PVS ACM por IG (MoM): usar tabelas de Mari et al.
 
    DUCTUS VENOSUS (DV) — pré-carga cardíaca direita:
-     IP_DV: normal <P95 para a IG (nomograma Hecher 1994; o motor calcula o percentil). Evitar corte absoluto fixo — "<1,0" pode subnotificar valores já acima do P95 (P95 ≈ 0,72 em 20–24 sem; 0,60 em 28–34; 0,52 >34).
+     IP_DV: normal <P95 para a IG (nomograma Hecher 1994 — PIV; o motor calcula o percentil). Evitar corte absoluto fixo — "<1,0" pode subnotificar valores já acima do P95 (Hecher P95 ≈ 0,95 em 20 sem; 0,82 em 24; 0,73 em 28; 0,66 em 32; 0,59 em 38).
      IP_DV >P95 = pré-carga cardíaca aumentada → N3 (medicina fetal prioritária).
      Onda "a" DO DV (componente atrial — final da diástole):
        Positiva e anterógrada = pré-carga adequada → NORMAL.
@@ -819,7 +819,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    PVS ACM                 │ <1,50 MoM                 │ >1,50 MoM → R6 (anemia)
    Onda "a" DV             │ Positiva (anterógrada)    │ Ausente/reversa → R6
    Colo uterino (TV)       │ ≥25 mm                    │ <20 mm → internação
-   FC fetal (11–13+6)      │ 150–180 bpm               │ <110 ou >200 bpm → R6
+   FC fetal (11–13+6)      │ 150–170 bpm               │ <110 ou >200 bpm → R6
    PBF (Manning)           │ 8–10 pontos               │ ≤4 → R6
    Dist. placenta ao OI    │ ≥20 mm                    │ <10 mm = pl. prévia → R6
    Espessura placenta      │ 2–4,5 cm                  │ >5 cm = investigar

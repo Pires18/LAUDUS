@@ -53,7 +53,7 @@ export function EditorHeader({
 }: EditorHeaderProps) {
   const { settings } = useApp();
   const area = EXAM_AREAS.find(a => a.id === exam.area);
-  const age = calculateAge(patient.birthDate || '', exam.createdAt);
+  const age = calculateAge(patient.birthDate || '', exam.examDate ?? exam.createdAt);
 
   const isFinalizado = exam.status === 'finalizado';
 

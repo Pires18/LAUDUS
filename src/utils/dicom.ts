@@ -54,8 +54,12 @@ export async function syncExamToOrthancWorklist(
     const dicomBirthDate = patient.birthDate ? patient.birthDate.replace(/[^0-9]/g, '') : '';
     
     const now = new Date();
-    const stepDateObj = examDate ? new Date(examDate) : now;
-    
+    // A data do .wl é a data em que o APARELHO vai realizar o exame — ele só
+    // lista entradas de HOJE na consulta MWL. examDate editado para o passado
+    // (correção da data do laudo) não pode vazar pra cá, senão o exame "some"
+    // do aparelho com toast de sucesso. Futuro é permitido (agendamento).
+    const stepDateObj = examDate && examDate > now.getTime() ? new Date(examDate) : now;
+
     const stepDate = stepDateObj.getFullYear() + 
       String(stepDateObj.getMonth() + 1).padStart(2, '0') + 
       String(stepDateObj.getDate()).padStart(2, '0');
@@ -368,9 +372,15 @@ export async function preloadDicomInstances(
     /** Se definido, reduz cada imagem (canvas → JPEG) pro tamanho do PDF final —
      * mais leve pra montar/imprimir com muitas fotos por página. */
     optimize?: { maxWidth: number; quality?: number };
+    /** Cancela os downloads em andamento (ex.: usuário trocou de estudo) —
+     * instância cancelada não conta como falha nem entra em `failedIds`. */
+    signal?: AbortSignal;
+    /** Blobs já baixados (instanceId -> object URL): a instância é lida deste
+     * blob local em vez da rede — ex.: PDF reusando os previews do painel. */
+    sourceUrls?: Record<string, string>;
   } = {}
 ): Promise<DicomInstancePreloadResult> {
-  const { concurrency = 6, timeoutMs = 16000, maxAttempts = 3, onProgress, optimize } = options;
+  const { concurrency = 6, timeoutMs = 16000, maxAttempts = 3, onProgress, optimize, signal, sourceUrls } = options;
   const urls: Record<string, string> = {};
   const failedIds: string[] = [];
   if (!instances || instances.length === 0) return { urls, failedIds };
@@ -380,19 +390,34 @@ export async function preloadDicomInstances(
   let done = 0;
   let cursor = 0;
 
+  // Auth/rota inválidas ou instância inexistente: repetir não muda o resultado,
+  // só segura o worker por até ~50s à toa.
+  const isPermanentHttpError = (status: number) => [400, 401, 403, 404].includes(status);
+
   const fetchOne = async (instance: any) => {
     const isBackup = instance.serverSource === 'backup';
     const serverUrl = isBackup ? backupBaseUrl : primaryBaseUrl;
     const proxyPath = getProxyEndpoint(settings, isBackup);
+    const localSource = sourceUrls?.[instance.ID];
     const target = `${serverUrl.replace(/\/$/, '')}/instances/${instance.ID}/preview`;
-    const url = `${proxyPath}?url=${encodeURIComponent(target)}${getDicomAuthParams(settings, isBackup)}`;
+    const url = localSource ?? `${proxyPath}?url=${encodeURIComponent(target)}${getDicomAuthParams(settings, isBackup)}`;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (signal?.aborted) return;
       const controller = new AbortController();
+      const onExternalAbort = () => controller.abort();
+      signal?.addEventListener('abort', onExternalAbort, { once: true });
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const res = await fetch(url, { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          if (isPermanentHttpError(res.status)) {
+            failedIds.push(instance.ID);
+            logger.warn(`[PACS] Imagem ${instance.ID} recusada (HTTP ${res.status}) — sem nova tentativa.`);
+            return;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        }
         let blob = await res.blob();
         if (optimize) {
           blob = await optimizeImageBlob(blob, optimize.maxWidth, optimize.quality ?? 0.85).catch((err) => {
@@ -401,10 +426,9 @@ export async function preloadDicomInstances(
           });
         }
         urls[instance.ID] = URL.createObjectURL(blob);
-        clearTimeout(timeoutId);
         return;
       } catch (err) {
-        clearTimeout(timeoutId);
+        if (signal?.aborted) return;
         if (attempt === maxAttempts) {
           failedIds.push(instance.ID);
           logger.warn(`[PACS] Imagem ${instance.ID} falhou após ${maxAttempts} tentativas:`, err);
@@ -413,12 +437,15 @@ export async function preloadDicomInstances(
           // num servidor/rede que acabou de engasgar.
           await new Promise((r) => setTimeout(r, 500 * attempt));
         }
+      } finally {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onExternalAbort);
       }
     }
   };
 
   const worker = async () => {
-    while (cursor < instances.length) {
+    while (cursor < instances.length && !signal?.aborted) {
       const idx = cursor++;
       await fetchOne(instances[idx]);
       done++;

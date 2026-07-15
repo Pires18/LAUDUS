@@ -315,7 +315,7 @@ FASE 4 — AUTOCÁLCULOS E MATEMÁTICA CLÍNICA
 
 4.4 RCP — RELAÇÃO CÉREBRO-PLACENTÁRIA:
     RCP = IP_ACM / IP_artéria_umbilical
-    Normal: >1,00 | Centralização suspeita: 0,75–1,00 | Centralização confirmada: ≤0,75
+    Normal: >1,00 | Centralização suspeita: 0,75–1,00 | Centralização confirmada: <0,75
     Para estadiamento de RCIU, o critério PREFERIDO é RCP <P5 para a IG (percentil). O corte
     absoluto <1,00 marca redistribuição fisiológica (brain-sparing); usar percentil quando disponível.
 

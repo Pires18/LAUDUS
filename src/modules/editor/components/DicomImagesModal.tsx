@@ -272,23 +272,16 @@ export function DicomImagesModal({
             </div>
           )}
 
-          {/* Pré-carregamento das imagens — evita abrir dezenas de requisições
-              simultâneas e mostrar miniaturas quebradas enquanto ainda carrega. */}
-          {!loading && !error && instances.length > 0 && !instancesReady && (
-            <div className="h-full flex flex-col items-center justify-center gap-4 bg-zinc-900/50 border border-zinc-800/55 rounded-3xl">
-              <Loader2 size={36} className="animate-spin text-brand-500" />
-              <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Carregando imagens do estudo ({preloadProgress.done}/{preloadProgress.total})...</p>
-            </div>
-          )}
-
           {!loading && !error && instances.length === 0 && (
             <div className="h-full flex items-center justify-center text-zinc-500 text-xs italic">
               Nenhuma imagem disponível para este exame.
             </div>
           )}
 
-          {/* Diagnostic Workspace Grid (Split view layout) */}
-          {!loading && !error && instancesReady && instances.length > 0 && (
+          {/* Diagnostic Workspace Grid (Split view layout) — as miniaturas
+              aparecem progressivamente conforme o pré-carregamento avança
+              (placeholder por imagem; nunca miniatura quebrada). */}
+          {!loading && !error && instances.length > 0 && (
             <div className="grid grid-cols-12 gap-5 h-full">
 
               {/* LEFT AREA (40% width): Thumbnails Selection Panel — única área com rolagem */}
@@ -296,8 +289,11 @@ export function DicomImagesModal({
 
                 {/* Header Toggles */}
                 <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3 mb-3 shrink-0">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">
-                  Estudo: {instances.length} Fotos · {selectedIds.size} no PDF
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+                  {!instancesReady && <Loader2 size={11} className="animate-spin text-brand-500" />}
+                  {instancesReady
+                    ? `Estudo: ${instances.length} Fotos · ${selectedIds.size} no PDF`
+                    : `Carregando ${preloadProgress.done}/${preloadProgress.total} · ${selectedIds.size} no PDF`}
                 </span>
                 <div className="flex items-center gap-3">
                   <button
@@ -360,6 +356,8 @@ export function DicomImagesModal({
                               <AlertTriangle size={16} className="text-amber-500" />
                               <span className="text-[8px] text-zinc-400 font-bold uppercase">Tentar de novo</span>
                             </div>
+                          ) : !thumbUrl ? (
+                            <Loader2 size={16} className="animate-spin text-zinc-600" />
                           ) : (
                             <img
                               src={thumbUrl}
@@ -416,6 +414,11 @@ export function DicomImagesModal({
                     >
                       Tentar novamente
                     </button>
+                  </div>
+                ) : !activeImageUrl && activeInstanceId ? (
+                  <div className="flex flex-col items-center gap-3 text-center text-zinc-500">
+                    <Loader2 size={28} className="animate-spin text-brand-500" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Carregando imagem...</span>
                   </div>
                 ) : activeImageUrl ? (
                   <div className="w-full h-full flex items-center justify-center relative">

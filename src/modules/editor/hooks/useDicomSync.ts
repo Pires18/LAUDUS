@@ -26,7 +26,7 @@ const locateStudies = async (
 ): Promise<any[]> => {
   const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
   
-  const queryOrthanc = async (query: any) => {
+  const queryOrthanc = async (query: any, limit?: number) => {
     try {
       const proxyPath = getProxyEndpoint(settings, serverSource === 'backup');
       const res = await fetch(
@@ -39,7 +39,8 @@ const locateStudies = async (
           body: JSON.stringify({
             Level: 'Study',
             Expand: true,
-            Query: query
+            Query: query,
+            ...(limit ? { Limit: limit } : {})
           })
         }
       );
@@ -98,7 +99,10 @@ const locateStudies = async (
   if (patient?.id) patientIds.add(patient.id);
   patientIds.add(exam.id);
 
-  const patientQueries = Array.from(patientIds).map(pid => queryOrthanc({ PatientID: pid }));
+  // Limit: paciente com anos de histórico devolvia TODOS os estudos expandidos
+  // numa resposta só — payload enorme só pra alimentar o seletor de estudos.
+  // 50 mais que cobre o seletor (que mostra os mais recentes primeiro).
+  const patientQueries = Array.from(patientIds).map(pid => queryOrthanc({ PatientID: pid }, 50));
   const patientResults = await Promise.all(patientQueries);
 
   for (const list of patientResults) {
@@ -342,7 +346,11 @@ export function useDicomSync({
         const backupUrl = backupConfigured ? getActivePacsUrl(settings, true) : '';
         const backupAuth = backupConfigured ? getDicomAuthParams(settings, true) : '';
 
-        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 2500) => {
+        // 8s (era 2,5s): o caminho nuvem (Vercel → Funnel → agente → Orthanc)
+        // passa disso fácil em cold start — o timeout curto marcava o servidor
+        // como "desconectado" e pulava a busca de estudos, deixando o painel
+        // sem imagens até o próximo ciclo de polling.
+        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 8000) => {
           const controller = new AbortController();
           const id = setTimeout(() => controller.abort(), timeoutMs);
           try {
