@@ -34,6 +34,29 @@ em silêncio ("aparelho parou de conectar", sem nenhum erro em lugar nenhum).
 então reaplicar é sempre inofensivo e também cobre um reload de firewall no
 meio do expediente. `status` passa a denunciar quando boot/watchdog faltam.
 
+### Causa raiz nº 5 (cosmética, mas confundia todo diagnóstico)
+
+**O GL.iNet dropava ICMP echo vindo da LAN — para todos os clientes** (Mac
+incluso), com `icmp_echo_ignore_all=0` e nenhuma regra "icmp" visível no nft:
+o drop estava na chain de INPUT. Consequência: o teste "Sibilo" (ping) do MX7
+**nunca** funcionou, em nenhuma configuração, o que fazia qualquer sintoma real
+parecer "problema de IP". Diagnóstico: `tcpdump -ni br-lan icmp` mostrou os
+echo requests chegando sem nenhum reply; ping do Mac ao roteador confirmou
+100% de perda. **Fix (persistido em `/etc/firewall.user`):**
+`iptables -I INPUT -i br-lan -p icmp --icmp-type echo-request -j ACCEPT`.
+Lição: o teste de conexão confiável num aparelho DICOM é o **C-ECHO/Verify**,
+não o ping — mas com o ping liberado os dois passam e o suporte para de
+perseguir fantasma.
+
+### Fator de degradação: Wi-Fi 2.4G no aparelho
+
+O MX7 estava em Wi-Fi 2.4G com **10% de perda de pacotes** (medido com
+`ping -c 50` do roteador) — transferências lentas e associações abortando.
+Migrado para a banda **5G: 0% de perda, ~2 ms**. IP do aparelho fixado
+estaticamente (`192.168.8.50`) e reservado no DHCP do roteador — o IP flapando
+(dois IPs pro mesmo MAC na tabela ARP) matava conexões no meio. Ideal
+definitivo continua sendo cabo, mas 5G + IP fixo zerou os sintomas.
+
 ## Pegadinhas de suporte que custaram tempo
 
 - **Comandos com placeholder** (`orthanc-<tenant>`, `/caminho/...`) foram executados
