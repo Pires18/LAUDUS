@@ -971,7 +971,7 @@ export function DicomControlCenter() {
                       <span className="text-[9px] font-black uppercase tracking-widest">Projeto completo</span>
                     </div>
                     <p className="text-[10px] text-ink-300 leading-relaxed">Migração de exames, automação por usuário e riscos no documento:</p>
-                    <code className="block bg-black/40 p-1.5 rounded-lg text-[9px] text-emerald-300 break-all">docs/pacs/PROJETO_PACS_NUVEM.md</code>
+                    <code className="block bg-black/40 p-1.5 rounded-lg text-[9px] text-emerald-300 break-all">docs/archive/PROJETO_PACS_NUVEM.md</code>
                   </div>
                 </div>
 

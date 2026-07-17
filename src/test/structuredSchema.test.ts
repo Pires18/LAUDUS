@@ -22,7 +22,7 @@ function mask(area: string, name: string, compartments: string[]): ReportTemplat
 describe('deriveStructuredSchema — seções vêm da MÁSCARA (por exame)', () => {
   it('cada máscara gera suas próprias seções a partir dos compartimentos', () => {
     const echo = deriveStructuredSchema(
-      mask('medicina-fetal', 'ECOCARDIOGRAMA FETAL', ['Situs', 'Corte de 4 Câmaras', 'Vias de Saída', 'Arcos Aórtico e Ductal']),
+      mask('medicina-fetal', 'CARDIO PARSER', ['Situs', 'Corte de 4 Câmaras', 'Vias de Saída', 'Arcos Aórtico e Ductal']),
       'medicina-fetal'
     );
     expect(echo.sections.map((s) => s.label)).toEqual(['Situs', 'Corte de 4 Câmaras', 'Vias de Saída', 'Arcos Aórtico e Ductal']);
@@ -31,7 +31,7 @@ describe('deriveStructuredSchema — seções vêm da MÁSCARA (por exame)', () 
 
 describe('deriveStructuredSchema — enriquecimento por rótulo', () => {
   it('nódulo tireoidiano → repetível + escore TI-RADS', () => {
-    const s = deriveStructuredSchema(mask('pequenas-partes', 'TIREOIDE', ['Lobo Direito', 'Achados Nodulares']), 'pequenas-partes');
+    const s = deriveStructuredSchema(mask('pequenas-partes', 'RASTREIO PP', ['Lobo Direito', 'Achados Nodulares']), 'pequenas-partes');
     const lobo = s.sections.find((x) => x.label === 'Lobo Direito');
     expect(lobo?.fields.find((f) => f.id === 'lobo_d_dims')?.calcId).toBe('volume-elipsoide');
     const nod = s.sections.find((x) => x.label === 'Achados Nodulares');
@@ -41,14 +41,16 @@ describe('deriveStructuredSchema — enriquecimento por rótulo', () => {
   });
 
   it('carótida direita → velocidades + NASCET (ids canônicos)', () => {
-    const s = deriveStructuredSchema(mask('vascular', 'CARÓTIDAS', ['Sistema Carotídeo Direito', 'Artérias Vertebrais']), 'vascular');
+    // nome fora da biblioteca: garante que o ENRICHER (parser) põe os ids
+    // canônicos — 'CARÓTIDAS E VERTEBRAIS' resolveria pelo modelo padrão
+    const s = deriveStructuredSchema(mask('vascular', 'CERVICAL VASC PARSER', ['Sistema Carotídeo Direito', 'Artérias Vertebrais']), 'vascular');
     const car = s.sections.find((x) => x.label === 'Sistema Carotídeo Direito');
     expect(car?.fields.find((f) => f.id === 'vps_aci_d')).toBeTruthy();
     expect(car?.fields.find((f) => f.id === 'estenose_d')?.options).toContain('estenose ≥70%');
   });
 
   it('mama → lesões repetíveis BI-RADS; abdome fígado → normal/alterado', () => {
-    const m = deriveStructuredSchema(mask('mastologia', 'MAMAS', ['Composição do Parênquima', 'Nódulos']), 'mastologia');
+    const m = deriveStructuredSchema(mask('mastologia', 'RASTREIO MASTO', ['Composição do Parênquima', 'Nódulos']), 'mastologia');
     expect(m.sections.find((x) => x.label === 'Nódulos')?.score).toBe('birads');
     const abd = deriveStructuredSchema(mask('medicina-interna', 'ABDOME', ['Fígado', 'Baço']), 'medicina-interna');
     expect(abd.sections.find((x) => x.label === 'Fígado')?.normalable).toBe(true);
@@ -70,7 +72,7 @@ describe('deriveStructuredSchema — enriquecimento por rótulo', () => {
   });
 
   it('fetal por exame: ecocardio (situs/4câmaras), 1T (CCN/TN/osso nasal), neuro (ventrículo)', () => {
-    const echo = deriveStructuredSchema(mask('medicina-fetal', 'ECOCARDIOGRAMA', ['Situs', 'Corte de 4 Câmaras', 'Função Ventricular']), 'medicina-fetal');
+    const echo = deriveStructuredSchema(mask('medicina-fetal', 'CARDIO PARSER', ['Situs', 'Corte de 4 Câmaras', 'Função Ventricular']), 'medicina-fetal');
     // campos descritivos têm id prefixado pela seção → checa pelas opções
     expect(echo.sections.find((x) => x.label === 'Situs')?.fields.some((f) => f.options?.includes('inversus'))).toBe(true);
     expect(echo.sections.find((x) => x.label === 'Corte de 4 Câmaras')?.fields.some((f) => f.id.endsWith('quatro_camaras'))).toBe(true);
@@ -94,7 +96,8 @@ describe('deriveStructuredSchema — enriquecimento por rótulo', () => {
   });
 
   it('compartimento sem enricher mantém campo genérico (fidelidade por máscara)', () => {
-    const s = deriveStructuredSchema(mask('vascular', 'OFTÁLMICAS', ['Artéria Oftálmica Direita']), 'vascular');
+    // nome fora da biblioteca de modelos padrão: exercita o PARSER, não o modelo
+    const s = deriveStructuredSchema(mask('vascular', 'DOPPLER ORBITÁRIO PARSER', ['Artéria Oftálmica Direita']), 'vascular');
     expect(s.sections.length).toBe(1);
     expect(s.sections[0].label).toBe('Artéria Oftálmica Direita');
   });
@@ -196,7 +199,7 @@ describe('summarizeStructured — normal/alterado e repetível', () => {
   });
 
   it('seção repetível itera instâncias por índice', () => {
-    const s = deriveStructuredSchema(mask('pequenas-partes', 'TIREOIDE', ['Achados Nodulares']), 'pequenas-partes');
+    const s = deriveStructuredSchema(mask('pequenas-partes', 'RASTREIO PP', ['Achados Nodulares']), 'pequenas-partes');
     const nod = s.sections.find((x) => x.label === 'Achados Nodulares')!;
     const { lines, filledCount } = summarizeStructured(s, {
       [countKey(nod.id)]: '2',

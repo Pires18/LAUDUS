@@ -4,8 +4,8 @@ import { mapAddonKey, ADDON_NAMES, resolveAddon, intervalMultiplier, planPriceBr
 
 /**
  * Testa uma API key da AbacatePay (admin only). Consolidado aqui (em vez de
- * api/abacatepay-test.ts próprio) para caber no limite de 12 funções
- * serverless do plano Hobby da Vercel — mesma auth/dependências do checkout.
+ * api/abacatepay-test.ts próprio) para manter baixo o número de funções
+ * serverless da Vercel — mesma auth/dependências do checkout.
  */
 async function handleTestKey(req: any, res: any) {
   const authed = await verifyAuth(req);

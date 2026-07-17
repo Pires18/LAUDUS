@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { CollectionError } from '../../components/CollectionError';
 import { EXAM_AREAS, ExamStatus, ExamRequest, Patient, Clinic } from '../../types';
 import { deleteItem, addAuditLog, deleteWorklistEntry, updateItem, countExamsByStatus, type ExamStatusCounts } from '../../store/db';
-import { formatDateTime, classNames, toDateInputValue, parseDateInputValue } from '../../utils/format';
+import { formatDate, formatTime, classNames, toDateInputValue, parseDateInputValue } from '../../utils/format';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   CircleDot, CheckCircle2, Clock, Search, FilePlus, Trash2, FileText,
@@ -29,6 +29,7 @@ export function Worklist() {
     worklistStatusFilter: statusFilter, setWorklistStatusFilter: setStatusFilter,
     worklistAreaFilter: areaFilter, setWorklistAreaFilter: setAreaFilter,
     worklistDateFilter: dateFilter, setWorklistDateFilter: setDateFilter,
+    worklistDateExact: dateExact, setWorklistDateExact: setDateExact,
     worklistSearch: search, setWorklistSearch: setSearch
   } = useApp();
   
@@ -108,7 +109,16 @@ export function Worklist() {
     let result = [...exams];
     if (selectedClinicId) result = result.filter(e => e.clinicId === selectedClinicId);
     if (areaFilter !== 'todas') result = result.filter(e => e.area === areaFilter);
-    if (dateFilter !== 'todos') {
+    if (dateExact) {
+      // Data específica: compara com a data do exame (examDate pode ser retroativa)
+      const [y, m, d] = dateExact.split('-').map(Number);
+      const dayStart = new Date(y, m - 1, d).getTime();
+      const dayEnd = new Date(y, m - 1, d + 1).getTime();
+      result = result.filter(e => {
+        const t = e.examDate ?? e.createdAt;
+        return t >= dayStart && t < dayEnd;
+      });
+    } else if (dateFilter !== 'todos') {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
       if (dateFilter === 'hoje') result = result.filter(e => e.createdAt >= todayStart);
@@ -127,7 +137,7 @@ export function Worklist() {
       });
     }
     return result;
-  }, [exams, areaFilter, dateFilter, search, selectedClinicId, patientMap]);
+  }, [exams, areaFilter, dateFilter, dateExact, search, selectedClinicId, patientMap]);
 
   const filtered = useMemo(() => {
     let result = filteredWithoutStatus;
@@ -141,7 +151,7 @@ export function Worklist() {
   // Há filtro secundário (busca/área/data) ativo? Nesse caso as contagens
   // refletem o conjunto filtrado no cliente.
   const secondaryFilterActive =
-    areaFilter !== 'todas' || dateFilter !== 'todos' || !!search.trim();
+    areaFilter !== 'todas' || dateFilter !== 'todos' || !!dateExact || !!search.trim();
 
   // Quando o usuário restringe a lista (busca/área/data OU seleciona um status
   // específico), carregamos TODAS as páginas do servidor. Isso garante que a
@@ -152,6 +162,7 @@ export function Worklist() {
     setStatusFilter('todos');
     setAreaFilter('todas');
     setDateFilter('todos');
+    setDateExact('');
     setSearch('');
   };
   useEffect(() => {
@@ -235,7 +246,9 @@ export function Worklist() {
     if (!editExamId) return;
     try {
       setLoadingMetadata(true);
-      const parsedExamDate = parseDateInputValue(editData.examDate);
+      // Só a data muda; o horário permanece o da criação do exame
+      const editingExam = exams.find(e => e.id === editExamId);
+      const parsedExamDate = parseDateInputValue(editData.examDate, editingExam?.createdAt);
       await updateItem('exams', editExamId, {
         requestingPhysician: editData.requestingPhysician,
         clinicalIndication: editData.clinicalIndication,
@@ -359,15 +372,41 @@ export function Worklist() {
             {(['hoje', 'semana', 'mes', 'todos'] as const).map(d => (
               <button
                 key={d}
-                onClick={() => setDateFilter(d)}
+                onClick={() => { setDateExact(''); setDateFilter(d); }}
                 className={classNames(
                   'px-3 py-1.5 rounded-lg text-[10px] font-black transition-all whitespace-nowrap',
-                  dateFilter === d ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'
+                  !dateExact && dateFilter === d ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'
                 )}
               >
                 {d === 'todos' ? 'Histórico' : d === 'hoje' ? 'Hoje' : d === 'semana' ? 'Semana' : 'Mês'}
               </button>
             ))}
+          </div>
+
+          {/* Specific date filter (filtra pela data do exame) */}
+          <div className={classNames(
+            'relative flex items-center h-9 rounded-xl border transition-all shrink-0',
+            dateExact ? 'bg-brand-50 border-brand-200' : 'bg-white border-ink-200 hover:bg-ink-50'
+          )}>
+            <input
+              type="date"
+              value={dateExact}
+              onChange={e => setDateExact(e.target.value)}
+              title="Filtrar por data do exame"
+              className={classNames(
+                'h-full bg-transparent outline-none text-[11px] font-bold pl-3',
+                dateExact ? 'pr-7 text-brand-700' : 'pr-3 text-ink-500'
+              )}
+            />
+            {dateExact && (
+              <button
+                onClick={() => setDateExact('')}
+                title="Limpar data"
+                className="absolute right-2 text-brand-500 hover:text-brand-700"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
 
           {/* Area filter toggle */}
@@ -510,8 +549,8 @@ export function Worklist() {
                     </td>
 
                     <td className="px-4 py-3.5">
-                      <p className="text-xs font-black text-ink-800 leading-none">{formatDateTime(exam.examDate ?? exam.createdAt).split(' - ')[0]}</p>
-                      <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
+                      <p className="text-xs font-black text-ink-800 leading-none">{formatDate(exam.examDate ?? exam.createdAt)}</p>
+                      <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">{formatTime(exam.createdAt)}</p>
                     </td>
 
                     <td className="px-4 py-3.5 text-right" onClick={e => e.stopPropagation()}>
@@ -642,8 +681,8 @@ export function Worklist() {
                       {area && <span className={classNames('inline-block text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border mt-1', area.color)}>{area.label}</span>}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-black text-ink-800 text-xs">{formatDateTime(exam.examDate ?? exam.createdAt).split(' - ')[0]}</p>
-                      <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">{formatDateTime(exam.createdAt).split(' - ')[1]}</p>
+                      <p className="font-black text-ink-800 text-xs">{formatDate(exam.examDate ?? exam.createdAt)}</p>
+                      <p className="text-[9px] text-ink-400 font-bold uppercase tracking-widest mt-0.5">{formatTime(exam.createdAt)}</p>
                     </div>
                   </div>
 

@@ -4,6 +4,7 @@ import { StructuredTab } from './StructuredTab';
 import { deriveStructuredSchema, summarizeStructured } from '../structured/deriveSchema';
 import { computeDerivations } from '../structured/liveCompute';
 import { itemCount, itemFieldId, countKey } from '../structured/structuredKeys';
+import { findRepeatContainer } from '../structured/containers';
 
 /**
  * Pré-visualização interativa do formulário estruturado derivado de uma máscara.
@@ -30,32 +31,33 @@ export function StructuredPreview({ template }: { template: ReportTemplate | nul
         const cur = next[f.id];
         const has = typeof cur === 'string' ? cur.trim() : cur?.text;
         if (has) continue;
-        if (f.kind === 'text') next[f.id] = f.placeholder || 'sem alterações';
+        if ((f.kind === 'measure' || f.kind === 'triplet') && f.normal) next[f.id] = f.normal;
+        else if (f.kind === 'text') next[f.id] = f.placeholder || 'sem alterações';
         else if (f.kind === 'select' && f.options?.length) next[f.id] = f.options[0];
       }
       return next;
     });
   };
 
-  const onAddItem = (sectionId: string) =>
-    setValues((v) => ({ ...v, [countKey(sectionId)]: String(Math.min(itemCount(v, sectionId) + 1, 20)) }));
+  const onAddItem = (containerId: string) =>
+    setValues((v) => ({ ...v, [countKey(containerId)]: String(Math.min(itemCount(v, containerId) + 1, 20)) }));
 
-  const onRemoveItem = (sectionId: string, index: number) => {
-    const section = schema.sections.find((s) => s.id === sectionId);
-    if (!section) return;
+  const onRemoveItem = (containerId: string, index: number) => {
+    const container = findRepeatContainer(schema, containerId);
+    if (!container) return;
     setValues((prev) => {
-      const n = itemCount(prev, sectionId);
+      const n = itemCount(prev, containerId);
       const next = { ...prev };
       for (let i = index; i < n - 1; i++) {
-        for (const f of section.fields) {
-          const from = itemFieldId(sectionId, i + 1, f.id);
-          const to = itemFieldId(sectionId, i, f.id);
+        for (const f of container.fields) {
+          const from = itemFieldId(containerId, i + 1, f.id);
+          const to = itemFieldId(containerId, i, f.id);
           if (from in next) next[to] = next[from];
           else delete next[to];
         }
       }
-      for (const f of section.fields) delete next[itemFieldId(sectionId, n - 1, f.id)];
-      next[countKey(sectionId)] = String(Math.max(1, n - 1));
+      for (const f of container.fields) delete next[itemFieldId(containerId, n - 1, f.id)];
+      next[countKey(containerId)] = String(Math.max(1, n - 1));
       return next;
     });
   };

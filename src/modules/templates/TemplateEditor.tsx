@@ -7,7 +7,8 @@ import { updateItem, addItemWithId, genId } from '../../store/db';
 import { ReportTemplate, EXAM_AREAS, Clinic } from '../../types';
 import { FileText, Loader2, Save, ArrowLeft, BrainCircuit, Building2, ClipboardList, Copy } from 'lucide-react';
 import { RichEditor } from '../editor/RichEditor';
-import { StructuredPreview } from '../editor/components/StructuredPreview';
+import { StructuredSchemaEditor } from './StructuredSchemaEditor';
+import { validateStructuredSchema } from '../editor/structured/schemaEditing';
 import { classNames } from '../../utils/format';
 import { auth } from '../../lib/firebase';
 
@@ -52,6 +53,16 @@ export function TemplateEditor({ templateId }: Props) {
     if (!draft.name?.trim()) { showToast('Nome da máscara é obrigatório.', 'error'); return; }
     if (!draft.analysisTemplate?.trim()) { showToast('O template de Análise não pode ficar vazio.', 'error'); return; }
     if (!draft.conclusionTemplate?.trim()) { showToast('O template de Conclusão não pode ficar vazio.', 'error'); return; }
+    // Esquema estruturado personalizado precisa estar consistente — ele é usado
+    // como está no Copiloto de todos os exames desta máscara.
+    if (draft.structuredSchema?.sections) {
+      const errs = validateStructuredSchema(draft.structuredSchema.sections);
+      if (errs.length) {
+        setActiveTab('structured');
+        showToast(`Formulário estruturado: ${errs[0]}`, 'error');
+        return;
+      }
+    }
     try {
       const { id, ...data } = draft;
       await updateItem('templates', templateId, data);
@@ -343,19 +354,24 @@ export function TemplateEditor({ templateId }: Props) {
         )}
 
         {activeTab === 'structured' && (
-          <div className="max-w-4xl space-y-4">
+          <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-ink-100 p-5 shadow-sm">
               <h3 className="font-bold text-ink-900 flex items-center gap-2 text-sm uppercase tracking-wider">
                 <ClipboardList size={16} className="text-brand-500" />
-                Formulário Estruturado
+                Formulário Estruturado — {EXAM_AREAS.find(a => a.id === draft.area)?.label || draft.area}
               </h3>
               <p className="text-xs text-ink-500 leading-relaxed mt-2">
-                Campos tipados derivados desta máscara ({EXAM_AREAS.find(a => a.id === draft.area)?.label || draft.area}),
-                com escores e cálculos clínicos em tempo real. É o que o médico preenche na aba "Estruturado" do Copiloto de cada exame.
-                Esta é uma pré-visualização interativa — os valores aqui não são salvos.
+                É o formulário tipado que o médico preenche na aba "Estruturado" do Copiloto de cada exame,
+                com escores, calculadoras e cálculos clínicos em tempo real. Aqui você cria, edita e ajusta
+                seções, campos e vínculos com calculadoras desta máscara. A pré-visualização ao lado é
+                interativa — os valores digitados nela não são salvos.
               </p>
             </div>
-            <StructuredPreview template={draft} />
+            <StructuredSchemaEditor
+              draft={draft}
+              editable={isAdmin}
+              onChange={(schema) => u('structuredSchema', schema)}
+            />
           </div>
         )}
 

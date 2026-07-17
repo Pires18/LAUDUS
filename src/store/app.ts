@@ -75,6 +75,9 @@ interface AppState {
   setWorklistAreaFilter: (a: string) => void;
   worklistDateFilter: 'todos' | 'hoje' | 'semana' | 'mes';
   setWorklistDateFilter: (d: 'todos' | 'hoje' | 'semana' | 'mes') => void;
+  /** Data específica (YYYY-MM-DD) — quando definida, tem precedência sobre o período. */
+  worklistDateExact: string;
+  setWorklistDateExact: (d: string) => void;
   worklistSearch: string;
   setWorklistSearch: (s: string) => void;
 
@@ -167,6 +170,8 @@ export const useApp = create<AppState>()(
   setWorklistAreaFilter: (a) => set({ worklistAreaFilter: a }),
   worklistDateFilter: 'todos',
   setWorklistDateFilter: (d) => set({ worklistDateFilter: d }),
+  worklistDateExact: '',
+  setWorklistDateExact: (d) => set({ worklistDateExact: d }),
   worklistSearch: '',
   setWorklistSearch: (s) => set({ worklistSearch: s }),
 
@@ -181,6 +186,7 @@ export const useApp = create<AppState>()(
         worklistStatusFilter: state.worklistStatusFilter,
         worklistAreaFilter: state.worklistAreaFilter,
         worklistDateFilter: state.worklistDateFilter,
+        worklistDateExact: state.worklistDateExact,
         worklistSearch: state.worklistSearch,
         patientsSearch: state.patientsSearch,
         templateSearch: state.templateSearch,

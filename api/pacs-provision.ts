@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import { hasPacsEntitlement } from './_entitlements.js';
+import { checkRateLimit } from './_rateLimit.js';
 
 /**
  * POST /api/pacs-provision — provisiona (ou simula) o PACS gerenciado do usuário.
@@ -47,6 +49,52 @@ function rand(n: number): string {
  */
 export function shouldBlockMockInProduction(opts: { isVercel: boolean; forcedMock: boolean; configured: boolean }): boolean {
   return opts.isVercel && !opts.forcedMock && !opts.configured;
+}
+
+/** shortUid usado na composição do nome da VM dedicada (mesma regra do provision). */
+export function shortUidOf(uid: string): string {
+  return uid.slice(0, 10).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Posse de uma VM dedicada: os nomes nascem como `pacs-<shortUid>-<hex>`, então
+ * uma VM só pode ser destruída pelo uid cujo prefixo bate. Protege a VM
+ * compartilhada (`orthanc-server`) e as VMs de outros clientes contra um
+ * DELETE forjado com `instanceName` arbitrário no corpo.
+ */
+export function isOwnedGcpInstanceName(name: string, uid: string): boolean {
+  const short = shortUidOf(uid);
+  return !!short && new RegExp(`^pacs-${short}-[a-z0-9]+$`).test(name);
+}
+
+/**
+ * Bloqueia um novo provisionamento quando o usuário JÁ tem uma instância real
+ * registrada (server-side) e não pediu explicitamente reprovisionar — sem isso,
+ * cliques repetidos (ou chamadas diretas à API) criam VMs/tenants duplicados
+ * que ficam órfãos gerando custo.
+ */
+export function shouldRejectExistingInstance(existing: { provider?: string } | null | undefined, reprovision: boolean): boolean {
+  if (!existing || reprovision) return false;
+  return existing.provider === 'gcp' || existing.provider === 'shared';
+}
+
+// ── Registro server-side de posse (`pacs_instances/{uid}`) ──────────────────
+// Gravado pelo próprio provisionamento e inacessível ao cliente pelas rules
+// (coleção sem match = deny). É a fonte de verdade de POSSE para o DELETE:
+// as settings do usuário são graváveis pelo próprio cliente e portanto não
+// servem como prova de que a VM/tenant pertence a ele.
+async function readInstanceRecord(uid: string): Promise<Record<string, any> | null> {
+  const { getDb } = await import('./_firebase.js');
+  const snap = await (await getDb()).collection('pacs_instances').doc(uid).get();
+  return snap.exists ? (snap.data() as Record<string, any>) : null;
+}
+async function writeInstanceRecord(uid: string, data: Record<string, unknown>): Promise<void> {
+  const { getDb } = await import('./_firebase.js');
+  await (await getDb()).collection('pacs_instances').doc(uid).set({ ...data, updatedAt: Date.now() });
+}
+async function deleteInstanceRecord(uid: string): Promise<void> {
+  const { getDb } = await import('./_firebase.js');
+  await (await getDb()).collection('pacs_instances').doc(uid).delete();
 }
 
 // Mint de um access token OAuth do Google a partir da service account (sem deps).
@@ -164,8 +212,8 @@ tailscale funnel --bg 3000 || true
 /**
  * DELETE /api/pacs-provision — destrói de verdade o PACS gerenciado do usuário
  * (VM real no GCP ou tenant na VM compartilhada). Consolidado neste arquivo
- * (em vez de api/pacs-deprovision.ts próprio) para caber no limite de 12
- * funções serverless do plano Hobby da Vercel. A destruição em si mora em
+ * (em vez de api/pacs-deprovision.ts próprio) para manter baixo o número de
+ * funções serverless da Vercel. A destruição em si mora em
  * `_pacsLifecycle.ts` (compartilhada com o CRON de lifecycle automático).
  */
 async function handleDeprovision(req: any, res: any) {
@@ -179,17 +227,75 @@ async function handleDeprovision(req: any, res: any) {
     res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' }));
     return;
   }
+  let uid = '';
   try {
     const { getAdminAuth } = await import('./_firebase.js');
-    await (await getAdminAuth()).verifyIdToken(token);
+    const dec = await (await getAdminAuth()).verifyIdToken(token);
+    uid = dec.uid;
   } catch {
     res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: 'Token inválido ou expirado.' }));
     return;
   }
 
+  // POSSE: o alvo da destruição vem do registro server-side gravado pelo
+  // próprio provisionamento — NUNCA do corpo da requisição, que é controlado
+  // pelo cliente e permitiria destruir a VM/tenant de outro usuário.
+  let target: { provider?: string; instanceName?: string; tenantId?: string } | null = null;
+  let fromRecord = false;
+  try {
+    const record = await readInstanceRecord(uid);
+    if (record) { target = record; fromRecord = true; }
+  } catch (err) {
+    // Prestes a destruir infraestrutura: sem confirmar a posse, NÃO destrói
+    // (fail-closed — o oposto do fail-open de leitura dos proxies).
+    console.error('[pacs-provision] registro de posse indisponível no DELETE:', err);
+    res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Não foi possível confirmar a posse da instância. Tente novamente em instantes.' }));
+    return;
+  }
+
+  // Instâncias LEGADAS (provisionadas antes do registro existir): aceita os
+  // dados do corpo, mas só com prova de posse — VM dedicada carrega o uid no
+  // nome; tenant compartilhado precisa bater com o dicomTenantId salvo.
+  if (!target) {
+    const b = body || {};
+    if (b.provider === 'gcp') {
+      if (!isOwnedGcpInstanceName(String(b.instanceName || ''), uid)) {
+        res.statusCode = 403; res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'A VM informada não pertence a esta conta.' }));
+        return;
+      }
+      target = { provider: 'gcp', instanceName: String(b.instanceName) };
+    } else if (b.provider === 'shared') {
+      try {
+        const { getDb } = await import('./_firebase.js');
+        const snap = await (await getDb()).collection('users').doc(uid).collection('settings').doc('app').get();
+        const savedTenant = snap.exists ? String(snap.data()?.dicomTenantId || '') : '';
+        if (!savedTenant || savedTenant !== String(b.tenantId || '')) {
+          res.statusCode = 403; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'O tenant informado não corresponde ao PACS configurado nesta conta.' }));
+          return;
+        }
+      } catch (err) {
+        console.error('[pacs-provision] falha ao validar tenant legado no DELETE:', err);
+        res.statusCode = 500; res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'Não foi possível confirmar a posse do tenant. Tente novamente em instantes.' }));
+        return;
+      }
+      target = { provider: 'shared', instanceName: String(b.instanceName || ''), tenantId: String(b.tenantId) };
+    } else {
+      // mock/none → destroyPacsInstance devolve "nada a destruir".
+      target = { provider: b.provider, instanceName: b.instanceName, tenantId: b.tenantId };
+    }
+  }
+
   const { destroyPacsInstance } = await import('./_pacsLifecycle.js');
-  const result = await destroyPacsInstance(body || {});
+  const result = await destroyPacsInstance(target || {});
+  if (result.success && fromRecord) {
+    try { await deleteInstanceRecord(uid); }
+    catch (err) { console.error('[pacs-provision] falha ao apagar registro pós-destruição:', err); }
+  }
   res.statusCode = result.success ? 200 : 500;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(result));
@@ -206,28 +312,57 @@ export default async function handler(req: any, res: any) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
 
-  // Autenticação: verifica o token (header OU corpo) DIRETO no Admin SDK para
-  // capturar o motivo exato da falha (verifyIdToken não usa a chave privada —
-  // valida assinatura via chaves públicas do Google e confere o projeto).
+  // Autenticação: verifica o token (header OU corpo) no Admin SDK. O motivo
+  // exato de uma falha vai só para o LOG server-side — nunca para a resposta
+  // (expor projeto/código de erro ao cliente ajuda reconhecimento do ambiente).
   const headerAuth = String(req.headers?.authorization || req.headers?.Authorization || '');
   const token = (headerAuth.startsWith('Bearer ') ? headerAuth.slice(7) : '') || (body?.token ? String(body.token) : '');
-  let authed: any = null; let verifyErr = '';
+  let authed: any = null;
   if (token) {
     try {
       const { getAdminAuth } = await import('./_firebase.js');
       const dec = await (await getAdminAuth()).verifyIdToken(token);
       authed = { uid: dec.uid, email: (dec.email || '').toLowerCase() };
     } catch (e: any) {
-      verifyErr = ((e?.errorInfo?.code || e?.code || 'err') + ': ' + (e?.message || '')).slice(0, 130);
+      console.warn('[pacs-provision] verifyIdToken falhou:',
+        ((e?.errorInfo?.code || e?.code || 'err') + ': ' + (e?.message || '')).slice(0, 130));
     }
   }
   if (!authed) {
-    const reason = token ? 'verify_failed' : 'no_token';
-    const fbProj = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '(default:laudus)';
     res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.', reason, fbProj, verifyErr }));
+    res.end(JSON.stringify({ error: 'Não autorizado. Faça login novamente.' }));
     return;
   }
+
+  // Anti-abuso: provisionar cria infraestrutura real cobrada. Cliques
+  // legítimos são raros — estourar o limite é bug do cliente ou abuso.
+  if (!(await checkRateLimit(`pacs-provision:${authed.uid}`, 5, 60 * 60 * 1000))) {
+    res.statusCode = 429; res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Muitas tentativas de provisionamento. Aguarde um pouco e tente novamente.' }));
+    return;
+  }
+
+  // Enforcement de plano: PACS é add-on pago — mesma checagem dos proxies
+  // (fail-open em falha de infraestrutura; bloqueia só quando confirmado).
+  if (!(await hasPacsEntitlement(authed.uid, authed.email))) {
+    res.statusCode = 403; res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'O recurso PACS/DICOM não está incluído no seu plano. Contrate o add-on PACS para criar seu servidor.' }));
+    return;
+  }
+
+  // Instância única: se já existe uma instância REAL registrada para esta
+  // conta, só segue com o pedido explícito de reprovisionamento (botão
+  // "Reprovisionar"/"Tentar novamente" do app envia reprovision: true).
+  const reprovision = body?.reprovision === true;
+  try {
+    const existing = await readInstanceRecord(authed.uid);
+    if (shouldRejectExistingInstance(existing, reprovision)) {
+      res.statusCode = 409; res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Você já tem um PACS ativo nesta conta. Use "Reprovisionar" ou remova o atual antes de criar outro.' }));
+      return;
+    }
+  } catch { /* registro indisponível → não bloqueia um provisionamento legítimo */ }
+
   const plan = ['starter', 'pro', 'dedicado'].includes(body?.plan) ? body.plan : 'pro';
   const zone = process.env.GCP_ZONE || 'southamerica-east1-c';
   const region = zone.replace(/-[a-z]$/, '');
@@ -274,6 +409,15 @@ export default async function handler(req: any, res: any) {
       const d: any = await r.json();
       if (!r.ok || !d.success) throw new Error(d?.error || 'Falha ao criar tenant na VM compartilhada.');
       const relayAuthKey = await tryCreateRelayAuthKey();
+      // Registro de posse server-side — fonte de verdade do DELETE e da trava
+      // de instância única. Falha aqui não derruba o provisionamento (a
+      // instância existe); o DELETE cai no caminho legado com validação.
+      try {
+        await writeInstanceRecord(authed.uid, {
+          provider: 'shared', instanceName: `tenant-${d.tenantId}`, tenantId: d.tenantId,
+          dicomPort: d.dicomPort ?? null, plan, createdAt: Date.now(),
+        });
+      } catch (err) { console.error('[pacs-provision] falha ao gravar registro da instância (shared):', err); }
       res.statusCode = 200; res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         status: 'ready', provider: 'shared', plan, region,
@@ -358,6 +502,11 @@ export default async function handler(req: any, res: any) {
     );
     const insertData: any = await insertRes.json();
     if (!insertRes.ok) throw new Error(`GCP insert: ${insertData?.error?.message || JSON.stringify(insertData)}`);
+
+    // Registro de posse server-side (ver comentário no caminho shared).
+    try {
+      await writeInstanceRecord(authed.uid, { provider: 'gcp', instanceName: name, plan, createdAt: Date.now() });
+    } catch (err) { console.error('[pacs-provision] falha ao gravar registro da instância (gcp):', err); }
 
     const agentUrl = `https://${name}.${process.env.TAILSCALE_TS_NET}`;
     res.statusCode = 200;

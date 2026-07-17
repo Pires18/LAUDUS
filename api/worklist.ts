@@ -103,6 +103,24 @@ export default async function handler(req: any, res: any) {
       }));
       return;
     }
+    // Mesma allowlist de sufixos do orthanc-proxy (anti-SSRF/DNS-rebinding):
+    // na nuvem, o agente só pode viver atrás do Tailscale Funnel (*.ts.net),
+    // salvo ampliação explícita via env.
+    if (process.env.VERCEL) {
+      const allowedSuffixes = (process.env.ORTHANC_PROXY_ALLOWED_HOST_SUFFIXES || '.ts.net')
+        .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+      let agentHost = '';
+      try { agentHost = new URL(localAgentUrl).hostname.toLowerCase(); } catch { /* cai no bloqueio abaixo */ }
+      if (!agentHost || !allowedSuffixes.some((suf) => agentHost.endsWith(suf))) {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Na nuvem, o Agente Local precisa estar atrás do Tailscale Funnel (*.ts.net). Se usar domínio próprio, configure ORTHANC_PROXY_ALLOWED_HOST_SUFFIXES.'
+        }));
+        return;
+      }
+    }
     try {
       // tenantId (VM compartilhada) vai na QUERY — o agente resolve a auth e a
       // pasta pelo tenant antes de ler o corpo.

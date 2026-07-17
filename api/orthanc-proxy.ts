@@ -11,12 +11,21 @@ export const config = {
   },
 };
 
+// Sufixos de host que o proxy pode alcançar na nuvem. O modelo suportado é
+// Tailscale Funnel (`*.ts.net`) — o DNS desses nomes aponta para a borda do
+// Tailscale, o que também fecha DNS-rebinding (um domínio do atacante
+// resolvendo para IP privado nunca termina em .ts.net). Instalações com
+// domínio próprio podem ampliar via env (lista separada por vírgula).
+const ALLOWED_HOST_SUFFIXES = (process.env.ORTHANC_PROXY_ALLOWED_HOST_SUFFIXES || '.ts.net')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
 /**
  * Guarda anti-SSRF: na nuvem o proxy só pode alcançar servidores Orthanc
  * públicos expostos via HTTPS (ex: Tailscale Funnel). Bloqueia IPs privados,
- * loopback, link-local e endpoints de metadados de nuvem.
+ * loopback, link-local, endpoints de metadados de nuvem e qualquer host fora
+ * da allowlist de sufixos.
  */
-function isBlockedTarget(url: URL): string | null {
+export function isBlockedTarget(url: URL): string | null {
   if (url.protocol !== 'https:') {
     return 'Na nuvem, o destino precisa ser HTTPS (ex: URL pública do Tailscale Funnel).';
   }
@@ -36,6 +45,9 @@ function isBlockedTarget(url: URL): string | null {
     ) {
       return 'Endereços IP privados/reservados não são permitidos.';
     }
+  }
+  if (!ALLOWED_HOST_SUFFIXES.some((suf) => host.endsWith(suf))) {
+    return 'Na nuvem, o proxy só alcança hosts do Tailscale Funnel (*.ts.net). Se usar domínio próprio, configure ORTHANC_PROXY_ALLOWED_HOST_SUFFIXES.';
   }
   return null;
 }

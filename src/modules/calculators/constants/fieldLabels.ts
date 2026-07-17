@@ -9,15 +9,19 @@ export const FIELD_LABELS: Record<string, string> = {
   // Volume / dimensões genéricas
   structureName: 'Estrutura', volume: 'Volume (cm³)', unit: 'Unidade',
   d1: 'D1', d2: 'D2', d3: 'D3',
-  // Idade gestacional (DUM/USG)
+  // Idade gestacional (DUM / USG / Biometria)
   method: 'Método', referenceDate: 'Data do exame',
   dumDate: 'DUM', prevUsgDate: 'Data USG anterior',
   prevUsgWeeks: 'IG USG (sem)', prevUsgDays: 'IG USG (dias)',
+  ccn: 'CCN (mm)',
   currentGa: 'IG Atual', edd: 'DPP', ga: 'IG Estimada',
   // Biometria fetal
   gaWeeks: 'IG (semanas)', gaDays: 'IG (dias)', sex: 'Sexo',
   bpd: 'DBP (mm)', hc: 'CC (mm)', ac: 'CA (mm)', fl: 'CF (mm)', hl: 'Úmero (mm)',
-  efw: 'PFE (g)', percentile: 'Percentil OMS (%)', pDescription: 'Classificação',
+  // o percentil depende da curva escolhida (Hadlock/INTERGROWTH/OMS): nunca
+  // rotule com o nome de uma curva — `referenceLabel` diz qual foi usada.
+  efw: 'PFE (g)', percentile: 'Percentil (%)', pDescription: 'Classificação',
+  referenceLabel: 'Curva de referência', efwMedian: 'PFE mediano da curva (g)',
   bpdPercentile: 'DBP p%', hcPercentile: 'CC p%', acPercentile: 'CA p%',
   flPercentile: 'CF p%', hlPercentile: 'Úmero p%',
   // Doppler
@@ -74,6 +78,12 @@ export const HIDDEN_METRIC_KEYS = new Set<string>([
   'selected',      // rótulo do órgão — redundante com a conclusão
   'sex',           // male/female/unknown (enum não localizado)
   'referenceDate', // data-base interna do cálculo
+  'bioParam',      // ccn/dbp/cc (código cru; o parâmetro usado já vai em sourceLabel/conclusão)
+  'sourceLabel',   // 'CCN (1º trimestre)' — já no rótulo do card e na conclusão
+  'reference',     // hadlock/intergrowth/who (código cru; a curva vai em referenceLabel)
+  'efwFormula',    // hadlock/intergrowth (código cru; já descrito na conclusão)
+  'referenceValidated', // flag interna do registry de curvas
+  'fellBack',      // flag interna: a curva escolhida não cobria a dimensão
   // FMF — entradas categóricas/booleanas cruas (já refletidas na conclusão):
   'racialOrigin', 'conception', 'parity', 'diabetes', 'analyzer',
   'nasalBone', 'ductusVenosus', 'tricuspid',

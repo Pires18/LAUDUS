@@ -2,7 +2,12 @@
 #
 # setup-vm.sh — Bootstrap de uma VM PACS LAUD.US (Debian/Ubuntu no Google Cloud)
 # ------------------------------------------------------------------------------
-# Automatiza as Fases ③–⑥ do PROJETO_PACS_NUVEM.md:
+# ⚠️  LEGADO / SINGLE-TENANT (VM dedicada). A produção multi-tenant usa
+#     `pacs-vm-setup.sh` (turnkey da VM COMPARTILHADA) + `pacs-tenant.sh`.
+#     Mantido como referência do caminho da VM dedicada e do builder da imagem
+#     dourada. Não usar para a VM compartilhada.
+# ------------------------------------------------------------------------------
+# Automatiza as Fases ③–⑥ do docs/archive/PROJETO_PACS_NUVEM.md:
 #   ③ Docker + Tailscale
 #   ④ Orthanc (Docker) com Worklist + DICOMweb
 #   ⑤ Agente LAUD.US (Node) como serviço systemd + Python/pydicom

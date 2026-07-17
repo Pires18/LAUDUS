@@ -1,4 +1,4 @@
-import { Calculator, Sparkles, Loader2, RotateCcw, LayoutGrid, Zap, CheckCircle2, Plus, X } from 'lucide-react';
+import { Calculator, Sparkles, Loader2, RotateCcw, LayoutGrid, Zap, CheckCircle2, Plus, X, Ruler } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import {
   StructuredSchema,
@@ -8,6 +8,7 @@ import {
 import { fieldValueToText } from '../structured/deriveSchema';
 import { Derivation } from '../structured/liveCompute';
 import { sectionState, itemCount, itemFieldId, normalKey } from '../structured/structuredKeys';
+import { sectionRepeatContainers, RepeatContainer } from '../structured/containers';
 
 interface StructuredTabProps {
   schema: StructuredSchema;
@@ -189,8 +190,13 @@ function FieldRenderer({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest">
+      <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest flex items-center gap-1.5">
         {field.label}
+        {field.normal && (
+          <span className="px-1 py-px rounded bg-emerald-50 border border-emerald-100 text-emerald-600 text-[8px] font-bold normal-case tracking-normal">
+            normal: {field.normal}
+          </span>
+        )}
       </label>
       <div className="flex items-start gap-1.5">
         {control}
@@ -239,6 +245,48 @@ export function StructuredTab({
       ))}
     </div>
   );
+
+  /** Lista de itens repetíveis (seção-lista pura OU grupo de lesões aninhado). */
+  const renderRepeatList = (container: RepeatContainer) => {
+    const count = itemCount(values, container.containerId);
+    return (
+      <div className="p-3 space-y-2.5">
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-ink-100 bg-ink-50/40 p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">{container.itemLabel || 'Item'} {i + 1}</span>
+              {count > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveItem(container.containerId, i)}
+                  className="w-5 h-5 rounded-md text-ink-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
+                  title="Remover"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {renderGrid(container.fields, (fid) => itemFieldId(container.containerId, i, fid))}
+            {derivations
+              .filter((d) => d.id.includes(`${container.containerId}@${i}`))
+              .map((d) => (
+                <div key={d.id} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50/70 border border-emerald-200/70 px-2.5 py-1.5">
+                  <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wide">{d.label}</span>
+                  <span className={classNames('text-[11px] font-black', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>
+                </div>
+              ))}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onAddItem(container.containerId)}
+          className="w-full h-9 rounded-xl border border-dashed border-brand-300 text-brand-600 hover:bg-brand-50 text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+        >
+          <Plus size={13} /> {container.addLabel || `Adicionar ${container.itemLabel || 'item'}`}
+        </button>
+      </div>
+    );
+  };
   if (!schema.sections.length) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
@@ -257,7 +305,6 @@ export function StructuredTab({
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
         {schema.sections.map((section) => {
           const isNormal = section.normalable && sectionState(values, section.id) === 'normal';
-          const count = section.repeatable ? itemCount(values, section.id) : 1;
           return (
           <div key={section.id} className="rounded-2xl border border-ink-200 bg-white overflow-hidden shadow-sm">
             <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-ink-100">
@@ -305,53 +352,48 @@ export function StructuredTab({
             </div>
 
             {isNormal ? (
-              <div className="px-3.5 py-2.5 text-[11px] font-semibold text-emerald-700/80 flex items-center gap-1.5">
-                <CheckCircle2 size={12} className="text-emerald-500" /> Sem alterações{section.normalText ? ` — ${section.normalText}` : ''}.
-              </div>
-            ) : section.repeatable ? (
-              <div className="p-3 space-y-2.5">
-                {Array.from({ length: count }).map((_, i) => (
-                  <div key={i} className="rounded-xl border border-ink-100 bg-ink-50/40 p-2.5">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">{section.itemLabel || 'Item'} {i + 1}</span>
-                      {count > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveItem(section.id, i)}
-                          className="w-5 h-5 rounded-md text-ink-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
-                          title="Remover"
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
+              <>
+                <div className="px-3.5 py-2.5 text-[11px] font-semibold text-emerald-700/80 flex items-center gap-1.5">
+                  <CheckCircle2 size={12} className="text-emerald-500" /> Sem alterações{section.normalText ? ` — ${section.normalText}` : ''}.
+                </div>
+                {/* Biometria que se registra mesmo na normalidade (dimensões, volume, índices). */}
+                {section.fields.some((f) => f.alwaysShow) && (
+                  <div className="px-3 pb-1">
+                    <div className="mb-1.5 flex items-center gap-1 text-[8px] font-black text-ink-400 uppercase tracking-widest">
+                      <Ruler size={9} /> Medidas do exame
                     </div>
-                    {renderGrid(section.fields, (fid) => itemFieldId(section.id, i, fid))}
-                    {derivBySection[section.id]?.filter((d) => d.id.includes(`@${i}`) || d.id.includes(`${section.id}@${i}`)).map((d) => (
-                      <div key={d.id} className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50/70 border border-emerald-200/70 px-2.5 py-1.5">
-                        <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wide">{d.label}</span>
-                        <span className={classNames('text-[11px] font-black', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>
-                      </div>
-                    ))}
+                    {renderGrid(section.fields.filter((f) => f.alwaysShow), (fid) => fid)}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => onAddItem(section.id)}
-                  className="w-full h-9 rounded-xl border border-dashed border-brand-300 text-brand-600 hover:bg-brand-50 text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                >
-                  <Plus size={13} /> Adicionar {section.itemLabel || 'item'}
-                </button>
-              </div>
+                )}
+              </>
+            ) : section.repeatable ? (
+              // Seção-lista pura (nódulos/lesões como a seção inteira).
+              renderRepeatList(sectionRepeatContainers(section)[0])
             ) : (
-              <div className="p-3">{renderGrid(section.fields, (fid) => fid)}</div>
+              // Seção com campos fixos + (opcional) grupo de lesões repetível aninhado.
+              <>
+                {section.fields.length > 0 && <div className="p-3 pb-1">{renderGrid(section.fields, (fid) => fid)}</div>}
+                {sectionRepeatContainers(section)
+                  .filter((c) => c.nested)
+                  .map((c) => (
+                    <div key={c.containerId} className="mt-1 mx-3 mb-1 rounded-xl border border-ink-100 bg-ink-50/30">
+                      <div className="px-3 pt-2 flex items-center gap-1.5 text-[9px] font-black text-ink-500 uppercase tracking-widest">
+                        <Plus size={10} className="text-brand-500" /> {c.itemLabel ? `${c.itemLabel}s` : 'Lesões'}
+                      </div>
+                      {renderRepeatList(c)}
+                    </div>
+                  ))}
+              </>
             )}
 
-            {!section.repeatable && !isNormal && derivBySection[section.id]?.length > 0 && (
+            {/* Cálculos automáticos de campos FIXOS da seção (itens têm o seu inline).
+                Vale também em 'Normal': a biometria registrada segue calculando. */}
+            {!section.repeatable && derivBySection[section.id]?.filter((d) => !d.id.includes('@')).length > 0 && (
               <div className="mx-3 mb-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70 px-3 py-2 space-y-1">
                 <div className="flex items-center gap-1 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
                   <Zap size={9} /> Cálculo automático
                 </div>
-                {derivBySection[section.id].map((d) => (
+                {derivBySection[section.id].filter((d) => !d.id.includes('@')).map((d) => (
                   <div key={d.id} className="flex items-center justify-between gap-2">
                     <span className="text-[10px] font-semibold text-emerald-800/80">{d.label}</span>
                     <span className={classNames('text-[11px] font-black tabular-nums', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>

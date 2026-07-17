@@ -4,6 +4,7 @@ import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAcce
 import { useApp } from '../../store/app';
 import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
 import { LaudCopilot } from './LaudCopilot';
+import { seedForCalculator } from './structured/calcSeed';
 import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
@@ -165,6 +166,18 @@ export function ExamEditor({ examId }: Props) {
   // Write-back da calculadora para um campo da aba Estruturado do copiloto.
   const [calcTargetField, setCalcTargetField] = useState<{ fieldId: string; label: string } | null>(null);
   const [structuredCalcResult, setStructuredCalcResult] = useState<{ fieldId: string; result: { text: string; metrics?: Record<string, any>; calcId?: string } } | null>(null);
+  /**
+   * Semeia a calculadora aberta com o que já foi digitado na aba Estruturado
+   * (datação, biometria, dados maternos, exame físico, marcadores). O que o
+   * médico salvou na própria calculadora prevalece sobre a semente.
+   */
+  const calculatorDataWithSeed = useMemo(() => {
+    const saved = exam?.calculatorData || {};
+    if (!calcModalInitialId) return saved;
+    const seed = seedForCalculator(calcModalInitialId, exam?.structuredValue, exam?.examDate ?? exam?.createdAt);
+    if (!seed) return saved;
+    return { ...saved, [calcModalInitialId]: { ...seed, ...(saved[calcModalInitialId] || {}) } };
+  }, [exam?.calculatorData, exam?.structuredValue, exam?.examDate, exam?.createdAt, calcModalInitialId]);
   const [showSnippets, setShowSnippets] = useState(false);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
@@ -1359,7 +1372,7 @@ export function ExamEditor({ examId }: Props) {
               editorRef.current?.insertContent(html);
               setShowCalculators(false);
             }}
-            calculatorData={exam.calculatorData}
+            calculatorData={calculatorDataWithSeed}
             onSaveCalculatorData={async (data) => {
               await updateItem('exams', exam.id, { calculatorData: data });
             }}

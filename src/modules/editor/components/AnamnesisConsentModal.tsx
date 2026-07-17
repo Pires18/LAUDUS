@@ -146,7 +146,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     try {
       setLoadingMetadata(true);
       // Fix 12: use deleteField() for empty clinicId to keep Firestore clean
-      const parsedExamDate = parseDateInputValue(examDateStr);
+      // Só a data muda; o horário permanece o da criação do exame
+      const parsedExamDate = parseDateInputValue(examDateStr, exam.createdAt);
       await updateItem('exams', exam.id, {
         requestingPhysician: requestingPhysician,
         clinicId: clinicId || deleteField(),

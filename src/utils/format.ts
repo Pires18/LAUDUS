@@ -29,6 +29,14 @@ export function formatDateTime(date: number | undefined): string {
 }
 
 /**
+ * Formata apenas a hora (hh:mm) no fuso local.
+ */
+export function formatTime(date: number | undefined): string {
+  if (!date) return '';
+  return new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
  * Converte timestamp (ms) para o formato YYYY-MM-DD de <input type="date">,
  * usando o fuso local (toISOString deslocaria o dia em fusos negativos).
  */
@@ -41,13 +49,16 @@ export function toDateInputValue(timestamp: number | undefined): string {
 }
 
 /**
- * Converte o valor YYYY-MM-DD de <input type="date"> para timestamp (ms)
- * à meia-noite local — mesma convenção usada na criação do exame.
+ * Converte o valor YYYY-MM-DD de <input type="date"> para timestamp (ms).
+ * O horário do dia vem de `timeSource` (normalmente o createdAt do exame),
+ * para que editar a data nunca zere o horário para 00:00; sem `timeSource`
+ * válido, usa o horário atual.
  */
-export function parseDateInputValue(value: string): number | null {
+export function parseDateInputValue(value: string, timeSource?: number): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [year, month, day] = value.split('-').map(Number);
-  const ts = new Date(year, month - 1, day).getTime();
+  const time = timeSource && !isNaN(new Date(timeSource).getTime()) ? new Date(timeSource) : new Date();
+  const ts = new Date(year, month - 1, day, time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds()).getTime();
   return isNaN(ts) ? null : ts;
 }
 

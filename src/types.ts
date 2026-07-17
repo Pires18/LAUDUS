@@ -166,6 +166,36 @@ export interface StructuredFieldDef {
   fullWidth?: boolean;
   /** Só exibe o campo quando outro campo estiver preenchido (ou com valor `equals`). */
   showIf?: { field: string; equals?: string };
+  /**
+   * Valor/faixa de referência de NORMALIDADE (ex.: '≤ 6 mm', '9–12 cm'). Exibido
+   * como referência no campo e usado pelo botão "Normal" da seção para
+   * pré-preencher medidas dentro da faixa habitual.
+   */
+  normal?: string;
+  /**
+   * Campo exibido MESMO com a seção em 'Normal' — biometria que se registra na
+   * normalidade (dimensões, volume, índices Doppler). Continua calculando ao
+   * vivo e é compilado junto da frase de normalidade.
+   */
+  alwaysShow?: boolean;
+}
+
+/**
+ * Grupo REPETÍVEL aninhado numa seção (lesões/nódulos/cistos com suas próprias
+ * calculadoras e escore). Aparece dentro do estado 'Alterado' quando a seção é
+ * `normalable`; caso contrário, aparece sempre. Cada item é escopado por
+ * instância com um id de container próprio (`<sectionId>#<groupId>`), sem
+ * colidir com os campos fixos da seção.
+ */
+export interface StructuredRepeatGroup {
+  id: string;
+  /** Rótulo de cada item (ex.: 'Nódulo', 'Lesão', 'Cisto'). */
+  itemLabel?: string;
+  /** Rótulo do botão de adicionar (ex.: 'Adicionar nódulo'). */
+  addLabel?: string;
+  /** Escore/sugestão inline a partir dos descritores de cada item. */
+  score?: 'tirads' | 'birads' | 'orads' | 'bosniak';
+  fields: StructuredFieldDef[];
 }
 
 export interface StructuredSection {
@@ -184,6 +214,12 @@ export interface StructuredSection {
   itemLabel?: string;
   /** Escore/sugestão inline a partir dos descritores desta seção. */
   score?: 'tirads' | 'birads' | 'orads' | 'bosniak';
+  /**
+   * Lista de lesões/nódulos repetíveis ANINHADA na seção (com calculadoras e
+   * escore próprios). Fica dentro do estado 'Alterado' quando a seção é
+   * `normalable` — é o lugar correto para inserir lesões e cálculos sob o órgão.
+   */
+  repeatGroup?: StructuredRepeatGroup;
 }
 
 export interface StructuredSchema {
@@ -230,6 +266,15 @@ export interface ReportTemplate {
   anamnesisTemplate?: string;
   /** Texto de termo de consentimento padrão para o exame */
   consentTemplate?: string;
+
+  /**
+   * Formulário estruturado PERSONALIZADO desta máscara (editado na aba
+   * "Estruturado" do editor de máscaras). Quando presente, substitui o esquema
+   * derivado automaticamente do analysisTemplate — inclusive no Copiloto.
+   * `sections: []` desativa o formulário estruturado deste exame;
+   * `null`/ausente volta ao modo automático.
+   */
+  structuredSchema?: { sections: StructuredSection[] } | null;
 
   createdAt: number;
   updatedAt: number;

@@ -8,7 +8,7 @@ import {
   X, Search, UserPlus, ArrowRight, Loader2, Sparkles, 
   ChevronRight
 } from 'lucide-react';
-import { classNames } from '../utils/format';
+import { classNames, parseDateInputValue, toDateInputValue } from '../utils/format';
 import { generateNumericId } from '../store/db';
 import { getInitialReportContent } from '../modules/templates/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,7 +42,8 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
   const [hoveredTemplate, setHoveredTemplate] = useState<ReportTemplate | null>(null);
   const [anamnesis, setAnamnesis] = useState('');
-  const [examDateStr, setExamDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
+  // toDateInputValue usa o fuso local — toISOString() viraria o dia após ~21h no Brasil
+  const [examDateStr, setExamDateStr] = useState<string>(toDateInputValue(Date.now()));
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const clinicDevices = useMemo(
     () => getDevicesForClinic(settings.dicomDevices, selectedClinic?.id),
@@ -162,6 +163,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
     if (!selectedPatient) return;
     setLoading(true);
     try {
+      const createdNow = Date.now();
       const examData: Partial<ExamRequest> = {
         friendlyId: generateNumericId(),
         patientId: selectedPatient.id,
@@ -176,12 +178,11 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
         consentAccepted: false,
         clinicalIndication: anamnesis.trim() || undefined,
         dicomDeviceId: selectedDeviceId || undefined,
-        examDate: examDateStr ? (() => {
-          const [year, month, day] = examDateStr.split('-').map(Number);
-          return new Date(year, month - 1, day).getTime();
-        })() : Date.now(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        // A data pode ser retroativa, mas o horário é sempre o da criação —
+        // nunca gravar 00:00 (quebra ordenação e exibição de hora na worklist).
+        examDate: parseDateInputValue(examDateStr, createdNow) ?? createdNow,
+        createdAt: createdNow,
+        updatedAt: createdNow,
       };
       const id = genId('exams');
       await addItemWithId('exams', id, examData);

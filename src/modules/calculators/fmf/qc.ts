@@ -33,7 +33,7 @@ export function psvRatioPlausible(value: number | undefined | null): boolean {
 
 /**
  * IG (semanas decimais) a partir do CCN (mm) — Hadlock 1992
- * (mesma curva do CrlCalculator). Retorna null se CCN inválido.
+ * (mesma curva de CCN da calculadora de IG). Retorna null se CCN inválido.
  */
 export function crlToGaWeeks(crlMm: number): number | null {
   if (!(crlMm > 0)) return null;

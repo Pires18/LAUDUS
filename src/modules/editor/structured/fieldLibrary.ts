@@ -85,7 +85,7 @@ const ENRICHERS: Enricher[] = [
   ] },
   // 1º trimestre (saco, embrião, CCN)
   { areas: ['medicina-fetal'], match: /saco gestacional/i, canonical: true, fields: [{ id: 'dmsg', label: 'DMSG', kind: 'measure', unit: 'mm', calcId: 'msd-dmsg' }] },
-  { areas: ['medicina-fetal'], match: /embri[ãa]o|cabe[çc]a.?n[áa]dega|\bccn\b/i, canonical: true, fields: [{ id: 'ccn', label: 'CCN', kind: 'measure', unit: 'mm', calcId: 'crl-ccn' }] },
+  { areas: ['medicina-fetal'], match: /embri[ãa]o|cabe[çc]a.?n[áa]dega|\bccn\b/i, canonical: true, fields: [{ id: 'ccn', label: 'CCN', kind: 'measure', unit: 'mm', calcId: 'gestational-age' }] },
   // Vitalidade / vasos Doppler específicos (mapeia cada vaso ao seu IP)
   { areas: ['medicina-fetal'], match: /batimentos|\bbcf\b|\bbce\b|frequ[êe]ncia card/i, canonical: true, fields: [{ id: 'bcf', label: 'BCF / FC', kind: 'measure', unit: 'bpm' }] },
   { areas: ['medicina-fetal'], match: /art[ée]ria umbilical/i, canonical: true, fields: [{ id: 'ip_au', label: 'IP Umbilical', kind: 'measure', hint: 'alterado se > p95' }] },

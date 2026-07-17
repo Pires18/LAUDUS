@@ -118,7 +118,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inst.status, settings.dicomLocalAgentUrl, settings.dicomTenantId]);
 
-  async function provision(plan: Plan) {
+  async function provision(plan: Plan, opts?: { reprovision?: boolean }) {
     if (busy) return;
     setBusy(true);
     const region = 'southamerica-east1';
@@ -140,12 +140,14 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
         const res = await fetch(PROVISION_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ plan, region, token })
+          // reprovision: o servidor bloqueia criar uma 2ª instância real na
+          // mesma conta, a menos que o pedido seja explicitamente de
+          // reprovisionamento (botões "Reprovisionar"/"Tentar novamente").
+          body: JSON.stringify({ plan, region, token, reprovision: !!opts?.reprovision })
         });
         const data = await res.json();
         if (!res.ok || !data.agentUrl) {
-          const diag = data.reason ? ` [${data.reason} · proj:${data.fbProj}${data.verifyErr ? ' · ' + data.verifyErr : ''}]` : '';
-          throw new Error((data.error || 'Falha no provisionamento.') + diag);
+          throw new Error(data.error || 'Falha no provisionamento.');
         }
         result = data;
         if (data.provider === 'gcp') {
@@ -349,7 +351,7 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
                 confirmLabel: 'Reprovisionar',
               });
               if (!ok) return;
-              provision((inst.plan as Plan) || 'pro');
+              provision((inst.plan as Plan) || 'pro', { reprovision: true });
             }}
             disabled={busy}
             className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink-600 bg-ink-100 border border-ink-200 hover:bg-ink-200 transition-all flex items-center gap-1.5 disabled:opacity-50"
@@ -382,7 +384,10 @@ export function MyPacsCard({ onOpenExams }: { onOpenExams?: () => void }) {
           </div>
         </div>
         <button
-          onClick={() => provision((inst.plan as Plan) || selectedPlan)}
+          // reprovision: o provisionamento anterior pode ter chegado a criar a
+          // instância (registro gravado) e falhado só no polling — sem a flag,
+          // o retry bateria na trava de instância única (409).
+          onClick={() => provision((inst.plan as Plan) || selectedPlan, { reprovision: true })}
           disabled={busy}
           className="h-10 px-4 rounded-xl text-[11px] font-black uppercase tracking-widest bg-ink-900 hover:bg-ink-800 text-white transition-all flex items-center gap-2 disabled:opacity-50"
         >

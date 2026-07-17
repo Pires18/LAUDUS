@@ -150,14 +150,22 @@ export function carotidStenosisNASCET(vpsIca: number, vdfIca?: number, vpsCca?: 
   return { label: label + ratioTxt, severe };
 }
 
-/** Interpretação do Índice Tornozelo-Braquial (ITB). */
+/**
+ * Interpretação do Índice Tornozelo-Braquial (ITB) — cortes ESC/AHA, os mesmos
+ * que o prompt da área ensina à IA (`areaPrompts.ts` § 6). O chip do formulário
+ * e o laudo gerado precisam concordar sobre o mesmo número.
+ *
+ * > 1,40 incompressível · 1,00–1,40 normal · 0,91–0,99 limítrofe ·
+ * 0,41–0,90 DAP leve a moderada · ≤ 0,40 DAP grave (isquemia crítica).
+ */
 export function itbClassification(itb: number): { label: string; alert: boolean } | null {
   if (!(itb > 0)) return null;
-  if (itb > 1.3) return { label: 'incompressível (> 1,3) — calcificação', alert: true };
-  if (itb >= 0.9) return { label: 'normal (0,9–1,3)', alert: false };
-  if (itb >= 0.7) return { label: 'DAOP leve (0,7–0,9)', alert: true };
-  if (itb >= 0.4) return { label: 'DAOP moderada (0,4–0,7)', alert: true };
-  return { label: 'DAOP grave (< 0,4)', alert: true };
+  if (itb > 1.4) return { label: 'incompressível (> 1,40) — calcificação arterial', alert: true };
+  if (itb >= 1.0) return { label: 'normal (1,00–1,40)', alert: false };
+  // faixa limítrofe: ainda não é DAP, mas não é normal — sinaliza sem alarmar
+  if (itb >= 0.91) return { label: 'limítrofe (0,91–0,99)', alert: false };
+  if (itb > 0.4) return { label: 'DAP leve a moderada (0,41–0,90)', alert: true };
+  return { label: 'DAP grave (≤ 0,40) — isquemia crítica', alert: true };
 }
 
 /** Sugestão Bosniak (adaptado ao US) para cisto renal a partir dos descritores. */

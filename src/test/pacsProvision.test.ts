@@ -1,5 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import handler, { shouldBlockMockInProduction } from '../../api/pacs-provision';
+import handler, {
+  shouldBlockMockInProduction,
+  shortUidOf,
+  isOwnedGcpInstanceName,
+  shouldRejectExistingInstance,
+} from '../../api/pacs-provision';
+import { destroyPacsInstance } from '../../api/_pacsLifecycle';
 
 /**
  * pacs-provision.ts cria/destrói infraestrutura de nuvem cobrada — testado por
@@ -53,8 +59,6 @@ describe('handler — gating de auth/método (sem invocar GCP/Tailscale/Firebase
     const res = fakeRes();
     await handler({ method: 'POST', headers: {}, body: {} }, res);
     expect(res.statusCode).toBe(401);
-    const parsed = JSON.parse(res.body);
-    expect(parsed.reason).toBe('no_token');
   });
 
   it('DELETE sem token → 401, sem tentar destruir nada', async () => {
@@ -67,7 +71,78 @@ describe('handler — gating de auth/método (sem invocar GCP/Tailscale/Firebase
     const res = fakeRes();
     await handler({ method: 'POST', headers: { authorization: 'Bearer token-forjado-invalido' }, body: {} }, res);
     expect(res.statusCode).toBe(401);
+  });
+
+  it('401 NÃO vaza detalhes de diagnóstico (reason/fbProj/verifyErr — só no log do servidor)', async () => {
+    const res = fakeRes();
+    await handler({ method: 'POST', headers: { authorization: 'Bearer token-forjado-invalido' }, body: {} }, res);
     const parsed = JSON.parse(res.body);
-    expect(parsed.reason).toBe('verify_failed');
+    expect(parsed.reason).toBeUndefined();
+    expect(parsed.fbProj).toBeUndefined();
+    expect(parsed.verifyErr).toBeUndefined();
+  });
+});
+
+describe('posse de VM dedicada (isOwnedGcpInstanceName)', () => {
+  const UID = 'AbC123xyz789restodouid';
+  const SHORT = shortUidOf(UID); // 'abc123xyz7'
+
+  it('shortUidOf espelha a regra do provisionamento (10 chars, minúsculo, alfanumérico)', () => {
+    expect(SHORT).toBe('abc123xyz7');
+  });
+
+  it('aceita a VM cujo nome carrega o shortUid do dono', () => {
+    expect(isOwnedGcpInstanceName(`pacs-${SHORT}-a1`, UID)).toBe(true);
+  });
+
+  it('recusa a VM de OUTRO usuário', () => {
+    expect(isOwnedGcpInstanceName('pacs-outrouid99-a1', UID)).toBe(false);
+  });
+
+  it('recusa a VM compartilhada (orthanc-server) e nomes arbitrários', () => {
+    expect(isOwnedGcpInstanceName('orthanc-server', UID)).toBe(false);
+    expect(isOwnedGcpInstanceName('', UID)).toBe(false);
+    expect(isOwnedGcpInstanceName(`pacs-${SHORT}-a1-e-mais-coisa!`, UID)).toBe(false);
+  });
+});
+
+describe('trava de instância única (shouldRejectExistingInstance)', () => {
+  it('sem registro → permite provisionar', () => {
+    expect(shouldRejectExistingInstance(null, false)).toBe(false);
+    expect(shouldRejectExistingInstance(undefined, false)).toBe(false);
+  });
+
+  it('registro real (shared/gcp) sem flag → bloqueia', () => {
+    expect(shouldRejectExistingInstance({ provider: 'shared' }, false)).toBe(true);
+    expect(shouldRejectExistingInstance({ provider: 'gcp' }, false)).toBe(true);
+  });
+
+  it('registro real + reprovision explícito → permite', () => {
+    expect(shouldRejectExistingInstance({ provider: 'gcp' }, true)).toBe(false);
+  });
+
+  it('registro mock/desconhecido → não bloqueia', () => {
+    expect(shouldRejectExistingInstance({ provider: 'mock' }, false)).toBe(false);
+  });
+});
+
+describe('destroyPacsInstance — guarda dura de nome de VM (gcp)', () => {
+  const savedSaKey = process.env.GCP_SA_KEY;
+  afterEach(() => {
+    if (savedSaKey === undefined) delete process.env.GCP_SA_KEY;
+    else process.env.GCP_SA_KEY = savedSaKey;
+  });
+
+  it('NUNCA destrói a VM compartilhada (orthanc-server), mesmo com pedido explícito', async () => {
+    const r = await destroyPacsInstance({ provider: 'gcp', instanceName: 'orthanc-server' });
+    expect(r.success).toBe(false);
+    expect(r.error).toMatch(/padrão de VM gerenciada/);
+  });
+
+  it('nome no padrão gerenciado passa da guarda (sem GCP configurado → nada a destruir)', async () => {
+    delete process.env.GCP_SA_KEY;
+    const r = await destroyPacsInstance({ provider: 'gcp', instanceName: 'pacs-abc123xyz7-a1' });
+    expect(r.success).toBe(true);
+    expect(r.note).toMatch(/GCP não configurado/);
   });
 });

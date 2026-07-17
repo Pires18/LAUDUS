@@ -85,10 +85,28 @@ describe('scoring vascular — NASCET e ITB', () => {
     expect(grave?.label).toMatch(/≥ 70%/);
     expect(grave?.label).toMatch(/ACI\/ACC/);
   });
-  it('ITB: normal, moderado e incompressível', () => {
+  it('ITB: cortes ESC/AHA — os mesmos que o prompt da área ensina à IA', () => {
+    // o chip do formulário e o laudo gerado precisam concordar sobre o mesmo
+    // número (antes divergiam: chip normal 0,9–1,3 × prompt normal 1,00–1,40)
+    expect(itbClassification(1.0)?.label).toMatch(/normal/);
     expect(itbClassification(1.0)?.alert).toBe(false);
-    expect(itbClassification(0.5)?.label).toMatch(/moderada/);
-    expect(itbClassification(1.4)?.label).toMatch(/incompress/);
+    expect(itbClassification(0.5)?.label).toMatch(/leve a moderada/);
+    expect(itbClassification(0.5)?.alert).toBe(true);
+    expect(itbClassification(0.3)?.label).toMatch(/grave/);
+    expect(itbClassification(1.5)?.label).toMatch(/incompress/);
+  });
+
+  it('ITB: fronteiras que mudaram ao adotar ESC/AHA', () => {
+    // 0,95 era "normal"; agora é LIMÍTROFE (não é DAP, mas não é normal)
+    expect(itbClassification(0.95)?.label).toMatch(/limítrofe/);
+    expect(itbClassification(0.95)?.alert).toBe(false);
+    // 1,35 era "incompressível"; agora é normal — só ACIMA de 1,40 é incompressível
+    expect(itbClassification(1.35)?.label).toMatch(/normal/);
+    expect(itbClassification(1.4)?.label).toMatch(/normal/);
+    expect(itbClassification(1.41)?.label).toMatch(/incompress/);
+    // 0,90 é DAP (o limite superior da DAP é 0,90, não 0,89)
+    expect(itbClassification(0.9)?.label).toMatch(/leve a moderada/);
+    expect(itbClassification(0.4)?.label).toMatch(/grave/);
   });
   it('Bosniak: cisto simples → I; componente sólido → IV', () => {
     expect(bosniakSuggest({ septos: 'ausentes', parede: 'fina' })?.label).toMatch(/Bosniak I /);
@@ -100,7 +118,7 @@ describe('scoring vascular — NASCET e ITB', () => {
 describe('summarize — seções normal/alterado e repetíveis', () => {
   const abdome = deriveStructuredSchema(tpl('medicina-interna', 'ABDOME', ['Baço']), 'medicina-interna');
   const bacoId = abdome.sections.find((s) => s.label === 'Baço')!.id;
-  const tireoide = deriveStructuredSchema(tpl('pequenas-partes', 'TIREOIDE', ['Achados Nodulares']), 'pequenas-partes');
+  const tireoide = deriveStructuredSchema(tpl('pequenas-partes', 'RASTREIO PP', ['Achados Nodulares']), 'pequenas-partes');
   const nodId = tireoide.sections.find((s) => s.label === 'Achados Nodulares')!.id;
 
   it('seção normalable em estado normal compila "sem alterações"', () => {
@@ -127,7 +145,7 @@ describe('summarize — seções normal/alterado e repetíveis', () => {
 });
 
 describe('liveCompute — escore TI-RADS por instância', () => {
-  const tireoide = deriveStructuredSchema(tpl('pequenas-partes', 'TIREOIDE', ['Achados Nodulares']), 'pequenas-partes');
+  const tireoide = deriveStructuredSchema(tpl('pequenas-partes', 'RASTREIO PP', ['Achados Nodulares']), 'pequenas-partes');
   const nodId = tireoide.sections.find((s) => s.label === 'Achados Nodulares')!.id;
 
   it('calcula TR do nódulo repetível a partir dos descritores', () => {

@@ -39,7 +39,7 @@ describe('computeDerivations — cálculo em tempo real', () => {
     const schema = deriveStructuredSchema(tpl('medicina-fetal', 'OBSTÉTRICA'), 'medicina-fetal');
     // DUM 01/01/2026, exame 15/04/2026 → ~14-15 semanas
     const d = computeDerivations(schema, { dum: '01/01/2026' }, new Date(2026, 3, 15).getTime());
-    const ig = d.find((x) => x.id === 'ig__dum');
+    const ig = d.find((x) => x.id === 'ig__ref');
     expect(ig?.text).toMatch(/\d+s \d+d · DPP \d{2}\/\d{2}\/\d{4}/);
   });
 
@@ -75,7 +75,7 @@ describe('computeDerivations — cálculo em tempo real', () => {
   });
 
   it('conduta TI-RADS ciente do tamanho (PAAF/seguimento)', () => {
-    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'TIREOIDE', ['Achados Nodulares']), 'pequenas-partes');
+    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'RASTREIO PP', ['Achados Nodulares']), 'pequenas-partes');
     const nodId = schema.sections.find((s) => s.score === 'tirads')!.id;
     const d = computeDerivations(schema, {
       [countKey(nodId)]: '1',

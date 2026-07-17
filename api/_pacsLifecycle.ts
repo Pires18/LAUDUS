@@ -78,6 +78,13 @@ export async function destroyPacsInstance(input: DestroyPacsInput): Promise<Dest
   }
 
   if (provider === 'gcp') {
+    // Guarda dura de formato: VMs de PACS gerenciado sempre nascem como
+    // `pacs-<uid10>-<hex>` (ver pacs-provision.ts). Qualquer outro nome — em
+    // especial a VM compartilhada `orthanc-server` — NUNCA pode ser destruído
+    // por aqui, mesmo que chegue via dado corrompido ou requisição forjada.
+    if (!/^pacs-[a-z0-9]+-[a-z0-9]+$/.test(instanceName)) {
+      return { success: false, error: `instanceName fora do padrão de VM gerenciada (pacs-*): ${instanceName}` };
+    }
     const gcpConfigured = !!process.env.GCP_SA_KEY;
     if (!gcpConfigured) {
       return { success: true, note: 'GCP não configurado no servidor — nada a destruir remotamente.' };

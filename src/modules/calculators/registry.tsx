@@ -5,7 +5,6 @@ import { OradsCalculator } from './components/OradsCalculator';
 import { FigoCalculator } from './components/FigoCalculator';
 import { GestationalAgeCalculator } from './components/GestationalAgeCalculator';
 import { MsdCalculator } from './components/MsdCalculator';
-import { CrlCalculator } from './components/CrlCalculator';
 import { WhoFetalBiometryCalculator } from './components/WhoFetalBiometryCalculator';
 import { DopplerCalculator } from './components/DopplerCalculator';
 import { BarcelonaFetalGrowthCalculator } from './components/BarcelonaFetalGrowthCalculator';
@@ -50,7 +49,8 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'Cálculo de Volume', 
     description: 'Cálculo universal de volume para estruturas (C × L × A × 0.523).', 
     component: VolumeCalculator,
-    areas: ['medicina-interna', 'ginecologia', 'pequenas-partes', 'medicina-fetal', 'vascular', 'musculoesqueletico', 'pediatria', 'procedimentos'],
+    // universal: qualquer área que meça uma estrutura em 3 eixos
+    areas: ['medicina-interna', 'ginecologia', 'pequenas-partes', 'medicina-fetal', 'vascular', 'musculoesqueletico', 'pediatria', 'procedimentos', 'mastologia', 'reumatologico'],
     reference: {
       text: 'Fórmula do Elipsoide Prolado (Comprimento × Largura × Altura × 0.523). Modelo físico universal padrão-ouro na ultrassonografia clínica volumétrica.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/'
@@ -107,7 +107,8 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'ACR TI-RADS (Tireoide)', 
     description: 'Calculadora oficial do ACR (2017) para nódulos tireoidianos.', 
     component: TiradsCalculator,
-    areas: ['pequenas-partes'],
+    // procedimentos: a PAAF TIREOIDE herda os descritores e a categoria do alvo
+    areas: ['pequenas-partes', 'procedimentos'],
     reference: {
       text: 'Tessler FN, et al. ACR Thyroid Imaging, Reporting and Data System (TI-RADS): White Paper of the ACR TI-RADS Committee. J Am Coll Radiol 2017.',
       link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Thyroid-Imaging-Reporting-and-Data-System'
@@ -118,7 +119,8 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'ACR BI-RADS (Mama)', 
     description: 'Léxico e classificação BI-RADS para ultrassonografia mamária.', 
     component: BiradsCalculator,
-    areas: ['pequenas-partes', 'ginecologia', 'mastologia'],
+    // procedimentos: a PAAF MAMA herda o léxico e a categoria da lesão-alvo
+    areas: ['pequenas-partes', 'ginecologia', 'mastologia', 'procedimentos'],
     reference: {
       text: 'American College of Radiology (ACR) Breast Imaging Reporting and Data System (BI-RADS) US Atlas 2013. Léxico oficial de lesões mamárias.',
       link: 'https://www.acr.org/Clinical-Resources/Reporting-and-Data-Systems/Bi-Rads'
@@ -151,13 +153,13 @@ export const CALCULATORS: CalculatorDef[] = [
 
   // --- MEDICINA FETAL ---
   { 
-    id: 'barcelona-fetal-growth', 
-    name: 'Crescimento Fetal (OMS + Doppler)', 
-    description: 'Calculadora completa passo-a-passo: biometria (OMS), peso e Doppler (Barcelona).', 
+    id: 'barcelona-fetal-growth',
+    name: 'Crescimento Fetal (Biometria + Doppler)',
+    description: 'Calculadora completa passo-a-passo: biometria e peso por curva selecionável (Hadlock, INTERGROWTH-21st ou OMS) e Doppler/estadiamento de Barcelona.',
     component: BarcelonaFetalGrowthCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Biometria pela OMS (Kiserud, 2017) e Doppler/Estadiamento pelo Consenso de Barcelona Fetal Medicine (Gratacós, 2014).',
+      text: 'Biometria/peso por Hadlock (Radiology 1984;152:497 e 1991;181:129), INTERGROWTH-21st (Papageorghiou, Lancet 2014; Stirnemann, UOG 2017) ou OMS (Kiserud, 2017) — a curva usada é exibida junto do percentil. Doppler/estadiamento pelo Consenso de Barcelona Fetal Medicine (Gratacós, 2014).',
       link: 'https://www.medicinafetalbarcelona.org/'
     }
   },
@@ -174,23 +176,24 @@ export const CALCULATORS: CalculatorDef[] = [
   },
   {
     id: 'gestational-age',
-    name: 'Idade Gestacional (DUM/USG)',
-    description: 'Calcula a IG atual e DPP baseada na DUM ou USG anterior.', 
+    name: 'Idade Gestacional (DUM / USG / Biometria)',
+    description: 'IG de referência e DPP por DUM, USG anterior ou biometria — CCN (1ºT), DBP (2ºT) ou CC (3ºT) — com comparação entre os métodos.', 
     component: GestationalAgeCalculator,
-    areas: ['medicina-fetal'],
+    // procedimentos: a IG no dia do procedimento define a janela da BVC/amnio
+    areas: ['medicina-fetal', 'procedimentos'],
     reference: {
       text: 'ACOG Committee Opinion No. 700: Methods for Estimating the Due Date. American College of Obstetricians and Gynecologists, Obstetrics & Gynecology 2017.',
       link: 'https://www.acog.org/'
     }
   },
   { 
-    id: 'who-fetal-biometry', 
-    name: 'Biometria Fetal (Peso/Percentil)', 
-    description: 'Peso fetal estimado (Hadlock IV) com percentil da OMS (WHO Fetal Growth).', 
+    id: 'who-fetal-biometry',
+    name: 'Biometria Fetal (Peso/Percentil)',
+    description: 'Peso fetal estimado (Hadlock IV ou INTERGROWTH) e percentis da biometria por curva selecionável: Hadlock (padrão), INTERGROWTH-21st ou OMS.',
     component: WhoFetalBiometryCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Kiserud T, et al. The World Health Organization Fetal Growth Charts: A Multinational Longitudinal Study of Ultrasound Biometric Measurements and Estimated Fetal Weight.',
+      text: 'Hadlock FP, et al. Radiology 1984;152:497 (biometria) e 1991;181:129 (peso). Papageorghiou AT, et al. Lancet 2014;384:869 e Stirnemann J, et al. UOG 2017;49:478 (INTERGROWTH-21st). Kiserud T, et al. WHO Fetal Growth Charts (2017). A curva usada é exibida junto de cada percentil.',
       link: 'https://www.who.int/tools/fetal-growth-charts'
     }
   },
@@ -210,21 +213,11 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'Líquido Amniótico (MBV/ILA)', 
     description: 'Avaliação do volume de LA por MBV (maior bolsão) ou ILA (4 quadrantes).', 
     component: AmnioticFluidCalculator,
-    areas: ['medicina-fetal'],
+    // procedimentos: BVC e amniocentese avaliam o LA antes de puncionar
+    areas: ['medicina-fetal', 'procedimentos'],
     reference: {
       text: 'Phelan JP, et al. Amniotic fluid volume assessment using the four-quadrant technique (ILA). Chamberlain PF, et al. Single deepest pocket technique (MBV) assessment.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/'
-    }
-  },
-  { 
-    id: 'crl-ccn', 
-    name: 'Idade Gestacional (CCN)', 
-    description: 'Calcula IG e DPP pelo CCN (Hadlock 1992).', 
-    component: CrlCalculator,
-    areas: ['medicina-fetal'],
-    reference: {
-      text: 'Hadlock FP, et al. Fetal crown-rump length: relation to gestational age. Radiology 1992. Curva normativa oficial de primeiro trimestre.',
-      link: 'https://pubmed.ncbi.nlm.nih.gov/1549421/'
     }
   },
   { 
@@ -277,7 +270,8 @@ export const CALCULATORS: CalculatorDef[] = [
     name: 'Índices Hemodinâmicos', 
     description: 'Cálculo universal de IR (Resistência), IP (Pulsatilidade) e Relação S/D.', 
     component: VascularRatiosCalculator,
-    areas: ['vascular', 'medicina-interna'],
+    // pediatria: IR da cerebral anterior (transfontanelar) e IR renal
+    areas: ['vascular', 'medicina-interna', 'pediatria'],
     reference: {
       text: 'Pourcelot L. (Índice de Resistência, 1974), Wladimiroff JW. (Índice de Pulsatilidade, 1984) e Stuart B. (Relação Sistólica/Diastólica) para análises espectrais Doppler.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/'

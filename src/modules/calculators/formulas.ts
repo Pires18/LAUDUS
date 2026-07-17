@@ -116,6 +116,168 @@ export function gaFromPriorUsg(usgDate: Date, usgWeeks: number, usgDays: number,
   return buildGa(totalDays, edd);
 }
 
+/**
+ * IG pelo DBP (diâmetro biparietal, mm) — Hadlock et al. 1984 (Radiology 152:497):
+ *   IG(sem) = 9,54 + 1,482·b + 0,1676·b²   (b = DBP em cm)
+ * Parâmetro de escolha no 2º trimestre (acurácia cai no 3º por moldagem cefálica).
+ */
+export function gaFromBpd(bpdMm: number): { totalDays: number; weeks: number; days: number; label: string } | null {
+  if (!(bpdMm > 0)) return null;
+  const b = bpdMm / 10;
+  const weeksDec = 9.54 + 1.482 * b + 0.1676 * Math.pow(b, 2);
+  if (!isFinite(weeksDec) || weeksDec <= 0) return null;
+  const totalDays = Math.round(weeksDec * 7);
+  return { totalDays, weeks: Math.floor(totalDays / 7), days: totalDays % 7, label: `${Math.floor(totalDays / 7)}s ${totalDays % 7}d` };
+}
+
+/**
+ * IG pela CC (circunferência cefálica, mm) — Hadlock et al. 1984:
+ *   IG(sem) = 8,96 + 0,540·h + 0,0003·h³   (h = CC em cm)
+ * Parâmetro de escolha no 3º trimestre (menos afetado pela moldagem que o DBP).
+ */
+export function gaFromHc(hcMm: number): { totalDays: number; weeks: number; days: number; label: string } | null {
+  if (!(hcMm > 0)) return null;
+  const h = hcMm / 10;
+  const weeksDec = 8.96 + 0.54 * h + 0.0003 * Math.pow(h, 3);
+  if (!isFinite(weeksDec) || weeksDec <= 0) return null;
+  const totalDays = Math.round(weeksDec * 7);
+  return { totalDays, weeks: Math.floor(totalDays / 7), days: totalDays % 7, label: `${Math.floor(totalDays / 7)}s ${totalDays % 7}d` };
+}
+
+/** Parâmetro biométrico usado para datar, por trimestre. */
+export type BiometryDatingParam = 'ccn' | 'dbp' | 'cc';
+
+export const BIOMETRY_DATING_LABEL: Record<BiometryDatingParam, string> = {
+  ccn: 'CCN (1º trimestre)',
+  dbp: 'DBP (2º trimestre)',
+  cc: 'CC (3º trimestre)',
+};
+
+/** IG por biometria: CCN (1ºT), DBP (2ºT) ou CC (3ºT). Medidas em mm. */
+export function gaFromBiometry(
+  param: BiometryDatingParam,
+  valueMm: number
+): { totalDays: number; weeks: number; days: number; label: string } | null {
+  if (param === 'ccn') {
+    const r = crlToGestationalAge(valueMm);
+    return r ? { totalDays: r.totalDays, weeks: r.weeks, days: r.days, label: r.label } : null;
+  }
+  if (param === 'dbp') return gaFromBpd(valueMm);
+  return gaFromHc(valueMm);
+}
+
+/**
+ * Escolhe o parâmetro biométrico de datação pelo trimestre: CCN no 1º,
+ * DBP no 2º e CC no 3º. Sem IG conhecida, infere pelos dados disponíveis
+ * (CCN presente → 1ºT; senão datar pela CC exige IG — cai no DBP).
+ */
+export function pickBiometryDatingParam(
+  available: { ccn?: number | null; dbp?: number | null; cc?: number | null },
+  knownWeeks?: number | null
+): BiometryDatingParam | null {
+  const has = (v?: number | null) => v != null && v > 0;
+  if (knownWeeks != null) {
+    if (knownWeeks < 14) return has(available.ccn) ? 'ccn' : has(available.dbp) ? 'dbp' : null;
+    if (knownWeeks < 28) return has(available.dbp) ? 'dbp' : has(available.cc) ? 'cc' : null;
+    return has(available.cc) ? 'cc' : has(available.dbp) ? 'dbp' : null;
+  }
+  // Sem IG prévia: CCN indica 1º trimestre; senão estima pelo DBP e refina.
+  if (has(available.ccn)) return 'ccn';
+  if (has(available.dbp)) {
+    const est = gaFromBpd(available.dbp!);
+    // ≥ 28 semanas pelo DBP → a CC é o parâmetro preferido, se houver.
+    if (est && est.totalDays / 7 >= 28 && has(available.cc)) return 'cc';
+    return 'dbp';
+  }
+  return has(available.cc) ? 'cc' : null;
+}
+
+/** Interpreta rótulos de IG: "12s3d", "12+3", "12 3", "12s", "12". */
+export function parseIgLabel(raw: string): { weeks: number; days: number } | null {
+  const s = (raw || '').trim().toLowerCase();
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})\s*(?:s(?:em)?|w|\+)?\s*(\d{1,2})?\s*d?/);
+  if (!m) return null;
+  const weeks = Number(m[1]);
+  const days = m[2] != null ? Number(m[2]) : 0;
+  if (!isFinite(weeks) || weeks < 0 || weeks > 45) return null;
+  if (!isFinite(days) || days < 0 || days > 6) return null;
+  return { weeks, days };
+}
+
+export type DatingMethod = 'dum' | 'usg' | 'biometria';
+
+export interface ReferenceGaInput {
+  /** Método escolhido no laudo. Ausente → hierarquia USG > DUM > biometria. */
+  method?: DatingMethod | null;
+  dum?: Date | null;
+  usgDate?: Date | null;
+  usgWeeks?: number | null;
+  usgDays?: number | null;
+  biometry?: { ccn?: number | null; dbp?: number | null; cc?: number | null };
+  examDate: Date;
+}
+
+export interface ReferenceGaResult {
+  totalDays: number;
+  weeks: number;
+  days: number;
+  label: string;
+  /** DPP — indisponível quando a datação vem da biometria isolada. */
+  edd?: Date;
+  method: DatingMethod;
+  /** Rótulo da fonte para exibição (ex.: 'DUM', 'USG anterior', 'CCN'). */
+  sourceLabel: string;
+}
+
+/**
+ * IG DE REFERÊNCIA do exame — fonte única de verdade para os percentis
+ * (biometria/OMS, Doppler, MoM) e para os cálculos de risco.
+ *
+ * Hierarquia quando o método não é declarado (ISUOG/ACOG/FMF): USG anterior
+ * (idealmente CCN de 11+0–13+6) > DUM confiável > biometria do exame atual.
+ * Com o método declarado, respeita a escolha e só cai no próximo se faltarem dados.
+ */
+export function resolveReferenceGa(input: ReferenceGaInput): ReferenceGaResult | null {
+  const { examDate } = input;
+  if (!examDate || isNaN(examDate.getTime())) return null;
+
+  const byUsg = (): ReferenceGaResult | null => {
+    if (!input.usgDate || input.usgWeeks == null) return null;
+    const r = gaFromPriorUsg(input.usgDate, input.usgWeeks, input.usgDays || 0, examDate);
+    return r ? { ...r, method: 'usg', sourceLabel: 'USG anterior' } : null;
+  };
+  const byDum = (): ReferenceGaResult | null => {
+    if (!input.dum) return null;
+    const r = gaFromLMP(input.dum, examDate);
+    return r ? { ...r, method: 'dum', sourceLabel: 'DUM' } : null;
+  };
+  const byBiometry = (): ReferenceGaResult | null => {
+    const bio = input.biometry || {};
+    const param = pickBiometryDatingParam(bio);
+    if (!param) return null;
+    const value = bio[param];
+    const r = gaFromBiometry(param, value!);
+    if (!r) return null;
+    // DPP a partir da IG biométrica: parto estimado 280 dias após a "DUM equivalente".
+    const edd = new Date(examDate);
+    edd.setDate(edd.getDate() + (280 - r.totalDays));
+    return { ...r, edd, method: 'biometria', sourceLabel: param.toUpperCase() };
+  };
+
+  const order: Array<() => ReferenceGaResult | null> =
+    input.method === 'dum' ? [byDum, byUsg, byBiometry]
+      : input.method === 'usg' ? [byUsg, byDum, byBiometry]
+      : input.method === 'biometria' ? [byBiometry, byUsg, byDum]
+      : [byUsg, byDum, byBiometry];
+
+  for (const fn of order) {
+    const r = fn();
+    if (r) return r;
+  }
+  return null;
+}
+
 /** Volume de derrame pleural pela fórmula de Balik: V(ml) = 20 × espessura(mm). */
 export function balikPleuralVolume(depthMm: number): number | null {
   return depthMm > 0 ? 20 * depthMm : null;

@@ -13,6 +13,7 @@ import { StructuredTab } from './components/StructuredTab';
 import { deriveStructuredSchema, summarizeStructured } from './structured/deriveSchema';
 import { computeDerivations, derivationsToLines } from './structured/liveCompute';
 import { itemCount, itemFieldId, countKey } from './structured/structuredKeys';
+import { findRepeatContainer } from './structured/containers';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
 import { routeMotor } from '../ai/router';
 import { recordHumanFeedback } from '../ai/training/feedbackStore';
@@ -1031,7 +1032,10 @@ export function LaudCopilot({
       const cur = next[field.id];
       const hasVal = !!(typeof cur === 'string' ? cur.trim() : cur?.text);
       if (hasVal) continue;
-      if (field.kind === 'text') {
+      if ((field.kind === 'measure' || field.kind === 'triplet') && field.normal) {
+        next[field.id] = field.normal; // valor de referência de normalidade
+        changed = true;
+      } else if (field.kind === 'text') {
         next[field.id] = field.placeholder || 'sem alterações';
         changed = true;
       } else if (field.kind === 'select' && field.options?.length) {
@@ -1049,28 +1053,29 @@ export function LaudCopilot({
     onOpenCalcForField?.(calcId, fieldId, label);
   };
 
-  // Itens repetíveis (múltiplos nódulos/lesões/linfonodos).
-  const handleAddItem = (sectionId: string) => {
-    const n = itemCount(latestStructuredRef.current, sectionId);
-    handleStructuredChange(countKey(sectionId), String(Math.min(n + 1, 20)));
+  // Itens repetíveis (nódulos/lesões/linfonodos) — `containerId` é a seção-lista
+  // pura OU o grupo aninhado (section#group), resolvido por findRepeatContainer.
+  const handleAddItem = (containerId: string) => {
+    const n = itemCount(latestStructuredRef.current, containerId);
+    handleStructuredChange(countKey(containerId), String(Math.min(n + 1, 20)));
   };
 
-  const handleRemoveItem = (sectionId: string, index: number) => {
-    const section = structuredSchema.sections.find((s) => s.id === sectionId);
-    if (!section) return;
-    const n = itemCount(latestStructuredRef.current, sectionId);
+  const handleRemoveItem = (containerId: string, index: number) => {
+    const container = findRepeatContainer(structuredSchema, containerId);
+    if (!container) return;
+    const n = itemCount(latestStructuredRef.current, containerId);
     const next = { ...latestStructuredRef.current };
     // Reindexa: desloca as instâncias acima do índice removido uma posição p/ baixo.
     for (let i = index; i < n - 1; i++) {
-      for (const f of section.fields) {
-        const from = itemFieldId(sectionId, i + 1, f.id);
-        const to = itemFieldId(sectionId, i, f.id);
+      for (const f of container.fields) {
+        const from = itemFieldId(containerId, i + 1, f.id);
+        const to = itemFieldId(containerId, i, f.id);
         if (from in next) next[to] = next[from];
         else delete next[to];
       }
     }
-    for (const f of section.fields) delete next[itemFieldId(sectionId, n - 1, f.id)];
-    next[countKey(sectionId)] = String(Math.max(1, n - 1));
+    for (const f of container.fields) delete next[itemFieldId(containerId, n - 1, f.id)];
+    next[countKey(containerId)] = String(Math.max(1, n - 1));
     setStructuredValues(next);
     persistStructured(next);
   };

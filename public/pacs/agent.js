@@ -2,7 +2,18 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
+
+// Comparação de segredos em tempo constante (anti timing-attack) — nunca
+// use ===/!== para segredos. Tamanhos diferentes retornam false direto
+// (timingSafeEqual exige buffers do mesmo tamanho); vazio nunca autentica.
+function secureEquals(a, b) {
+  const ba = Buffer.from(String(a || ''), 'utf8');
+  const bb = Buffer.from(String(b || ''), 'utf8');
+  if (ba.length === 0 || ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 
 const PORT = process.env.PORT || 3000;
 
@@ -107,11 +118,11 @@ function checkAuth(req, res, u) {
   if (TENANTS_DIR) {
     const tenant = loadTenant(u);
     if (!tenant) { unauthorized(res, 'tenantId inválido ou ausente (servidor multi-tenant).'); return { ok: false }; }
-    if (provided && provided === tenant.secret) return { ok: true, tenant };
+    if (secureEquals(provided, tenant.secret)) return { ok: true, tenant };
     unauthorized(res); return { ok: false };
   }
   if (!AGENT_SECRET) return { ok: true, tenant: null };
-  if (provided && provided === AGENT_SECRET) return { ok: true, tenant: null };
+  if (secureEquals(provided, AGENT_SECRET)) return { ok: true, tenant: null };
   unauthorized(res); return { ok: false };
 }
 
@@ -139,7 +150,7 @@ const server = http.createServer((req, res) => {
   // POST /api/admin/tenant -> provisiona um tenant na VM compartilhada (admin).
   // Protegido por x-admin-secret. Executa pacs-tenant.sh e devolve os dados JSON.
   if (req.method === 'POST' && pathname === '/api/admin/tenant') {
-    if (!ADMIN_SECRET || req.headers['x-admin-secret'] !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !secureEquals(req.headers['x-admin-secret'], ADMIN_SECRET)) {
       res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ success: false, error: 'Admin não autorizado.' })); return;
     }
@@ -177,7 +188,7 @@ const server = http.createServer((req, res) => {
   // chamado pelo servidor (api/pacs-deprovision.ts) quando o usuário remove o
   // PACS na nuvem pelo app.
   if (req.method === 'DELETE' && pathname.startsWith('/api/admin/tenant/')) {
-    if (!ADMIN_SECRET || req.headers['x-admin-secret'] !== ADMIN_SECRET) {
+    if (!ADMIN_SECRET || !secureEquals(req.headers['x-admin-secret'], ADMIN_SECRET)) {
       res.statusCode = 401; res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ success: false, error: 'Admin não autorizado.' })); return;
     }
@@ -298,6 +309,12 @@ const server = http.createServer((req, res) => {
         // Diretório de saída: multi-tenant → pasta do tenant; senão WORKLIST_DIR.
         if (tenant && tenant.worklistDir) payload.outputDir = tenant.worklistDir;
         else if (WORKLIST_DIR) payload.outputDir = WORKLIST_DIR;
+        // Sem trava server-side (instalação local), o outputDir vem do cliente:
+        // recusa path-traversal — o destino deve ser uma pasta literal.
+        else if (payload.outputDir && String(payload.outputDir).includes('..')) {
+          res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: 'outputDir inválido (path-traversal não permitido).' })); return;
+        }
 
         const pythonScriptPath = path.join(__dirname, 'generate_wl.py');
         const commandsToTry = ['python', 'python3', 'py'];
@@ -357,6 +374,12 @@ const server = http.createServer((req, res) => {
         if (!/^[A-Za-z0-9_-]+$/.test(String(examId))) {
           res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ success: false, error: 'examId inválido.' })); return;
+        }
+        // Mesma sanidade do POST: sem trava server-side, o dir vem do cliente
+        // — recusa path-traversal antes de compor o caminho do .wl.
+        if (!(tenant && tenant.worklistDir) && !WORKLIST_DIR && outputDir && String(outputDir).includes('..')) {
+          res.statusCode = 400; res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ success: false, error: 'outputDir inválido (path-traversal não permitido).' })); return;
         }
         let dir = (tenant && tenant.worklistDir) || WORKLIST_DIR || outputDir;
         if (!dir) {

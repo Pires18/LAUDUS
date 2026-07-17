@@ -159,9 +159,21 @@ async function runCronBatch(req: any, res: any) {
         }, { merge: true });
         pacsSuspendedCount++;
       } else if (isCanceledOrExpired && inst.status === 'suspended' && inst.scheduledDeletionAt && now > inst.scheduledDeletionAt) {
-        const result = await destroyPacsInstance({ provider: inst.provider, instanceName: inst.instanceName, tenantId: inst.tenantId });
+        // POSSE: prefere o registro server-side (`pacs_instances/{uid}`,
+        // gravado pelo provisionamento e inacessível ao cliente) — as settings
+        // são graváveis pelo próprio usuário e não servem como prova do que
+        // destruir. Sem registro (instância legada), usa as settings mesmo;
+        // a guarda de nome `pacs-*` em destroyPacsInstance segura o pior caso.
+        let target: { provider?: string; instanceName?: string; tenantId?: string } =
+          { provider: inst.provider, instanceName: inst.instanceName, tenantId: inst.tenantId };
+        try {
+          const recSnap = await db.collection('pacs_instances').doc(userId).get();
+          if (recSnap.exists) target = recSnap.data() as typeof target;
+        } catch { /* registro indisponível → segue com as settings (legado) */ }
+        const result = await destroyPacsInstance(target);
         if (result.success) {
           pacsBatch.set(settingsRef, { pacsInstance: { status: 'none', updatedAt: now } }, { merge: true });
+          pacsBatch.delete(db.collection('pacs_instances').doc(userId));
           pacsDestroyedCount++;
         } else {
           console.error(`[CRON PACS] Falha ao destruir PACS de ${userId}:`, result.error);

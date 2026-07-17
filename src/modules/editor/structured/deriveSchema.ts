@@ -6,7 +6,9 @@ import {
   StructuredFieldValue,
 } from '../../../types';
 import { enrichSections } from './fieldLibrary';
+import { findStandardSchema } from './standardSchemas';
 import { sectionState, itemCount, itemFieldId } from './structuredKeys';
+import { sectionRepeatContainers } from './containers';
 
 /** Placeholders de preenchimento usados nas máscaras (fetal `(...)` / não-fetal `[__]`). */
 const PLACEHOLDER_RE = /\(\.\.\.\)|\(…\)|\[_{2,}\]|\[inserir\]/g;
@@ -94,6 +96,18 @@ export function deriveStructuredSchema(
   template: ReportTemplate | null,
   area: string
 ): StructuredSchema {
+  // Esquema PERSONALIZADO salvo na máscara tem precedência total — é usado
+  // como está, sem parser nem enriquecimento (inclusive `[]` = formulário
+  // desativado para este exame).
+  if (template?.structuredSchema?.sections) {
+    return { area, examName: template.name, sections: template.structuredSchema.sections };
+  }
+  // MODELO PADRÃO curado por exame (standardSchemas) — já vem tipado e com
+  // calculadoras/escores ligados; dispensa parser e enriquecimento.
+  const std = findStandardSchema(area, template?.name);
+  if (std) {
+    return { area, examName: template?.name, sections: std.sections };
+  }
   const parsed = template?.analysisTemplate
     ? parseMaskSections(template.analysisTemplate)
     : [];
@@ -127,43 +141,52 @@ export function summarizeStructured(
   const vals = values || {};
 
   for (const section of schema.sections) {
-    // Seção normalable em estado 'normal' → emite normalidade e segue.
+    // Seção normalable em estado 'normal' → emite a normalidade e, junto, a
+    // biometria registrada mesmo na normalidade (campos `alwaysShow`).
     if (section.normalable && sectionState(vals, section.id) === 'normal') {
       lines.push(`${section.label}: sem alterações${section.normalText ? ` (${section.normalText})` : ''}`);
       filledCount++;
-      continue;
-    }
-
-    if (section.repeatable) {
-      const n = itemCount(vals, section.id);
-      const block: string[] = [];
-      for (let i = 0; i < n; i++) {
-        const itemLines: string[] = [];
-        for (const field of section.fields) {
-          const text = fieldValueToText(vals[itemFieldId(section.id, i, field.id)]);
-          if (!text) continue;
-          filledCount++;
-          itemLines.push(`    - ${field.label}: ${withUnit(field, text)}`);
-        }
-        if (itemLines.length) {
-          block.push(`  ${section.itemLabel || 'Item'} ${i + 1}:`);
-          block.push(...itemLines);
-        }
-      }
-      if (block.length) {
-        lines.push(`${section.label}:`);
-        lines.push(...block);
+      for (const field of section.fields) {
+        if (!field.alwaysShow) continue;
+        const text = fieldValueToText(vals[field.id]);
+        if (!text) continue;
+        filledCount++;
+        lines.push(`  - ${field.label}: ${withUnit(field, text)}`);
       }
       continue;
     }
 
     const sectionLines: string[] = [];
-    for (const field of section.fields) {
-      const text = fieldValueToText(vals[field.id]);
-      if (!text) continue;
-      filledCount++;
-      sectionLines.push(`  - ${field.label}: ${withUnit(field, text)}`);
+
+    // Campos FIXOS da seção (não valem para seções-lista puras, cujos `fields`
+    // pertencem a cada item — esses são emitidos como container abaixo).
+    if (!section.repeatable) {
+      for (const field of section.fields) {
+        const text = fieldValueToText(vals[field.id]);
+        if (!text) continue;
+        filledCount++;
+        sectionLines.push(`  - ${field.label}: ${withUnit(field, text)}`);
+      }
     }
+
+    // Containers repetíveis: seção-lista pura e/ou grupo de lesões aninhado.
+    for (const container of sectionRepeatContainers(section)) {
+      const n = itemCount(vals, container.containerId);
+      for (let i = 0; i < n; i++) {
+        const itemLines: string[] = [];
+        for (const field of container.fields) {
+          const text = fieldValueToText(vals[itemFieldId(container.containerId, i, field.id)]);
+          if (!text) continue;
+          filledCount++;
+          itemLines.push(`    - ${field.label}: ${withUnit(field, text)}`);
+        }
+        if (itemLines.length) {
+          sectionLines.push(`  ${container.itemLabel || 'Item'} ${i + 1}:`);
+          sectionLines.push(...itemLines);
+        }
+      }
+    }
+
     if (sectionLines.length) {
       lines.push(`${section.label}:`);
       lines.push(...sectionLines);

@@ -8,9 +8,18 @@ import { StructuredFieldValue } from '../../../types';
  */
 
 export const normalKey = (sectionId: string) => `__n:${sectionId}`;
-export const countKey = (sectionId: string) => `__c:${sectionId}`;
-export const itemFieldId = (sectionId: string, index: number, fieldId: string) =>
-  `${sectionId}@${index}@${fieldId}`;
+export const countKey = (containerId: string) => `__c:${containerId}`;
+export const itemFieldId = (containerId: string, index: number, fieldId: string) =>
+  `${containerId}@${index}@${fieldId}`;
+
+/**
+ * Id de container de um grupo repetível ANINHADO numa seção. Usa `#` como
+ * separador (o `@` já separa instância/campo), então as chaves de item ficam
+ * `<sectionId>#<groupId>@<i>@<fieldId>` — sem colisão com os campos fixos da
+ * seção (`<fieldId>`) nem com uma seção-lista pura (`<sectionId>@<i>@<fieldId>`).
+ */
+export const groupContainerId = (sectionId: string, groupId: string) =>
+  `${sectionId}#${groupId}`;
 
 export function isInternalKey(key: string): boolean {
   return key.startsWith('__');
