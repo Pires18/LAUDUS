@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
+ * Próximo índice de imagem ao navegar, com clamp nos limites (pura, testável).
+ * Nunca sai de [0, count-1]; com lista vazia (count 0) permanece em 0.
+ */
+export function stepImageIndex(current: number, count: number, dir: 'prev' | 'next'): number {
+  if (dir === 'prev') return current > 0 ? current - 1 : current;
+  return current < count - 1 ? current + 1 : current;
+}
+
+/**
  * Navegação entre imagens do estudo DICOM (índice ativo, prev/next e setas do
  * teclado). Extraído de ExamEditor para reduzir o tamanho do componente.
  *
@@ -23,11 +32,11 @@ export function useImageNavigation(
   }, [selectedStudyId]);
 
   const handlePrevImage = useCallback(() => {
-    setActiveImageIndex((prev) => (prev > 0 ? prev - 1 : prev));
-  }, []);
+    setActiveImageIndex((prev) => stepImageIndex(prev, instanceCount, 'prev'));
+  }, [instanceCount]);
 
   const handleNextImage = useCallback(() => {
-    setActiveImageIndex((prev) => (prev < instanceCount - 1 ? prev + 1 : prev));
+    setActiveImageIndex((prev) => stepImageIndex(prev, instanceCount, 'next'));
   }, [instanceCount]);
 
   // Navegação por teclado (setas) — só com um visor aberto.

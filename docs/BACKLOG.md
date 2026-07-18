@@ -75,10 +75,25 @@
   `src/modules/editor/ExamEditor.tsx` (1574 linhas), `src/modules/ai/engine.ts` (1282 linhas).
   Origem: `docs/archive/PLANO_REFINAMENTO.md` (item R4).
 - **Uso de `any` ainda alto** (R7) — caiu de ~248 para ~183 ocorrências desde a
-  auditoria de 04/07, mas segue como dívida técnica.
+  auditoria de 04/07, mas segue como dívida técnica. A maioria são casts de
+  `doc.data()` (aceitáveis) e o padrão de setter dinâmico `setField(key, {...} as any)`
+  (extras de preço em `AdminFinanceiro.tsx`), que exigiria genéricos pesados.
   Origem: `docs/archive/PLANO_REFINAMENTO.md` (item R7).
+- **Readers do Financeiro — parte deferida** (item 2 da auditoria 2026-07) — os
+  leitores de `AdminFinanceiro.tsx` (planos + histórico de preço) foram tipados
+  (`Plan`, `PriceHistoryEntry`), removendo os `as any`. FALTAM os leitores em
+  `finance/FinanceOverviewTab.tsx` e `finance/TransactionsTab.tsx` (casts inline de
+  `doc.data()`), **deferidos por serem território do processo paralelo** — mexer
+  amplo neles gera conflito de merge.
+- **`FinanceStats` duplicado** — definido 3× com shapes divergentes
+  (`AdminAnalytics.tsx`, `finance/FinanceOverviewTab.tsx`, `finance/TransactionsTab.tsx`;
+  o de Analytics não tem `otherCount`/`updatedAt`). Consolidar num tipo único em
+  `store/db.ts`. Também deferido (toca arquivos do processo paralelo).
 - **Cobertura de testes dos componentes do Editor** (Fase 5 do plano de melhorias) —
-  explicitamente marcada como "só se sobrar tempo", nunca executada.
+  infra de teste de UI habilitada em 2026-07-18 (`@testing-library/react` + `jsdom`
+  por-arquivo via docblock `@vitest-environment`); primeiros testes de render/hook
+  escritos (`PlaygroundPanel`, `useImageNavigation`). Expandir para os demais
+  componentes extraídos do Editor.
   Origem: `docs/archive/PLANO_MELHORIAS_2026-07.md`.
 
 ---

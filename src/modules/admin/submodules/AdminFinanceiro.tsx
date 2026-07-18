@@ -34,6 +34,18 @@ type FinTab = 'overview' | 'plans' | 'pacs-plans' | 'vm-infra' | 'features' | 'e
 
 type PlanForm = Omit<Plan, 'id' | 'examLimit' | 'clinicLimit' | 'iaLimit' | 'storageLimitGb' | 'voiceDictation' | 'customMasks'>;
 
+/** Snapshot de preços de um plano (os 3 intervalos), como gravado no histórico. */
+type PlanPrices = NonNullable<Plan['prices']>;
+
+/** Entrada da subcoleção `saas_plans/{id}/price_history` — snapshot antes/depois. */
+type PriceHistoryEntry = {
+  id: string;
+  before: PlanPrices | null;
+  after: PlanPrices | null;
+  changedByName: string;
+  changedAt: number;
+};
+
 const EMPTY_PLAN: PlanForm = {
   name: '',
   description: '',
@@ -172,7 +184,7 @@ function PlansTab() {
       const snap = await getDocs(collection(firestore, 'saas_plans'));
       // O id do DOCUMENTO é autoritativo — vem depois do spread para nunca ser
       // sobrescrito por um campo `id` que tenha sido gravado nos dados por engano.
-      setPlans(snap.docs.map(d => ({ ...d.data(), id: d.id } as any)));
+      setPlans(snap.docs.map(d => ({ ...(d.data() as Plan), id: d.id })));
     } finally {
       setLoading(false);
     }
@@ -227,7 +239,9 @@ function PlansTab() {
       // `price` (legado) espelha o mensal; `interval` fica 'month' — o plano cobre os 3.
       // Nunca gravamos `id` nos dados (o id é do documento) para não corromper a
       // identificação dos planos na listagem/seleção/exclusão.
-      const { id: _omitId, ...formData } = form as any;
+      // `openEdit` faz spread do plano (que TEM id) dentro do form, então em runtime
+      // pode haver um `id` mesmo que PlanForm não o declare — removemos por segurança.
+      const { id: _omitId, ...formData } = form as PlanForm & { id?: string };
       const data = {
         ...formData,
         prices,
@@ -549,13 +563,13 @@ function PlanFormModal({ form, setForm, onSave, onCancel, saving, isNew, planId 
   const setPrice = (k: 'month' | 'semester' | 'year', v: number) => set('prices', { ...prices, [k]: v });
 
   const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState<Array<{ id: string; before: any; after: any; changedByName: string; changedAt: number }> | null>(null);
+  const [history, setHistory] = useState<PriceHistoryEntry[] | null>(null);
   const loadHistory = async () => {
     setShowHistory(true);
     if (!planId || history !== null) return;
     try {
       const snap = await getDocs(query(collection(firestore, 'saas_plans', planId, 'price_history'), orderBy('changedAt', 'desc'), limit(10)));
-      setHistory(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) })));
+      setHistory(snap.docs.map(d => ({ id: d.id, ...(d.data() as Omit<PriceHistoryEntry, 'id'>) })));
     } catch {
       setHistory([]);
     }
