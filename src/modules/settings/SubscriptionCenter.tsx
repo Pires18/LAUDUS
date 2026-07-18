@@ -8,6 +8,7 @@ import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firesto
 import { firestore, auth } from '../../lib/firebase';
 import { classNames } from '../../utils/format';
 import { planPriceBrl, addonPriceBrl } from '../../../api/_pricing';
+import type { Plan, Transaction } from '../../types';
 import {
   CreditCard, QrCode, Database, Calculator, Loader2, CheckCircle2,
   AlertCircle, Clock, Ban, Zap, Lock, Sparkles, FileText, Wallet,
@@ -86,7 +87,7 @@ export function SubscriptionCenter() {
   const [addonsConfig,      setAddonsConfig]      = useState<AddonsConfig>(ADDONS_DEFAULT);
   const [planName,          setPlanName]          = useState<string | null>(null);
   
-  const [plansList, setPlansList] = useState<any[]>([]);
+  const [plansList, setPlansList] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
 
   // ── Load add-ons pricing from admin config ────────────────────────────────
@@ -105,7 +106,7 @@ export function SubscriptionCenter() {
 
   // ── Load plan name from saas_plans ───────────────────────────────────────
   useEffect(() => {
-    const planId = (subscription as any)?.planId;
+    const planId = subscription?.planId;
     if (planId) {
       getDoc(doc(firestore, 'saas_plans', planId))
         .then(snap => { if (snap.exists()) setPlanName(snap.data().name); })
@@ -118,15 +119,15 @@ export function SubscriptionCenter() {
     const q = query(collection(firestore, 'saas_plans'), where('active', '==', true));
     getDocs(q)
       .then(snap => {
-        const list = snap.docs.map(d => ({ ...d.data(), id: d.id }));
-        list.sort((a: any, b: any) => (a.price || 0) - (b.price || 0));
+        const list = snap.docs.map(d => ({ ...d.data(), id: d.id }) as Plan);
+        list.sort((a, b) => (a.price || 0) - (b.price || 0));
         setPlansList(list);
       })
       .catch(() => {})
       .finally(() => setLoadingPlans(false));
   }, []);
 
-  const [userTransactions, setUserTransactions] = useState<any[]>([]);
+  const [userTransactions, setUserTransactions] = useState<Transaction[]>([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   // ── Load user transactions from transactions ────────────────────────────
@@ -136,8 +137,8 @@ export function SubscriptionCenter() {
     try {
       const q = query(collection(firestore, 'transactions'), where('userId', '==', user.uid));
       const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Transaction);
+      list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       setUserTransactions(list);
     } catch (err) {
       logger.error('Erro ao buscar transações do usuário:', err);
@@ -294,7 +295,7 @@ export function SubscriptionCenter() {
   // ── Derived values ────────────────────────────────────────────────────────
 
   const canUsePro      = motorOptions.includes('pro');
-  const selectedMotor  = (settings as any).selectedMotor || 'lite';
+  const selectedMotor  = settings.selectedMotor || 'lite';
 
   const reportsPercent  = reportsQuota > 0 ? Math.min(100, Math.round((reportsUsed  / reportsQuota)  * 100)) : 0;
   const isHighUsage     = reportsPercent >= 85;
@@ -358,7 +359,7 @@ export function SubscriptionCenter() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {plansList.map((p) => {
-              const isSelected = (subscription as any)?.planId === p.id;
+              const isSelected = subscription?.planId === p.id;
               const isFeatured = p.featured;
 
               return (
@@ -869,7 +870,7 @@ export function SubscriptionCenter() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ink-50 text-[11px]">
-                    {userTransactions.map((t: any) => {
+                    {userTransactions.map((t) => {
                       const dateStr = t.timestamp
                         ? new Date(t.timestamp).toLocaleDateString('pt-BR')
                         : '—';
@@ -900,14 +901,14 @@ export function SubscriptionCenter() {
                             R$ {(t.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-2.5 text-center font-bold text-ink-500">
-                            {methodNames[t.paymentMethod] || t.paymentMethod || 'Manual'}
+                            {methodNames[t.paymentMethod || ''] || t.paymentMethod || 'Manual'}
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <span className={classNames(
                               'px-1.5 py-0.5 rounded text-[8px] font-black uppercase border',
-                              statusColors[t.status] || 'bg-ink-50 text-ink-400'
+                              statusColors[t.status || ''] || 'bg-ink-50 text-ink-400'
                             )}>
-                              {statusLabels[t.status] || t.status || 'Pago'}
+                              {statusLabels[t.status || ''] || t.status || 'Pago'}
                             </span>
                           </td>
                         </tr>

@@ -33,8 +33,8 @@ export function AdminLaudIAInsights() {
         const isPro = /pro/i.test(String(x.model || ''));
         const cost = Number(x.costUsd) || 0;
         const a = byArea[area] || (byArea[area] = { area, total: 0, lite: 0, pro: 0, costUsd: 0 });
-        a.total += 1; isPro ? a.pro += 1 : a.lite += 1; a.costUsd += cost;
-        t.total += 1; isPro ? t.pro += 1 : t.lite += 1; t.costUsd += cost;
+        a.total += 1; if (isPro) a.pro += 1; else a.lite += 1; a.costUsd += cost;
+        t.total += 1; if (isPro) t.pro += 1; else t.lite += 1; t.costUsd += cost;
       });
       setRows(Object.values(byArea).sort((a, b) => b.total - a.total));
       setTotals(t);

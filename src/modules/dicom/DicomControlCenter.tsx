@@ -8,7 +8,8 @@ import {
   Cpu, FileText, CheckCircle2, AlertTriangle, HelpCircle,
   Copy, Check, ArrowRight, Monitor, Radio,
   Users, Image, RefreshCw, Sparkles,
-  SlidersHorizontal, ChevronDown, Star, Upload, Printer
+  SlidersHorizontal, ChevronDown, Star, Upload, Printer,
+  type LucideIcon
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint, getDicomAuthParams, getWorklistEndpoint } from '../../store/db';
@@ -1529,7 +1530,7 @@ PACS_ADMIN_SECRET=<o segredo que o script gerou>`} />
               return `${mb.toLocaleString('pt-BR')} MB`;
             };
             const fmtNum = (n?: number) => (n === undefined || n === null ? '—' : n.toLocaleString('pt-BR'));
-            const Metric = ({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: string }) => (
+            const Metric = ({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: string; tone: string }) => (
               <div className="rounded-xl border border-ink-100 bg-white p-3 flex flex-col gap-1">
                 <div className={classNames('w-8 h-8 rounded-lg flex items-center justify-center', tone)}>
                   <Icon size={16} />

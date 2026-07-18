@@ -34,6 +34,9 @@ export function PatientDetail({ patientId }: Props) {
   // Trilha de acesso LGPD: registra a abertura do prontuário.
   useEffect(() => {
     if (patient?.id) logPatientAccess('patient', patient.id, patient.name);
+    // `patient.name` omitido: o acesso é registrado UMA vez por prontuário (por
+    // id). Reagir ao nome duplicaria o log LGPD se o cadastro fosse editado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patient?.id]);
 
   const clinicMap = useMemo(() => new Map(clinics.map((c) => [c.id, c])), [clinics]);

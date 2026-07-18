@@ -622,3 +622,39 @@ describe('AUDITORIA — sementes das demais calculadoras multi-campo', () => {
     }
   });
 });
+
+describe('AUDITORIA — achados aninhados na estrutura (não como seção solta)', () => {
+  it('lesão aninhada num órgão lateralizado não repete o seletor de lado', () => {
+    // o lado é ESTRUTURAL (a seção do rim/testículo direito|esquerdo); um campo
+    // `lado: direito|esquerdo` na lesão duplicaria a informação da própria seção.
+    const erros: string[] = [];
+    forEachSchema((area, def, sections) => {
+      for (const s of sections) {
+        const lateralizada = /-(direito|esquerdo)$/.test(s.id);
+        if (!lateralizada) continue;
+        for (const c of sectionRepeatContainers(s)) {
+          for (const f of c.fields) {
+            const soLados = f.options && f.options.every((o) => /^(direit|esquerd|bilateral|—)/i.test(o));
+            if (/^lad/i.test(f.id) && soLados) {
+              erros.push(`${area}/${def.name}/${s.label}[${c.itemLabel}]: "${f.id}" repete o lado da seção`);
+            }
+          }
+        }
+      }
+    });
+    expect(erros, `\n${erros.join('\n')}`).toEqual([]);
+  });
+
+  it('cistos renais vivem DENTRO do rim (nenhuma máscara tem seção solta de cistos)', () => {
+    // regressão do ajuste "estruturas integradas dentro das estruturas"
+    forEachSchema((area, def, sections) => {
+      if (area !== 'medicina-interna') return;
+      expect(sections.some((s) => s.id === 'cistos-renais'), `${def.name}: seção solta de cistos`).toBe(false);
+    });
+    // e todo rim dedicado carrega o grupo de cistos/lesões aninhado
+    for (const exame of ['ABDOME TOTAL', 'RINS E VIAS URINÁRIAS', 'RINS E VIAS URINÁRIAS COM DOPPLER']) {
+      const rim = findStandardSchema('medicina-interna', exame)!.sections.find((s) => s.id === 'rim-direito')!;
+      expect(rim.repeatGroup?.fields.some((f) => f.id === 'polo'), exame).toBe(true);
+    }
+  });
+});

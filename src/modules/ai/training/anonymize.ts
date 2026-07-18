@@ -43,7 +43,7 @@ const PII_PATTERNS: Array<{ name: string; pattern: RegExp; replacement: string }
   // Telefone BR: (00) 00000-0000, +55..., 0000-0000
   { name: 'telefone', pattern: /(\+?55\s?)?(\(?\d{2}\)?\s?)?\d{4,5}-?\d{4}\b/g, replacement: '[TELEFONE]' },
   // Datas: 00/00/0000, 00-00-0000, 00.00.0000
-  { name: 'data', pattern: /\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/g, replacement: '[DATA]' },
+  { name: 'data', pattern: /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b/g, replacement: '[DATA]' },
 ];
 
 /**

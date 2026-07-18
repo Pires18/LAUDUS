@@ -9,13 +9,12 @@ import { RichEditor, RichEditorRef } from './RichEditor';
 import { buildPrompt } from '../ai/engine';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
-import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronLeft, ChevronRight, ChevronDown, Zap, FileText, Star, Printer } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, X, Copy, UserCog, Sparkles, BookOpen, Search, ChevronDown, Zap, FileText, Star, Printer } from 'lucide-react';
 import { addToExcellenceCorpus } from '../ai/training/excellenceCorpus';
 import { recordHumanFeedback } from '../ai/training/feedbackStore';
 import { ReportQualityPanel } from './components/ReportQualityPanel';
 import { AnimatePresence, motion } from 'framer-motion';
 import { classNames, formatDate } from '../../utils/format';
-import { logger } from '../../utils/logger';
 import { PrintLayout } from '../export/PrintLayout';
 import { printLaudo, preloadPrintEngine } from '../export/printReport';
 import { ReportPreview } from '../export/ReportDocument';
@@ -28,13 +27,16 @@ import { PrintImagesLayout } from '../export/PrintImagesLayout';
 import { useExamActions } from './hooks/useExamActions';
 import { useGoogleDocs } from './hooks/useGoogleDocs';
 import { useDicomSync } from './hooks/useDicomSync';
+import { usePrintImages } from './hooks/usePrintImages';
+import { useImageNavigation } from './hooks/useImageNavigation';
 import { useDicomInstancePreload } from './hooks/useDicomInstancePreload';
 import { useCopilotSuggestions } from './hooks/useCopilotSuggestions';
-import { getStudyInstanceUID, preloadDicomInstances } from '../../utils/dicom';
+import { getStudyInstanceUID } from '../../utils/dicom';
 
 import { useAdmin } from '../../hooks/useAdmin';
 // Refactored Components
 import { DicomViewerSidebar } from './components/DicomViewerSidebar';
+import { FullScreenImageViewer } from './components/FullScreenImageViewer';
 import { ExternalStudyUploadModal } from './components/ExternalStudyUploadModal';
 import { EditorHeader } from './components/EditorHeader';
 import { EditorToolbar } from './components/EditorToolbar';
@@ -157,7 +159,6 @@ export function ExamEditor({ examId }: Props) {
   const [calcModalInitialId, setCalcModalInitialId] = useState<string | null>(null);
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
   const [showDicomImages, setShowDicomImages] = useState(false);
-  const [selectedInstancesForPrint, setSelectedInstancesForPrint] = useState<any[]>([]);
   const [copilotPrompt, setCopilotPrompt] = useState('');
   // Canal dedicado para resultados de calculadora/formulário enviados ao
   // copiloto. Não passa pela caixa de texto (evita concatenação com rascunho
@@ -194,7 +195,6 @@ export function ExamEditor({ examId }: Props) {
   const chatSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showIntegratedViewer, setShowIntegratedViewer] = useState(false);
-  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [showFullScreenImage, setShowFullScreenImage] = useState(false);
   const [dicomRefreshKey, setDicomRefreshKey] = useState(0);
   const [showExternalUpload, setShowExternalUpload] = useState(false);
@@ -237,39 +237,9 @@ export function ExamEditor({ examId }: Props) {
     retryOne: retryDicomInstance,
   } = useDicomInstancePreload(dicomInstances, settings);
 
-  // Ao trocar de estudo PACS, volta para a primeira imagem do novo estudo.
-  useEffect(() => {
-    setActiveImageIndex(0);
-  }, [selectedStudyId]);
-
-  const handlePrevImage = useCallback(() => {
-    setActiveImageIndex(prev => (prev > 0 ? prev - 1 : prev));
-  }, []);
-
-  const handleNextImage = useCallback(() => {
-    setActiveImageIndex(prev => (prev < dicomInstances.length - 1 ? prev + 1 : prev));
-  }, [dicomInstances.length]);
-
-  // Keyboard navigation for DICOM viewer
-  useEffect(() => {
-    if (!showIntegratedViewer && !showFullScreenImage) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        handlePrevImage();
-      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        e.preventDefault();
-        handleNextImage();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showIntegratedViewer, showFullScreenImage, handlePrevImage, handleNextImage]);
+  // Navegação entre imagens do estudo DICOM — fluxo extraído para useImageNavigation.
+  const { activeImageIndex, setActiveImageIndex, handlePrevImage, handleNextImage } =
+    useImageNavigation(dicomInstances.length, selectedStudyId, showIntegratedViewer, showFullScreenImage);
   const getExternalViewerUrl = useCallback(() => {
     if (!candidateStudies || candidateStudies.length === 0) return null;
     const activeStudy = candidateStudies.find(c => c.ID === selectedStudyId) || candidateStudies[0];
@@ -494,95 +464,15 @@ export function ExamEditor({ examId }: Props) {
 
 
 
-  // Grid types: '1x2' = 1 coluna × 2 linhas (2 imagens), '2x4' = 2 colunas × 4 linhas (8 imagens)
-  const [selectedGridType, setSelectedGridType] = useState<string>('2x4');
-  const [isPrintingImages, setIsPrintingImages] = useState(false);
-  const [printProgress, setPrintProgress] = useState<string>('');
-  const [printLocalUrls, setPrintLocalUrls] = useState<Record<string, string>>({});
-
-  // Quanto mais fotos por página, menor cada uma sai impressa — não faz
-  // sentido carregar/imprimir na resolução nativa do preview do Orthanc.
-  // Reduzir aqui deixa o PDF mais leve e a montagem mais rápida, principalmente
-  // com estudos grandes (muitas imagens ou imagens pesadas).
-  const PRINT_OPTIMIZE_BY_GRID: Record<string, { maxWidth: number; quality: number }> = {
-    '1x1': { maxWidth: 1600, quality: 0.88 },
-    '1x2': { maxWidth: 1200, quality: 0.85 },
-    '2x3': { maxWidth: 900, quality: 0.82 },
-    '2x4': { maxWidth: 700, quality: 0.8 },
-  };
-
-  const handlePrintImages = async (instances: any[], gridType: string = '2x4') => {
-    if (instances.length === 0) return;
-    setIsPrintingImages(true);
-    setPrintProgress(`Otimizando imagens (0/${instances.length})...`);
-    showToast('Preparando imagens para a impressão...', 'info');
-
-    let localUrlsMap: Record<string, string> = {};
-    try {
-      // Mesma função de pré-carregamento usada no painel lateral: baixa tudo
-      // como blob local ANTES de imprimir, com timeout + 3 tentativas por
-      // imagem — imagem pesada ou rede instável não pode travar pra sempre,
-      // nem uma falha pontual (transiente, quase sempre passageira com mais
-      // tentativas) derrubar o PDF inteiro, mesmo com as outras 99% prontas.
-      // Também já otimiza (reduz/recomprime) cada imagem pro tamanho real que
-      // ela vai ocupar na página, no mesmo passo do carregamento.
-      // `sourceUrls`: imagens já pré-carregadas no painel são lidas do blob
-      // local (instantâneo) em vez de re-baixadas da rede — só o que ainda
-      // não chegou vai ao PACS.
-      const preloadResult = await preloadDicomInstances(instances, settings, {
-        maxAttempts: 3,
-        sourceUrls: dicomPreloadedUrls,
-        optimize: PRINT_OPTIMIZE_BY_GRID[gridType] || { maxWidth: 1000, quality: 0.82 },
-        onProgress: (done, total, failed) => {
-          setPrintProgress(`Otimizando imagens (${done}/${total})${failed ? ` — ${failed} falharam` : ''}...`);
-        },
-      });
-      localUrlsMap = preloadResult.urls;
-      const failedInstanceIds = preloadResult.failedIds;
-
-      const printableInstances = instances.filter((inst) => localUrlsMap[inst.ID]);
-      if (printableInstances.length === 0) {
-        throw new Error('Nenhuma imagem pôde ser carregada.');
-      }
-      if (failedInstanceIds.length > 0) {
-        showToast(`${failedInstanceIds.length} de ${instances.length} imagem(ns) falharam mesmo após 3 tentativas e foram puladas — o PDF sai com as demais ${printableInstances.length}.`, 'error');
-      }
-
-      setPrintLocalUrls(localUrlsMap);
-      setSelectedInstancesForPrint(printableInstances);
-      setSelectedGridType(gridType);
-      
-      document.body.classList.add('print-mode-images');
-      
-      // Tiny delay to let DOM render the images loaded from local blob URLs
-      setTimeout(() => {
-        window.print();
-        document.body.classList.remove('print-mode-images');
-        setIsPrintingImages(false);
-        setPrintProgress('');
-        
-        // Delay resetting instances and revoking object URLs to avoid tearing during viewport restore
-        setTimeout(() => {
-          setSelectedInstancesForPrint([]);
-          // Revoke local object URLs to free up memory
-          Object.values(localUrlsMap).forEach(url => {
-            URL.revokeObjectURL(url);
-          });
-          setPrintLocalUrls({});
-        }, 500);
-      }, 300);
-    } catch (err) {
-      logger.error('[PACS Print Preload Error]', err);
-      showToast('Erro ao carregar imagens para a impressão.', 'error');
-      setIsPrintingImages(false);
-      setPrintProgress('');
-      // Clean up any successfully created blobs in case of partial success / error
-      Object.values(localUrlsMap).forEach(url => {
-        URL.revokeObjectURL(url);
-      });
-      setPrintLocalUrls({});
-    }
-  };
+  // Impressão de imagens DICOM em PDF — fluxo extraído para usePrintImages.
+  const {
+    selectedInstancesForPrint,
+    selectedGridType,
+    isPrintingImages,
+    printProgress,
+    printLocalUrls,
+    handlePrintImages,
+  } = usePrintImages(settings, dicomPreloadedUrls);
 
   const originalTitleRef = useRef<string | null>(null);
 
@@ -661,6 +551,78 @@ export function ExamEditor({ examId }: Props) {
     const timer = setTimeout(() => setLoadTimeout(true), 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Painel do Copiloto — extraído em variável (em vez de JSX inline) porque
+  // ele é ancorado em dois lugares mutuamente exclusivos (editor normal vs.
+  // visualização de imagem em tela cheia), nunca os dois ao mesmo tempo.
+  const copilotSidebar = (exam && showCopilot && exam.status !== 'finalizado' && currentRole !== 'recepcao') ? (
+    <motion.aside
+      key="copilot-panel"
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 24 }}
+      transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+      className="fixed inset-x-0 top-0 w-full h-dvh z-[300] lg:z-auto lg:static lg:w-[440px] lg:h-full lg:shrink-0 bg-white border-l border-ink-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] lg:shadow-none flex flex-col overflow-hidden"
+    >
+      {/* Premium Header with Mesh-style Gradient */}
+      <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-600/30 via-brand-800/10 to-transparent pointer-events-none" />
+        <div className="absolute top-[-50%] left-[-10%] w-[120%] h-[200%] bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.1),transparent_50%)] animate-pulse pointer-events-none" />
+
+        <div className="relative flex items-center gap-3 z-10">
+          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg backdrop-blur-xl">
+            <Sparkles size={16} className="text-brand-400 fill-brand-400/25 animate-pulse" />
+          </div>
+          <div>
+            <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copiloto</span>
+            <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowCopilot(false)}
+          className="relative z-10 w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all border border-white/10 active:scale-95 shadow-inner"
+          title="Ocultar Copiloto"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <LaudCopilot
+          reportContent={reportContent}
+          onUpdate={(newContent) => {
+            setReportContent(newContent);
+            debouncedSave(newContent);
+          }}
+          isGenerating={isCopilotGenerating}
+          setIsGenerating={setIsCopilotGenerating}
+          exam={exam}
+          template={template}
+          patient={patient}
+          chatHistory={localChatHistory}
+          onChatUpdate={handleChatUpdate}
+          onShowCalculators={(id) => {
+            setCalcTargetField(null);
+            setCalcModalInitialId(id || null);
+            setShowCalculators(true);
+          }}
+          prompt={copilotPrompt}
+          onChangePrompt={setCopilotPrompt}
+          injectedMessage={copilotInjection}
+          onInjectionConsumed={() => setCopilotInjection(null)}
+          onOpenCalcForField={(calcId, fieldId, label) => {
+            setCalcTargetField({ fieldId, label });
+            setCalcModalInitialId(calcId || null);
+            setShowCalculators(true);
+          }}
+          structuredCalcResult={structuredCalcResult}
+          onStructuredResultConsumed={() => setStructuredCalcResult(null)}
+          isDocked
+        />
+      </div>
+    </motion.aside>
+  ) : null;
 
   return (
     <>
@@ -1077,76 +1039,11 @@ export function ExamEditor({ examId }: Props) {
           </div>
         </div>
 
-        {/* Floating Copilot (Non-Docked, Minimizable widget) */}
-        <AnimatePresence>
-          {showCopilot && exam.status !== 'finalizado' && currentRole !== 'recepcao' && (
-            <motion.aside 
-              initial={{ opacity: 0, scale: 0.94, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 30 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[300] overflow-hidden"
-            >
-              {/* Premium Header with Mesh-style Gradient */}
-              <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-brand-600/30 via-brand-800/10 to-transparent pointer-events-none" />
-                <div className="absolute top-[-50%] left-[-10%] w-[120%] h-[200%] bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.1),transparent_50%)] animate-pulse pointer-events-none" />
-                
-                <div className="relative flex items-center gap-3 z-10">
-                  <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg backdrop-blur-xl">
-                    <Sparkles size={16} className="text-brand-400 fill-brand-400/25 animate-pulse" />
-                  </div>
-                  <div>
-                    <span className="font-black text-xs uppercase tracking-widest block leading-none">Laud.IA Copiloto</span>
-                    <span className="text-[9px] text-ink-400 font-bold uppercase tracking-tighter pt-0.5 block">Assistente de Co-autoria</span>
-                  </div>
-                </div>
-                
-                <button 
-                  onClick={() => setShowCopilot(false)}
-                  className="relative z-10 w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-white flex items-center justify-center transition-all border border-white/10 active:scale-95 shadow-inner"
-                  title="Minimizar Copiloto"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <LaudCopilot
-                  reportContent={reportContent}
-                  onUpdate={(newContent) => {
-                    setReportContent(newContent);
-                    debouncedSave(newContent);
-                  }}
-                  isGenerating={isCopilotGenerating}
-                  setIsGenerating={setIsCopilotGenerating}
-                  exam={exam}
-                  template={template}
-                  patient={patient}
-                  chatHistory={localChatHistory}
-                  onChatUpdate={handleChatUpdate}
-                  onShowCalculators={(id) => {
-                    setCalcTargetField(null);
-                    setCalcModalInitialId(id || null);
-                    setShowCalculators(true);
-                  }}
-                  prompt={copilotPrompt}
-                  onChangePrompt={setCopilotPrompt}
-                  injectedMessage={copilotInjection}
-                  onInjectionConsumed={() => setCopilotInjection(null)}
-                  onOpenCalcForField={(calcId, fieldId, label) => {
-                    setCalcTargetField({ fieldId, label });
-                    setCalcModalInitialId(calcId || null);
-                    setShowCalculators(true);
-                  }}
-                  structuredCalcResult={structuredCalcResult}
-                  onStructuredResultConsumed={() => setStructuredCalcResult(null)}
-                  isDocked={false}
-                />
-              </div>
-            </motion.aside>
-          )}
-        </AnimatePresence>
+        {/* Copilot: painel lateral ancorado (desktop) — só aqui fora da tela
+            cheia de imagem, onde o mesmo painel reaparece lado a lado. */}
+        {!showFullScreenImage && (
+          <AnimatePresence>{copilotSidebar}</AnimatePresence>
+        )}
 
         {/* Suggestion chips from B6 proactive AI — appear above FAB after generation */}
         <AnimatePresence>
@@ -1173,21 +1070,16 @@ export function ExamEditor({ examId }: Props) {
           )}
         </AnimatePresence>
 
-        {/* FAB Toggle Copilot — oculto e fechado ao finalizar */}
-        {exam.status !== 'finalizado' ? (
+        {/* FAB Toggle Copilot — some quando o painel já está aberto (o próprio
+            header do painel tem o botão de fechar) e ao finalizar o laudo */}
+        {exam.status !== 'finalizado' && !showCopilot ? (
           <button
-            onClick={() => { setShowCopilot(!showCopilot); if (!showCopilot) clearSuggestions(); }}
-            className={classNames(
-              "fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2",
-              showCopilot
-                ? "bg-white text-ink-900 border-ink-100"
-                : "bg-brand-600 text-white border-brand-500 shadow-brand-500/30"
-            )}
+            onClick={() => { setShowCopilot(true); clearSuggestions(); }}
+            className="fixed bottom-24 md:bottom-8 right-6 md:right-8 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl z-[80] transition-all transform hover:scale-105 active:scale-95 border-2 bg-brand-600 text-white border-brand-500 shadow-brand-500/30"
+            title="Abrir Copiloto"
           >
-            {showCopilot ? <X size={24} /> : <Sparkles size={24} />}
-            {!showCopilot && (
-               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse" />
-            )}
+            <Sparkles size={24} />
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse" />
           </button>
         ) : null}
       </div>
@@ -1497,85 +1389,21 @@ export function ExamEditor({ examId }: Props) {
       )}
 
       {showFullScreenImage && dicomInstances[activeImageIndex] && (
-        <div 
-          className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-4 animate-fade-in cursor-zoom-out"
-          onClick={() => setShowFullScreenImage(false)}
-        >
-          {/* Close Button */}
-          <button 
-            onClick={() => setShowFullScreenImage(false)}
-            className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 border border-white/10 z-[210]"
-            title="Fechar Tela Cheia"
-          >
-            <X size={24} />
-          </button>
-
-          {/* Navigation Buttons */}
-          <button
-            onClick={(e) => { e.stopPropagation(); handlePrevImage(); }}
-            className="absolute left-6 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/10 hover:bg-white/20 hover:scale-105 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all active:scale-95 shadow-2xl z-[210] cursor-pointer"
-            title="Anterior (Seta Esquerda)"
-          >
-            <ChevronLeft size={32} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); handleNextImage(); }}
-            className="absolute right-6 top-1/2 -translate-y-1/2 p-4 rounded-full bg-white/10 hover:bg-white/20 hover:scale-105 text-white/80 hover:text-white border border-white/10 backdrop-blur-sm transition-all active:scale-95 shadow-2xl z-[210] cursor-pointer"
-            title="Próxima (Seta Direita)"
-          >
-            <ChevronRight size={32} />
-          </button>
-
-          {(() => {
-            const activeInstance = dicomInstances[activeImageIndex];
-            const instanceNum = activeInstance.MainDicomTags?.InstanceNumber || (activeImageIndex + 1);
-            const activeUrl = dicomPreloadedUrls[activeInstance.ID];
-            const activeFailed = dicomFailedIds.includes(activeInstance.ID);
-
-            return (
-              <div
-                className="relative max-w-full max-h-full flex flex-col items-center gap-4"
-                onClick={(e) => e.stopPropagation()}
-                onWheel={(e) => {
-                  if (e.deltaY < 0) {
-                    handlePrevImage();
-                  } else if (e.deltaY > 0) {
-                    handleNextImage();
-                  }
-                }}
-              >
-                {!activeUrl && !activeFailed ? (
-                  <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-2 text-white/70">
-                    <Loader2 size={28} className="animate-spin" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">
-                      Carregando imagem{!dicomInstancesReady ? ` (${dicomPreloadProgress.done}/${dicomPreloadProgress.total})` : ''}...
-                    </span>
-                  </div>
-                ) : activeFailed ? (
-                  <div className="w-[60vw] max-w-lg aspect-video flex flex-col items-center justify-center gap-3 text-white/70 border border-white/10 rounded-lg bg-white/5">
-                    <AlertCircle size={28} className="text-amber-500" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Imagem indisponível</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); retryDicomInstance(activeInstance.ID); }}
-                      className="h-8 px-3 rounded-lg bg-amber-700 hover:bg-amber-600 active:scale-95 text-white text-[10px] font-black uppercase tracking-wider transition-all"
-                    >
-                      Tentar novamente
-                    </button>
-                  </div>
-                ) : (
-                  <img
-                    src={activeUrl}
-                    alt={`Instance ${instanceNum}`}
-                    className="max-w-[95vw] max-h-[85vh] rounded-lg shadow-2xl border border-white/5"
-                  />
-                )}
-                <div className="px-4 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-black tracking-widest text-white uppercase select-none z-10">
-                  FOTO {activeImageIndex + 1} DE {dicomInstances.length} (INSTÂNCIA {instanceNum})
-                </div>
-              </div>
-            );
-          })()}
-        </div>
+        <FullScreenImageViewer
+          instances={dicomInstances}
+          activeImageIndex={activeImageIndex}
+          preloadedUrls={dicomPreloadedUrls}
+          failedIds={dicomFailedIds}
+          instancesReady={dicomInstancesReady}
+          preloadProgress={dicomPreloadProgress}
+          onClose={() => setShowFullScreenImage(false)}
+          onPrev={handlePrevImage}
+          onNext={handleNextImage}
+          onRetry={retryDicomInstance}
+          showCopilotFab={exam.status !== 'finalizado' && currentRole !== 'recepcao' && !showCopilot}
+          onOpenCopilot={() => setShowCopilot(true)}
+          copilotSidebar={copilotSidebar}
+        />
       )}
         </div>
       )}

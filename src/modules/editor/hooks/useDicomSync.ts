@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getProxyEndpoint, getActivePacsUrl, getDicomAuthParams } from '../../../store/db';
-import { ExamRequest, Patient } from '../../../types';
+import { ExamRequest, Patient, AppSettings } from '../../../types';
 import { getStudyInstanceUID } from '../../../utils/dicom';
 import { logger } from '../../../utils/logger';
 
 interface UseDicomSyncProps {
   exam: ExamRequest | undefined;
   patient: Patient | null;
-  settings: any;
+  settings: AppSettings;
   activePacsServer: 'primary' | 'backup' | 'both';
   changeSelectedStudy: (id: string | null) => void;
   dicomRefreshKey: number;
@@ -22,7 +22,7 @@ const locateStudies = async (
   exam: ExamRequest,
   patient: Patient | null,
   serverSource: 'primary' | 'backup',
-  settings: any
+  settings: AppSettings
 ): Promise<any[]> => {
   const findUrl = `${baseUrl.replace(/\/$/, '')}/tools/find`;
   
@@ -350,7 +350,7 @@ export function useDicomSync({
         // passa disso fácil em cold start — o timeout curto marcava o servidor
         // como "desconectado" e pulava a busca de estudos, deixando o painel
         // sem imagens até o próximo ciclo de polling.
-        const fetchWithTimeout = async (url: string, options: any = {}, timeoutMs = 8000) => {
+        const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 8000) => {
           const controller = new AbortController();
           const id = setTimeout(() => controller.abort(), timeoutMs);
           try {

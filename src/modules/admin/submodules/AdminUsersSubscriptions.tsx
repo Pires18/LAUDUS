@@ -10,7 +10,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useApp } from '../../../store/app';
 import { addAuditLog, getMetricsSummary, type MetricsSummary } from '../../../store/db';
 import { updateUserRole, setUserActiveStatus, deleteUserDocument } from '../../../store/adminUsers';
-import type { UserRole } from '../../../types';
+import type { UserRole, Subscription } from '../../../types';
 import {
   collection, collectionGroup, doc, updateDoc, setDoc, deleteField, getDoc, getDocs, query, where, writeBatch,
 } from 'firebase/firestore';
@@ -84,7 +84,7 @@ export function AdminUsersSubscriptions() {
   const confirm               = useConfirm();
 
   const { data: users,         loading: loadingUsers } = useCollection<SystemUser>('users',         { isGlobal: true });
-  const { data: subscriptions, loading: loadingSubs  } = useCollection<any>       ('subscriptions', { isGlobal: true });
+  const { data: subscriptions, loading: loadingSubs  } = useCollection<Subscription>('subscriptions', { isGlobal: true });
 
   const [activeTab,    setActiveTab]    = useState<UsersTab>('overview');
   const [search,       setSearch]       = useState('');
@@ -157,7 +157,7 @@ export function AdminUsersSubscriptions() {
         const isPro = /pro/i.test(String(data.model || ''));
         const u = map[uid] || (map[uid] = { total: 0, lite: 0, pro: 0 });
         u.total += 1;
-        isPro ? u.pro += 1 : u.lite += 1;
+        if (isPro) u.pro += 1; else u.lite += 1;
       });
       setUsageByUid(map);
     } catch (err: any) {
@@ -221,10 +221,10 @@ export function AdminUsersSubscriptions() {
   });
 
   let mrr = 0;
-  subscriptions.forEach((s: any) => {
+  subscriptions.forEach((s) => {
     // Gratuidade (cortesia) e vitalício não geram receita — excluídos do MRR.
     if (s.status === 'active' && !s.comp && !s.lifetime) {
-      const planPrice = planPrices[s.planId] || planPrices[(s.plan || '').toLowerCase()] || pricing.basePlanPrice;
+      const planPrice = planPrices[s.planId || ''] || planPrices[(s.plan || '').toLowerCase()] || pricing.basePlanPrice;
       mrr += planPrice;
 
       // Adiciona addons individuais
@@ -248,7 +248,7 @@ export function AdminUsersSubscriptions() {
 
   // ─── Filters ─────────────────────────────────────────────────────────────────
   const filtered = users.filter(u => {
-    const sub     = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
+    const sub     = subscriptions.find((s) => s.id === `sub_${u.id}`);
     const txt     = `${u.name || ''} ${u.email || ''} ${sub?.plan || ''} ${u.subscriptionStatus || ''}`.toLowerCase();
     const matchTx = txt.includes(search.toLowerCase());
     const matchRo = roleFilter === 'all' || u.role === roleFilter;
@@ -268,7 +268,7 @@ export function AdminUsersSubscriptions() {
   // somar exatamente `reportsUsed` (nunca diverge do total).
   const consumoRows = users
     .map(u => {
-      const sub = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
+      const sub = subscriptions.find((s) => s.id === `sub_${u.id}`);
       const reportsUsed  = u.reportsUsedThisMonth ?? sub?.reportsUsedThisMonth ?? 0;
       const reportsQuota = u.reportsQuota ?? sub?.reportsQuota ?? 100;
       const unlimited    = reportsQuota >= 9999 || reportsQuota === 0;
@@ -311,7 +311,7 @@ export function AdminUsersSubscriptions() {
 
   // Assinantes por plano (usa nome do saas_plans quando disponível)
   const planCounts: Record<string, number> = {};
-  subscriptions.forEach((s: any) => {
+  subscriptions.forEach((s) => {
     if (s.status === 'canceled' || s.status === 'paused') return;
     const plan = saasPlansList.find(p => p.id === s.planId);
     const name = plan?.name || s.plan || 'Sem plano';
@@ -415,7 +415,7 @@ export function AdminUsersSubscriptions() {
 
   async function handleToggleAddon(u: SystemUser, addon: 'calculators' | 'pacs' | 'appointments' | 'clinics') {
     const subId = `sub_${u.id}`;
-    const sub   = subscriptions.find((s: any) => s.id === subId);
+    const sub   = subscriptions.find((s) => s.id === subId);
     const curr: string[] = sub?.addons ? [...sub.addons] : [];
     const isRemoving = curr.includes(addon);
     const ok = await confirm({
@@ -876,7 +876,7 @@ export function AdminUsersSubscriptions() {
                   </td>
                 </tr>
               ) : filtered.map((u) => {
-                const sub    = subscriptions.find((s: any) => s.id === `sub_${u.id}`);
+                const sub    = subscriptions.find((s) => s.id === `sub_${u.id}`);
                 const isProc = processing === u.id;
                 const used   = u.reportsUsedThisMonth ?? 0;
                 // `??`, não `||`: reportsQuota === 0 é a convenção de "ilimitado"

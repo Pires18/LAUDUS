@@ -607,6 +607,58 @@ export interface AuditLog {
   timestamp: number;
 }
 
+/**
+ * Documento da coleção `users/{uid}` — fonte de verdade do shape lido em todo o
+ * sistema (admin, hooks, engine). Substitui os `doc.data() as any` espalhados.
+ * Todos os campos além do id são opcionais: docs legados/parciais existem.
+ */
+export interface UserDoc {
+  id: string;
+  name?: string;
+  displayName?: string;
+  email?: string;
+  photoURL?: string;
+  role?: UserRole;
+  active?: boolean;
+  lastLogin?: number;
+
+  // Assinatura / cotas (espelho do doc de subscription para leitura rápida)
+  subscriptionId?: string;
+  subscriptionStatus?: SubscriptionStatus | string;
+  motorProEnabled?: boolean;
+  reportsUsedThisMonth?: number;
+  reportsQuota?: number;
+  clinicsQuota?: number;
+  tokenQuotaLite?: number;
+  tokenQuotaPro?: number;
+
+  // Licença legada
+  licenseExpiresAt?: number;
+  licensePlanName?: string;
+  licenseCode?: string;
+  licensePlanId?: string;
+
+  // LGPD / consentimento
+  termsAcceptedAt?: number;
+  termsVersion?: string;
+
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/** Transação financeira (coleção `transactions`) — pagamento de plano/add-on. */
+export interface Transaction {
+  id: string;
+  userId?: string;
+  userEmail?: string;
+  type?: string;
+  description?: string;
+  amount?: number;
+  status?: 'paid' | 'pending' | 'failed' | 'refunded' | string;
+  paymentMethod?: string;
+  timestamp?: number;
+}
+
 /** Assinatura ativa de um usuário */
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'paused';
 export type SubscriptionAddon = 'pacs' | 'calculators' | 'appointments' | 'clinics';
@@ -619,7 +671,7 @@ export interface Subscription {
   planId?: string;
   addons: SubscriptionAddon[];
   status: SubscriptionStatus;
-  paymentMethod: 'pix' | 'credit_card' | 'manual';
+  paymentMethod: 'pix' | 'credit_card' | 'manual' | 'courtesy';
   abacatePayCustomerId?: string;
   abacatePaySubscriptionId?: string;
   price?: number;

@@ -131,8 +131,32 @@ const RINS_RESUMO = (): StructuredSection => ({
 
 const SFU = ['ausente', 'SFU I', 'SFU II', 'SFU III', 'SFU IV'];
 
+/**
+ * Cistos/lesões focais de UM rim — ficam ANINHADOS na seção do rim (grupo
+ * revelado sob 'Alterado'), não numa seção solta. O lado é estrutural (a seção
+ * do rim), então a lesão só descreve a localização DENTRO do rim.
+ * - variante descritiva: Bosniak PROIBIDO no US (abdome/rins sem Doppler);
+ * - variante Bosniak v2019 adaptada: só em RINS COM DOPPLER (regra do prompt).
+ */
+const LESAO_RENAL = (bosniak: boolean): StructuredFieldDef[] =>
+  bosniak
+    ? [
+        { id: 'polo', label: 'Localização', kind: 'select', options: ['polo superior', 'terço médio', 'polo inferior', 'seio renal'] },
+        { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+        { id: 'septos', label: 'Septos', kind: 'select', options: ['ausentes', 'poucos finos', 'múltiplos finos', 'espessos/irregulares'] },
+        { id: 'parede', label: 'Parede', kind: 'select', options: ['fina', 'espessa/irregular'] },
+        { id: 'calcificacao', label: 'Calcificação', kind: 'select', options: ['ausente', 'fina', 'grosseira'] },
+        { id: 'solido', label: 'Componente sólido/fluxo ao Doppler', kind: 'select', options: ['ausente', 'presente'] },
+      ]
+    : [
+        { id: 'polo', label: 'Localização', kind: 'select', options: ['polo superior', 'terço médio', 'polo inferior', 'seio renal'] },
+        { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
+        { id: 'classificacao', label: 'Classificação (US)', kind: 'select', options: ['cisto simples', 'cisto minimamente complexo', 'cisto complexo (investigação seccional)'], hint: 'não usar Bosniak em laudo de US' },
+        { id: 'detalhe', label: 'Detalhe (septos, debris, calcificação)', kind: 'text', fullWidth: true },
+      ];
+
 /** Rim dedicado por lado (ABDOME TOTAL e RINS E VIAS URINÁRIAS). */
-const RIM = (side: 'direito' | 'esquerdo'): StructuredSection => {
+const RIM = (side: 'direito' | 'esquerdo', opts: { bosniak?: boolean } = {}): StructuredSection => {
   const s = side === 'direito' ? 'd' : 'e';
   return {
     id: `rim-${side}`,
@@ -146,29 +170,10 @@ const RIM = (side: 'direito' | 'esquerdo'): StructuredSection => {
       { id: `rim_${s}_dilat`, label: 'Dilatação pielocalicinal (SFU)', kind: 'select', options: SFU },
       { id: `rim_${s}_achados`, label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'ecogenicidade cortical, nefropatia (G1–G5), massa' },
     ],
+    // cistos/lesões do rim: aninhados, aparecem sob 'Alterado'
+    repeatGroup: { id: 'lesao', itemLabel: 'Cisto / lesão', addLabel: 'Adicionar cisto/lesão', score: opts.bosniak ? 'bosniak' : undefined, fields: LESAO_RENAL(!!opts.bosniak) },
   };
 };
-
-/** Cistos renais DESCRITIVOS (Bosniak proibido no US nas máscaras de abdome/rins). */
-const CISTOS_RENAIS_DESCRITIVO = (): StructuredSection =>
-  achados('cistos-renais', 'Cistos Renais', 'Cisto', [
-    { id: 'lado', label: 'Lado / localização', kind: 'select', options: ['rim direito — polo superior', 'rim direito — terço médio', 'rim direito — polo inferior', 'rim esquerdo — polo superior', 'rim esquerdo — terço médio', 'rim esquerdo — polo inferior'] },
-    { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
-    { id: 'classificacao', label: 'Classificação (US)', kind: 'select', options: ['cisto simples', 'cisto minimamente complexo', 'cisto complexo (investigação seccional)'], hint: 'não usar Bosniak em laudo de US' },
-    { id: 'detalhe', label: 'Detalhe (septos, debris, calcificação)', kind: 'text', fullWidth: true },
-  ], { normalText: 'ausentes', addLabel: 'Adicionar cisto' });
-
-/** Cistos renais com sugestão Bosniak v2019 adaptada (apenas RINS COM DOPPLER). */
-const CISTOS_RENAIS_BOSNIAK = (): StructuredSection =>
-  achados('cistos-renais', 'Cistos Renais (Bosniak US-adaptado)', 'Cisto', [
-    { id: 'lado', label: 'Lado / localização', kind: 'text', placeholder: 'rim direito — polo superior' },
-    { id: 'dims', label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide' },
-    // descritores lidos pelo bosniakSuggest (ids fixos)
-    { id: 'septos', label: 'Septos', kind: 'select', options: ['ausentes', 'poucos finos', 'múltiplos finos', 'espessos/irregulares'] },
-    { id: 'parede', label: 'Parede', kind: 'select', options: ['fina', 'espessa/irregular'] },
-    { id: 'calcificacao', label: 'Calcificação', kind: 'select', options: ['ausente', 'fina', 'grosseira'] },
-    { id: 'solido', label: 'Componente sólido/fluxo ao Doppler', kind: 'select', options: ['ausente', 'presente'] },
-  ], { normalText: 'ausentes', score: 'bosniak', addLabel: 'Adicionar cisto' });
 
 const LITIASE = (): StructuredSection =>
   achados('litiase', 'Litíase', 'Cálculo', [
@@ -267,7 +272,7 @@ const ABDOME_SUPERIOR = (): StructuredSection[] => [
 
 const ABDOME_TOTAL = (): StructuredSection[] => [
   FIGADO(), VIAS_BILIARES(), VESICULA(), PANCREAS(), BACO(),
-  RIM('direito'), RIM('esquerdo'), CISTOS_RENAIS_DESCRITIVO(),
+  RIM('direito'), RIM('esquerdo'),
   GRANDES_VASOS(), BEXIGA(), RETROPERITONIO(),
 ];
 
@@ -313,7 +318,7 @@ const PROSTATA_ABDOMINAL = (): StructuredSection[] => [
 ];
 
 const RINS_VIAS = (): StructuredSection[] => [
-  RIM('direito'), RIM('esquerdo'), CISTOS_RENAIS_DESCRITIVO(), LITIASE(),
+  RIM('direito'), RIM('esquerdo'), LITIASE(),
   {
     id: 'ureteres',
     label: 'Ureteres',
@@ -326,7 +331,7 @@ const RINS_VIAS = (): StructuredSection[] => [
 ];
 
 const RINS_VIAS_DOPPLER = (): StructuredSection[] => [
-  RIM('direito'), RIM('esquerdo'), CISTOS_RENAIS_BOSNIAK(), LITIASE(),
+  RIM('direito', { bosniak: true }), RIM('esquerdo', { bosniak: true }), LITIASE(),
   DOPPLER_RENAL(),
   BEXIGA({ jatos: true }),
   VRPM(),

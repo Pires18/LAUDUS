@@ -43,6 +43,10 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
       setCalcResult(calculatorData[initialCalcId] || null);
       setActiveTab('params');
     }
+    // `calculatorData` omitido de propósito: só (re)carregamos o snapshot quando
+    // o médico ABRE outra calculadora (initialCalcId muda). Reagir a
+    // calculatorData resetaria o resultado a cada edição de campo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCalcId]);
   
   const [showAll, setShowAll] = useState(false);

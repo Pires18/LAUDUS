@@ -123,18 +123,25 @@ describe('standardSchemas — conteúdo clínico de medicina interna', () => {
     for (const id of ['vps_renal_d', 'vps_renal_e', 'vps_aorta', 'ir_d', 'ir_e']) {
       expect(dop.fields.some((f) => f.id === id), id).toBe(true);
     }
-    // Cistos como achado: Normal por padrão; lista Bosniak aninhada no 'Alterado'.
-    const cistos = s.find((x) => x.id === 'cistos-renais')!;
-    expect(cistos.normalable).toBe(true);
-    expect(cistos.repeatGroup?.score).toBe('bosniak');
+    // Cistos ANINHADOS no rim (não em seção solta); lista Bosniak sob 'Alterado'.
+    expect(s.some((x) => x.id === 'cistos-renais'), 'não deve haver seção solta de cistos').toBe(false);
+    for (const side of ['direito', 'esquerdo']) {
+      const rim = s.find((x) => x.id === `rim-${side}`)!;
+      expect(rim.repeatGroup?.score, side).toBe('bosniak');
+      expect(rim.repeatGroup?.fields.some((f) => f.id === 'solido'), side).toBe(true);
+      // o lado é estrutural (a seção do rim), não um dropdown na lesão
+      expect(rim.repeatGroup?.fields.some((f) => f.id === 'lado'), side).toBe(false);
+    }
   });
 
-  it('RINS (sem Doppler) e ABDOME: cistos renais DESCRITIVOS, sem escore Bosniak', () => {
+  it('RINS (sem Doppler) e ABDOME: cistos DESCRITIVOS aninhados no rim, sem Bosniak', () => {
     for (const name of ['RINS E VIAS URINÁRIAS', 'ABDOME TOTAL']) {
-      const cistos = findStandardSchema('medicina-interna', name)!.sections.find((x) => x.id === 'cistos-renais')!;
-      expect(cistos.normalable, name).toBe(true);
-      expect(cistos.repeatGroup?.score, name).toBeUndefined();
-      expect(cistos.repeatGroup?.fields.some((f) => f.id === 'classificacao'), name).toBe(true);
+      const s = findStandardSchema('medicina-interna', name)!.sections;
+      expect(s.some((x) => x.id === 'cistos-renais'), name).toBe(false);
+      const rim = s.find((x) => x.id === 'rim-direito')!;
+      expect(rim.repeatGroup?.score, name).toBeUndefined();
+      expect(rim.repeatGroup?.fields.some((f) => f.id === 'classificacao'), name).toBe(true);
+      expect(rim.repeatGroup?.fields.find((f) => f.id === 'dims')?.calcId, name).toBe('volume-elipsoide');
     }
   });
 
@@ -213,6 +220,22 @@ describe('standardSchemas — cálculo ao vivo em pequenas partes', () => {
     const tr = d.find((x) => x.id.includes('__tr'));
     expect(tr?.sectionId).toBe('nodulos'); // agrupa sob a seção dona
     expect(tr?.text).toContain('TR5');
+  });
+
+  it('cisto renal ANINHADO no rim: Bosniak deriva por instância na seção do rim', () => {
+    const schema = deriveStructuredSchema(tpl('medicina-interna', 'RINS E VIAS URINÁRIAS COM DOPPLER'), 'medicina-interna');
+    const c = groupContainerId('rim-direito', 'lesao'); // lesões aninhadas no rim direito
+    const d = computeDerivations(schema, {
+      [normalKey('rim-direito')]: 'altered',
+      [countKey(c)]: '1',
+      [itemFieldId(c, 0, 'solido')]: 'presente', // componente sólido → Bosniak IV
+      [itemFieldId(c, 0, 'dims')]: '3 x 2 x 2',
+    });
+    const bosniak = d.find((x) => x.id.includes('bosniak') || /Bosniak/.test(x.text));
+    expect(bosniak?.sectionId).toBe('rim-direito'); // o chip cai NA seção do rim
+    expect(bosniak?.text).toMatch(/Bosniak IV/);
+    // e o volume do cisto também deriva na mesma seção
+    expect(d.some((x) => x.sectionId === 'rim-direito' && /cm³/.test(x.text))).toBe(true);
   });
 });
 

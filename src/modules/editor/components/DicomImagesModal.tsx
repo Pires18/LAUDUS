@@ -91,6 +91,10 @@ export function DicomImagesModal({
       setSelectedIds(new Set());
       setActiveInstanceId(null);
     }
+    // `activeInstanceId` omitido: o effect logo abaixo ("Sync ... if empty",
+    // deps [instances, activeInstanceId]) é o dedicado a reagir a ele. Incluí-lo
+    // aqui re-rodaria toda a (re)inicialização de seleção a cada troca de imagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, instances]);
 
   // Sync activeInstanceId if it becomes empty

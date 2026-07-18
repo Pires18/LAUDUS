@@ -67,7 +67,7 @@ export function AdminAudit() {
       l.details || '',
       l.userId || '',
     ].map(cell).join(','));
-    // BOM (﻿) para o Excel abrir acentos corretamente.
+    // BOM (U+FEFF) para o Excel abrir acentos corretamente.
     const csv = '﻿' + [header.join(','), ...rows].join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
