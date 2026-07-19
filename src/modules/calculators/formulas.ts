@@ -300,15 +300,16 @@ export function amnioticMBV(depths: number[]): AmnioticResult | null {
   return { result, classification };
 }
 
-/** Índice de líquido amniótico (ILA/AFI): soma dos 4 quadrantes; classifica. */
+/** Índice de líquido amniótico (ILA/AFI): soma dos 4 quadrantes; classifica.
+ *  Faixas casadas com o liveCompute e o prompt de área: 80–240 mm = normal
+ *  (8–24 cm, padrão clínico), < 50 oligoâmnio, > 240 polidrâmnio. */
 export function amnioticILA(q1: number, q2: number, q3: number, q4: number): AmnioticResult | null {
   if (!(q1 && q2 && q3 && q4)) return null;
   const result = Number(q1) + Number(q2) + Number(q3) + Number(q4);
   let classification: string;
   if (result < 50) classification = 'Oligoâmnio (ILA < 50mm)';
   else if (result <= 80) classification = 'Líquido reduzido (50-80mm)';
-  else if (result <= 180) classification = 'Volume normal (80-180mm)';
-  else if (result <= 240) classification = 'Líquido aumentado (180-240mm)';
+  else if (result <= 240) classification = 'Volume normal (80-240mm)';
   else classification = 'Polidrâmnio (ILA > 240mm)';
   return { result, classification };
 }

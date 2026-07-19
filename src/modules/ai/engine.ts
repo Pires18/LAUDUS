@@ -389,10 +389,14 @@ function buildMaskHtml(templates: ReportTemplate[], settings?: AppSettings): str
   const parts: string[] = [];
   if (templates.length > 1) {
     parts.push(
-      `LAUDO COMBINADO (${combinedExamType(templates)}): gere UM ÚNICO laudo com UM único <h1> exatamente "${getCombinedTitle(templates)}". ` +
-        `Mescle as seções por tipo: uma única TÉCNICA, uma única ANÁLISE contendo os compartimentos de todos os exames na ordem apresentada, ` +
-        `e CLASSIFICAÇÕES/CONCLUSÃO/RECOMENDAÇÕES/OBSERVAÇÕES METODOLÓGICAS únicas cobrindo os achados de todos os exames. ` +
-        `PROIBIDO empilhar dois laudos, repetir títulos de seção ou emitir mais de um <h1>.`
+      `LAUDO COMBINADO (${combinedExamType(templates)}): gere UM ÚNICO laudo com UM único <h1> exatamente "${getCombinedTitle(templates)}".
+REGRAS DE UNIFICAÇÃO (obrigatórias, seção a seção):
+1. TÉCNICA: redija UM ÚNICO parágrafo coeso e fluente unificando vias de acesso, transdutores, preparos e fases dos exames. PROIBIDO repetir "Exame realizado" mais de uma vez ou empilhar as técnicas em parágrafos separados.
+2. ANÁLISE: uma única seção com os compartimentos de TODOS os exames na ordem apresentada. Órgão avaliado pelos dois exames (ex.: bexiga) aparece UMA única vez, integrando as informações exigidas por ambos.
+3. CLASSIFICAÇÕES (quando presente) e CONCLUSÃO: únicas, cobrindo os achados de todos os exames — bullets na ordem dos exames, sem repetir a mesma frase de normalidade.
+4. RECOMENDAÇÕES: únicas, sem recomendações duplicadas entre os exames.
+5. OBSERVAÇÕES METODOLÓGICAS: UM único bloco sem frases repetidas — unifique o texto operador-dependente numa só menção e cite TODAS as diretrizes/classificações aplicáveis dos exames (CBR, LI-RADS, O-RADS, Bosniak etc.) numa única frase.
+PROIBIDO empilhar dois laudos, repetir títulos de seção ou emitir mais de um <h1>.`
     );
     templates.forEach((t, i) => {
       parts.push(`═══ EXAME ${i + 1} — ${t.name} ═══`);

@@ -242,8 +242,18 @@ export function computePreeclampsiaRisk(
   const cov = present.map(a => present.map(b => corr(model, a, b) * model.sd[a] * model.sd[b]));
   const prec = invertMatrix(cov);
 
-  // Integração numérica do posterior sobre t (IG de parto), 20–60 semanas.
-  const T_MIN = 20, T_MAX = 60, STEP = 0.05;
+  // Integração numérica do posterior sobre t (IG de parto).
+  // ⚠️ AUDITORIA (jul/2026): o denominador `total` DEVE representar a MASSA
+  // COMPLETA da distribuição a priori N(μ,σ) — não uma janela truncada. Com
+  // T_MAX=60 (versão anterior), ~18% da massa da prior de uma gestante de
+  // BAIXO risco (μ≈54) ficava ALÉM de 60 semanas e era descartada do
+  // denominador, RENORMALIZANDO o risco para cima (superestimava ~25% os
+  // casos de baixo risco — a causa real da divergência com a FMF, antes
+  // mascarada por um σ artificialmente apertado). Estendendo a integração
+  // até capturar toda a cauda (T_MIN 10 → T_MAX 100, >6σ em ambos os lados
+  // para qualquer μ plausível 35–57), o σ PUBLICADO do Wright 2015 (6,8833)
+  // reproduz os 3 casos oficiais da FMF dentro de ~4% — sem calibração.
+  const T_MIN = 10, T_MAX = 100, STEP = 0.02;
   let total = 0, cumPreterm = 0, cumTerm = 0;
   for (let t = T_MIN; t <= T_MAX; t += STEP) {
     const zp = (t - mu) / sigma;

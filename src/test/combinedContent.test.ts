@@ -192,3 +192,61 @@ describe('getCombinedInitialReportContent', () => {
     expect(getCombinedInitialReportContent([null, undefined])).toBe('');
   });
 });
+
+describe('unificação de prosa — TÉCNICA e OBSERVAÇÕES METODOLÓGICAS', () => {
+  // Boilerplates reais das máscaras de produção (deploy unificado)
+  const OBS_RINS =
+    '<p>Exame operador-dependente realizado segundo protocolo padronizado e em conformidade com as diretrizes de CBR e a classificação de Bosniak (2019). A avaliação pode ser limitada por interposição gasosa intestinal e pelo biotipo do paciente. Os achados devem ser correlacionados com o quadro clínico, laboratorial e estudos prévios.</p>';
+  const OBS_PELVICA =
+    '<p>Exame operador-dependente realizado segundo protocolo padronizado e em conformidade com as diretrizes de CBR e o sistema O-RADS US (v2022). Os achados devem ser correlacionados com o quadro clínico, laboratorial e estudos prévios.</p>';
+  const OBS_PROSTATA_LIMITE =
+    '<p>A avaliação pode ser limitada por interposição gasosa intestinal e pelo biotipo do paciente; a via abdominal oferece menor resolução que a via transretal para a próstata.</p>';
+
+  const withObs = (name: string, obs: string, technique = '<p>Exame realizado.</p>') =>
+    mask({ name, title: `ULTRASSONOGRAFIA DE ${name}`, observationsTemplate: obs, technique });
+
+  const section = (html: string, title: string): string => {
+    const m = html.match(new RegExp(`<h2>${title}</h2>\\n([\\s\\S]*?)(?=<h2|$)`));
+    return m ? m[1] : '';
+  };
+
+  it('TÉCNICA vira UM único parágrafo com as sentenças dos dois exames', () => {
+    const a = mask({ name: 'A', technique: '<p>Exame realizado com transdutores de banda larga, multifrequenciais. Análise em modo B e com Doppler colorido, quando indicado.</p>' });
+    const b = mask({ name: 'B', technique: '<p>Exame realizado por via suprapúbica com transdutor convexo e repleção vesical adequada.</p>' });
+    const tec = section(getCombinedInitialReportContent([a, b]), 'TÉCNICA');
+    expect(tec.match(/<p>/g)).toHaveLength(1);
+    expect(tec).toContain('banda larga');
+    expect(tec).toContain('repleção vesical adequada');
+    expect(tec).toContain('Doppler colorido');
+  });
+
+  it('OBSERVAÇÕES: frase-tronco das diretrizes é FUNDIDA citando as duas classificações', () => {
+    const html = getCombinedInitialReportContent([withObs('RINS', OBS_RINS), withObs('PÉLVICA', OBS_PELVICA)]);
+    const obs = section(html, 'OBSERVAÇÕES METODOLÓGICAS');
+    expect(obs.match(/<p>/g)).toHaveLength(1);
+    // Uma única menção ao texto operador-dependente, com AS DUAS diretrizes
+    expect(obs.match(/Exame operador-dependente/g)).toHaveLength(1);
+    expect(obs).toContain('classificação de Bosniak (2019) e o sistema O-RADS US (v2022)');
+    // Frase idêntica de correlação clínica aparece uma vez
+    expect(obs.match(/Os achados devem ser correlacionados/g)).toHaveLength(1);
+    // Frase exclusiva de um exame é preservada
+    expect(obs).toContain('interposição gasosa');
+  });
+
+  it('OBSERVAÇÕES: sentença que é prefixo de outra é absorvida pela mais completa', () => {
+    const shorter = withObs('A', '<p>A avaliação pode ser limitada por interposição gasosa intestinal e pelo biotipo do paciente.</p>');
+    const longer = withObs('B', OBS_PROSTATA_LIMITE);
+    const obs = section(getCombinedInitialReportContent([shorter, longer]), 'OBSERVAÇÕES METODOLÓGICAS');
+    expect(obs.match(/A avaliação pode ser limitada/g)).toHaveLength(1);
+    expect(obs).toContain('via transretal para a próstata');
+  });
+
+  it('sentenças idênticas aparecem uma única vez; diferentes são mantidas em sequência', () => {
+    const a = withObs('A', '<p>Frase comum idêntica nos dois exames aqui presente. Só do exame A.</p>');
+    const b = withObs('B', '<p>Frase comum idêntica nos dois exames aqui presente. Só do exame B.</p>');
+    const obs = section(getCombinedInitialReportContent([a, b]), 'OBSERVAÇÕES METODOLÓGICAS');
+    expect(obs.match(/Frase comum idêntica/g)).toHaveLength(1);
+    expect(obs).toContain('Só do exame A.');
+    expect(obs).toContain('Só do exame B.');
+  });
+});

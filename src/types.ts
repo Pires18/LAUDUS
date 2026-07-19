@@ -180,6 +180,13 @@ export interface StructuredFieldDef {
    */
   normal?: string;
   /**
+   * Para kind='select' clínico normal/alterado: a opção considerada NORMAL.
+   * Qualquer outra opção selecionada (não vazia) marca o campo — e a seção —
+   * como ALTERADO automaticamente (ex.: osso nasal normalOption='presente' →
+   * 'ausente'/'hipoplásico' alteram). Ver `abnormalRange.ts`.
+   */
+  normalOption?: string;
+  /**
    * Campo exibido MESMO com a seção em 'Normal' — biometria que se registra na
    * normalidade (dimensões, volume, índices Doppler). Continua calculando ao
    * vivo e é compilado junto da frase de normalidade.

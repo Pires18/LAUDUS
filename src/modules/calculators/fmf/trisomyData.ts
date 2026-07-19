@@ -152,9 +152,11 @@ export const PROVISIONAL_TRISOMY_PARAMS: TrisomyModelParams = {
   //   dígito-a-dígito contra a calc oficial da FMF (exato nas 6 idades) e todos
   //   os marcadores (NT, bioquímica, ON/DV/TR, FHR) implementados de papers-fonte.
   //   Gate assumido pelo usuário (apoio à decisão; NÃO é a calc oficial da FMF).
-  version: 'trisomy-wright2008NT + kagan2008biochem(+pisoFMF) + kagan2008FHR + marcadores2009 + aprioriFmfLive2026-v7',
+  version: 'trisomy-ntDeltaLR-fmfLiveCal2026(+piso÷20) + kagan2008biochem(+pisoFMF) + kagan2008FHR + marcadores2009 + aprioriFmfLive2026-v8',
 
-  // ── TN: modelo de mistura (Wright 2008, Tabela 2) — EXATO ──────────────
+  // ── TN: mistura Wright 2008 (Tabela 2) — mantida como FONTE DA MEDIANA
+  //    esperada (crlDependent) e dos fatos-ouro das medianas afetadas. A LR
+  //    do motor NÃO vem mais daqui (ver ntDeltaLr abaixo). ──────────────────
   nt: {
     crlDependent: { b0: -0.8951, b1: 0.02940, b2: -0.0001812, sd: 0.07900 },
     normalIndep: { alpha0: -0.3319, alpha1: -0.03790, mu: 0.3019, sd: 0.1945 },
@@ -163,6 +165,30 @@ export const PROVISIONAL_TRISOMY_PARAMS: TrisomyModelParams = {
       t18: { p: 0.7096, mu: 0.7439, sd: 0.1658 },
       t13: { p: 0.8376, mu: 0.6018, sd: 0.2032 },
     },
+  },
+
+  // ── LR da TN CALIBRADA à calc OFICIAL da FMF ao vivo ────────────────────
+  // Sweep limpo (usuário, 19/jul/2026): 35a, CCN 65 (mediana esperada 1,78mm),
+  // só a TN variando. A razão entre TNs cancela os fatores constantes, isolando
+  // a forma da LR da TN. A mistura Wright 2008 subia ~4–6× mais rápido que a
+  // FMF (superclassificava TN limítrofe) — e NÃO fecha por ajuste de parâmetro
+  // (a FMF é "plana até 2,5 e depois dispara", forma que 2 Gaussianas não
+  // reproduzem). Adotada LR empírica em delta-TN (= TN − mediana), ancorada no
+  // nível publicado da mistura em TN 2,0 (0,30/0,31/0,30 p/ T21/T18/T13) e com
+  // a FORMA da FMF. delta nos pontos do sweep (CCN 65): NT 1,5/2,0/2,5/3,0/3,5/
+  // 4,0 → −0,278/0,222/0,722/1,222/1,722/2,222. LR relativa da FMF (÷TN2,0):
+  //   T21     1,00 1,00 1,353 6,979 18,47 24,08  (adj 1:4600/4600/3400/660/250/192, base 1:230)
+  //   T13/18  1,00 1,00 1,00  2,606 10,37 21,55  (adj 1:8600×3/3300/830/400, base 1:430)
+  // (T18 e T13 herdam a MESMA forma combinada da FMF — a oficial só reporta o
+  //  combinado — cada um ancorado no seu nível publicado em TN 2,0.)
+  ntDeltaLr: {
+    delta: [-0.278, 0.222, 0.722, 1.222, 1.722, 2.222],
+    lr: {
+      t21: [0.300, 0.300, 0.406, 2.094, 5.541, 7.223],
+      t18: [0.310, 0.310, 0.310, 0.808, 3.215, 6.680],
+      t13: [0.300, 0.300, 0.300, 0.782, 3.111, 6.465],
+    },
+    maxLR: 60,
   },
 
   // ── Bioquímica: bivariada log10(MoM) (Kagan 2008) ─────────────────────

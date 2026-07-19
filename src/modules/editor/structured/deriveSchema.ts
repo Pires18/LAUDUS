@@ -8,7 +8,8 @@ import {
 import { enrichSections } from './fieldLibrary';
 import { findStandardSchema } from './standardSchemas';
 import { mergeStructuredSchemas, MergedStructuredSchema } from './mergeSchemas';
-import { sectionState, itemCount, itemFieldId } from './structuredKeys';
+import { itemCount, itemFieldId } from './structuredKeys';
+import { effectiveSectionState } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
 
 /** Placeholders de preenchimento usados nas máscaras (fetal `(...)` / não-fetal `[__]`). */
@@ -169,9 +170,11 @@ export function summarizeStructured(
   const vals = values || {};
 
   for (const section of schema.sections) {
-    // Seção normalable em estado 'normal' → emite a normalidade e, junto, a
-    // biometria registrada mesmo na normalidade (campos `alwaysShow`).
-    if (section.normalable && sectionState(vals, section.id) === 'normal') {
+    // Seção normalable em estado EFETIVO 'normal' → emite a normalidade e,
+    // junto, a biometria registrada mesmo na normalidade (`alwaysShow`). O
+    // estado efetivo já vira 'alterado' sozinho quando um valor sai da faixa
+    // (a menos que o médico tenha escolhido manualmente).
+    if (section.normalable && effectiveSectionState(section, vals) === 'normal') {
       lines.push(`${section.label}: sem alterações${section.normalText ? ` (${section.normalText})` : ''}`);
       filledCount++;
       for (const field of section.fields) {

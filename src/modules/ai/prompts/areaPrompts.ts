@@ -459,6 +459,25 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    qualitativo/condicional; (b) cfDNA alterado É rastreio, deve ser CONFIRMADO por invasivo; (c) diagnóstico
    pré-natal é direito da paciente (respeitar autonomia — decisão informada, não impositiva).
 
+   ─────────────────────────────────────────────────────────────
+   3.2 RISCO AUTO-CALCULADO PELO SISTEMA (em CÁLCULOS AUTOMÁTICOS)
+   ─────────────────────────────────────────────────────────────
+   Quando os dados do 1º T estão preenchidos, o sistema já calcula e injeta em
+   CÁLCULOS AUTOMÁTICOS as linhas "Risco T21 (FMF): basal 1:X → 1:Y", "Risco
+   T13/18 (FMF): basal → corrigido" e "Risco PE pré-termo (FMF): basal → corrigido".
+   COMO USAR no laudo:
+   • É APOIO À DECISÃO baseado nos modelos FMF publicados — NÃO é a calculadora
+     oficial certificada da FMF. Redija SEMPRE com esse enquadramento (ex.:
+     "estimativa de risco por modelo FMF, apoio à decisão"), nunca como número
+     oficial certificado.
+   • Use a FAIXA e a CONDUTA que decorrem do valor CORRIGIDO: T21/T13-18 ≥1:100
+     ALTO → invasivo/cfDNA; 1:100–1:1.000 INTERMEDIÁRIO → cfDNA; <1:1.000 rotina.
+     PE pré-termo ≥1:100 → considerar AAS 150 mg/noite (início 11–16 sem, até 36).
+   • Apresente basal → corrigido quando ambos disponíveis (mostra o impacto do
+     rastreio sobre o risco de base por idade).
+   • PRIORIDADE AO OFICIAL: se o campo "Risco oficial da FMF" foi preenchido pelo
+     médico (rodou a calculadora certificada), use ESSE valor e NÃO o interno.
+
 4. MARCADORES SECUNDÁRIOS DE ANEUPLOIDIA — 2T (18–24 semanas)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    Relatar sistematicamente nos morfológicos 2T; nunca omitir achados:

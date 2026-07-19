@@ -122,7 +122,9 @@ describe('líquido amniótico', () => {
   it('ILA: soma dos quadrantes e classificação', () => {
     const r = amnioticILA(30, 40, 50, 30)!; // 150 → normal
     expect(r.result).toBe(150);
-    expect(r.classification).toBe('Volume normal (80-180mm)');
+    expect(r.classification).toBe('Volume normal (80-240mm)');
+    // 200 mm (20 cm) agora é NORMAL (8–24 cm, padrão clínico casado com o prompt)
+    expect(amnioticILA(50, 50, 50, 50)!.classification).toBe('Volume normal (80-240mm)');
     expect(amnioticILA(10, 10, 10, 10)!.classification).toBe('Oligoâmnio (ILA < 50mm)');
     expect(amnioticILA(70, 70, 60, 60)!.classification).toBe('Polidrâmnio (ILA > 240mm)');
     expect(amnioticILA(0, 40, 50, 30)).toBeNull();

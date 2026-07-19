@@ -113,7 +113,8 @@ export function useExamActions({
     // ignorando a escolha do usuário (segurança nunca otimizada por custo).
     const decision = routeMotor({
       area: template.area,
-      examType: template.name,
+      // Nome combinado: red flags de qualquer um dos exames disparam o Pro.
+      examType: combinedExamType(tpls),
       clinicalIndication,
       anamnesis,
       userMotor: settings.selectedMotor,

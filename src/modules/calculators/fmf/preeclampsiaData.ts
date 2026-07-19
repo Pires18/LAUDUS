@@ -37,21 +37,24 @@
 import type { PeCoefficients, PeBiomarkerModel } from './preeclampsia';
 
 export const PROVISIONAL_PE_COEFFICIENTS: PeCoefficients = {
-  validated: true, // ✅ liberado (18/jul/2026) — coeficientes conferidos dígito-a-
-  //   dígito (Wright 2015 / O'Gorman 2016 / Gana 2022) e validado caso-a-caso
-  //   contra a calc oficial de PE (decisão de risco + AAS idênticas; resíduo
-  //   numérico pequeno, conservador). Gate assumido pelo usuário (apoio à
-  //   decisão; NÃO é a calc oficial da FMF).
-  version: 'pe-wright2015-maternal + ogorman2016-biomarkers + fmfLiveCal2026-v3',
+  validated: true, // ✅ liberado (18/jul/2026; re-auditado 19/jul/2026) —
+  //   coeficientes conferidos dígito-a-dígito (Wright 2015 / O'Gorman 2016 /
+  //   Gana 2022) e validado caso-a-caso contra a calc oficial de PE. A
+  //   RE-AUDITORIA de 19/jul corrigiu o bug de truncagem da integração
+  //   (T_MAX 60→100 em preeclampsia.ts) e RESTAUROU o σ publicado — os 3
+  //   casos oficiais fecham em ~4% SEM calibração. Apoio à decisão; NÃO é a
+  //   calc oficial da FMF.
+  version: 'pe-wright2015-maternal + ogorman2016-biomarkers (published, no-cal) v4',
 
-  intercept: 54.36,  // Wright 2015 (mantido)
-  // σ CALIBRADO à calc oficial da FMF ao vivo (v1.0.44, jul/2026): o ponto
-  // publicado é 6,8833, mas a FMF live usa um σ mais apertado (extremo do
-  // IC95% do próprio Wright 2015, 6,67–7,10). Ajustando σ→6,65, os 3 casos
-  // conferidos contra a oficial fecham dentro de ~4% (antes ~32%):
-  //   referência 1:261 vs 270 | alto risco 1:25 vs 24 | +biomarcadores 1:88 vs 90.
-  // O intercepto e todos os demais coeficientes seguem os publicados.
-  sigma: 6.65,       // FMF live (Wright 2015 pub.: 6,8833; IC95% 6,67–7,10)
+  intercept: 54.36,  // Wright 2015 (publicado)
+  // σ PUBLICADO do Wright 2015 (AJOG 2015;213:62), SEM calibração. A versão
+  // anterior usava σ→6,65 como REMENDO para compensar o bug de truncagem da
+  // integração (T_MAX=60 descartava a cauda da prior, superestimando ~25% o
+  // risco de baixo risco). Corrigido o T_MAX (→100 em preeclampsia.ts), o σ
+  // publicado 6,8833 reproduz os 3 casos oficiais da FMF dentro de ~4%
+  // (conservador): referência 1:258 vs 270 | alto risco 1:24 vs 24 |
+  // +biomarcadores 1:87 vs 90. Sem nenhum coeficiente ajustado à mão.
+  sigma: 6.8833,     // Wright 2015 (publicado — sem calibração)
 
   agePerYearOver35: -0.207,
   heightPerCmOver164: 0.117,

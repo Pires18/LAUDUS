@@ -1180,6 +1180,7 @@ export function ExamEditor({ examId }: Props) {
       {isAdmin && showPromptPreview && template && patient && (
         <PromptPreviewModal
           template={template}
+          templates={templates}
           patient={patient}
           exam={exam}
           settings={settings}

@@ -58,13 +58,10 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(vw?.text).toContain('Peso');
   });
 
-  it('índices Doppler (IR / S/D) no vascular genérico', () => {
-    const schema = deriveStructuredSchema(tpl('vascular', 'ARTÉRIAS OFTÁLMICAS'), 'vascular');
-    const d = computeDerivations(schema, { vps: '100', vdf: '25' });
-    const idx = d.find((x) => x.id === 'doppler__idx');
-    expect(idx?.text).toContain('IR 0,75');
-    expect(idx?.text).toContain('S/D 4,00');
-  });
+  // Os índices Doppler genéricos (IR/PI/S-D de VPS/VDF/Vmed) vivem na
+  // calculadora `vascular-ratios` (coberta em calculators.test.ts via
+  // `dopplerIndices`), não em derivação ao vivo — não há campo de esquema
+  // `vps`/`vdf` "cru" para dispará-la (o parser gera `vps-val`).
 
   it('PFE de Hadlock (fetal) a partir de DBP/CC/CA/CF, com percentil quando há DUM', () => {
     const schema = deriveStructuredSchema(tpl('medicina-fetal', 'OBSTÉTRICA'), 'medicina-fetal');
@@ -180,5 +177,74 @@ describe('computeDerivations — cálculo em tempo real', () => {
   it('derivationsToLines formata para a instrução da IA', () => {
     const lines = derivationsToLines([{ id: 'x', sectionId: 's', label: 'RCP', text: '1,58' }]);
     expect(lines[0]).toBe('  - RCP: 1,58');
+  });
+});
+
+describe('computeDerivations — riscos FMF AO VIVO (integração calculadora↔estruturado)', () => {
+  const schema1T = deriveStructuredSchema(tpl('medicina-fetal', 'MORFOLÓGICA DO PRIMEIRO TRIMESTRE'), 'medicina-fetal');
+
+  it('trissomias: perfil clássico de T21 gera chip de risco alto ao preencher', () => {
+    const d = computeDerivations(schema1T, {
+      mae_idade: '38', ccn: '65', nt: '3.5', bhcg_mom: '2.5', pappa_mom: '0.4', on: 'ausente',
+    });
+    const t21 = d.find((x) => x.id === 'fmf_t21');
+    expect(t21).toBeDefined();
+    expect(t21?.text).toContain('alto risco');
+    expect(t21?.alert).toBe(true);
+    expect(d.find((x) => x.id === 'fmf_t1318')).toBeDefined();
+  });
+
+  it('trissomias: o chip mostra BASAL → CORRIGIDO (1:N nos dois)', () => {
+    const d = computeDerivations(schema1T, {
+      mae_idade: '38', ccn: '65', nt: '3.5', bhcg_mom: '2.5', pappa_mom: '0.4', on: 'ausente',
+    });
+    const t21 = d.find((x) => x.id === 'fmf_t21');
+    expect(t21?.text).toMatch(/basal 1:\d+.*→.*1:\d+/); // basal e corrigido presentes
+    const t1318 = d.find((x) => x.id === 'fmf_t1318');
+    expect(t1318?.text).toMatch(/basal .*→/);
+  });
+
+  it('trissomias: só idade (sem TN/bioquímica/marcador) NÃO gera chip', () => {
+    const d = computeDerivations(schema1T, { mae_idade: '38' });
+    expect(d.find((x) => x.id === 'fmf_t21')).toBeUndefined();
+  });
+
+  it('trissomias: chip suprimido quando o risco OFICIAL da FMF foi colado', () => {
+    const d = computeDerivations(schema1T, {
+      mae_idade: '38', ccn: '65', nt: '3.5', on: 'ausente', risco_trissomias_fmf: 'T21 1:50',
+    });
+    expect(d.find((x) => x.id === 'fmf_t21')).toBeUndefined();
+  });
+
+  it('pré-eclâmpsia: fatores maternos + PAM + IP uterina geram chip de risco', () => {
+    const d = computeDerivations(schema1T, {
+      ig_metodo: 'Biometria do exame atual', ccn: '65',
+      mae_idade: '42', mae_peso: '95', mae_altura: '158', mae_etnia: 'afro-caribenha',
+      pa_sistolica: '135', pa_diastolica: '85', ip_uta: '2.2',
+    });
+    const pe = d.find((x) => x.id === 'fmf_pe_preterm');
+    expect(pe).toBeDefined();
+    expect(pe?.text).toMatch(/1:\d/);
+  });
+
+  it('pré-eclâmpsia: só fatores maternos (sem biomarcador) NÃO gera chip', () => {
+    const d = computeDerivations(schema1T, {
+      mae_idade: '42', mae_peso: '95', mae_altura: '158', mae_etnia: 'afro-caribenha',
+    });
+    expect(d.find((x) => x.id === 'fmf_pe_preterm')).toBeUndefined();
+  });
+
+  it('TRAVA 1º TRIMESTRE: obstétrica com Doppler de 2º/3º T (IG ~30 sem) NÃO calcula risco de PE do 1º T', () => {
+    const schemaDoppler = deriveStructuredSchema(tpl('medicina-fetal', 'OBSTÉTRICA ABDOMINAL COM DOPPLER'), 'medicina-fetal');
+    // DUM 17/09/2025, exame 15/04/2026 → ~30 semanas (fora da janela 11–13+6)
+    const d = computeDerivations(schemaDoppler, {
+      ig_metodo: 'DUM', dum: '17/09/2025',
+      mae_idade: '42', mae_peso: '95', mae_altura: '158', mae_etnia: 'afro-caribenha',
+      pa_sistolica: '135', pa_diastolica: '85', ip_uta: '2.2',
+    }, new Date(2026, 3, 15).getTime());
+    // medianas Tan 2018 são do 1º T — não aplicar em 30 sem
+    expect(d.find((x) => x.id === 'fmf_pe_preterm')).toBeUndefined();
+    // mas a razão P2/P1 oftálmica (marcador GA-independente) e a PAM seguem valendo
+    expect(d.find((x) => x.id === 'pam__calc')).toBeDefined();
   });
 });

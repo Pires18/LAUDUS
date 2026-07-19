@@ -4,10 +4,11 @@ import { Dna, AlertTriangle, Info, ArrowRight } from 'lucide-react';
 import { CalculatorInput } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 import {
-  computeTrisomyRisk, ntExpectedMedianMm, fhrExpectedBpm,
+  ntExpectedMedianMm, fhrExpectedBpm,
   type MarkerState, type Trisomy, type TrisomyFactorBreakdown,
 } from '../fmf/trisomy';
-import { ageRelatedRisk, PROVISIONAL_TRISOMY_PARAMS } from '../fmf/trisomyData';
+import { trisomyRiskFromForm } from '../fmf/fromForm';
+import { PROVISIONAL_TRISOMY_PARAMS } from '../fmf/trisomyData';
 import { momPlausible, crlToGaWeeks, crlInWindow, formatGa, formatOneInN, CRL_MIN_MM, CRL_MAX_MM } from '../fmf/qc';
 
 const MARKER_OPTIONS: { label: string; value: MarkerState }[] = [
@@ -160,22 +161,20 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
     return w;
   }, [crlMm, ntMm, ntMoM, bhcgMoM, pappaMoM]);
 
-  // ── Cálculo único (basal + corrigido) ─────────────────────────────
+  // ── Cálculo único (basal + corrigido) — via fonte ÚNICA `trisomyRiskFromForm`
+  //    (mesma matemática do cálculo ao vivo da aba Estruturado). ──────────
   const risk = useMemo(() => {
     if (!hasResult) return null;
-    return computeTrisomyRisk(
-      {
-        priorRisk: ageRelatedRisk(ageNum),
-        ntMm: ntMm ? Number(ntMm) : undefined,
-        crlMm: crlMm ? Number(crlMm) : undefined,
-        gestDays: gaWeeks ? Math.round(gaWeeks * 7) : undefined,
-        freeBhcgMoM: bhcgMoM ? Number(bhcgMoM) : undefined,
-        pappaMoM: pappaMoM ? Number(pappaMoM) : undefined,
-        fhrBpm: fhrBpm ? Number(fhrBpm) : undefined,
-        nasalBone, ductusVenosus, tricuspid,
-      },
-      PROVISIONAL_TRISOMY_PARAMS,
-    );
+    return trisomyRiskFromForm({
+      ageYears: ageNum,
+      ntMm: ntMm ? Number(ntMm) : null,
+      crlMm: crlMm ? Number(crlMm) : null,
+      gestDays: gaWeeks ? Math.round(gaWeeks * 7) : null,
+      freeBhcgMoM: bhcgMoM ? Number(bhcgMoM) : null,
+      pappaMoM: pappaMoM ? Number(pappaMoM) : null,
+      fhrBpm: fhrBpm ? Number(fhrBpm) : null,
+      nasalBone, ductusVenosus, tricuspid,
+    });
   }, [hasResult, ageNum, ntMm, crlMm, gaWeeks, bhcgMoM, pappaMoM, fhrBpm, nasalBone, ductusVenosus, tricuspid]);
 
   useEffect(() => {
@@ -188,9 +187,12 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
     const disclaimer = validated ? 'Apoio à decisão (não é a calc oficial da FMF). ' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
     const gaStr = gaWeeks ? ` IG (CCN): ${formatGa(gaWeeks)}.` : '';
     const ntStr = ntMm && ntMoM ? `, TN ${ntMm}mm (${ntMoM.toFixed(2)} MoM)` : '';
+    const floorStr = risk.reassuranceFloored.t21
+      ? ' (risco no piso de tranquilização — não reduz abaixo de 1/20 do basal, convenção FMF)'
+      : '';
     const summary =
       `${disclaimer}Risco combinado 1º trimestre — ` +
-      `T21: basal ${fmt(risk.priorOneInN.t21)} → corrigido ${fmt(risk.oneInN.t21)} (${riskBand(risk.oneInN.t21).label}); ` +
+      `T21: basal ${fmt(risk.priorOneInN.t21)} → corrigido ${fmt(risk.oneInN.t21)} (${riskBand(risk.oneInN.t21).label})${floorStr}; ` +
       `T18: basal ${fmt(risk.priorOneInN.t18)} → corrigido ${fmt(risk.oneInN.t18)}; ` +
       `T13: basal ${fmt(risk.priorOneInN.t13)} → corrigido ${fmt(risk.oneInN.t13)}. ` +
       `Idade ${ageNum}a${ntStr}` +

@@ -513,8 +513,12 @@ describe('AUDITORIA — calculadoras multi-campo integradas ao card completo', (
     expect(ila?.alert).toBe(false);
     // oligoâmnio pela soma (1+1+1+1 = 4 cm < 5)
     expect(computeDerivations(s, { ila_q1: '1', ila_q2: '1', ila_q3: '1', ila_q4: '1' }).find((x) => x.id === 'la__ila')?.alert).toBe(true);
-    // sem quadrantes, cai no total manual
-    expect(computeDerivations(s, { ila: '22' }).find((x) => x.id === 'la__ila')?.text).toMatch(/22,0 cm — líquido aumentado/);
+    // sem quadrantes, cai no total manual. ILA 8–24 = normal (padrão clínico,
+    // casado com o prompt de área); só > 24 é polidrâmnio.
+    expect(computeDerivations(s, { ila: '22' }).find((x) => x.id === 'la__ila')?.text).toMatch(/22,0 cm — volume normal/);
+    const poli = computeDerivations(s, { ila: '26' }).find((x) => x.id === 'la__ila');
+    expect(poli?.text).toMatch(/polidrâmnio/);
+    expect(poli?.alert).toBe(true);
   });
 
   it('MBV: classificação automática por bolsão único (mm)', () => {

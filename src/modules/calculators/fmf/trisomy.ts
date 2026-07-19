@@ -24,7 +24,11 @@ export interface MarkerLR {
   normal: Record<Trisomy, number>;
 }
 
-/** Modelo de mistura da TN (log10 da TN em mm). */
+/** Modelo de mistura da TN (log10 da TN em mm). Wright 2008 — mantido como
+ *  fonte da MEDIANA esperada (`ntExpectedMedianMm`, componente CRL-dependente)
+ *  e para os fatos-ouro das medianas afetadas. A LR usada pelo motor NÃO é mais
+ *  esta mistura (ela sobe ~4–6× mais rápido que a FMF ao vivo — a FMF usa um
+ *  modelo proprietário atualizado), e sim `NtDeltaLrModel` calibrada à FMF. */
 export interface NtMixtureParams {
   /** Componente CRL-dependente: μ0 = b0 + b1·CRL + b2·CRL²; DP = sd. */
   crlDependent: { b0: number; b1: number; b2: number; sd: number };
@@ -32,6 +36,22 @@ export interface NtMixtureParams {
   normalIndep: { alpha0: number; alpha1: number; mu: number; sd: number };
   /** Componente CRL-independente por aneuploidia: proporção p + μ/σ. */
   affectedIndep: Record<Trisomy, { p: number; mu: number; sd: number }>;
+}
+
+/**
+ * LR da TN EMPÍRICA — calibrada à curva da calculadora OFICIAL da FMF ao vivo
+ * (sweep limpo, jul/2026). A LR é função do DELTA-TN (mm) = TN medida − mediana
+ * esperada (CRL), abordagem padrão da FMF/Wright que torna a curva ~independente
+ * do CCN. Interpolação log-linear em LR vs delta; extrapolação log-linear travada
+ * em `maxLR` acima do último ponto e achatada (platô) abaixo do primeiro.
+ */
+export interface NtDeltaLrModel {
+  /** Pontos de delta-TN (mm), crescentes. */
+  delta: number[];
+  /** LR por trissomia em cada delta (mesmo comprimento de `delta`). */
+  lr: Record<Trisomy, number[]>;
+  /** LR máxima (trava a extrapolação para TN muito extrema). */
+  maxLR: number;
 }
 
 /** Bioquímica: bivariada de log10(MoM), médias afetadas dependentes da IG. */
@@ -62,11 +82,23 @@ export interface FhrParams {
 export interface TrisomyModelParams {
   validated: boolean;
   version: string;
+  /** Mistura Wright 2008 — usada só para a MEDIANA esperada da TN e fatos-ouro. */
   nt: NtMixtureParams;
+  /** LR da TN calibrada à FMF ao vivo (o que o motor de fato usa). */
+  ntDeltaLr: NtDeltaLrModel;
   biochem: BiochemParams;
   markers: { nasalBone: MarkerLR; ductusVenosus: MarkerLR; tricuspid: MarkerLR };
   fhr: FhrParams;
 }
+
+/**
+ * PISO DE TRANQUILIZAÇÃO da FMF (achado do sweep, jul/2026): a calc oficial
+ * NÃO deixa o rastreio reduzir o risco abaixo de 1/N do risco de base — nos
+ * dados, exatamente ÷20 (T21: base 1:230 → piso 1:4600; T13/18: 1:430 →
+ * 1:8600). Evita falsa tranquilização por acúmulo de fatores favoráveis. O
+ * risco AJUSTADO nunca fica abaixo de `prior / REASSURANCE_FLOOR_DIVISOR`.
+ */
+export const REASSURANCE_FLOOR_DIVISOR = 20;
 
 export interface TrisomyInputs {
   priorRisk: Record<Trisomy, number>;
@@ -104,6 +136,9 @@ export interface TrisomyRisk {
   /** Detalhamento das LRs individuais que compõem `lr` — para exibir a
    *  "jornada" basal → corrigido fator a fator. */
   factors: Record<Trisomy, TrisomyFactorBreakdown>;
+  /** true quando o piso de tranquilização (÷N) segurou o risco ajustado —
+   *  o produto das LRs levaria a um risco menor que `prior/divisor`. */
+  reassuranceFloored: Record<Trisomy, boolean>;
 }
 
 // ───────────────────────────── Probabilidade ────────────────────────────
@@ -170,6 +205,35 @@ export function ntMixtureLR(ntMm: number, crlMm: number, nt: NtMixtureParams, t:
   return fNorm > 0 ? fAff / fNorm : 1;
 }
 
+/**
+ * LR da TN CALIBRADA À FMF (delta-TN). Substitui `ntMixtureLR` no motor.
+ * delta = TN medida − mediana esperada (CRL). Interpola log-linear a tabela
+ * calibrada; achata abaixo do menor delta (platô) e extrapola log-linear
+ * (travado em maxLR) acima do maior.
+ */
+export function ntCalibratedLR(
+  ntMm: number, crlMm: number, nt: NtMixtureParams, table: NtDeltaLrModel, t: Trisomy,
+): number {
+  if (!(ntMm > 0) || !(crlMm > 0)) return 1;
+  const median = ntExpectedMedianMm(crlMm, nt);
+  const d = ntMm - median;
+  const xs = table.delta;
+  const ys = table.lr[t];
+  const n = xs.length;
+  if (d <= xs[0]) return ys[0];
+  if (d >= xs[n - 1]) {
+    const slope = (Math.log(ys[n - 1]) - Math.log(ys[n - 2])) / (xs[n - 1] - xs[n - 2]);
+    return Math.min(table.maxLR, Math.exp(Math.log(ys[n - 1]) + slope * (d - xs[n - 1])));
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (d >= xs[i] && d <= xs[i + 1]) {
+      const f = (d - xs[i]) / (xs[i + 1] - xs[i]);
+      return Math.exp(Math.log(ys[i]) + f * (Math.log(ys[i + 1]) - Math.log(ys[i])));
+    }
+  }
+  return 1;
+}
+
 /** LR bivariada da bioquímica com médias afetadas dependentes da IG. */
 export function biochemLR(bhcgMoM: number, pappaMoM: number, gestDays: number, bio: BiochemParams, t: Trisomy): number {
   if (!(bhcgMoM > 0) || !(pappaMoM > 0)) return 1;
@@ -234,6 +298,7 @@ export function computeTrisomyRisk(inputs: TrisomyInputs, params: TrisomyModelPa
   const lrOut = {} as Record<Trisomy, number>;
   const priorOneInN = {} as Record<Trisomy, number>;
   const factors = {} as Record<Trisomy, TrisomyFactorBreakdown>;
+  const reassuranceFloored = {} as Record<Trisomy, boolean>;
 
   const gestDays = inputs.gestDays ?? 89; // ~12+5 semanas
 
@@ -242,7 +307,7 @@ export function computeTrisomyRisk(inputs: TrisomyInputs, params: TrisomyModelPa
     const factorLRs: TrisomyFactorBreakdown = {};
 
     if (inputs.ntMm && inputs.crlMm) {
-      const ntLr = ntMixtureLR(inputs.ntMm, inputs.crlMm, params.nt, t);
+      const ntLr = ntCalibratedLR(inputs.ntMm, inputs.crlMm, params.nt, params.ntDeltaLr, t);
       factorLRs.nt = ntLr;
       lr *= ntLr;
     }
@@ -273,13 +338,20 @@ export function computeTrisomyRisk(inputs: TrisomyInputs, params: TrisomyModelPa
     }
 
     const postOdds = probToOdds(inputs.priorRisk[t]) * lr;
-    const p = oddsToProb(postOdds);
+    let p = oddsToProb(postOdds);
+    // PISO DE TRANQUILIZAÇÃO (FMF): o risco ajustado não cai abaixo de
+    // prior/divisor (÷20 nos dados oficiais). `lr` (breakdown) permanece o
+    // produto cru dos fatores; só o risco exibido é limitado.
+    const floorP = inputs.priorRisk[t] / REASSURANCE_FLOOR_DIVISOR;
+    const floored = p < floorP;
+    if (floored) p = floorP;
     posterior[t] = p;
     oneInN[t] = probToOneInN(p);
     lrOut[t] = lr;
     priorOneInN[t] = probToOneInN(inputs.priorRisk[t]);
     factors[t] = factorLRs;
+    reassuranceFloored[t] = floored;
   }
 
-  return { posterior, oneInN, lr: lrOut, priorOneInN, factors };
+  return { posterior, oneInN, lr: lrOut, priorOneInN, factors, reassuranceFloored };
 }

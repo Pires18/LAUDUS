@@ -106,7 +106,7 @@ const BIOQUIMICA = (): StructuredSection => ({
     { id: 'bio_analisador', label: 'Analisador', kind: 'select', options: ['Cobas', 'Delfia', 'Kryptor'], hint: 'define as medianas usadas na conversão em MoM' },
     { id: 'pappa_mom', label: 'PAPP-A', kind: 'measure', unit: 'MoM', normal: '≈ 1,0 MoM' },
     { id: 'bhcg_mom', label: 'β-hCG livre', kind: 'measure', unit: 'MoM', normal: '≈ 1,0 MoM' },
-    { id: 'plgf_mom', label: 'PlGF', kind: 'measure', unit: 'MoM', normal: '≈ 1,0 MoM', hint: 'rastreio de pré-eclâmpsia' },
+    { id: 'plgf_mom', label: 'PlGF', kind: 'measure', unit: 'pg/mL', hint: 'valor BRUTO (pg/mL) — o MoM é calculado pela mediana do analisador · rastreio de pré-eclâmpsia' },
   ],
 });
 
@@ -119,7 +119,7 @@ const VITALIDADE = (): StructuredSection => ({
     { id: 'apresentacao', label: 'Apresentação', kind: 'select', options: ['cefálica', 'pélvica', 'córmica / transversa'], alwaysShow: true },
     { id: 'dorso', label: 'Dorso', kind: 'select', options: ['à esquerda', 'à direita', 'anterior', 'posterior'], alwaysShow: true },
     { id: 'bcf', label: 'BCF', kind: 'measure', unit: 'bpm', normal: '110–160 bpm', alwaysShow: true },
-    { id: 'movimentos', label: 'Movimentos fetais', kind: 'select', options: ['presentes e adequados', 'reduzidos', 'ausentes'] },
+    { id: 'movimentos', label: 'Movimentos fetais', kind: 'select', options: ['presentes e adequados', 'reduzidos', 'ausentes'], normalOption: 'presentes e adequados' },
   ],
 });
 
@@ -146,14 +146,14 @@ const DOPPLER_FETAL = (opts: { oftalmicas?: boolean; ducto?: boolean; barcelona?
   normalText: 'índices dentro dos limites da normalidade para a idade gestacional',
   fields: [
     { id: 'ip_au', label: 'IP Artéria Umbilical', kind: 'measure', calcId: 'doppler-fetal', alwaysShow: true, hint: 'percentil automático (20–40 sem) · alterado se > p95' },
-    { id: 'au_diastole', label: 'Diástole final (AU)', kind: 'select', options: ['positiva', 'ausente', 'reversa'], alwaysShow: true, hint: 'ausente/reversa = estadiamento de Barcelona' },
+    { id: 'au_diastole', label: 'Diástole final (AU)', kind: 'select', options: ['positiva', 'ausente', 'reversa'], normalOption: 'positiva', alwaysShow: true, hint: 'ausente/reversa = estadiamento de Barcelona' },
     { id: 'ip_acm', label: 'IP Artéria Cerebral Média', kind: 'measure', alwaysShow: true, hint: 'redistribuição se < p5 · RCP (ACM/AU) automática' },
     { id: 'psv_acm', label: 'PSV ACM', kind: 'measure', unit: 'cm/s', hint: 'MoM automático (18–40 sem) · anemia se > 1,5 MoM' },
     { id: 'ip_uta', label: 'IP Artérias Uterinas (média)', kind: 'measure', alwaysShow: true, hint: 'percentil automático · risco se > p95' },
-    { id: 'uta_incisura', label: 'Incisura protodiastólica', kind: 'select', options: ['ausente bilateral', 'presente unilateral', 'presente bilateral'] },
+    { id: 'uta_incisura', label: 'Incisura protodiastólica', kind: 'select', options: ['ausente bilateral', 'presente unilateral', 'presente bilateral'], normalOption: 'ausente bilateral' },
     ...(opts.ducto
       ? [
-          { id: 'dv', label: 'Ducto venoso — onda A', kind: 'select' as const, options: ['positiva', 'ausente', 'reversa'] },
+          { id: 'dv', label: 'Ducto venoso — onda A', kind: 'select' as const, options: ['positiva', 'ausente', 'reversa'], normalOption: 'positiva' },
           { id: 'ip_dv', label: 'IP Ducto Venoso', kind: 'measure' as const, hint: 'percentil automático · > p95 = pré-carga aumentada' },
         ]
       : []),
@@ -202,7 +202,7 @@ const LIQUIDO = (): StructuredSection => ({
     { id: 'ila_q2', label: 'Quadrante superior esquerdo', kind: 'measure', unit: 'cm', alwaysShow: true },
     { id: 'ila_q3', label: 'Quadrante inferior direito', kind: 'measure', unit: 'cm', alwaysShow: true },
     { id: 'ila_q4', label: 'Quadrante inferior esquerdo', kind: 'measure', unit: 'cm', alwaysShow: true },
-    { id: 'ila', label: 'ILA (total)', kind: 'measure', unit: 'cm', calcId: 'amniotic-fluid', normal: '8–18 cm', alwaysShow: true, hint: 'soma dos 4 quadrantes (auto) ou total manual · classificação automática' },
+    { id: 'ila', label: 'ILA (total)', kind: 'measure', unit: 'cm', calcId: 'amniotic-fluid', normal: '8–24 cm', alwaysShow: true, hint: 'soma dos 4 quadrantes (auto) ou total manual · < 5 oligo · > 24 polidrâmnio · classificação automática' },
     { id: 'mbv', label: 'MBV (maior bolsão vertical)', kind: 'measure', unit: 'mm', normal: '20–80 mm', alwaysShow: true, hint: 'método do bolsão único · < 20 oligo · > 80 polidrâmnio (auto)' },
   ],
 });
@@ -213,7 +213,7 @@ const CORDAO = (): StructuredSection => ({
   normalable: true,
   normalText: 'três vasos (duas artérias e uma veia), inserção habitual',
   fields: [
-    { id: 'cordao_vasos', label: 'Vasos', kind: 'select', options: ['3 vasos (2 artérias + 1 veia)', '2 vasos (artéria umbilical única)'], alwaysShow: true },
+    { id: 'cordao_vasos', label: 'Vasos', kind: 'select', options: ['3 vasos (2 artérias + 1 veia)', '2 vasos (artéria umbilical única)'], normalOption: '3 vasos (2 artérias + 1 veia)', alwaysShow: true },
     { id: 'cordao_desc', label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'inserção velamentosa/marginal, circulares, cistos' },
   ],
 });
@@ -331,7 +331,7 @@ const MORFOLOGICA_1T = (): StructuredSection[] => [
     normalable: true,
     normalText: 'tópica, única e evolutiva; feto com movimentação ativa',
     fields: [
-      { id: 'bcf', label: 'BCF (FCF)', kind: 'measure', unit: 'bpm', normal: '110–160 bpm', alwaysShow: true, hint: 'também alimenta a FHR do rastreio combinado de trissomias' },
+      { id: 'bcf', label: 'BCF (FCF)', kind: 'measure', unit: 'bpm', normal: '150–170 bpm', alwaysShow: true, hint: 'faixa do 1º T (11–13+6 sem); <110 ou >200 bpm → R6 · alimenta a FHR do rastreio combinado de trissomias' },
       { id: 'gestacao_desc', label: 'Achados', kind: 'text', fullWidth: true },
     ],
   },
@@ -349,12 +349,12 @@ const MORFOLOGICA_1T = (): StructuredSection[] => [
     normalable: true,
     normalText: 'TN dentro da normalidade, osso nasal presente, ducto venoso com onda A positiva e ausência de regurgitação tricúspide',
     fields: [
-      { id: 'nt', label: 'Translucência nucal (TN)', kind: 'measure', unit: 'mm', normal: '≤ 3,5 mm', alwaysShow: true, hint: 'alerta automático se > 3,5 mm (> p95)' },
-      { id: 'on', label: 'Osso nasal', kind: 'select', options: ['presente', 'ausente', 'hipoplásico'], alwaysShow: true },
-      { id: 'dv', label: 'Ducto venoso — onda A', kind: 'select', options: ['positiva', 'ausente', 'reversa'], alwaysShow: true },
+      { id: 'nt', label: 'Translucência nucal (TN)', kind: 'measure', unit: 'mm', normal: '≤ 3,5 mm', alwaysShow: true, hint: '3,0–3,4 mm já eleva o risco combinado (ver risco T21 ao lado); > 3,5 mm → conduta/R6 (o motor usa o delta-TN por CCN, não um corte fixo)' },
+      { id: 'on', label: 'Osso nasal', kind: 'select', options: ['presente', 'ausente', 'hipoplásico'], normalOption: 'presente', alwaysShow: true },
+      { id: 'dv', label: 'Ducto venoso — onda A', kind: 'select', options: ['positiva', 'ausente', 'reversa'], normalOption: 'positiva', alwaysShow: true },
       { id: 'ip_dv', label: 'IP do ducto venoso', kind: 'measure', hint: 'percentil automático · > p95 = pré-carga aumentada' },
-      { id: 'tricuspide', label: 'Regurgitação tricúspide', kind: 'select', options: ['ausente', 'presente'], alwaysShow: true },
-      { id: 'risco_trissomias', label: 'Risco combinado de trissomias (FMF)', kind: 'calc', calcId: 'fmf-trisomy-risk', fullWidth: true, hint: 'idade + TN + bioquímica + FCF + marcadores → risco de T21/18/13 · semeada pelos campos do exame · apoio à decisão (não é a calculadora oficial da FMF)' },
+      { id: 'tricuspide', label: 'Regurgitação tricúspide', kind: 'select', options: ['ausente', 'presente'], normalOption: 'ausente', alwaysShow: true },
+      { id: 'risco_trissomias', label: 'Risco combinado de trissomias (FMF)', kind: 'calc', calcId: 'fmf-trisomy-risk', fullWidth: true, hint: 'CALCULA AUTOMÁTICO ao preencher idade + TN + bioquímica + FCF + marcadores (chip de risco T21 e T13/18 aparece sozinho) · abra para detalhar/ajustar · apoio à decisão (não é a calculadora oficial da FMF)' },
       { id: 'risco_trissomias_fmf', label: 'Risco oficial da FMF (opcional)', kind: 'text', fullWidth: true, hint: 'se você rodou a calculadora OFICIAL da FMF (fetalmedicine.org), cole aqui o "1 em N" de T21 e T13/18 — entra no laudo com prioridade sobre o cálculo interno' },
     ],
   },
@@ -366,10 +366,10 @@ const MORFOLOGICA_1T = (): StructuredSection[] => [
     normalText: 'artérias uterinas com índices normais, sem incisuras; artérias oftálmicas abaixo do limiar de risco',
     fields: [
       { id: 'ip_uta', label: 'IP Artérias Uterinas (média)', kind: 'measure', calcId: 'doppler-fetal', alwaysShow: true, hint: 'percentil automático · risco se > p95' },
-      { id: 'uta_incisura', label: 'Incisuras protodiastólicas', kind: 'select', options: ['ausentes', 'presentes'] },
+      { id: 'uta_incisura', label: 'Incisuras protodiastólicas', kind: 'select', options: ['ausentes', 'presentes'], normalOption: 'ausentes' },
       { id: 'oft_p1', label: 'PSV 1º pico (P1)', kind: 'measure', unit: 'cm/s', hint: 'média dos dois olhos' },
       { id: 'oft_p2', label: 'PSV 2º pico (P2)', kind: 'measure', unit: 'cm/s', hint: 'razão P2/P1 automática · risco de PE se ≥ 0,65' },
-      { id: 'risco_pe', label: 'Risco de pré-eclâmpsia (FMF)', kind: 'calc', calcId: 'fmf-preeclampsia-risk', fullWidth: true, hint: 'fatores maternos + PAM + IP uterinas + PlGF → risco de PE pré-termo/termo e conduta AAS · semeada pelos campos do exame · apoio à decisão (não é a calculadora oficial da FMF)' },
+      { id: 'risco_pe', label: 'Risco de pré-eclâmpsia (FMF)', kind: 'calc', calcId: 'fmf-preeclampsia-risk', fullWidth: true, hint: 'CALCULA AUTOMÁTICO ao preencher fatores maternos + PAM + IP uterinas + PlGF (chip de risco pré-termo e conduta AAS aparece sozinho) · abra para detalhar (4 PA / bilateral / oftálmicas) · apoio à decisão (não é a calculadora oficial da FMF)' },
       { id: 'risco_pe_fmf', label: 'Risco oficial de PE da FMF (opcional)', kind: 'text', fullWidth: true, hint: 'se você rodou a calculadora OFICIAL de pré-eclâmpsia da FMF, cole aqui o risco pré-termo (< 37 sem) e a conduta — entra no laudo com prioridade sobre o cálculo interno' },
     ],
   },
@@ -403,7 +403,7 @@ const NEUROSSONOGRAFIA = (): StructuredSection[] => [
   sistema('fossa-posterior', 'Fossa Posterior', 'cerebelo e vermis íntegros, cisterna magna de dimensões normais, tronco habitual', [
     { id: 'cerebelo', label: 'Diâmetro transverso do cerebelo', kind: 'measure', unit: 'mm', alwaysShow: true },
     { id: 'cisterna_magna', label: 'Cisterna magna', kind: 'measure', unit: 'mm', normal: '2–10 mm', alwaysShow: true },
-    { id: 'vermis', label: 'Vermis cerebelar', kind: 'select', options: ['íntegro', 'hipoplásico', 'ausente'], alwaysShow: true },
+    { id: 'vermis', label: 'Vermis cerebelar', kind: 'select', options: ['íntegro', 'hipoplásico', 'ausente'], normalOption: 'íntegro', alwaysShow: true },
   ]),
   sistema('espacos-liquidos', 'Espaços Líquidos e Vascularização', 'espaço subaracnóideo e fissuras sem alterações; Doppler sem malformações vasculares grosseiras'),
 ];
@@ -411,13 +411,13 @@ const NEUROSSONOGRAFIA = (): StructuredSection[] => [
 const ECOCARDIOGRAMA = (): StructuredSection[] => [
   DATACAO(),
   sistema('situs', 'Situs e Posição', 'situs solitus, estômago e ápice à esquerda; levocardia; eixo cardíaco normal (~45°)', [
-    { id: 'situs_tipo', label: 'Situs', kind: 'select', options: ['solitus', 'inversus', 'ambíguo'], alwaysShow: true },
+    { id: 'situs_tipo', label: 'Situs', kind: 'select', options: ['solitus', 'inversus', 'ambíguo'], normalOption: 'solitus', alwaysShow: true },
     { id: 'eixo', label: 'Eixo cardíaco', kind: 'measure', unit: '°', normal: '45° ± 20°', alwaysShow: true },
     { id: 'rct', label: 'Relação cardiotorácica', kind: 'measure', normal: '≈ 0,3', alwaysShow: true, hint: 'cardiomegalia se > 0,35' },
   ]),
   sistema('ritmo', 'Ritmo e Frequência', 'ritmo sinusal regular', [
     { id: 'bcf', label: 'Frequência cardíaca', kind: 'measure', unit: 'bpm', normal: '110–160 bpm', alwaysShow: true },
-    { id: 'ritmo_tipo', label: 'Ritmo', kind: 'select', options: ['sinusal regular', 'extrassístoles', 'taquiarritmia', 'bradiarritmia / BAV'], alwaysShow: true },
+    { id: 'ritmo_tipo', label: 'Ritmo', kind: 'select', options: ['sinusal regular', 'extrassístoles', 'taquiarritmia', 'bradiarritmia / BAV'], normalOption: 'sinusal regular', alwaysShow: true },
   ]),
   sistema('quatro-camaras', 'Corte de 4 Câmaras', 'câmaras simétricas, septos íntegros, forame oval pérvio, valvas AV normais, veias pulmonares no átrio esquerdo'),
   sistema('vias-saida', 'Vias de Saída', 'concordância ventrículo-arterial com cruzamento normal dos grandes vasos; valvas semilunares normais'),
@@ -461,7 +461,7 @@ const FETO_GEMELAR = (n: 1 | 2): StructuredSection[] => [
     normalText: 'índices dentro dos limites da normalidade',
     fields: [
       { id: `f${n}_ip_au`, label: 'IP Artéria Umbilical', kind: 'measure', calcId: 'doppler-fetal', alwaysShow: true },
-      { id: `f${n}_diastole`, label: 'Diástole final (AU)', kind: 'select', options: ['positiva', 'ausente', 'reversa'], alwaysShow: true },
+      { id: `f${n}_diastole`, label: 'Diástole final (AU)', kind: 'select', options: ['positiva', 'ausente', 'reversa'], normalOption: 'positiva', alwaysShow: true },
       { id: `f${n}_ip_acm`, label: 'IP ACM', kind: 'measure' },
       { id: `f${n}_psv_acm`, label: 'PSV ACM', kind: 'measure', unit: 'cm/s', hint: 'anemia/TAPS: > 1,5 MoM' },
       { id: `f${n}_mbv`, label: 'MBV do saco', kind: 'measure', unit: 'mm', alwaysShow: true, hint: 'TTTS: < 20 mm (doador) / > 80 mm (receptor)' },
@@ -515,7 +515,7 @@ const CERVICOMETRIA = (): StructuredSection[] => [
     normalable: true,
     normalText: 'ausente às manobras de compressão fúndica e de Valsalva',
     fields: [
-      { id: 'funil_tipo', label: 'Tipo (T/Y/V/U)', kind: 'select', options: ['T (normal)', 'Y', 'V', 'U'], alwaysShow: true },
+      { id: 'funil_tipo', label: 'Tipo (T/Y/V/U)', kind: 'select', options: ['T (normal)', 'Y', 'V', 'U'], normalOption: 'T (normal)', alwaysShow: true },
       { id: 'funil_comp', label: 'Comprimento da funilização', kind: 'measure', unit: 'mm' },
       { id: 'funil_manobra', label: 'Manobras realizadas', kind: 'multiselect', options: ['compressão fúndica', 'Valsalva', 'ortostatismo'] },
     ],

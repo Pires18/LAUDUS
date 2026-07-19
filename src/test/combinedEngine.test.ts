@@ -69,6 +69,7 @@ describe('buildPrompt — laudo combinado', () => {
   it('userMessage contém diretriz LAUDO COMBINADO, título combinado e os dois exames', () => {
     const built = buildPrompt(base([ABDOME, PELVICA]) as any);
     expect(built.userMessage).toContain('LAUDO COMBINADO');
+    expect(built.userMessage).toContain('REGRAS DE UNIFICAÇÃO');
     expect(built.userMessage).toContain(getCombinedTitle([ABDOME, PELVICA]));
     expect(built.userMessage).toContain('═══ EXAME 1 — ABDOME TOTAL ═══');
     expect(built.userMessage).toContain('═══ EXAME 2 — PÉLVICA ABDOMINAL ═══');

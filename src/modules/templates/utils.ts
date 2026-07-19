@@ -138,6 +138,78 @@ const blockLabel = (html: string): string | null => {
   return label || null;
 };
 
+// ── Fusão de prosa unificada (TÉCNICA / OBSERVAÇÕES METODOLÓGICAS) ──
+
+/** Divide um texto plano em sentenças (fim em "." seguido de maiúscula). */
+const splitSentences = (text: string): string[] =>
+  text
+    .split(/(?<=\.)\s+(?=[A-ZÀ-ÚÇ])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+/** Tokens normalizados de uma sentença (sem acentos/caixa/pontuação final). */
+const sentenceTokens = (sentence: string): string[] =>
+  normalizeText(sentence)
+    .split(' ')
+    .map((w) => w.replace(/[.,;:]+$/, ''))
+    .filter(Boolean);
+
+/** Nº mínimo de palavras iguais no início para considerar duas sentenças "a mesma frase-tronco". */
+const PROSE_MERGE_MIN_WORDS = 8;
+
+/**
+ * Funde o conteúdo de TÉCNICA/OBSERVAÇÕES de N máscaras num ÚNICO parágrafo
+ * coeso, sentença a sentença:
+ * - sentença idêntica (normalizada) aparece uma vez;
+ * - sentença que é PREFIXO de outra é absorvida pela mais completa (ex.: a
+ *   limitação por interposição gasosa com e sem a ressalva da via abdominal);
+ * - sentenças com o mesmo tronco inicial (≥ 8 palavras) são FUNDIDAS com "e"
+ *   (ex.: "…diretrizes de CBR e a classificação de Bosniak (2019)" +
+ *   "…diretrizes de CBR e o sistema O-RADS US (v2022)" → uma única frase com
+ *   as duas diretrizes);
+ * - sentenças diferentes são mantidas em sequência, no mesmo parágrafo.
+ */
+const mergeUnifiedProse = (contents: Array<string | undefined>): string => {
+  const entries: { text: string }[] = [];
+
+  const addSentence = (sentence: string) => {
+    const newTokens = sentenceTokens(sentence);
+    if (newTokens.length === 0) return;
+    for (const entry of entries) {
+      const exTokens = sentenceTokens(entry.text);
+      let common = 0;
+      while (
+        common < exTokens.length &&
+        common < newTokens.length &&
+        exTokens[common] === newTokens[common]
+      ) common++;
+      if (common === newTokens.length && common === exTokens.length) return; // idêntica
+      if (common < PROSE_MERGE_MIN_WORDS) continue;
+      if (common === newTokens.length) return; // nova ⊆ existente
+      if (common === exTokens.length) { entry.text = sentence; return; } // existente ⊆ nova
+      // Fusão: tronco comum + cauda existente + " e " + cauda nova
+      const exWords = entry.text.trim().split(/\s+/);
+      const newWords = sentence.trim().split(/\s+/);
+      const head = exWords.slice(0, common).join(' ');
+      const exTail = exWords.slice(common).join(' ').replace(/\.\s*$/, '');
+      const newTail = newWords.slice(common).join(' ');
+      entry.text = `${head} ${exTail} e ${newTail}`;
+      return;
+    }
+    entries.push({ text: sentence });
+  };
+
+  for (const content of contents) {
+    const clean = sanitize(content);
+    if (!clean) continue;
+    const plain = clean.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+    for (const sentence of splitSentences(plain)) addSentence(sentence);
+  }
+
+  if (entries.length === 0) return '';
+  return `<p>${entries.map((e) => e.text).join(' ')}</p>`;
+};
+
 /**
  * Concatena o conteúdo da mesma seção vindo de N máscaras, descartando
  * duplicatas: em modo 'exact', parágrafos com texto normalizado idêntico;
@@ -188,7 +260,9 @@ export function getCombinedInitialReportContent(
   const withRecommendations = toggles?.recommendations !== false;
   const withObservations = toggles?.observations !== false;
 
-  html += addSection('TÉCNICA', mergeSectionContents(valid.map((t) => t.technique), 'exact'));
+  // TÉCNICA e OBSERVAÇÕES METODOLÓGICAS são UNIFICADAS num parágrafo único e
+  // coeso (fusão de sentenças); as demais seções concatenam com dedupe.
+  html += addSection('TÉCNICA', mergeUnifiedProse(valid.map((t) => t.technique)));
   html += addSection('ANÁLISE', mergeSectionContents(valid.map((t) => t.analysisTemplate), 'label'));
   if (withClassification)
     html += addSection('CLASSIFICAÇÕES', mergeSectionContents(valid.map((t) => t.classificationTemplate || ''), 'exact'));
@@ -196,7 +270,7 @@ export function getCombinedInitialReportContent(
   if (withRecommendations)
     html += addSection('RECOMENDAÇÕES', mergeSectionContents(valid.map((t) => t.recommendationsTemplate), 'exact'));
   if (withObservations)
-    html += addSection('OBSERVAÇÕES METODOLÓGICAS', mergeSectionContents(valid.map((t) => t.observationsTemplate || ''), 'exact'));
+    html += addSection('OBSERVAÇÕES METODOLÓGICAS', mergeUnifiedProse(valid.map((t) => t.observationsTemplate || '')));
 
   return html;
 }

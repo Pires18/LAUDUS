@@ -7,7 +7,8 @@ import {
 } from '../../../types';
 import { fieldValueToText } from '../structured/deriveSchema';
 import { Derivation } from '../structured/liveCompute';
-import { sectionState, itemCount, itemFieldId, normalKey } from '../structured/structuredKeys';
+import { itemCount, itemFieldId, normalKey } from '../structured/structuredKeys';
+import { effectiveSectionState, isAutoAltered, fieldDefAbnormal } from '../structured/abnormalRange';
 import { sectionRepeatContainers, RepeatContainer } from '../structured/containers';
 
 /**
@@ -206,10 +207,16 @@ function FieldRenderer({
     <div className="flex flex-col gap-1">
       <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest flex items-center gap-1.5">
         {field.label}
-        {field.normal && (
-          <span className="px-1 py-px rounded bg-emerald-50 border border-emerald-100 text-emerald-600 text-[8px] font-bold normal-case tracking-normal">
-            normal: {field.normal}
-          </span>
+        {(field.normal || field.normalOption) && (
+          fieldDefAbnormal(field, rawText) ? (
+            <span className="px-1 py-px rounded bg-amber-100 border border-amber-300 text-amber-700 text-[8px] font-black normal-case tracking-normal">
+              alterado{field.normal ? ` (normal: ${field.normal})` : ''}
+            </span>
+          ) : field.normal ? (
+            <span className="px-1 py-px rounded bg-emerald-50 border border-emerald-100 text-emerald-600 text-[8px] font-bold normal-case tracking-normal">
+              normal: {field.normal}
+            </span>
+          ) : null
         )}
       </label>
       <div className="flex items-start gap-1.5">
@@ -318,12 +325,16 @@ export function StructuredTab({
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
         {schema.sections.map((section) => {
-          const isNormal = section.normalable && sectionState(values, section.id) === 'normal';
+          const isNormal = section.normalable && effectiveSectionState(section, values) === 'normal';
+          const autoAltered = section.normalable && isAutoAltered(section, values);
           return (
           <div key={section.id} className="rounded-2xl border border-ink-200 bg-white overflow-hidden shadow-sm">
             <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-ink-100">
               <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">{section.label}</span>
               <div className="flex items-center gap-1.5">
+                {autoAltered && (
+                  <span className="px-1.5 py-px rounded bg-amber-100 border border-amber-300 text-amber-700 text-[8px] font-black uppercase tracking-wide" title="Alterado automaticamente por valor fora da faixa">auto</span>
+                )}
                 {section.normalable ? (
                   <div className="flex items-center rounded-lg border border-ink-200 overflow-hidden">
                     <button

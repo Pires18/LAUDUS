@@ -1,8 +1,14 @@
 import { StructuredSchema, StructuredFieldValue, StructuredFieldDef } from '../../../types';
 import { fieldValueToText } from './deriveSchema';
-import { sectionState, itemCount, itemFieldId } from './structuredKeys';
+import { itemCount, itemFieldId } from './structuredKeys';
+import { effectiveSectionState } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
-import { meanArterialPressure, bodyMassIndex } from './calcSeed';
+import { meanArterialPressure, bodyMassIndex, seedForCalculator } from './calcSeed';
+import { trisomyRiskFromForm, trisomyHasEvidence, peRiskFromForm } from '../../calculators/fmf/fromForm';
+import { formatOneInN, crlToGaWeeks } from '../../calculators/fmf/qc';
+import type { MarkerState } from '../../calculators/fmf/trisomy';
+import type { RacialOrigin, Conception } from '../../calculators/fmf/preeclampsia';
+import type { Analyzer, ParityKind, DiabetesKind } from '../../calculators/fmf/medians';
 import { tiradsScore, biradsSuggest, oradsSuggest, grafType, carotidStenosisNASCET, itbClassification, bosniakSuggest } from './scoring';
 import {
   ellipsoidVolume,
@@ -13,14 +19,14 @@ import {
   pickBiometryDatingParam,
   parseIgLabel,
   resolveReferenceGa,
-  dopplerIndices,
   ivcCollapsibilityIndex,
   DatingMethod,
 } from '../../calculators/formulas';
 import {
-  calcHadlockEfw, getWhoPercentile, mcaPsvMoM, getCprRef,
+  calcHadlockEfw, mcaPsvMoM, getCprRef,
   UA_REF, MCA_REF, UTA_REF, DV_REF, getRef, zToPercentile, DOPPLER_GA_MIN, DOPPLER_GA_MAX,
 } from '../../calculators/constants/fetalReferences';
+import { getPercentileBy, DEFAULT_BIOMETRY_REFERENCE } from '../../calculators/constants/biometryReferences';
 
 /**
  * Cálculo em TEMPO REAL (sem abrir modal) a partir dos campos estruturados.
@@ -215,7 +221,9 @@ export function computeDerivations(
   };
 
   for (const section of schema.sections) {
-    const isNormal = section.normalable && sectionState(v, section.id) === 'normal';
+    // estado EFETIVO: auto-alterado quando um valor digitado sai da faixa normal
+    // (a menos que o médico tenha escolhido manualmente) → passa a computar.
+    const isNormal = section.normalable && effectiveSectionState(section, v) === 'normal';
     // Campos FIXOS da seção (não valem para seção-lista pura). Em 'Normal',
     // só a biometria que se registra na normalidade (`alwaysShow`) segue calculando.
     if (!section.repeatable) {
@@ -278,26 +286,29 @@ export function computeDerivations(
     if (vd + ve > 0) out.push({ id: 'tireoide__voltotal', sectionId: secOf('lobo_d_dims', 'istmo'), label: 'Volume tireoidiano total', text: `${fmt(vd + ve)} cm³${vd + ve > 18 ? ' — aumentado' : ''}`, alert: vd + ve > 18 });
   }
 
-  // ── Fetal: PFE (Hadlock IV) + percentil OMS a partir de DBP/CC/CA/CF ──
+  // ── Fetal: PFE (Hadlock IV) + percentil a partir de DBP/CC/CA/CF ──
+  // O percentil usa a MESMA curva-padrão da calculadora de biometria
+  // (DEFAULT_BIOMETRY_REFERENCE = Hadlock, com fallback OMS quando fora da
+  // faixa) → o chip ao vivo e o modal dão o MESMO percentil.
   const bpdN = num(v['dbp']), ccN = num(v['cc']), caN = num(v['ca']), cfN = num(v['cf']);
   if (bpdN && ccN && caN && cfN && bpdN > 0 && ccN > 0 && caN > 0 && cfN > 0) {
     const efw = calcHadlockEfw(bpdN, ccN, caN, cfN);
-    // F7 — usa a curva OMS por sexo quando informado (senão a unissex).
+    // curva por sexo quando informado (só a OMS diferencia; Hadlock resolve na neutra).
     const sexo = fieldValueToText(v['sexo_fetal']);
     const efwDim = /mascul/i.test(sexo) ? 'EFW_M' : /femin/i.test(sexo) ? 'EFW_F' : 'EFW';
-    const pct = weeksGA != null ? getWhoPercentile(efwDim, weeksGA, efw) : null;
+    const pct = weeksGA != null ? getPercentileBy(DEFAULT_BIOMETRY_REFERENCE, efwDim, weeksGA, efw).percentile : null;
     const pctTxt = pct != null ? ` · p${pct}${pct < 10 ? ' (PIG)' : pct > 90 ? ' (GIG)' : ''}` : '';
     out.push({ id: 'pfe__hadlock', sectionId: secOf('ca', 'biometria'), label: 'PFE (Hadlock IV)', text: `${Math.round(efw)} g${pctTxt}`, alert: pct != null && (pct < 10 || pct > 90) });
   }
 
-  // ── Fetal: percentil OMS por medida biométrica (quando há IG pela DUM) ──
+  // ── Fetal: percentil por medida biométrica (mesma curva-padrão da calculadora) ──
   if (weeksGA != null) {
     for (const [fieldId, dim, label] of [
       ['dbp', 'BPD', 'DBP'], ['cc', 'HC', 'CC'], ['ca', 'AC', 'CA'], ['cf', 'FL', 'CF'],
     ] as const) {
       const val = num(v[fieldId]);
       if (val == null || val <= 0) continue;
-      const p = getWhoPercentile(dim, weeksGA, val);
+      const p = getPercentileBy(DEFAULT_BIOMETRY_REFERENCE, dim, weeksGA, val).percentile;
       if (p != null) out.push({ id: `pct_${fieldId}`, sectionId: secOf(fieldId, 'biometria'), label: `${label} percentil`, text: `p${p}`, alert: p < 3 || p > 97 });
     }
   }
@@ -572,8 +583,7 @@ export function computeDerivations(
     let c: string;
     if (ilaCm < 5) c = 'oligoâmnio';
     else if (ilaCm < 8) c = 'líquido reduzido';
-    else if (ilaCm <= 18) c = 'volume normal';
-    else if (ilaCm <= 24) c = 'líquido aumentado';
+    else if (ilaCm <= 24) c = 'volume normal';
     else c = 'polidrâmnio';
     const origem = temQuadrantes ? ' (soma dos 4 quadrantes)' : '';
     out.push({ id: 'la__ila', sectionId: secOf('ila', 'liquido-amniotico'), label: 'ILA', text: `${fmt(ilaCm, 1)} cm${origem} — ${c}`, alert: ilaCm < 5 || ilaCm > 24 });
@@ -593,13 +603,91 @@ export function computeDerivations(
     out.push({ id: 'vci__idx', sectionId: secOf('vci_max', 'grandes-vasos'), label: 'Colapsabilidade VCI', text: `${fmt(vciIdx, 0)}%${baixo ? ' — < 50% (sugere congestão / volemia alta)' : ''}`, alert: baixo });
   }
 
-  // ── Vascular genérico: índices Doppler (IR / S/D) a partir de VPS e VDF ──
-  const vps = num(v['vps']);
-  const vdf = num(v['vdf']);
-  if (vps != null && vdf != null && vdf > 0) {
-    const di = dopplerIndices(vps, vdf);
-    if (di.ri != null && di.sd != null) {
-      out.push({ id: 'doppler__idx', sectionId: secOf('vps', 'doppler'), label: 'Índices', text: `IR ${fmt(di.ri)} · S/D ${fmt(di.sd)}` });
+  // Nota: os índices Doppler genéricos (IR/PI/S-D a partir de VPS/VDF/Vmed)
+  // ficam na calculadora `vascular-ratios` (VascularRatiosCalculator), que os
+  // vasos vasculares abrem — não há campo de esquema `vps`/`vdf` "cru" para um
+  // cálculo ao vivo (o parser gera `vps-val` e o fieldLibrary usa ids por vaso).
+
+  // ── RISCOS FMF AO VIVO — trissomias e pré-eclâmpsia calculados enquanto o
+  // médico preenche o 1º trimestre (idade/TN/bioquímica/marcadores e fatores
+  // maternos/PAM/Doppler). Mesma matemática do modal (`fromForm.ts`), então o
+  // chip inline e a calculadora dão o MESMO número. O chip mostra BASAL →
+  // CORRIGIDO. Se o campo "risco OFICIAL da FMF" foi preenchido, ele tem
+  // prioridade e o chip interno é suprimido.
+  //
+  // ⚠️ TRAVA DE 1º TRIMESTRE: o rastreio combinado (TN + medianas Tan 2018 de
+  // MAP/UtA/PlGF) é validado SÓ em 11+0–13+6 sem. Sem esta trava, uma
+  // OBSTÉTRICA ABDOMINAL COM DOPPLER (2º/3º T, que também tem dados maternos +
+  // IP uterina) calcularia um risco de PE ERRADO com medianas do 1º T. Só
+  // computa quando a IG (ou o CCN) está na janela do 1º trimestre. ──
+  const n = (x: unknown): number | null => {
+    const s = typeof x === 'string' ? x : x == null ? '' : String(x);
+    return s ? num(s) : null;
+  };
+  const asMarker = (x: unknown): MarkerState =>
+    x === 'abnormal' ? 'abnormal' : x === 'normal' ? 'normal' : 'notAssessed';
+  const fmtN = (o: number) => formatOneInN(o);
+  const band = (o: number) => (o <= 100 ? ' — alto risco' : o <= 1000 ? ' — risco intermediário' : '');
+
+  const ccnNum = num(v['ccn']);
+  const ccnInWindow = ccnNum != null && ccnNum >= 45 && ccnNum <= 84;
+  // IG para o rastreio: referência (se 11–13+6) ou derivada do CCN.
+  const gaForRisk =
+    weeksGA != null && weeksGA >= 11 && weeksGA < 14
+      ? weeksGA
+      : ccnInWindow
+        ? crlToGaWeeks(ccnNum!)
+        : null;
+  const firstTrimester = gaForRisk != null;
+
+  // Trissomias (seção Marcadores)
+  if (firstTrimester && !fieldValueToText(v['risco_trissomias_fmf']).trim()) {
+    const s = seedForCalculator('fmf-trisomy-risk', v, examDateMs);
+    const triInput = s && {
+      ageYears: n(s.age), crlMm: n(s.crlMm), ntMm: n(s.ntMm), fhrBpm: n(s.fhrBpm),
+      freeBhcgMoM: n(s.bhcgMoM), pappaMoM: n(s.pappaMoM),
+      nasalBone: asMarker(s.nasalBone), ductusVenosus: asMarker(s.ductusVenosus), tricuspid: asMarker(s.tricuspid),
+    };
+    const tri = triInput && trisomyHasEvidence(triInput) ? trisomyRiskFromForm(triInput) : null;
+    if (tri) {
+      const sid = secOf('nt', 'marcadores');
+      out.push({ id: 'fmf_t21', sectionId: sid, label: 'Risco T21 (FMF)', text: `basal ${fmtN(tri.priorOneInN.t21)} → ${fmtN(tri.oneInN.t21)}${band(tri.oneInN.t21)}`, alert: tri.oneInN.t21 <= 1000 });
+      // T13/18 COMBINADO (a FMF reporta junto): basal e corrigido.
+      const basalComb = 1 / tri.priorOneInN.t18 + 1 / tri.priorOneInN.t13;
+      const corrComb = tri.posterior.t18 + tri.posterior.t13;
+      const basalCombN = basalComb > 0 ? Math.round(1 / basalComb) : Infinity;
+      const corrCombN = corrComb > 0 ? Math.round(1 / corrComb) : Infinity;
+      out.push({ id: 'fmf_t1318', sectionId: sid, label: 'Risco T13/18 (FMF)', text: `basal ${fmtN(basalCombN)} → ${fmtN(corrCombN)}${band(corrCombN)}`, alert: corrCombN <= 1000 });
+    }
+  }
+
+  // Pré-eclâmpsia (seção Doppler do 1º trimestre)
+  if (firstTrimester && !fieldValueToText(v['risco_pe_fmf']).trim()) {
+    const s = seedForCalculator('fmf-preeclampsia-risk', v, examDateMs);
+    // só mostra quando há PELO MENOS um biomarcador (PAM/IP uterina/PlGF/PSV) —
+    // fatores maternos sozinhos dão o basal, mas não vale poluir o formulário.
+    const hasBiomarker = !!s && [s.mapMmHg, s.utaPiRaw, s.plgfRaw, s.psvRatioRaw].some((x) => n(x) != null);
+    const pe = s && hasBiomarker && peRiskFromForm({
+      ageYears: n(s.age), weightKg: n(s.weightKg), heightCm: n(s.heightCm),
+      gaWeeks: gaForRisk,
+      racialOrigin: (s.racialOrigin as RacialOrigin) || 'white',
+      conception: (s.conception as Conception) || 'spontaneous',
+      parity: (s.parity as ParityKind) || 'nulliparous',
+      previousPeGaWeeks: n(s.previousPeGaWeeks),
+      diabetes: (s.diabetes as DiabetesKind) || 'none',
+      chronicHypertension: !!s.chronicHypertension, sleOrAps: !!s.sleOrAps,
+      familyHistoryPE: !!s.familyHistoryPE, smoker: !!s.smoker,
+      analyzer: (s.analyzer as Analyzer) || 'cobas',
+      mapMmHg: n(s.mapMmHg), utaPiRaw: n(s.utaPiRaw), plgfRaw: n(s.plgfRaw), psvRatio: n(s.psvRatioRaw),
+    });
+    if (pe) {
+      out.push({
+        id: 'fmf_pe_preterm',
+        sectionId: secOf('ip_uta', 'doppler-1t'),
+        label: 'Risco PE pré-termo (FMF)',
+        text: `basal ${fmtN(pe.risk.basalPretermPE.oneInN)} → ${fmtN(pe.risk.pretermPE.oneInN)}${pe.risk.aspirinRecommended ? ' — considerar AAS 150 mg/noite' : ''}`,
+        alert: pe.risk.aspirinRecommended,
+      });
     }
   }
 

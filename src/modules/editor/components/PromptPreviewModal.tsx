@@ -4,6 +4,8 @@ import type { ReportTemplate, Patient, ExamRequest, AppSettings } from '../../..
 
 interface PromptPreviewModalProps {
   template: ReportTemplate;
+  /** Exame combinado: todas as máscaras (1ª = primária). Ausente = [template]. */
+  templates?: ReportTemplate[];
   patient: Patient;
   exam: ExamRequest | undefined;
   settings: AppSettings;
@@ -16,11 +18,12 @@ interface PromptPreviewModalProps {
  * user message — com opção de copiar. Extraído de ExamEditor; o prompt é
  * montado uma única vez (antes era duplicado entre exibir e copiar).
  */
-export function PromptPreviewModal({ template, patient, exam, settings, onClose, onCopied }: PromptPreviewModalProps) {
+export function PromptPreviewModal({ template, templates, patient, exam, settings, onClose, onCopied }: PromptPreviewModalProps) {
   const model = settings.geminiModel || 'gemini-3.5-flash';
 
   const { universalContext, areaContext, userMessage } = buildPrompt({
     template,
+    templates,
     patient,
     settings,
     clinicalIndication: exam?.clinicalIndication,

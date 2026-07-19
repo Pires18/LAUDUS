@@ -4,15 +4,13 @@ import { HeartPulse, AlertTriangle, Pill, Info, ArrowRight } from 'lucide-react'
 import { CalculatorInput, CategorySelector } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 import {
-  computePreeclampsiaRisk, DEFAULT_PE_THRESHOLDS,
-  type RacialOrigin, type Conception, type PeMaternalFactors, type PeBiomarkers,
+  DEFAULT_PE_THRESHOLDS,
+  type RacialOrigin, type Conception,
 } from '../fmf/preeclampsia';
-import { PROVISIONAL_PE_COEFFICIENTS, PE_BIOMARKER_MODEL } from '../fmf/preeclampsiaData';
+import { peRiskFromForm } from '../fmf/fromForm';
+import { PROVISIONAL_PE_COEFFICIENTS } from '../fmf/preeclampsiaData';
 import { momPlausible, psvRatioPlausible, formatOneInN } from '../fmf/qc';
-import {
-  mapMedianMmHg, utaPiMedian, plgfMedian, psvRatioExpected, toMoM, toDelta,
-  type Analyzer, type PeMedianCovariates,
-} from '../fmf/medians';
+import { type Analyzer } from '../fmf/medians';
 
 type Parity = 'nulliparous' | 'parousNoPE' | 'parousPE';
 type Diabetes = 'none' | 'type1' | 'type2';
@@ -165,33 +163,40 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
     return w && h ? w / (h * h) : null;
   }, [weightKg, heightCm]);
 
-  // MoM automático dos biomarcadores (MAP, UtA-PI, PlGF) — medianas Tan 2018
-  // ajustadas por IG + covariáveis, com intercepto por analisador.
-  const gaDays = gaWeeks ? Number(gaWeeks) * 7 : undefined;
-  const covariates = useMemo<PeMedianCovariates | null>(() => {
-    if (!gaDays || !Number(weightKg) || !Number(heightCm) || !Number(age)) return null;
-    return {
-      gaDays, weightKg: Number(weightKg), heightCm: Number(heightCm), ageYears: Number(age),
-      racialOrigin, smoker, chronicHypertension,
-      diabetes: diabetes === 'type1' ? 'type1' : diabetes === 'type2' ? 'type2noinsulin' : 'none',
-      ivf: conception === 'ivf',
-      parity,
-    };
-  }, [gaDays, weightKg, heightCm, age, racialOrigin, smoker, chronicHypertension, diabetes, conception, parity]);
+  // Cálculo via fonte ÚNICA `peRiskFromForm` (mesma matemática do cálculo ao
+  // vivo da aba Estruturado) — converte MAP/UtA/PlGF em MoM (Tan 2018) e a
+  // razão oftálmica em delta (Gana 2022), depois roda o Bayes de riscos
+  // competitivos. O PlGF entra BRUTO (pg/mL); os detalhados (PA/UtA/PSV) já
+  // vêm agregados em effMap/effUta/effPsv.
+  const gaWeeksNum = gaWeeks ? Number(gaWeeks) : null;
+  const canCompute = !!(Number(age) && Number(weightKg) && Number(heightCm));
+  const hasCovariates = !!(gaWeeksNum && Number(weightKg) && Number(heightCm) && Number(age));
 
-  const mapMoM = useMemo(() => (effMap && covariates ? toMoM(Number(effMap), mapMedianMmHg(covariates)) : undefined), [effMap, covariates]);
-  const utaPiMoM = useMemo(() => (effUta && covariates ? toMoM(Number(effUta), utaPiMedian(covariates)) : undefined), [effUta, covariates]);
-  const plgfMoM = useMemo(() => (plgfRaw && covariates ? toMoM(Number(plgfRaw), plgfMedian(covariates, analyzer)) : undefined), [plgfRaw, covariates, analyzer]);
-  // PSV ratio da artéria oftálmica (Gana 2022) — delta bruto (medido −
-  // esperado), NÃO é MoM. Ver comentário em `preeclampsia.ts`.
-  const psvRatioDelta = useMemo(
-    () => (effPsv && covariates ? toDelta(Number(effPsv), psvRatioExpected(covariates)) : undefined),
-    [effPsv, covariates],
-  );
+  const computed = useMemo(() => {
+    if (!canCompute) return null;
+    return peRiskFromForm({
+      ageYears: Number(age), weightKg: Number(weightKg), heightCm: Number(heightCm),
+      gaWeeks: gaWeeksNum,
+      racialOrigin, conception, parity,
+      previousPeGaWeeks: previousPeGaWeeks ? Number(previousPeGaWeeks) : null,
+      diabetes: diabetes === 'type1' ? 'type1' : diabetes === 'type2' ? 'type2noinsulin' : 'none',
+      chronicHypertension, sleOrAps, familyHistoryPE, smoker, analyzer,
+      mapMmHg: effMap ? Number(effMap) : null,
+      utaPiRaw: effUta ? Number(effUta) : null,
+      plgfRaw: plgfRaw ? Number(plgfRaw) : null,
+      psvRatio: effPsv ? Number(effPsv) : null,
+    });
+  }, [canCompute, age, weightKg, heightCm, gaWeeksNum, racialOrigin, conception, parity, previousPeGaWeeks, diabetes, chronicHypertension, sleOrAps, familyHistoryPE, smoker, analyzer, effMap, effUta, plgfRaw, effPsv]);
+
+  const result = computed?.risk ?? null;
+  const mapMoM = computed?.mapMoM;
+  const utaPiMoM = computed?.utaPiMoM;
+  const plgfMoM = computed?.plgfMoM;
+  const psvRatioDelta = computed?.psvRatioDelta;
 
   const qcWarnings = useMemo(() => {
     const w: string[] = [];
-    if ((effMap || effUta || plgfRaw || effPsv) && !covariates) w.push('Informe idade, peso, altura e IG para calcular o MoM/delta dos biomarcadores.');
+    if ((effMap || effUta || plgfRaw || effPsv) && !hasCovariates) w.push('Informe idade, peso, altura e IG para calcular o MoM/delta dos biomarcadores.');
     if (!momPlausible(mapMoM)) w.push('MAP em MoM fora da faixa plausível (0,2–5,0).');
     if (!momPlausible(utaPiMoM)) w.push('IP uterinas em MoM fora da faixa plausível (0,2–5,0).');
     if (!momPlausible(plgfMoM)) w.push('PlGF em MoM fora da faixa plausível (0,2–5,0).');
@@ -200,21 +205,7 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
       w.push('IG do parto na PE prévia fora de 20–42 semanas.');
     }
     return w;
-  }, [effMap, effUta, plgfRaw, effPsv, covariates, mapMoM, utaPiMoM, plgfMoM, parity, previousPeGaWeeks]);
-
-  const canCompute = !!(Number(age) && Number(weightKg) && Number(heightCm));
-
-  const result = useMemo(() => {
-    if (!canCompute) return null;
-    const factors: PeMaternalFactors = {
-      ageYears: Number(age), weightKg: Number(weightKg), heightCm: Number(heightCm), racialOrigin, conception,
-      chronicHypertension, diabetesType1: diabetes === 'type1', diabetesType2: diabetes === 'type2',
-      sleOrAps, familyHistoryPE, nulliparous: parity === 'nulliparous', previousPE: parity === 'parousPE',
-      previousPeGaWeeks: previousPeGaWeeks ? Number(previousPeGaWeeks) : undefined,
-    };
-    const biomarkers: PeBiomarkers = { mapMoM, utaPiMoM, plgfMoM, psvRatioDelta };
-    return computePreeclampsiaRisk(factors, biomarkers, PROVISIONAL_PE_COEFFICIENTS, PE_BIOMARKER_MODEL);
-  }, [canCompute, age, weightKg, heightCm, racialOrigin, conception, parity, previousPeGaWeeks, diabetes, chronicHypertension, sleOrAps, familyHistoryPE, mapMoM, utaPiMoM, plgfMoM, psvRatioDelta]);
+  }, [effMap, effUta, plgfRaw, effPsv, hasCovariates, mapMoM, utaPiMoM, plgfMoM, parity, previousPeGaWeeks]);
 
   useEffect(() => {
     if (!result) {
@@ -222,7 +213,9 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
       onChange({
         age, weightKg, heightCm, gaWeeks, racialOrigin, conception, parity, previousPeGaWeeks,
         diabetes, chronicHypertension, sleOrAps, familyHistoryPE, smoker, analyzer,
-        mapMmHg, utaPiRaw, plgfRaw, psvRatioRaw, _summary: null,
+        mapMmHg, utaPiRaw, plgfRaw, psvRatioRaw,
+        pa1rs, pa1rd, pa1ls, pa1ld, pa2rs, pa2rd, pa2ls, pa2ld, utaR, utaL, oftRp1, oftRp2, oftLp1, oftLp2,
+        _summary: null,
       });
       return;
     }
@@ -238,10 +231,11 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
     onChange({
       age, weightKg, heightCm, gaWeeks, racialOrigin, conception, parity, previousPeGaWeeks,
       diabetes, chronicHypertension, sleOrAps, familyHistoryPE, smoker, analyzer,
-      mapMmHg, mapMoM: mapMoM ? Number(mapMoM.toFixed(3)) : '',
-      utaPiRaw, utaPiMoM: utaPiMoM ? Number(utaPiMoM.toFixed(3)) : '',
+      pa1rs, pa1rd, pa1ls, pa1ld, pa2rs, pa2rd, pa2ls, pa2ld, utaR, utaL, oftRp1, oftRp2, oftLp1, oftLp2,
+      mapMmHg: effMap, mapMoM: mapMoM ? Number(mapMoM.toFixed(3)) : '',
+      utaPiRaw: effUta, utaPiMoM: utaPiMoM ? Number(utaPiMoM.toFixed(3)) : '',
       plgfRaw, plgfMoM: plgfMoM ? Number(plgfMoM.toFixed(3)) : '',
-      psvRatioRaw, psvRatioDelta: psvRatioDelta !== undefined ? Number(psvRatioDelta.toFixed(3)) : '',
+      psvRatioRaw: effPsv, psvRatioDelta: psvRatioDelta !== undefined ? Number(psvRatioDelta.toFixed(3)) : '',
       riscoBasalPePretermo: fmt(result.basalPretermPE.oneInN),
       riscoBasalPeTermo: fmt(result.basalTermPE.oneInN),
       riscoPePretermo: fmt(result.pretermPE.oneInN),
@@ -260,7 +254,8 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
   // garantem troca de referência de `result` quando mudam sozinhos —
   // precisam estar aqui, senão o _summary/dados salvos podem ficar
   // desatualizados se forem o último campo editado pelo médico.
-  }, [result, mapMoM, utaPiMoM, plgfMoM, psvRatioDelta, gaWeeks, smoker, analyzer, mapMmHg, utaPiRaw, plgfRaw, psvRatioRaw]);
+  }, [result, mapMoM, utaPiMoM, plgfMoM, psvRatioDelta, gaWeeks, smoker, analyzer, effMap, effUta, plgfRaw, effPsv,
+      pa1rs, pa1rd, pa1ls, pa1ld, pa2rs, pa2rd, pa2ls, pa2ld, utaR, utaL, oftRp1, oftRp2, oftLp1, oftLp2, mapMmHg, utaPiRaw, psvRatioRaw]);
 
   return (
     <div className="space-y-7">
