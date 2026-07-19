@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { classNames } from '../../utils/format';
+import { LAUDIA_VERSION } from '../../version';
 import { useConfirm } from '../../hooks/useConfirm';
 import { resolveGeminiModel } from '../ai/engine';
 import { logger } from '../../utils/logger';
@@ -305,7 +306,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     if (!selectedAreaFilter) return;
     const ok = await confirm({
       title: 'Restaurar Diretriz',
-      message: 'Restaurar a diretriz desta área para o padrão V2.0 do sistema?',
+      message: `Restaurar a diretriz desta área para o padrão v${LAUDIA_VERSION} do sistema?`,
       confirmLabel: 'Restaurar',
       variant: 'warning',
     });
@@ -316,7 +317,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     const nextSettings = { ...localSettings, aiAreaPrompts: updatedAreaPrompts };
     setLocalSettings(nextSettings);
     updateSettings(nextSettings)
-      .then(() => showToast('Diretriz restaurada para o padrão V2.0.', 'success'))
+      .then(() => showToast(`Diretriz restaurada para o padrão v${LAUDIA_VERSION}.`, 'success'))
       .catch(() => showToast('Erro ao restaurar diretriz.', 'error'));
   }
 
@@ -436,7 +437,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-black text-ink-900 tracking-tight">LAUD.IA</h2>
-                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-600 text-[9px] font-black uppercase tracking-widest">v2.1</span>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-600 text-[9px] font-black uppercase tracking-widest">v{LAUDIA_VERSION}</span>
                 {localSettings.aiTrainingEnabled && (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-600 text-[9px] font-black uppercase tracking-widest">⬤ Training</span>
                 )}
@@ -1023,7 +1024,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                                     className="flex items-center gap-1 px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-widest bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-all"
                                   >
                                     <RotateCcw size={9} />
-                                    V2.0
+                                    v{LAUDIA_VERSION}
                                   </button>
                                 )}
                                 <button
@@ -1618,7 +1619,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                   { label: 'Motor Pro', value: motorConfig.pro.model, icon: Sparkles },
                   { label: 'Treinamento', value: localSettings.aiTrainingEnabled ? `Ativo (${localSettings.aiTrainingContextSize || 3} exames)` : 'Desativado', icon: GraduationCap },
                   { label: 'API Key', value: localSettings.geminiApiKey ? 'Configurada' : 'Não configurada', icon: Key },
-                  { label: 'Laud.IA Core', value: 'v2.0 PROD', icon: ShieldCheck },
+                  { label: 'Laud.IA Core', value: `v${LAUDIA_VERSION} PROD`, icon: ShieldCheck },
                 ].map(item => (
                   <div key={item.label} className="p-3 bg-ink-50 rounded-xl border border-ink-100">
                     <div className="flex items-center gap-1.5 mb-1">

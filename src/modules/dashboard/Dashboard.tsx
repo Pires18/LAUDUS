@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getAiUsageStats } from '../../store/db';
 import { useSubscription } from '../../hooks/useSubscription';
 import { ExamRequest, Patient, Clinic, EXAM_AREAS, Appointment } from '../../types';
+import { LAUDIA_VERSION } from '../../version';
 import { WeeklyCalendar } from '../appointments/components/WeeklyCalendar';
 import { getLocalDateStr } from '../appointments/utils/scheduleUtils';
 import {
@@ -161,7 +162,7 @@ export function Dashboard() {
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-ink-50 border border-ink-100">
                 <Sparkles size={12} className="text-brand-500" />
-                <span className="text-[9px] font-black text-ink-600 uppercase tracking-widest">LAUD.IA CORE V2.0</span>
+                <span className="text-[9px] font-black text-ink-600 uppercase tracking-widest">LAUD.IA CORE v{LAUDIA_VERSION}</span>
               </div>
               {selectedClinic && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-50 border border-brand-100">

@@ -45,12 +45,26 @@ Fetal**, o **PACS multi-tenant self-service** e a higiene técnica final. Suíte
   self-service; importação de exames existentes para o Orthanc do tenant; fluxo
   clínico real validado (GL.iNet + aparelho) com automação de `DicomModalities`.
 
+### Corrigido — versão exibida na UI (fonte única de verdade)
+- **Bug: a UI mostrava "v2.0" travada** enquanto o `package.json` já ia em 2.1.0/2.2.0.
+  A causa era a versão **hardcoded** e dessincronizada em vários pontos (rodapé da
+  Sidebar/BottomNav, badge e textos do editor LAUD.IA, cabeçalho do Dashboard).
+- **`src/version.ts` (novo)** — fonte única: `LAUDUS_VERSION` vem do `package.json`
+  (injetado via `define` do Vite como `__APP_VERSION__`, espelhado no `vitest.config`)
+  e `LAUDIA_VERSION` é a linha de versão **própria** do motor de IA. Todos os pontos
+  de UI passam a ler daqui — nunca mais dessincroniza da release.
+- **LAUD.IA padronizada em v2.1** em toda a UI (antes divergia: "v2.0" no rodapé,
+  "v2.1" no editor). Observação: a **doutrina de prompts** (`ai/prompts/*.ts`)
+  mantém seu `@version` interno próprio (V2.0 — Release Oficial de Jun/2026, a
+  arquitetura cognitiva estável); v2.1 são os refinamentos por cima — é um eixo de
+  versão separado do número de produto exibido.
+
 ### Segurança & Higiene (limpeza final desta release)
 - **Removidos 2 exports de PHI versionados por engano** na raiz
   (`clear-clinical-findings-report-*.json`, 186 KB cada, com IDs e achados de
   pacientes reais) e adicionado padrão ao `.gitignore` para impedir recorrência.
 - **`eslint --fix`** aplicado (let→const) em 8 pontos; lint em 0 erros.
-- Versão: `2.1.0` → `2.2.0`.
+- Versão: `2.1.0` → `2.2.0` (LAUD.US); LAUD.IA em v2.1.
 
 ### Consolidação da documentação (detalhamento por data abaixo)
 

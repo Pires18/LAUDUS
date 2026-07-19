@@ -6,6 +6,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useCollection } from '../hooks/useFirestore';
 import { useAllAccessibleClinics } from '../hooks/useAllAccessibleClinics';
 import { ExamRequest } from '../types';
+import { VERSION_BADGE } from '../version';
 import {
   LayoutDashboard, ClipboardList, FileSignature,
   Calculator, Hospital, PanelLeftClose,
@@ -487,7 +488,7 @@ export function Sidebar() {
             {/* Version badge */}
             <div className="text-center pt-1">
               <span className="text-[8px] font-black text-ink-300 uppercase tracking-[0.2em]">
-                LAUD.US v2.0 · LAUD.IA v2.0
+                {VERSION_BADGE}
               </span>
             </div>
           </div>

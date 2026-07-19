@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../store/app';
 import { useCollection } from '../hooks/useFirestore';
 import { ExamRequest } from '../types';
+import { VERSION_BADGE } from '../version';
 import { useAuth } from '../hooks/useAuth';
 import { useAdmin } from '../hooks/useAdmin';
 import { useSubscription } from '../hooks/useSubscription';
@@ -263,7 +264,7 @@ export function BottomNav() {
                 </div>
                 <div className="text-center">
                   <span className="text-[8px] font-black text-ink-300 uppercase tracking-[0.2em]">
-                    LAUD.US v2.0 · LAUD.IA v2.0
+                    {VERSION_BADGE}
                   </span>
                 </div>
               </div>

@@ -396,7 +396,17 @@ function localOrthancWorklistPlugin() {
   };
 }
 
+// Versão da aplicação — fonte única de verdade é o package.json, injetada como
+// `__APP_VERSION__` (ver src/version.ts). Evita badges de versão hardcoded que
+// dessincronizam da release (bug histórico: UI travada em "v2.0").
+const appVersion = JSON.parse(
+  fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'),
+).version as string;
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react(),
     localOrthancWorklistPlugin(),
