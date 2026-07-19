@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Clinic, Appointment } from '../../../types';
-import { generateSlotsForDay } from '../utils/scheduleUtils';
+import { generateSlotsForDay, getAgendaDayStatus } from '../utils/scheduleUtils';
 import { 
   Clock, Plus, Check, RefreshCw, X, Trash2, ShieldCheck, Edit
 } from 'lucide-react';
@@ -60,7 +60,12 @@ export function DailyTimeline({
 
       {slots.length === 0 ? (
         <div className="text-center py-12 text-ink-400 italic text-xs">
-          Sem expediente ou turnos configurados para este dia da semana.
+          {(() => {
+            const status = getAgendaDayStatus(clinic, selectedDate);
+            return !status.open && status.reason !== 'sem-expediente'
+              ? `Agenda fechada nesta data — ${status.label}.`
+              : 'Sem expediente ou turnos configurados para este dia da semana.';
+          })()}
         </div>
       ) : (
         <div className="relative border-l border-ink-200 ml-4 pl-6 space-y-6 py-2">

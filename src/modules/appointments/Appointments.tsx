@@ -16,7 +16,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { logger } from '../../utils/logger';
 
 // Modular Imports
-import { getLocalDateStr, isSlotAvailable } from './utils/scheduleUtils';
+import { getLocalDateStr, isSlotAvailable, getAgendaDayStatus } from './utils/scheduleUtils';
 import { useAppointmentsState } from './hooks/useAppointmentsState';
 import { WeeklyCalendar } from './components/WeeklyCalendar';
 import { StatsBar } from './components/StatsBar';
@@ -149,6 +149,12 @@ export function Appointments() {
       return;
     }
 
+    const dayStatus = getAgendaDayStatus(selectedClinic, appointmentDate);
+    if (!dayStatus.open) {
+      showToast(`Agenda fechada em ${appointmentDate.split('-').reverse().join('/')} — ${dayStatus.label}`, 'error');
+      return;
+    }
+
     const conflict = isSlotAvailable(selectedClinic.id, appointmentDate, appointmentTime, appointments);
     if (!conflict.available) {
       showToast(`Horário ${appointmentTime} já reservado para ${conflict.bookedBy}`, 'error');
@@ -267,6 +273,13 @@ export function Appointments() {
     const app = state.reschedulingApp;
     if (!app) return;
 
+    const appClinic = clinics.find(c => c.id === app.clinicId) || defaultClinic;
+    const dayStatus = getAgendaDayStatus(appClinic, newDateStr);
+    if (!dayStatus.open) {
+      showToast(`Agenda fechada em ${newDateStr.split('-').reverse().join('/')} — ${dayStatus.label}`, 'error');
+      return;
+    }
+
     const conflict = isSlotAvailable(app.clinicId || '', newDateStr, newTimeStr, appointments, app.id);
     if (!conflict.available) {
       showToast(`Horário ${newTimeStr} já reservado para ${conflict.bookedBy}`, 'error');
@@ -353,7 +366,15 @@ export function Appointments() {
       const m = String(d.getMinutes()).padStart(2, '0');
       const newTimeStr = `${h}:${m}`;
 
-      const conflict = isSlotAvailable(updatedFields.clinicId || app.clinicId || '', newDateStr, newTimeStr, appointments, app.id);
+      const targetClinicId = updatedFields.clinicId || app.clinicId || '';
+      const targetClinic = clinics.find(c => c.id === targetClinicId) || null;
+      const dayStatus = getAgendaDayStatus(targetClinic, newDateStr);
+      if (!dayStatus.open) {
+        showToast(`Agenda fechada em ${newDateStr.split('-').reverse().join('/')} — ${dayStatus.label}`, 'error');
+        return;
+      }
+
+      const conflict = isSlotAvailable(targetClinicId, newDateStr, newTimeStr, appointments, app.id);
       if (!conflict.available) {
         showToast(`Horário ${newTimeStr} já reservado para ${conflict.bookedBy}`, 'error');
         return;
@@ -370,17 +391,15 @@ export function Appointments() {
     }
   };
 
-  // Salvar configuracao de turnos
-  const handleSaveClinicConfig = async (clinicId: string, weekdayShifts: any) => {
+  // Salvar configuracao de agenda (turnos + janelas de abertura + bloqueios)
+  const handleSaveClinicConfig = async (clinicId: string, schedulingConfig: Clinic['schedulingConfig']) => {
     try {
-      await updateItem('clinics', clinicId, {
-        schedulingConfig: { weekdayShifts }
-      });
-      showToast('Turnos salvos com sucesso!');
+      await updateItem('clinics', clinicId, { schedulingConfig });
+      showToast('Configurações de agenda salvas com sucesso!');
       dispatch({ type: 'SET_ACTIVE_TAB', payload: 'agendamentos' });
     } catch (error) {
-      logger.error('Erro ao salvar configuração de turnos:', error);
-      showToast('Erro ao salvar configuração de turnos', 'error');
+      logger.error('Erro ao salvar configuração de agenda:', error);
+      showToast('Erro ao salvar configuração de agenda', 'error');
     }
   };
 
@@ -452,6 +471,7 @@ export function Appointments() {
                 onSelectDate={(date) => dispatch({ type: 'SET_DATE_FILTER', payload: date })}
                 appointments={appointments}
                 clinicId={selectedClinicId || undefined}
+                clinic={defaultClinic}
               />
               
               <StatsBar

@@ -1,14 +1,16 @@
 import { useMemo, useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Home } from 'lucide-react';
-import { Appointment } from '../../../types';
+import { Appointment, Clinic } from '../../../types';
 import { classNames } from '../../../utils/format';
-import { getLocalDateStr, countDayAppointments } from '../utils/scheduleUtils';
+import { getLocalDateStr, countDayAppointments, getAgendaDayStatus } from '../utils/scheduleUtils';
 
 interface WeeklyCalendarProps {
   selectedDate: string;
   onSelectDate: (date: string) => void;
   appointments: Appointment[];
   clinicId?: string;
+  /** Clínica ativa — habilita o indicador de agenda fechada/bloqueada por data */
+  clinic?: Clinic | null;
 }
 
 export function WeeklyCalendar({
@@ -16,6 +18,7 @@ export function WeeklyCalendar({
   onSelectDate,
   appointments,
   clinicId,
+  clinic,
 }: WeeklyCalendarProps) {
   const [weekOffset, setWeekOffset] = useState(0);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +47,10 @@ export function WeeklyCalendar({
       // Full day: has appointments but all agendado/confirmado and confirmed equals total (simplified indicator)
       const isFull = counts.total > 0 && counts.agendado === 0 && counts.confirmado === counts.total;
 
+      // Agenda fechada (fora de janela de abertura) ou data bloqueada
+      const dayStatus = clinic ? getAgendaDayStatus(clinic, dateStr) : null;
+      const isClosed = dayStatus ? (dayStatus.reason === 'fora-da-janela' || dayStatus.reason === 'bloqueada') : false;
+
       days.push({
         dateStr,
         dayNum: d.getDate(),
@@ -56,10 +63,13 @@ export function WeeklyCalendar({
         isPast,
         isWeekend,
         isFull,
+        isClosed,
+        closedReason: dayStatus?.reason === 'bloqueada' ? 'BLOQ.' : 'FECHADA',
+        closedLabel: dayStatus?.label,
       });
     }
     return days;
-  }, [appointments, weekOffset, clinicId, today]);
+  }, [appointments, weekOffset, clinicId, clinic, today]);
 
   const weekRangeLabel = useMemo(() => {
     if (weekDays.length === 0) return '';
@@ -164,11 +174,14 @@ export function WeeklyCalendar({
               key={day.dateStr}
               type="button"
               onClick={() => onSelectDate(day.dateStr)}
+              title={day.isClosed ? day.closedLabel : undefined}
               className={classNames(
                 "flex flex-col items-center justify-between min-h-[85px] py-2.5 px-1 rounded-2xl border transition-all duration-300 relative active:scale-95 shadow-sm",
                 isSelected
                   ? "bg-ink-900 border-ink-900 text-white shadow-md scale-[1.03]"
-                  : "bg-white border-ink-200 hover:border-ink-300 text-ink-700 hover:bg-ink-50",
+                  : day.isClosed
+                    ? "bg-ink-50 border-ink-200 text-ink-400 hover:bg-ink-100"
+                    : "bg-white border-ink-200 hover:border-ink-300 text-ink-700 hover:bg-ink-50",
                 day.isToday && !isSelected ? "ring-2 ring-ink-900/10 border-ink-400" : ""
               )}
             >
@@ -183,7 +196,14 @@ export function WeeklyCalendar({
                 {day.dayNum}
               </span>
 
-              {day.isFull ? (
+              {day.isClosed ? (
+                <span className={classNames(
+                  "px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-widest leading-none mt-1.5",
+                  isSelected ? "bg-white/10 text-ink-300" : "bg-ink-100 border border-ink-200 text-ink-500"
+                )}>
+                  {day.closedReason}
+                </span>
+              ) : day.isFull ? (
                 <span className={classNames(
                   "px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-widest leading-none mt-1.5",
                   isSelected ? "bg-rose-500/20 text-rose-300" : "bg-rose-50 border border-rose-100 text-rose-600"

@@ -6,7 +6,7 @@ import {
 import { Patient, ReportTemplate, Clinic, EXAM_AREAS, ExamArea, Appointment } from '../../../types';
 import { classNames } from '../../../utils/format';
 import { AreaIcon } from '../../../components/AreaIcon';
-import { generateSlotsForDay, findNextAvailableDate, getLocalDateStr } from '../utils/scheduleUtils';
+import { generateSlotsForDay, findNextAvailableDate, getLocalDateStr, getAgendaDayStatus } from '../utils/scheduleUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CreateAppointmentModalProps {
@@ -208,6 +208,11 @@ export function CreateAppointmentModal({
     if (!selectedClinic || !appointmentDate) return [];
     return generateSlotsForDay(selectedClinic, appointmentDate, appointments);
   }, [selectedClinic, appointmentDate, appointments]);
+
+  const dayStatus = useMemo(() => {
+    if (!selectedClinic || !appointmentDate) return null;
+    return getAgendaDayStatus(selectedClinic, appointmentDate);
+  }, [selectedClinic, appointmentDate]);
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -629,7 +634,11 @@ export function CreateAppointmentModal({
                   {slots.length === 0 ? (
                     <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-700 text-xs font-semibold">
                       <AlertCircle size={16} />
-                      <span>Sem turnos configurados ou expediente ativo para o dia selecionado.</span>
+                      <span>
+                        {dayStatus && !dayStatus.open
+                          ? `Agenda fechada nesta data — ${dayStatus.label}.`
+                          : 'Sem turnos configurados ou expediente ativo para o dia selecionado.'}
+                      </span>
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-[160px] overflow-y-auto p-1.5 border border-ink-200 rounded-xl custom-scrollbar bg-white">

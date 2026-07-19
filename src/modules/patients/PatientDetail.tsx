@@ -3,13 +3,15 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem, logPatientAccess } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
 import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
-import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings, ClipboardPen, Check, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings, ClipboardPen, Check, X as XIcon, Star } from 'lucide-react';
 import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
 import { where } from 'firebase/firestore';
 import { AnamnesisConsentModal } from '../editor/components/AnamnesisConsentModal';
+import { ClinicalRecordsSection } from './components/ClinicalRecordsSection';
+import { deleteField } from '../../store/db';
 
 interface Props {
   patientId: string;
@@ -24,6 +26,9 @@ export function PatientDetail({ patientId }: Props) {
   const [historyDraft, setHistoryDraft] = useState('');
   const [savingHistory, setSavingHistory] = useState(false);
   const historyRef = useRef<HTMLTextAreaElement>(null);
+  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const [followUpReasonDraft, setFollowUpReasonDraft] = useState('');
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
 
   const { data: patient, loading: patientLoading } = useDocument<Patient>('patients', patientId);
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams', {
@@ -85,6 +90,38 @@ export function PatientDetail({ patientId }: Props) {
     setTimeout(() => historyRef.current?.focus(), 50);
   }
 
+  async function handleActivateFollowUp() {
+    if (!patient) return;
+    setSavingFollowUp(true);
+    try {
+      await updateItem('patients', patient.id, {
+        followUp: true,
+        followUpReason: followUpReasonDraft.trim() || deleteField(),
+        followUpSince: Date.now(),
+      });
+      setFollowUpModalOpen(false);
+      showToast('Paciente marcado como em acompanhamento', 'success');
+    } catch {
+      showToast('Erro ao atualizar acompanhamento', 'error');
+    } finally {
+      setSavingFollowUp(false);
+    }
+  }
+
+  async function handleDeactivateFollowUp() {
+    if (!patient) return;
+    try {
+      await updateItem('patients', patient.id, {
+        followUp: false,
+        followUpReason: deleteField(),
+        followUpSince: deleteField(),
+      });
+      showToast('Acompanhamento encerrado', 'success');
+    } catch {
+      showToast('Erro ao atualizar acompanhamento', 'error');
+    }
+  }
+
   async function handleSaveHistory() {
     if (!patient) return;
     setSavingHistory(true);
@@ -124,13 +161,44 @@ export function PatientDetail({ patientId }: Props) {
                 <ArrowLeft size={14} />
               </button>
               <div className="min-w-0">
-                <h1 className="text-base font-black text-ink-900 tracking-tight leading-none truncate max-w-[200px] sm:max-w-md">{patient.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base font-black text-ink-900 tracking-tight leading-none truncate max-w-[200px] sm:max-w-md">{patient.name}</h1>
+                  {patient.followUp && (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-black uppercase tracking-wider shrink-0"
+                      title={patient.followUpReason || 'Paciente em acompanhamento'}
+                    >
+                      <Star size={10} className="fill-amber-500 text-amber-500" />
+                      Acompanhamento
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-ink-500 font-medium mt-0.5">
                   Prontuário: {patient.id} · {calculateAge(patient.birthDate)} · CPF: {patient.cpf ? formatCPF(patient.cpf) : 'Não informado'}
+                  {patient.followUp && patient.followUpReason && (
+                    <span className="text-amber-700 font-bold"> · {patient.followUpReason}</span>
+                  )}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  if (patient.followUp) {
+                    handleDeactivateFollowUp();
+                  } else {
+                    setFollowUpReasonDraft(patient.followUpReason || '');
+                    setFollowUpModalOpen(true);
+                  }
+                }}
+                className={patient.followUp
+                  ? "h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest bg-amber-500 hover:bg-amber-400 text-white border border-amber-500 transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-amber-500/20"
+                  : "h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5 active:scale-95"}
+                title={patient.followUp ? 'Encerrar acompanhamento' : 'Deixar paciente em evidência (acompanhamento)'}
+              >
+                <Star size={11} className={patient.followUp ? 'fill-white' : 'fill-amber-500 text-amber-500'} />
+                <span className="hidden sm:inline">{patient.followUp ? 'Em Acompanhamento' : 'Acompanhar'}</span>
+              </button>
               <button
                 onClick={() => setEditing(true)}
                 className="h-9 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink-500 hover:text-ink-700 bg-ink-100 border border-ink-200 hover:bg-ink-200 transition-all flex items-center gap-1.5 active:scale-95"
@@ -301,6 +369,9 @@ export function PatientDetail({ patientId }: Props) {
           </div>
         </div>
 
+        {/* ─── PRONTUÁRIO CLÍNICO ─── */}
+        <ClinicalRecordsSection patientId={patientId} />
+
         {/* ─── EXAMS LIST CONTAINER ─── */}
         <div className="bg-white rounded-2xl border border-ink-200 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-ink-100 flex items-center justify-between bg-ink-50/30">
@@ -417,6 +488,37 @@ export function PatientDetail({ patientId }: Props) {
           </div>
         )}
       </div>
+
+      <Modal open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} title="Colocar em Acompanhamento" size="sm">
+        <div className="space-y-4">
+          <p className="text-xs text-ink-600 leading-relaxed">
+            O paciente ficará <strong>em evidência</strong> na lista de pacientes, com destaque e prioridade de exibição.
+          </p>
+          <div>
+            <label className="label">Motivo do acompanhamento (opcional)</label>
+            <textarea
+              className="input min-h-[70px] resize-none"
+              rows={3}
+              value={followUpReasonDraft}
+              onChange={e => setFollowUpReasonDraft(e.target.value)}
+              placeholder="Ex: Nódulo BI-RADS 3 — controle em 6 meses"
+              autoFocus
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">
+            <button type="button" onClick={() => setFollowUpModalOpen(false)} className="btn-secondary">Cancelar</button>
+            <button
+              type="button"
+              onClick={handleActivateFollowUp}
+              disabled={savingFollowUp}
+              className="btn-primary flex items-center gap-1.5"
+            >
+              {savingFollowUp ? <Loader2 size={13} className="animate-spin" /> : <Star size={13} />}
+              Ativar Acompanhamento
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={editing} onClose={() => setEditing(false)} title="Editar Paciente" size="lg">
         <PatientForm

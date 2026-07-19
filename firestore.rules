@@ -150,6 +150,15 @@ service cloud.firestore {
           || (hasClinicWriteAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
         allow delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
       }
+      // Prontuário clínico (notas, exame físico, laboratório): mesmo modelo
+      // de acesso dos pacientes — dono/admin total; membro escreve, viewer lê.
+      match /clinical_records/{recordId} {
+        allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
+        allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
+        allow update: if isOwner(userId) || isAdmin()
+          || (hasClinicWriteAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
+        allow delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+      }
 
       // Demais dados da subárvore do usuário (settings, ai_usage, etc.):
       // permanecem exclusivos do dono/admin — sem acesso de equipe.

@@ -77,18 +77,57 @@ export function getLocalDateStr(dateOrTimestamp: Date | number | string): string
   return `${year}-${month}-${day}`;
 }
 
-export function findNextAvailableDate(clinic: Clinic, startingFromStr: string, appointments: Appointment[]): string {
-  const config = clinic.schedulingConfig;
-  const shiftsConfig = config?.weekdayShifts || DEFAULT_WEEKDAY_SHIFTS;
+/** Situação da agenda de uma clínica numa data exata. */
+export interface AgendaDayStatus {
+  open: boolean;
+  /**
+   * aberta        — dia disponível para agendamento
+   * bloqueada     — data exata bloqueada (feriado/recesso)
+   * fora-da-janela — existe(m) janela(s) de abertura e a data está fora delas
+   * sem-expediente — dia da semana sem turnos ativos
+   */
+  reason: 'aberta' | 'bloqueada' | 'fora-da-janela' | 'sem-expediente';
+  /** Detalhe exibível (motivo do bloqueio ou rótulo da janela mais próxima) */
+  label?: string;
+}
 
+/**
+ * Verifica se a agenda da clínica está aberta na data. Ordem de precedência:
+ * data bloqueada > fora de janela de abertura > dia sem expediente.
+ */
+export function getAgendaDayStatus(clinic: Clinic | null | undefined, dateStr: string): AgendaDayStatus {
+  const config = clinic?.schedulingConfig;
+
+  const blocked = config?.blockedDates?.find(b => b.date === dateStr);
+  if (blocked) {
+    return { open: false, reason: 'bloqueada', label: blocked.reason || 'Data bloqueada' };
+  }
+
+  const windows = config?.agendaWindows || [];
+  if (windows.length > 0) {
+    const inWindow = windows.some(w => w.start && w.end && dateStr >= w.start && dateStr <= w.end);
+    if (!inWindow) {
+      return { open: false, reason: 'fora-da-janela', label: 'Agenda não aberta para esta data' };
+    }
+  }
+
+  const dayOfWeek = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`).getDay();
+  const shiftsConfig = config?.weekdayShifts || DEFAULT_WEEKDAY_SHIFTS;
+  const daySetting = shiftsConfig.find(bh => bh.day === dayOfWeek);
+  if (!daySetting || !daySetting.active || !daySetting.shifts || daySetting.shifts.length === 0) {
+    return { open: false, reason: 'sem-expediente', label: 'Sem expediente neste dia da semana' };
+  }
+
+  return { open: true, reason: 'aberta' };
+}
+
+export function findNextAvailableDate(clinic: Clinic, startingFromStr: string, appointments: Appointment[]): string {
   const date = new Date(startingFromStr.includes('T') ? startingFromStr : `${startingFromStr}T00:00:00`);
-  
-  for (let i = 0; i < 30; i++) {
+
+  for (let i = 0; i < 60; i++) {
     const dateStr = getLocalDateStr(date);
-    const dayOfWeek = date.getDay();
-    const daySetting = shiftsConfig.find(bh => bh.day === dayOfWeek);
-    
-    if (daySetting && daySetting.active && daySetting.shifts && daySetting.shifts.length > 0) {
+
+    if (getAgendaDayStatus(clinic, dateStr).open) {
       const slots = generateSlotsForDay(clinic, dateStr, appointments);
       if (slots.some(s => !s.booked)) {
         return dateStr;
@@ -96,7 +135,7 @@ export function findNextAvailableDate(clinic: Clinic, startingFromStr: string, a
     }
     date.setDate(date.getDate() + 1);
   }
-  
+
   return startingFromStr;
 }
 
@@ -119,6 +158,9 @@ export function generateSlotsForDay(
   dateStr: string,
   appointments: Appointment[]
 ): { time: string; booked: boolean; shiftName: string; bookedBy?: string; appointmentId?: string }[] {
+  // Janela de abertura / data bloqueada / dia sem expediente ⇒ sem slots.
+  if (!getAgendaDayStatus(clinic, dateStr).open) return [];
+
   const dayOfWeek = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`).getDay();
   const config = clinic.schedulingConfig;
   const shiftsConfig = config?.weekdayShifts || DEFAULT_WEEKDAY_SHIFTS;

@@ -56,9 +56,73 @@ export interface Patient {
   history?: string;
   /** Observações gerais */
   notes?: string;
+  /** Paciente em acompanhamento: fica em evidência na lista de pacientes */
+  followUp?: boolean;
+  /** Motivo do acompanhamento (ex.: "Nódulo BI-RADS 3 — controle 6 meses") */
+  followUpReason?: string;
+  /** Timestamp de quando o acompanhamento foi ativado */
+  followUpSince?: number;
   /** Timestamp de criação */
   createdAt: number;
   /** Timestamp da última atualização */
+  updatedAt: number;
+}
+
+/** Tipo de entrada do prontuário clínico do paciente */
+export type ClinicalRecordType = 'nota' | 'exame-fisico' | 'laboratorio';
+
+/** Resultado individual de exame laboratorial */
+export interface LabResult {
+  /** Nome do exame (ex.: Hemoglobina, TSH) */
+  name: string;
+  /** Valor medido, como texto livre (aceita "12,5", "positivo"...) */
+  value: string;
+  unit?: string;
+  /** Faixa de referência do laboratório */
+  reference?: string;
+}
+
+/** Sinais vitais / antropometria do exame físico */
+export interface VitalSigns {
+  /** Pressão arterial sistólica (mmHg) */
+  paSys?: number;
+  /** Pressão arterial diastólica (mmHg) */
+  paDia?: number;
+  /** Frequência cardíaca (bpm) */
+  fc?: number;
+  /** Frequência respiratória (irpm) */
+  fr?: number;
+  /** Temperatura (°C) */
+  temp?: number;
+  /** Saturação de O2 (%) */
+  spo2?: number;
+  /** Peso (kg) */
+  weightKg?: number;
+  /** Altura (cm) */
+  heightCm?: number;
+}
+
+/**
+ * Entrada do prontuário clínico (coleção `clinical_records` na subárvore do
+ * usuário). Uma entrada por evento: nota clínica, exame físico ou resultados
+ * de laboratório.
+ */
+export interface ClinicalRecord {
+  id: string;
+  patientId: string;
+  clinicId?: string;
+  type: ClinicalRecordType;
+  /** Título curto opcional (ex.: "Retorno pós-operatório") */
+  title?: string;
+  /** Texto livre: conteúdo da nota, achados do exame físico ou observações do laboratório */
+  text?: string;
+  /** Sinais vitais (apenas type = 'exame-fisico') */
+  vitals?: VitalSigns;
+  /** Resultados laboratoriais (apenas type = 'laboratorio') */
+  labResults?: LabResult[];
+  /** Data clínica do registro (pode diferir da data de criação no sistema) */
+  recordDate: number;
+  createdAt: number;
   updatedAt: number;
 }
 
@@ -571,6 +635,28 @@ export interface Clinic {
         end: string; // e.g. "12:00"
         slotDurationMinutes: number;
       }[];
+    }[];
+    /**
+     * Janelas de abertura da agenda em datas exatas (ex.: mês aberto de
+     * 01/08 a 31/08). Se houver ao menos uma janela, só é possível agendar
+     * dentro delas; sem janelas, a agenda fica sempre aberta (comportamento
+     * legado).
+     */
+    agendaWindows?: {
+      id: string;
+      /** Data inicial inclusive (YYYY-MM-DD) */
+      start: string;
+      /** Data final inclusive (YYYY-MM-DD) */
+      end: string;
+      /** Rótulo opcional (ex.: "Agosto/2026") */
+      label?: string;
+    }[];
+    /** Datas exatas bloqueadas (feriados, recessos), mesmo dentro de janela aberta */
+    blockedDates?: {
+      /** Data bloqueada (YYYY-MM-DD) */
+      date: string;
+      /** Motivo exibido na recepção (ex.: "Feriado municipal") */
+      reason?: string;
     }[];
   };
   createdAt: number;

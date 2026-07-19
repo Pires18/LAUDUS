@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Appointment, Clinic } from '../../../types';
-import { generateSlotsForDay } from '../utils/scheduleUtils';
+import { generateSlotsForDay, getAgendaDayStatus } from '../utils/scheduleUtils';
 import { X, CalendarRange, AlertCircle, Loader2 } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import { motion } from 'framer-motion';
@@ -28,6 +28,8 @@ export function RescheduleModal({
   const slots = useMemo(() => {
     return generateSlotsForDay(clinic, newDate, appointments);
   }, [clinic, newDate, appointments]);
+
+  const dayStatus = useMemo(() => getAgendaDayStatus(clinic, newDate), [clinic, newDate]);
 
   const handleConfirm = async () => {
     if (!newTime) return;
@@ -95,7 +97,11 @@ export function RescheduleModal({
             {slots.length === 0 ? (
               <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-rose-700 text-xs font-semibold">
                 <AlertCircle size={16} />
-                <span>Sem turnos configurados ou expediente ativo para a data selecionada.</span>
+                <span>
+                  {!dayStatus.open
+                    ? `Agenda fechada nesta data — ${dayStatus.label}.`
+                    : 'Sem turnos configurados ou expediente ativo para a data selecionada.'}
+                </span>
               </div>
             ) : (
               <div className="space-y-3 max-h-[180px] overflow-y-auto p-2 border border-ink-200 rounded-xl custom-scrollbar">

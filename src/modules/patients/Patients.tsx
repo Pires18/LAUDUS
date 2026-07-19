@@ -7,7 +7,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Patient } from '../../types';
 import { addItemWithId, deleteItem, generateStandardId, countWhere } from '../../store/db';
 import { useState, useMemo } from 'react';
-import { UserPlus, Search, Trash2, Users as UsersIcon, Loader2, X } from 'lucide-react';
+import { UserPlus, Search, Trash2, Users as UsersIcon, Loader2, X, Star } from 'lucide-react';
 import { calculateAge, formatDate, formatCPF, formatPhone, classNames } from '../../utils/format';
 import { PatientForm } from './PatientForm';
 import { ListSkeleton } from '../../components/SkeletonLoader';
@@ -16,6 +16,7 @@ export function Patients() {
   const { setView, showToast, patientsSearch: search, setPatientsSearch: setSearch } = useApp();
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
+  const [followUpOnly, setFollowUpOnly] = useState(false);
 
   // Capitaliza a primeira letra para melhorar as chances de match na busca prefixada do Firebase
   const searchPrefix = search.charAt(0).toUpperCase() + search.slice(1);
@@ -32,14 +33,21 @@ export function Patients() {
 
   // Filtro local adicional caso a busca prefixada traga maiúsculas/minúsculas diferentes, ou para buscar por CPF
   const filtered = useMemo(() => {
-    return patients.filter((p) =>
-      !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.cpf?.includes(search)
-    );
-  }, [patients, search]);
+    return patients.filter((p) => {
+      const matchesSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.cpf?.includes(search);
+      const matchesFollowUp = !followUpOnly || p.followUp;
+      return matchesSearch && matchesFollowUp;
+    });
+  }, [patients, search, followUpOnly]);
 
-  // Sort alphabetically
-  const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  const followUpCount = useMemo(() => patients.filter(p => p.followUp).length, [patients]);
+
+  // Pacientes em acompanhamento ficam em evidência no topo; demais em ordem alfabética
+  const sorted = [...filtered].sort((a, b) => {
+    if (!!a.followUp !== !!b.followUp) return a.followUp ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
 
   async function handleCreate(data: Omit<Patient, 'id' | 'createdAt' | 'updatedAt'>) {
     const id = generateStandardId('PAC');
@@ -116,6 +124,27 @@ export function Patients() {
               </button>
             )}
           </div>
+          <button
+            onClick={() => setFollowUpOnly(v => !v)}
+            className={classNames(
+              "h-9 px-3.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border flex items-center gap-1.5 shrink-0 active:scale-95",
+              followUpOnly
+                ? "bg-amber-500 border-amber-500 text-white shadow-sm"
+                : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+            )}
+            title="Mostrar apenas pacientes em acompanhamento"
+          >
+            <Star size={12} className={followUpOnly ? 'fill-white' : 'fill-amber-500 text-amber-500'} />
+            <span className="hidden sm:inline">Em Acompanhamento</span>
+            {followUpCount > 0 && (
+              <span className={classNames(
+                "min-w-[16px] h-4 rounded-full text-[9px] font-black flex items-center justify-center px-1",
+                followUpOnly ? "bg-white text-amber-600" : "bg-amber-500 text-white"
+              )}>
+                {followUpCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* ─── PATIENTS TABLE ─── */}
@@ -169,7 +198,10 @@ export function Patients() {
                       <tr
                         key={p.id}
                         onClick={() => setView({ name: 'patient-detail', patientId: p.id })}
-                        className="group hover:bg-ink-50/40 transition-colors cursor-pointer"
+                        className={classNames(
+                          "group transition-colors cursor-pointer",
+                          p.followUp ? "bg-amber-50/50 hover:bg-amber-50" : "hover:bg-ink-50/40"
+                        )}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
@@ -183,7 +215,17 @@ export function Patients() {
                               )}>
                               {p.name?.charAt(0)?.toUpperCase() || '?'}
                             </div>
-                            <span className="font-semibold text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px] text-sm">{p.name}</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                {p.followUp && (
+                                  <Star size={12} className="fill-amber-500 text-amber-500 shrink-0" />
+                                )}
+                                <span className="font-semibold text-ink-900 group-hover:text-brand-600 transition-colors truncate max-w-[200px] text-sm">{p.name}</span>
+                              </div>
+                              {p.followUp && p.followUpReason && (
+                                <span className="text-[10px] text-amber-700 font-bold truncate block max-w-[220px]">{p.followUpReason}</span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-ink-700 font-mono text-xs font-bold">{p.id}</td>
@@ -219,7 +261,10 @@ export function Patients() {
                   <div
                     key={p.id}
                     onClick={() => setView({ name: 'patient-detail', patientId: p.id })}
-                    className="p-4 active:bg-ink-50 transition-colors flex items-center gap-3"
+                    className={classNames(
+                      "p-4 transition-colors flex items-center gap-3",
+                      p.followUp ? "bg-amber-50/50 active:bg-amber-50" : "active:bg-ink-50"
+                    )}
                   >
                     <div
                       title={p.gender === 'F' ? 'Feminino' : p.gender === 'M' ? 'Masculino' : 'Não informado'}
@@ -232,7 +277,10 @@ export function Patients() {
                       {p.name?.charAt(0)?.toUpperCase() || '?'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-ink-900 truncate">{p.name}</div>
+                      <div className="font-bold text-ink-900 truncate flex items-center gap-1.5">
+                        {p.followUp && <Star size={12} className="fill-amber-500 text-amber-500 shrink-0" />}
+                        <span className="truncate">{p.name}</span>
+                      </div>
                       <div className="text-[10px] font-mono text-brand-600 font-bold mt-0.5">Prontuário: {p.id}</div>
                       <div className="flex items-center gap-2 text-xs text-ink-500 mt-1">
                         <span>{calculateAge(p.birthDate)}</span>
