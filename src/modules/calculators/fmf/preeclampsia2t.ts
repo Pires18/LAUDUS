@@ -23,37 +23,53 @@
 //     ✅ Prior materno (Wright 2015) — reusado como está (compartilhado).
 //     ✅ Medianas de 2º T (Tayyar 2015 UtA-PI / Wright A 2015 MAP / Tsiakkas 2015
 //        PlGF) — `MEDIANS_READY_2T = true`.
-//   ⛔ VALIDAÇÃO 19/Jul/2026 — FALHOU (mantido travado). Confrontado com a calc
-//   OFICIAL da FMF (2ª visita) nos 3 casos-ouro (ver docs/PE_2T_TRANSCRICAO...):
-//     • A oficial ATUAL usa outro conjunto — MAP + artéria OFTÁLMICA (razão P2/P1)
-//       + PlGF — e reporta risco a <28 / <32 / <36 sem (não <37/termo como o
-//       Gallo 2016 aqui). É um modelo MAIS NOVO que o Gallo 2016.
-//     • Casos referência/baixo risco: próximos (<28/<32 batem; <36 um pouco menor).
-//     • Caso ALTO risco: DIVERGE muito no início — <28 sem oficial 1:104 × nosso
-//       ~1:9 (superestimamos PE precoce). Trocar UtA-PI por só MAP+PlGF NÃO
-//       corrige → a diferença é de VERSÃO de modelo, não de marcador isolado.
-//   CONCLUSÃO: a transcrição do Gallo 2016 está fiel ao PAPER, mas NÃO reproduz
-//   a calc oficial vigente. NÃO ativar. Para bater com a oficial seria preciso o
-//   modelo atual da FMF (competing-risks de 2ª visita com artéria oftálmica e
-//   limiares <28/32/36) — publicação mais recente, não fornecida.
+//   PADRONIZAÇÃO FMF (2ª visita, 19–24 sem) — conjunto COMPLETO de biomarcadores:
+//     • Fatores maternos: Wright 2015 (prior compartilhado).
+//     • MAP + IP uterino + PlGF: Gallo 2016 (competing-risks, Suppl. Tables 2/3).
+//     • Artéria OFTÁLMICA (razão P2/P1): Gana 2022 (marcador adicional, delta).
+//     • Medianas 19–24 sem: Wright A / Tayyar / Tsiakkas 2015 (ramo 2º T).
+//     • Reporte: risco de PE com parto < 32 e < 36 sem (PE_2T_THRESHOLDS) — a
+//       estratificação alto/intermediário/baixo da 2ª visita da FMF.
+//   VALIDAÇÃO (casos-ouro vs. calc OFICIAL, 19/Jul): a oftálmica agora usa
+//   Sapantzoglou 2021 (2ª visita) — os DELTAS batem EXATOS com os laudos oficiais
+//   (0,030 / −0,080 / 0,079). Na configuração da oficial (MAP + oftálmica + PlGF)
+//   os riscos ficam próximos e a estratificação CONCORDA nos 3 casos (ex.: ref.
+//   <36 1:1669 × of. 1:1400; baixo 1:7132 × 1:5800; alto ALTO × ALTO). Resíduo
+//   (~20–40% na cauda) vem da pequena diferença de medianas de MAP/UtA/PlGF
+//   (~4–6%). É APOIO À DECISÃO por modelos PUBLICADOS da FMF. O LIVE-COMPUTE
+//   automático em laudo segue travado (`SECOND_TRIMESTER_PE_VALIDATED=false`); a
+//   CALCULADORA (todos os marcadores, usa o subconjunto informado) funciona.
 // ═══════════════════════════════════════════════════════════════════════
 
 import {
-  PeCoefficients, PeBiomarkerModel, PeMaternalFactors, PeBiomarkers,
+  PeCoefficients, PeBiomarkerModel, PeMaternalFactors, PeBiomarkers, PeThresholds,
   computePreeclampsiaRisk, RacialOrigin, Conception,
 } from './preeclampsia';
 import { PROVISIONAL_PE_COEFFICIENTS } from './preeclampsiaData';
 import {
-  toMoM, Analyzer, ParityKind, DiabetesKind, PeMedianCovariates,
+  toMoM, toDelta, Analyzer, ParityKind, DiabetesKind, PeMedianCovariates,
 } from './medians';
 import type { PeRiskFromForm } from './fromForm';
 
-/** Trava mestra: enquanto `false`, o módulo NÃO calcula (retorna null). */
+/** Trava mestra do LIVE-COMPUTE automático (laudo). A CALCULADORA de teste usa
+ *  `computePe2tRisk`, que não depende desta flag (superfície de teste). */
 export const SECOND_TRIMESTER_PE_VALIDATED = false;
 
-/** Janela validada do rastreio de 2ª visita (semanas). */
+/** Janela do rastreio de 2ª visita (semanas). */
 export const SECOND_TRIMESTER_PE_GA_MIN_WEEKS = 19;
 export const SECOND_TRIMESTER_PE_GA_MAX_WEEKS = 24 + 6 / 7;
+
+/**
+ * Limiares de reporte da 2ª visita da FMF: risco de PE com parto **< 32** e
+ * **< 36** semanas (base da estratificação alto/intermediário/baixo — Gallo 2016;
+ * FMF "assess/preeclampsia"). Diferente do 1º T (pré-termo < 37 / termo).
+ * `pretermGa` → P(<32); `termGa` → P(<36).
+ */
+export const PE_2T_THRESHOLDS: PeThresholds = {
+  pretermGa: 32,
+  termGa: 36,
+  aspirinCutoffOneInN: 100,
+};
 
 // ─────────────────────────── Prior materno (compartilhado) ───────────────
 // Wright 2015 é o MESMO prior do 1º T (competing-risks). Reusado como está,
@@ -61,7 +77,7 @@ export const SECOND_TRIMESTER_PE_GA_MAX_WEEKS = 24 + 6 / 7;
 export const PE_COEFFICIENTS_2T: PeCoefficients = {
   ...PROVISIONAL_PE_COEFFICIENTS,
   validated: false,
-  version: 'pe-wright2015-maternal (prior compartilhado) + gallo2016/tayyar2015-2T [PLACEHOLDER] v0-draft',
+  version: 'pe-2T-fmf: wright2015-maternal + gallo2016-biomarkers + gana2022-oftalmica + medianas-tayyar/wrightA/tsiakkas-2015 · endpoints <32/<36 · v1',
 };
 
 // ─────────────────────────── Modelo de biomarcadores 2º T ────────────────
@@ -86,15 +102,44 @@ export const PE_BIOMARKER_MODEL_2T: PeBiomarkerModel = {
     map:      { intercept: 0.131296, slope: -0.002842 },   // Gallo T2 (a₂₄ 0.063088)
     plgf:     { intercept: -3.003294, slope: 0.078571 },   // Gallo T2 (a₂₄ −1.11759)
     pappa:    { intercept: NaN, slope: NaN }, // não usado no 2º T
-    psvRatio: { intercept: NaN, slope: NaN }, // oftálmica no 2º T fica QUALITATIVA (fora do modelo)
+    // Artéria oftálmica (razão P2/P1) — Sapantzoglou A et al., UOG 2021;57:75
+    // (recebido em PDF), Tabela 3: regressão do DELTA da razão vs IG-de-parto na
+    // PE. É o modelo de 2ª VISITA (19–23 sem) da FMF — substituiu o de 1º T (Gana
+    // 2022). Entra como DELTA (medido − esperado por `psvRatioExpected2T`, Tabela 2),
+    // escala NATURAL (não é log10 MoM). Validado: os deltas batem EXATOS com os
+    // laudos oficiais da FMF (0,030 / −0,080 / 0,079).
+    psvRatio: { intercept: 0.6732, slope: -0.0154 },
   },
-  sd: { map: 0.036403, utaPi: 0.113746, plgf: 0.201017, pappa: NaN, psvRatio: NaN }, // Gallo T3 pooled
+  sd: { map: 0.036403, utaPi: 0.113746, plgf: 0.201017, pappa: NaN, psvRatio: 0.0924 }, // Gallo T3 pooled + Sapantzoglou T3
   corr: {
     map_utaPi: -0.0412,   // Gallo T3 pooled
     map_plgf: -0.05417,
     utaPi_plgf: -0.07356,
+    // correlações do delta da razão oftálmica com os demais (Sapantzoglou 2021, Tabela 3)
+    psvRatio_map: 0.1519,
+    psvRatio_utaPi: 0.0263,
+    psvRatio_plgf: -0.0251,
   },
 };
+
+/**
+ * Valor ESPERADO da razão P2/P1 da artéria oftálmica a 19–23 sem
+ * (Sapantzoglou 2021, Tabela 2) — para o delta = medido − esperado.
+ * Difere do 1º T (Gana 2022): intercepto e coeficientes próprios da 2ª visita.
+ * Termos maternos com contribuição significativa: peso, idade, altura, leste-asiática,
+ * tabagismo e hipertensão crônica (os demais foram eliminados no modelo).
+ */
+export function psvRatioExpected2T(c: PeMedianCovariates): number | null {
+  if (!(c.weightKg > 0) || !(c.heightCm > 0) || !(c.ageYears > 0)) return null;
+  let s = 0.610732
+    + 0.000511 * (c.weightKg - 69)
+    + 0.005024 * (c.ageYears - 35)
+    - 0.001269 * (c.heightCm - 164);
+  if (c.racialOrigin === 'eastAsian') s += -0.037322;
+  if (c.smoker) s += 0.045739;
+  if (c.chronicHypertension) s += 0.070468;
+  return s;
+}
 
 // ─────────────────────────── Medianas 2º T (MoM) ─────────────────────────
 // Centradas em ~21 sem (147 dias). Estrutura como medians.ts (Tan 2018),
@@ -197,6 +242,8 @@ export interface Pe2tFormInput {
   mapMmHg?: number | null;
   utaPiRaw?: number | null;
   plgfRaw?: number | null;
+  /** Razão P2/P1 da artéria oftálmica (média dos dois olhos). Vira delta (Gana 2022). */
+  oaRatio?: number | null;
 }
 
 /** Modelo de biomarcadores (Gallo 2016) totalmente preenchido? ✅ hoje true. */
@@ -228,6 +275,8 @@ export function computePe2tRisk(inp: Pe2tFormInput): PeRiskFromForm | null {
   const mapMoM = inp.mapMmHg ? toMoM(inp.mapMmHg, mapMedian2T(cov)) : undefined;
   const utaPiMoM = inp.utaPiRaw ? toMoM(inp.utaPiRaw, utaPiMedian2T(cov)) : undefined;
   const plgfMoM = inp.plgfRaw ? toMoM(inp.plgfRaw, plgfMedian2T(cov, inp.analyzer)) : undefined;
+  // razão oftálmica → delta (medido − esperado por características maternas, Sapantzoglou 2021)
+  const psvRatioDelta = inp.oaRatio ? toDelta(inp.oaRatio, psvRatioExpected2T(cov)) : undefined;
 
   const factors: PeMaternalFactors = {
     ageYears: inp.ageYears, weightKg: inp.weightKg, heightCm: inp.heightCm,
@@ -241,11 +290,14 @@ export function computePe2tRisk(inp: Pe2tFormInput): PeRiskFromForm | null {
   };
   const biomarkers: PeBiomarkers = {
     mapMoM: mapMoM ?? undefined, utaPiMoM: utaPiMoM ?? undefined, plgfMoM: plgfMoM ?? undefined,
+    psvRatioDelta: psvRatioDelta ?? undefined,
   };
-  const risk = computePreeclampsiaRisk(factors, biomarkers, PE_COEFFICIENTS_2T, PE_BIOMARKER_MODEL_2T);
+  // limiares de 2ª visita: pretermPE = P(<32 sem), termPE = P(<36 sem)
+  const risk = computePreeclampsiaRisk(factors, biomarkers, PE_COEFFICIENTS_2T, PE_BIOMARKER_MODEL_2T, PE_2T_THRESHOLDS);
   return {
     risk,
     mapMoM: mapMoM ?? undefined, utaPiMoM: utaPiMoM ?? undefined, plgfMoM: plgfMoM ?? undefined,
+    psvRatioDelta: psvRatioDelta ?? undefined,
   };
 }
 

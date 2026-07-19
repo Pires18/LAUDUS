@@ -1,7 +1,7 @@
 # 📘 Documentação Oficial — LAUD.US
 
 **Plataforma de laudos ultrassonográficos com IA, PACS/DICOM gerenciado e SaaS de assinatura.**
-Versão do documento: 2026-07-08 (v4.2 — reorganização/unificação da documentação: BACKLOG único, PACS incidente MX7 e fix de AE-Title incorporados em §6, pendências §17 realinhadas) · Ambiente: produção (Vercel Pro + Firebase).
+Versão do documento: 2026-07-19 (v4.3 — acompanha o release **LAUD.US 2.2.0**: rollout completo da aba Estruturado, calculadoras FMF 1º/2º trimestre, exames combinados, padronização de Medicina Fetal, PACS multi-tenant self-service e higiene técnica final; ver [CHANGELOG](../CHANGELOG.md) §[2.2.0]) · Ambiente: produção (Vercel Pro + Firebase).
 
 **Status:** vivo · **Complementares:** [Arquitetura](../src/ARCHITECTURE.md) · [Backlog (itens abertos)](BACKLOG.md) · [Cascata de Prompts LAUD.IA](CASCADE_PROMPTS.md) · [Política de Retenção LGPD](LGPD_POLITICA_RETENCAO.md) · [Termos de Uso](legal/TERMOS_DE_USO.md) · [Política de Privacidade](legal/POLITICA_DE_PRIVACIDADE.md) · [Pacote de Revisão Jurídica](legal/PACOTE_REVISAO_JURIDICA.md) · [Central PACS/DICOM (ponto de entrada)](pacs/PACS_CENTRAL_MESTRE.md) · [PACS Tenant Setup](pacs/PACS_TENANT_SETUP.md) · [PACS Provision Setup](pacs/PACS_PROVISION_SETUP.md) · [PACS Manual](pacs/PACS_MANUAL.md) · [Incidente MX7 08/07](pacs/incidents/INCIDENTE_2026-07-08_TIMEOUT_MX7.md) · [Coeficientes FMF](FMF_COEFICIENTES_EXTRAIDOS.md) · auditorias/planos concluídos em [`docs/archive/`](archive/).
 
@@ -443,4 +443,4 @@ Ver a lista completa e sempre atualizada em [`docs/BACKLOG.md`](BACKLOG.md) — 
 **Add-on** — recurso pago avulso. **Orthanc** — servidor PACS. **Worklist** — lista de exames que o aparelho lê (`.wl`). **Agente** — programa que grava `.wl` e faz proxy do Orthanc. **Tenant** — instância isolada numa VM compartilhada (`tenantId`). **Tailscale/Funnel** — VPN privada + endereço HTTPS público. **MRR/ARR** — receita recorrente mensal/anual. **Entitlement** — direito de uso derivado do plano. **Fail-open** — se a checagem falha, libera (não derruba pagante). **Collection-group query** — consulta sobre todas as subcoleções de mesmo nome (ex.: `ai_usage`). **Clinic membership** — vínculo de um usuário convidado (não dono) a uma clínica, com papel `editor`/`viewer` (`clinic_memberships`). **Reconciliação financeira** — comparação entre receita/MRR teóricos e valores reais cobrados/consumidos, para detectar divergência.
 
 ---
-*Documentação oficial v4.2 (08/07/2026). Pendências vivas em [`docs/BACKLOG.md`](BACKLOG.md); detalhamento por área nos documentos complementares listados no topo.*
+*Documentação oficial v4.3 (19/07/2026 · release 2.2.0). Pendências vivas em [`docs/BACKLOG.md`](BACKLOG.md); detalhamento por área nos documentos complementares listados no topo.*

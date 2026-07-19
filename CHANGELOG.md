@@ -5,7 +5,56 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
-## [Não versionado] — 2026-07-09
+## [2.2.0] — 2026-07-19
+
+Release de consolidação — corta em produção todo o trabalho acumulado desde a
+2.1.0 (24/06). Reúne o rollout completo da **aba Estruturado**, as **calculadoras
+FMF de 1º/2º trimestre**, os **exames combinados**, a padronização de **Medicina
+Fetal**, o **PACS multi-tenant self-service** e a higiene técnica final. Suíte em
+**882 testes** (50 arquivos), `tsc` limpo, `eslint` 0 erros.
+
+### Adicionado — Calculadoras FMF (Medicina Fetal)
+- **Risco de trissomias (1º trimestre)** — modelo FMF real: TN por mistura de
+  distribuições, bioquímica (β-hCG livre + PAPP-A) por Kagan, marcadores adicionais
+  (osso nasal, ducto venoso, regurgitação tricúspide) 2009. Riscos competitivos.
+- **Risco de pré-eclâmpsia (1º trimestre)** — Bayes/competing-risks O'Gorman 2016,
+  medianas Cobas, razão de PSV da oftálmica (Gana 2022), prior materno Wright 2015.
+- **Risco de pré-eclâmpsia (2º trimestre)** — **finalizado nesta release**: fatores
+  maternos Wright 2015 + MAP/IP uterino/PlGF Gallo 2016 + **artéria oftálmica
+  Sapantzoglou 2021** (o delta bate exato com os laudos oficiais da FMF: 0,030 /
+  −0,080 / 0,079). Reporte a **< 32 e < 36 sem** com estratificação
+  alto/intermediário/baixo; estratificação concordante com a calc oficial nos
+  casos-ouro. Banner "EM VALIDAÇÃO" removido — vira apoio à decisão por modelos
+  publicados (o live-compute automático em laudo segue travado).
+
+### Adicionado — Aba Estruturado do Copiloto
+- **3ª aba do editor** (formulário tipado derivado da máscara + cálculo/escore ao
+  vivo + write-back das calculadoras → IA), com **rollout completo nas 10 áreas** e
+  **editor de esquema por máscara**. Auditoria trava 26 invariantes
+  (`structuredAudit.test.ts`, 71/71 máscaras).
+
+### Adicionado — Exames combinados & Medicina Fetal
+- **Exames combinados** — 2 máscaras → 1 laudo (seções mescladas dinamicamente,
+  consumindo 2 laudos da cota).
+- **Medicina Fetal V2.1** — recomendações das 9 máscaras padronizadas com faixa de
+  data; ecocardio de rotina apenas no morfológico de 2º T; invariantes travadas em
+  `fetalRecommendations.test.ts`.
+
+### Adicionado — PACS/DICOM multi-tenant
+- **VM compartilhada multi-tenant** em produção com provisão E **desprovisão**
+  self-service; importação de exames existentes para o Orthanc do tenant; fluxo
+  clínico real validado (GL.iNet + aparelho) com automação de `DicomModalities`.
+
+### Segurança & Higiene (limpeza final desta release)
+- **Removidos 2 exports de PHI versionados por engano** na raiz
+  (`clear-clinical-findings-report-*.json`, 186 KB cada, com IDs e achados de
+  pacientes reais) e adicionado padrão ao `.gitignore` para impedir recorrência.
+- **`eslint --fix`** aplicado (let→const) em 8 pontos; lint em 0 erros.
+- Versão: `2.1.0` → `2.2.0`.
+
+### Consolidação da documentação (detalhamento por data abaixo)
+
+### Detalhamento — 2026-07-09
 
 ### Documentação — auditoria completa e unificação
 Leitura integral de toda a documentação (34 arquivos em `docs/` + `README.md` +
@@ -42,7 +91,7 @@ de reorganização estrutural:
 
 ---
 
-## [Não versionado] — 2026-07-08
+### Detalhamento — 2026-07-08
 
 ### PACS — incidente real (MX7 timeout) + padronização pra evitar recorrência
 Investigação de suporte (usuário real, aparelho Mindray MX7 via relé GL.iNet)
@@ -58,7 +107,7 @@ Fixes produtizados pra não repetir com outros usuários:
 - **`src/utils/dicom.ts`**: o campo que vira `ScheduledStationAETitle` no `.wl` (identifica **qual aparelho** deve pegar aquele item da Worklist) usava `settings.dicomOrthancAETitle || targetDevice.aeTitle` — ou seja, a identidade do **PACS/Orthanc** (`'ORTHANC'`, sempre preenchida depois de qualquer provisionamento gerenciado) tinha prioridade sobre o AE Title do **aparelho selecionado** no formulário. Resultado: todo exame gravava a mesma AE Title no `.wl`, não importa qual aparelho fosse escolhido — o seletor de aparelho em `CreateExamModal`/`ConfirmAppointmentModal` era efetivamente decorativo em qualquer conta com mais de um aparelho cadastrado. Corrigido (envio primário e de backup): `aeTitle` agora é sempre `targetDevice.aeTitle`.
 - **`docs/pacs/PACS_CENTRAL_MESTRE.md`** (novo): documento mestre único — mapa de toda a documentação PACS/DICOM, checklist de configuração "do zero à produção" já incorporando todos os aprendizados do incidente, hardening de segurança consolidado, e roadmap de riscos residuais priorizado.
 
-## [Não versionado] — 2026-07-07
+### Detalhamento — 2026-07-07
 
 ### Corrigido
 - **`IACostsTab` (`AdminFinanceiro.tsx`) quebrava ao abrir** — um `useEffect` estava declarado depois de um `return` condicional (`if (loadingConfig) return <Spinner />`), violando as Regras de Hooks do React (hooks precisam rodar na mesma ordem/quantidade em todo render). No primeiro render (carregando) o hook era pulado; no seguinte, aparecia — React derrubava o componente inteiro (`Uncaught Error: Rendered more hooks than during the previous render`). Corrigido movendo a agregação de dados + o `useEffect` para antes do `return` condicional.

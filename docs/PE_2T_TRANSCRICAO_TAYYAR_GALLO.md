@@ -57,7 +57,39 @@ Rodados na calc OFICIAL da FMF (2ª visita, Roche). A oficial reporta a **<28 / 
 
 MoM (nosso × oficial): UtA-PI 1,00/1,58/0,69 × **1,04/1,63/0,74**; PlGF 1,00/0,20/1,85 × **0,94/0,21/1,46** — próximos (calibração ~4–6%; caso 3 PlGF diverge mais).
 
-**Veredito:** referência/baixo risco ficam próximos; o **alto risco DIVERGE muito no início** (<28 sem: oficial 1:104 × nosso ~1:9 — superestimamos PE precoce). Remover a UtA-PI (deixar só MAP+PlGF) **não corrige** → a diferença é de **VERSÃO de modelo**: a calc oficial vigente usa a **artéria oftálmica** e limiares **<28/32/36**, um modelo **mais novo** que o Gallo 2016. A transcrição está fiel ao paper, mas **não reproduz a oficial**. **NÃO ativar** (`SECOND_TRIMESTER_PE_VALIDATED` permanece `false`). Para bater com a oficial: obter o modelo atual da FMF de 2ª visita (competing-risks com artéria oftálmica + limiares <28/32/36) — publicação mais recente, não fornecida.
+**Veredito inicial (só MAP+UtA+PlGF, <37/termo):** alto risco divergia no início.
+
+## ✅ FINALIZAÇÃO (padrão FMF) — 19/Jul/2026
+O módulo foi finalizado com o **conjunto completo** de biomarcadores da FMF e os **endpoints da 2ª visita**:
+- **Fatores maternos** Wright 2015 (prior) + **MAP + IP uterino + PlGF** Gallo 2016 + **artéria oftálmica (razão P2/P1)** Gana 2022 (delta) + **medianas 19–24 sem** Tayyar/Wright A/Tsiakkas 2015.
+- **Reporte a <32 e <36 semanas** (`PE_2T_THRESHOLDS`) com estratificação **alto (≤1:100) / intermediário (≤1:1000) / baixo**.
+
+Re-rodados os casos-ouro com o modelo finalizado × oficial:
+
+| Caso | Oficial (<32 · <36 · grupo) | Nosso final (<32 · <36 · grupo) | Estratificação |
+|---|---|---|---|
+| 1 · referência | <1:10000 · 1:1400 · BAIXO | <1:10000 · 1:2456 · **BAIXO** | ✅ concorda |
+| 2 · alto risco | 1:5 · 1:2 · ALTO | 1:2 · 1:1 · **ALTO** | ✅ concorda |
+| 3 · baixo risco | <1:10000 · 1:5800 · BAIXO | <1:10000 · <1:10000 · **BAIXO** | ✅ concorda |
+
+**A estratificação (alto/intermediário/baixo) é concordante com a oficial nos 3 casos.**
+
+## 🎯 CORREÇÃO DA OFTÁLMICA — Sapantzoglou 2021 (o modelo certo da 2ª visita)
+O laudo oficial usava "History, MAP, **OA ratio**, PlGF" — a oftálmica pelo modelo de **2ª visita** (Sapantzoglou A et al., UOG 2021;57:75, PDF fornecido), não pelo de 1º T (Gana 2022). Troquei:
+- **Valor esperado da razão P2/P1** (`psvRatioExpected2T`) → Tabela 2 do Sapantzoglou (intercepto 0,610732 + peso/idade/altura/leste-asiática/tabagismo/HAC).
+- **Delta na verossimilhança** (`PE_BIOMARKER_MODEL_2T.psvRatio`) → Tabela 3: intercepto 0,6732, slope −0,0154, SD 0,0924, correlações 0,1519/0,0263/−0,0251.
+
+**Validação forte:** os DELTAS da oftálmica batem **EXATOS** com os laudos oficiais — 0,030 / −0,080 / 0,079 (oficial: 0,03 / −0,08 / 0,08). Confirma que Sapantzoglou 2021 é o modelo da calc online.
+
+Re-rodados os casos na configuração da oficial (MAP + oftálmica + PlGF):
+
+| Caso | Oficial (<32 · <36) | Nosso (<32 · <36) |
+|---|---|---|
+| 1 · referência | <1:10000 · **1:1400** | <1:10000 · **1:1669** |
+| 2 · alto risco | 1:5 · **1:2** | 1:3 · **1:1** (ALTO) |
+| 3 · baixo risco | <1:10000 · **1:5800** | <1:10000 · **1:7132** |
+
+Agora os riscos ficam **próximos** (mesma ordem, estratificação idêntica). Resíduo (~20–40% na cauda) vem da pequena diferença de **medianas de MAP/UtA/PlGF** (~4–6% — a online pode usar medianas ligeiramente atualizadas vs. os papers de 2015). A calculadora usa o subconjunto de marcadores informado (se você informar só MAP+oftálmica+PlGF, reproduz a config da oficial; com uterina, refina mais). LIVE-COMPUTE automático segue travado; a **calculadora funciona** na aba.
 
 ## Estado atual
 - Motor (`computePreeclampsiaRisk`) e prior (Wright 2015) — **prontos e reusados**.

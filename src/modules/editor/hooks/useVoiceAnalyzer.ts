@@ -40,7 +40,7 @@ export function useVoiceAnalyzer(isListening: boolean) {
         updateVolume();
       } catch (err) {
         logger.warn('[Voice Analyser] Microfone não acessível ou permissão negada:', err);
-        let mockInterval = setInterval(() => {
+        const mockInterval = setInterval(() => {
           if (cancelled) { clearInterval(mockInterval); return; }
           setVoiceVolume(Math.random() * 100);
         }, 100);

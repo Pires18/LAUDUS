@@ -81,7 +81,7 @@ export function findNextAvailableDate(clinic: Clinic, startingFromStr: string, a
   const config = clinic.schedulingConfig;
   const shiftsConfig = config?.weekdayShifts || DEFAULT_WEEKDAY_SHIFTS;
 
-  let date = new Date(startingFromStr.includes('T') ? startingFromStr : `${startingFromStr}T00:00:00`);
+  const date = new Date(startingFromStr.includes('T') ? startingFromStr : `${startingFromStr}T00:00:00`);
   
   for (let i = 0; i < 30; i++) {
     const dateStr = getLocalDateStr(date);

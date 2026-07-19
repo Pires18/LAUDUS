@@ -159,7 +159,7 @@ export async function getSettings(): Promise<AppSettings> {
     const snap = await getDoc(docRef);
     const isWindows = typeof window !== 'undefined' && /Win/i.test(navigator.userAgent);
     
-    let defaultSettings: AppSettings = {
+    const defaultSettings: AppSettings = {
       geminiModel: 'gemini-3.5-flash',
       aiProvider: 'gemini',
       dicomSyncEnabled: true,
@@ -199,7 +199,7 @@ export async function getSettings(): Promise<AppSettings> {
       // Máscaras faz a migração "pré-ativar atuais" uma única vez.
       enabledSystemMaskIds: []
     };
-    let data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
+    const data = snap.exists() ? (snap.data() as AppSettings) : defaultSettings;
 
     // ── Versioned settings migrations ───────────────────────────────────────
     // Add new entries at the END. Never change existing version numbers.

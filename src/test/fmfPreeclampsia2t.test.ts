@@ -10,7 +10,10 @@ import {
   mapMedian2T,
   utaPiMedian2T,
   plgfMedian2T,
+  psvRatioExpected2T,
   peRisk2tFromForm,
+  computePe2tRisk,
+  PE_2T_THRESHOLDS,
   type Pe2tFormInput,
 } from '../modules/calculators/fmf/preeclampsia2t';
 import { PROVISIONAL_PE_COEFFICIENTS } from '../modules/calculators/fmf/preeclampsiaData';
@@ -90,5 +93,58 @@ describe('PE 2º trimestre (esboço Tayyar/Gallo)', () => {
     expect(plgfDelfia).toBeLessThan(210);      // ~164 pg/mL
     expect(plgfCobas).toBeGreaterThan(plgfDelfia); // Roche/Cobas > DELFIA
     expect(plgfMedian2T(refCov, 'kryptor')).toBeNull(); // não modelado por Tsiakkas
+  });
+
+  it('reporta nos limiares de 2ª visita da FMF (<32 e <36 sem)', () => {
+    expect(PE_2T_THRESHOLDS.pretermGa).toBe(32);
+    expect(PE_2T_THRESHOLDS.termGa).toBe(36);
+  });
+
+  it('inclui a artéria oftálmica (Sapantzoglou 2021) no modelo de biomarcadores', () => {
+    expect(Number.isFinite(PE_BIOMARKER_MODEL_2T.reg.psvRatio.intercept)).toBe(true);
+    expect(Number.isFinite(PE_BIOMARKER_MODEL_2T.sd.psvRatio)).toBe(true);
+  });
+
+  it('o delta da oftálmica bate com os laudos OFICIAIS da FMF (validação forte)', () => {
+    // razão medida 0,641 nos 3 casos; delta = 0,641 − esperado(Sapantzoglou T2).
+    // Laudos oficiais: 0,03 / −0,08 / 0,08.
+    const c1 = { gaDays: 21 * 7, weightKg: 69, heightCm: 164, ageYears: 35, racialOrigin: 'white' as const, smoker: false, chronicHypertension: false, diabetes: 'none' as const, ivf: false, parity: 'nulliparous' as const };
+    const c2 = { gaDays: 22 * 7, weightKg: 88, heightCm: 160, ageYears: 40, racialOrigin: 'afroCaribbean' as const, smoker: false, chronicHypertension: true, diabetes: 'none' as const, ivf: false, parity: 'parousPE' as const };
+    const c3 = { gaDays: 20 * 7, weightKg: 62, heightCm: 168, ageYears: 27, racialOrigin: 'white' as const, smoker: false, chronicHypertension: false, diabetes: 'none' as const, ivf: false, parity: 'nulliparous' as const };
+    expect(0.641 - psvRatioExpected2T(c1)!).toBeCloseTo(0.03, 2);
+    expect(0.641 - psvRatioExpected2T(c2)!).toBeCloseTo(-0.08, 2);
+    expect(0.641 - psvRatioExpected2T(c3)!).toBeCloseTo(0.08, 2);
+  });
+
+  it('a CALCULADORA (computePe2tRisk) calcula e estratifica os casos-ouro', () => {
+    // referência → BAIXO ; alto risco → ALTO (concordante com a calc oficial FMF)
+    const ref = computePe2tRisk({
+      ageYears: 35, weightKg: 69, heightCm: 164, gaWeeks: 21,
+      racialOrigin: 'white', conception: 'spontaneous', parity: 'nulliparous',
+      diabetes: 'none', chronicHypertension: false, sleOrAps: false, familyHistoryPE: false,
+      smoker: false, analyzer: 'cobas', mapMmHg: 85.5, utaPiRaw: 1.05, plgfRaw: 251.8, oaRatio: 0.641,
+    });
+    expect(ref).not.toBeNull();
+    expect(ref!.risk.termPE.oneInN).toBeGreaterThan(1000); // < 36 sem: BAIXO
+
+    const alto = computePe2tRisk({
+      ageYears: 40, weightKg: 88, heightCm: 160, gaWeeks: 22,
+      racialOrigin: 'afroCaribbean', conception: 'spontaneous', parity: 'parousPE', previousPeGaWeeks: 30,
+      diabetes: 'none', chronicHypertension: true, sleOrAps: false, familyHistoryPE: true,
+      smoker: false, analyzer: 'cobas', mapMmHg: 102, utaPiRaw: 1.70, plgfRaw: 90, oaRatio: 0.641,
+    });
+    expect(alto).not.toBeNull();
+    expect(alto!.risk.termPE.oneInN).toBeLessThanOrEqual(100); // < 36 sem: ALTO
+    expect(alto!.psvRatioDelta).toBeDefined();
+  });
+
+  it('a CALCULADORA respeita a janela (null fora de 19–24+6)', () => {
+    const foraJanela = computePe2tRisk({
+      ageYears: 30, weightKg: 65, heightCm: 165, gaWeeks: 30,
+      racialOrigin: 'white', conception: 'spontaneous', parity: 'nulliparous',
+      diabetes: 'none', chronicHypertension: false, sleOrAps: false, familyHistoryPE: false,
+      smoker: false, analyzer: 'cobas', mapMmHg: 90,
+    });
+    expect(foraJanela).toBeNull();
   });
 });

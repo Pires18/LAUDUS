@@ -129,8 +129,8 @@ export function VenousCartographyCalculator({ value, onChange }: CalculatorProps
       // Perforators
       if (legData.perforators.length > 0) {
         const perfStr = legData.perforators.map(perf => {
-          let n = perf.name !== 'other' ? perf.name : '';
-          let l = perf.location ? ` (${perf.location})` : '';
+          const n = perf.name !== 'other' ? perf.name : '';
+          const l = perf.location ? ` (${perf.location})` : '';
           return `${n}${l}: ${perf.caliber}mm`;
         }).join(' | ');
         parts.push(`- Perfurantes Incompetentes: ${perfStr}.`);

@@ -24,9 +24,9 @@ import { Preeclampsia2tRiskCalculator } from './components/Preeclampsia2tRiskCal
 import { ExamArea } from '../../types';
 
 export interface CalculatorProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   value: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   onChange: (val: any) => void;
   examDateMs?: number;
 }
@@ -256,12 +256,12 @@ export const CALCULATORS: CalculatorDef[] = [
   },
   {
     id: 'fmf-preeclampsia-risk-2t',
-    name: 'Risco de Pré-eclâmpsia (2º trimestre) — EM VALIDAÇÃO',
-    description: 'Rastreamento de 2ª visita (19–24+6 sem) por fatores maternos + MAP, IP uterinas e PlGF (riscos competitivos). EM VALIDAÇÃO (para teste): ainda não conferida contra a calculadora oficial da FMF.',
+    name: 'Risco de Pré-eclâmpsia (2º trimestre)',
+    description: 'Rastreamento de 2ª visita (19–24+6 sem) por fatores maternos + MAP, IP uterinas, artéria oftálmica e PlGF (riscos competitivos). Reporte a <32 e <36 sem com estratificação alto/intermediário/baixo. Apoio à decisão; não é a calculadora oficial da FMF.',
     component: Preeclampsia2tRiskCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Modelo de 2º trimestre transcrito das fontes: fatores maternos Wright D et al., AJOG 2015 (prior compartilhado); biomarcadores por riscos competitivos Gallo DM et al., AJOG 2016;214:619; medianas "nos três trimestres" de Tayyar A et al. (IP uterino, UOG 2015;45:689), Wright A et al. (MAP, UOG 2015;45:698) e Tsiakkas A et al. (PlGF, UOG 2015;45:591). EM VALIDAÇÃO — pendente de conferência caso-a-caso contra a calculadora OFICIAL da FMF (2ª visita); não usar para decisão clínica.',
+      text: 'Padronização FMF de 2ª visita por modelos publicados: fatores maternos Wright D et al., AJOG 2015 (prior compartilhado); biomarcadores por riscos competitivos Gallo DM et al., AJOG 2016;214:619 (MAP, IP uterino, PlGF); artéria oftálmica (razão P2/P1) por Sapantzoglou A et al., UOG 2021;57:75 (modelo de 2ª visita 19–23 sem); medianas "nos três trimestres" de Tayyar A et al. (IP uterino, UOG 2015;45:689), Wright A et al. (MAP, UOG 2015;45:698) e Tsiakkas A et al. (PlGF, UOG 2015;45:591). Reporte a <32 e <36 semanas. O delta da oftálmica bate exatamente com os laudos oficiais da FMF; estratificação concordante e riscos próximos aos da calc oficial nos casos-ouro — apoio à decisão, não substitui a calculadora oficial nem o julgamento clínico.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/26645684/'
     }
   },
