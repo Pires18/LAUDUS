@@ -84,6 +84,13 @@ interface AppState {
   // ── Patients Filter State ──
   patientsSearch: string;
   setPatientsSearch: (s: string) => void;
+
+  // ── Layout ──
+  // Estado global (não só local do Sidebar) porque o editor de laudo precisa
+  // recolher o menu quando abre um painel lateral próprio (PACS ou Copiloto),
+  // pra sobrar espaço horizontal.
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (val: boolean) => void;
 }
 
 export const useApp = create<AppState>()(
@@ -178,6 +185,10 @@ export const useApp = create<AppState>()(
   // ── Patients Filter State ──
   patientsSearch: '',
   setPatientsSearch: (s) => set({ patientsSearch: s }),
+
+  // ── Layout ──
+  sidebarCollapsed: false,
+  setSidebarCollapsed: (val) => set({ sidebarCollapsed: val }),
     }),
     {
       name: 'laudus-storage',

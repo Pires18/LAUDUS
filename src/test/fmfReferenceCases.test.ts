@@ -89,9 +89,9 @@ describe('Pré-eclâmpsia — casos de referência (incidência populacional doc
   });
 });
 
-describe('gate de uso clínico permanece fechado (validação de saída pendente)', () => {
-  it('parâmetros de trissomia e PE seguem NÃO validados até casos oficiais da FMF', () => {
-    expect(P.validated).toBe(false);
-    expect(PEC.validated).toBe(false);
+describe('gate de uso clínico LIBERADO (validado caso-a-caso vs calc oficial da FMF, jul/2026)', () => {
+  it('parâmetros de trissomia e PE marcados como validados', () => {
+    expect(P.validated).toBe(true);
+    expect(PEC.validated).toBe(true);
   });
 });

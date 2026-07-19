@@ -83,6 +83,13 @@ export interface ExamRequest {
   examType: string;
   /** ID da máscara de laudo utilizada */
   templateId?: string;
+  /**
+   * Exame combinado: IDs ordenados das máscaras que compõem o laudo.
+   * O 1º é a máscara primária e é SEMPRE espelhado em `templateId`
+   * (retrocompatibilidade: PACS, Google Docs, retrieval e exames antigos
+   * leem só o singular). Ausente ou com 1 item = exame simples.
+   */
+  templateIds?: string[];
   /** Data/hora agendada */
   scheduledAt?: number;
   /** Nome do médico que solicitou o exame */
@@ -201,6 +208,11 @@ export interface StructuredRepeatGroup {
 export interface StructuredSection {
   id: string;
   label: string;
+  /**
+   * Exame combinado: nome do exame de origem desta seção (para compilar o
+   * formulário em blocos por máscara). Ausente em exames simples.
+   */
+  sourceExam?: string;
   fields: StructuredFieldDef[];
   /** Calculadora aplicável à seção inteira (atalho no cabeçalho) */
   calcId?: string;

@@ -10,6 +10,19 @@ import { Derivation } from '../structured/liveCompute';
 import { sectionState, itemCount, itemFieldId, normalKey } from '../structured/structuredKeys';
 import { sectionRepeatContainers, RepeatContainer } from '../structured/containers';
 
+/**
+ * Texto SEM trim, pro valor ao vivo do campo de digitação livre — fieldValueToText
+ * corta espaço nas pontas (certo pra resumo/derivação), mas usado como `value`
+ * do input controlado apagava o espaço que o médico acabava de digitar no fim
+ * da frase a cada tecla (o input re-renderiza com o valor "corrigido" antes de
+ * ele conseguir digitar o próximo caractere).
+ */
+function rawFieldText(v: StructuredFieldValue | undefined): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  return v.text || '';
+}
+
 interface StructuredTabProps {
   schema: StructuredSchema;
   values: Record<string, StructuredFieldValue>;
@@ -143,6 +156,7 @@ function FieldRenderer({
   onOpenCalc: (calcId: string, fieldId: string, label: string) => void;
 }) {
   const asText = fieldValueToText(value);
+  const rawText = rawFieldText(value);
 
   const calcButton = field.calcId && (
     <button
@@ -185,7 +199,7 @@ function FieldRenderer({
       </div>
     );
   } else {
-    control = <div className="flex-1 min-w-0"><TextLikeInput field={field} value={asText} onChange={onChange} /></div>;
+    control = <div className="flex-1 min-w-0"><TextLikeInput field={field} value={rawText} onChange={onChange} /></div>;
   }
 
   return (

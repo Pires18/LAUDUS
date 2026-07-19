@@ -106,9 +106,9 @@ describe('teto de exibição do risco "1:N" (mesma convenção da calculadora FM
   });
 });
 
-describe('trava de segurança', () => {
-  it('coeficientes não validados', () => {
-    expect(PROVISIONAL_PE_COEFFICIENTS.validated).toBe(false);
+describe('gate de validação', () => {
+  it('coeficientes validados (liberados jul/2026)', () => {
+    expect(PROVISIONAL_PE_COEFFICIENTS.validated).toBe(true);
   });
 });
 

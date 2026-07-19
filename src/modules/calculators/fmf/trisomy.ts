@@ -46,12 +46,26 @@ export interface BiochemParams {
   }>;
 }
 
+/** FHR (frequência cardíaca fetal): delta = medido − esperado(IG) em bpm,
+ *  Gaussiana por cariótipo (Kagan 2008, Hum Reprod 23:1968, Tabela IV). */
+export interface FhrParams {
+  /** FHR esperada (bpm) = a + b·d + c·d² (d = gestação em dias). */
+  expected: { a: number; b: number; c: number };
+  /** Distribuição euploide do delta (média 0). */
+  normal: { mean: number; sd: number };
+  /** Distribuições afetadas: média = intercept + slope·d (T13 depende da IG). */
+  affected: Record<Trisomy, { meanIntercept: number; meanSlope: number; sd: number }>;
+  /** Truncamento do delta a ±X bpm (evita explosão de cauda; ~3 DP euploide). */
+  deltaTruncation: number;
+}
+
 export interface TrisomyModelParams {
   validated: boolean;
   version: string;
   nt: NtMixtureParams;
   biochem: BiochemParams;
   markers: { nasalBone: MarkerLR; ductusVenosus: MarkerLR; tricuspid: MarkerLR };
+  fhr: FhrParams;
 }
 
 export interface TrisomyInputs {
@@ -64,6 +78,8 @@ export interface TrisomyInputs {
   /** MoM já ajustados por covariáveis (do laudo laboratorial). */
   freeBhcgMoM?: number;
   pappaMoM?: number;
+  /** Frequência cardíaca fetal medida (bpm). Ausente = fator não avaliado. */
+  fhrBpm?: number;
   nasalBone?: MarkerState;
   ductusVenosus?: MarkerState;
   tricuspid?: MarkerState;
@@ -73,6 +89,7 @@ export interface TrisomyInputs {
 export interface TrisomyFactorBreakdown {
   nt?: number;
   biochem?: number;
+  fhr?: number;
   nasalBone?: number;
   ductusVenosus?: number;
   tricuspid?: number;
@@ -174,6 +191,29 @@ export function markerLR(state: MarkerState | undefined, lr: MarkerLR, t: Trisom
   return state === 'abnormal' ? lr.abnormal[t] : lr.normal[t];
 }
 
+/** FHR esperada (bpm) para a gestação em dias (Kagan 2008, Hum Reprod 23:1968). */
+export function fhrExpectedBpm(gestDays: number, fhr: FhrParams): number {
+  const { a, b, c } = fhr.expected;
+  return a + b * gestDays + c * gestDays * gestDays;
+}
+
+/** LR da FHR pelo delta (medido − esperado), Gaussiana euploide vs afetada.
+ *  O delta é truncado a ±deltaTruncation para evitar a explosão de cauda da
+ *  razão de Gaussianas com DPs diferentes (a calc oficial trunca de modo
+ *  análogo). Correlações com NT/bioquímica são desprezíveis (Kagan 2008,
+ *  Tabela IV) → tratada como fator independente, como os demais marcadores. */
+export function fhrLR(fhrBpm: number, gestDays: number, fhr: FhrParams, t: Trisomy): number {
+  if (!(fhrBpm > 0)) return 1;
+  const lim = fhr.deltaTruncation;
+  const raw = fhrBpm - fhrExpectedBpm(gestDays, fhr);
+  const delta = Math.min(lim, Math.max(-lim, raw));
+  const aff = fhr.affected[t];
+  const meanAff = aff.meanIntercept + aff.meanSlope * gestDays;
+  const fN = normalPdf(delta, fhr.normal.mean, fhr.normal.sd);
+  const fA = normalPdf(delta, meanAff, aff.sd);
+  return fN > 0 ? fA / fN : 1;
+}
+
 // ───────────────────────────── Orquestração ─────────────────────────────
 
 export function computeTrisomyRisk(inputs: TrisomyInputs, params: TrisomyModelParams): TrisomyRisk {
@@ -199,6 +239,11 @@ export function computeTrisomyRisk(inputs: TrisomyInputs, params: TrisomyModelPa
       const bioLr = biochemLR(inputs.freeBhcgMoM, inputs.pappaMoM, gestDays, params.biochem, t);
       factorLRs.biochem = bioLr;
       lr *= bioLr;
+    }
+    if (inputs.fhrBpm !== undefined && inputs.fhrBpm > 0) {
+      const fhrLr = fhrLR(inputs.fhrBpm, gestDays, params.fhr, t);
+      factorLRs.fhr = fhrLr;
+      lr *= fhrLr;
     }
     if (inputs.nasalBone && inputs.nasalBone !== 'notAssessed') {
       const nbLr = markerLR(inputs.nasalBone, params.markers.nasalBone, t);

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { X, Sparkles, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 
 interface FullScreenImageViewerProps {
@@ -48,8 +48,11 @@ export function FullScreenImageViewer({
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/95 flex animate-fade-in">
-      {/* Área da imagem — encolhe quando o Copiloto está aberto ao lado. */}
-      <div
+      {/* Área da imagem — encolhe suavemente (via layout animation) quando o
+          Copiloto abre/fecha ao lado, em vez de saltar instantaneamente. */}
+      <motion.div
+        layout
+        transition={{ layout: { type: 'spring', damping: 32, stiffness: 320 } }}
         className="relative flex-1 min-w-0 flex flex-col items-center justify-center p-4 cursor-zoom-out"
         onClick={onClose}
       >
@@ -123,7 +126,7 @@ export function FullScreenImageViewer({
             FOTO {activeImageIndex + 1} DE {instances.length} (INSTÂNCIA {instanceNum})
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Copiloto lado a lado — mesmo painel do editor, sem sobrepor a imagem */}
       <AnimatePresence>{copilotSidebar}</AnimatePresence>

@@ -233,23 +233,23 @@ export const CALCULATORS: CalculatorDef[] = [
   },
   {
     id: 'fmf-trisomy-risk',
-    name: 'Risco de Cromossomopatia (EM VALIDAÇÃO)',
-    description: 'Rastreamento combinado de 1º trimestre para T21/18/13 (idade, TN, bioquímica e marcadores). Implementação auditada; validação de saída pendente.',
+    name: 'Risco de Cromossomopatia',
+    description: 'Rastreamento combinado de 1º trimestre para T21/18/13 (idade, TN, bioquímica, FHR e marcadores). Apoio à decisão; não é a calculadora oficial da FMF.',
     component: TrisomyRiskCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Implementação AUDITADA e fiel aos modelos publicados (Snijders/Nicolaides 1999; Wright 2008; Kagan et al., UOG 2008), com testes de referência ponta-a-ponta. Validação de saída contra a calculadora OFICIAL da FMF ainda pendente — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
+      text: 'Implementação AUDITADA e fiel aos modelos publicados (Snijders/Nicolaides 1999; Wright 2008; Kagan et al., UOG 2008 e Hum Reprod 2008 [FHR]), com a priori (T21/T13-18) e marcadores conferidos contra a calculadora OFICIAL da FMF (jul/2026) — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
       link: 'https://obgyn.onlinelibrary.wiley.com/doi/10.1002/uog.5331'
     }
   },
   {
     id: 'fmf-preeclampsia-risk',
-    name: 'Risco de Pré-eclâmpsia (EM VALIDAÇÃO)',
-    description: 'Rastreamento de 1º trimestre por fatores maternos + MAP, IP uterinas e PlGF (modelo de riscos competitivos). Implementação auditada; validação de saída pendente.',
+    name: 'Risco de Pré-eclâmpsia',
+    description: 'Rastreamento de 1º trimestre por fatores maternos + MAP, IP uterinas e PlGF (modelo de riscos competitivos). Apoio à decisão; não é a calculadora oficial da FMF.',
     component: PreeclampsiaRiskCalculator,
     areas: ['medicina-fetal'],
     reference: {
-      text: 'Implementação AUDITADA e fiel aos modelos publicados (fatores maternos Wright D et al., AJOG 2015; riscos competitivos O\'Gorman 2016; medianas Tan et al., UOG 2018; PSV oftálmico Gana 2022; conduta AAS por ASPRE, Rolnik et al., NEJM 2017), com testes de referência ponta-a-ponta. Validação de saída contra a calculadora OFICIAL da FMF ainda pendente — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
+      text: 'Implementação AUDITADA e fiel aos modelos publicados (fatores maternos Wright D et al., AJOG 2015; riscos competitivos O\'Gorman 2016; medianas Tan et al., UOG 2018; PSV oftálmico Gana 2022; conduta AAS por ASPRE, Rolnik et al., NEJM 2017), validada caso-a-caso contra a calculadora OFICIAL de PE da FMF (jul/2026; risco e conduta AAS idênticos) — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/25724400/'
     }
   },

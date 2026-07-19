@@ -183,7 +183,7 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
       return;
     }
     const fmt = formatOneInN;
-    const disclaimer = validated ? '' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
+    const disclaimer = validated ? 'Apoio à decisão (não é a calc oficial da FMF). ' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
     const conduta = result.aspirinRecommended
       ? 'Risco elevado de PE pré-termo — considerar AAS 150 mg/noite (11–14 até 36 sem).'
       : 'Risco não elevado para PE pré-termo pelo rastreamento.';
@@ -230,7 +230,7 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
         </div>
       </div>
 
-      {!validated && (
+      {!validated ? (
         <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-200 flex gap-3 items-start">
           <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
           <div className="text-[11px] text-amber-800 font-bold leading-relaxed">
@@ -238,6 +238,11 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
             oftálmica por Gana 2022; parte ainda aproximada. Não usar para decisão clínica. Não é a
             calculadora oficial da FMF.
           </div>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-ink-50 border border-ink-200 text-[11px] text-ink-500 font-bold leading-relaxed">
+          Apoio à decisão clínica — não é a calculadora oficial da FMF. O risco final deve ser sempre
+          integrado ao julgamento clínico.
         </div>
       )}
 

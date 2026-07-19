@@ -29,12 +29,12 @@
 //     FACTOR abaixo) usando a taxa de perda fetal, mas fixa em ~12 semanas
 //     (ponto médio da janela 11–13+6) — não varia semana a semana dentro da
 //     janela por falta de dado granular em fonte aberta.
-//   • T18/T13 como frações fixas de T21 (1/10, 1/30) e correção de IG
-//     herdada do T21: aproximação de ordem de grandeza — a perda fetal
-//     intrauterina de T18/T13 é conhecidamente MAIOR que a de T21, então o
-//     fator real para essas duas trissomias é provavelmente MAIOR que o
-//     usado aqui (nosso risco tende a ficar um pouco CONSERVADOR/subestimado
-//     para T18/T13 especificamente).
+//   • T18/T13 como frações do T21 às 12 sem: CALIBRADO (jul/2026) contra a
+//     calc oficial da FMF — combinado T13/18 ≈ 0,56× T21 (constante em
+//     25–40a). Split interno T18:T13=3:1 é aproximação clínica (a oficial só
+//     reporta o combinado). O a priori de T13/18 herda o erro do a priori de
+//     T21 (nosso ~8–17% abaixo da calc ao vivo — ver GA_PRIOR_CORRECTION e
+//     T21_TERM_RISK_BY_AGE).
 //   • LRs de marcadores "cruas" (prevalência/prevalência): o FMF usa LRs
 //     ajustadas por correlação com a TN, tipicamente um pouco MENORES.
 // ═══════════════════════════════════════════════════════════════════════
@@ -48,11 +48,39 @@ export const T21_TERM_RISK_BY_AGE: ReadonlyArray<readonly [number, number]> = [
   [40, 85], [41, 65], [42, 50], [43, 40], [44, 32], [45, 25],
 ];
 
-const T18_FRACTION_OF_T21 = 1 / 10;
-const T13_FRACTION_OF_T21 = 1 / 30;
+// Frações do T21 às ~12 SEMANAS (não a termo). A perda fetal intrauterina de
+// T18/T13 entre 12 sem e termo é MUITO maior que a da T21, então às 12 semanas
+// o risco de T13/18 fica próximo do de T21 (bem acima da razão a termo ~1/10,
+// 1/30). Calibrado contra a calculadora OFICIAL da FMF (fetalmedicine.org,
+// jul/2026): rodando o mesmo caso aos 20/25/30/35/40/45 anos, a razão
+// prob(T13/18 combinado)/prob(T21) do "Risk from History" é constante ≈0,54–0,57
+//   idade  T21     T13/18   razão
+//    20   1:980   1:1800   0,544
+//    25   1:860   1:1500   0,573
+//    30   1:570   1:1000   0,570
+//    35   1:230   1:430    0,535
+//    40   1:67    1:124    0,540
+//    45   1:17    1:31     0,548
+// Adotamos combinado = 0,56 × prob(T21), com split interno T18:T13 ≈ 3:1
+// (T18 é ~3× mais comum que T13 no 1º trimestre) → T18=0,42, T13=0,14.
+// (Antes: 1/10 e 1/30 — razões A TERMO — subestimavam T13/18 em ~5× às 12 sem.)
+const T18_FRACTION_OF_T21 = 0.42;
+const T13_FRACTION_OF_T21 = 0.14;
 
-export function t21TermRisk(ageYears: number): number {
-  const tbl = T21_TERM_RISK_BY_AGE;
+/**
+ * Risco a priori de T21 às ~12 SEMANAS por idade materna — "1 : N".
+ * CALIBRADO contra a calculadora OFICIAL da FMF (fetalmedicine.org, jul/2026):
+ * são os valores EXATOS do "Risk from History" rodando o mesmo caso (12+5) em
+ * cada idade. Substitui a antiga derivação (tabela a termo × fator de correção
+ * de IG), que ficava ~8–17% abaixo desta curva ao vivo. Pontos oficiais:
+ *   20→1:980  25→1:860  30→1:570  35→1:230  40→1:67  45→1:17
+ */
+export const T21_RISK_12WK_BY_AGE: ReadonlyArray<readonly [number, number]> = [
+  [20, 980], [25, 860], [30, 570], [35, 230], [40, 67], [45, 17],
+];
+
+/** Interpola (log-linear em "1:N") uma tabela idade→risco; extrapola achatando nas pontas. */
+function interpOneInN(tbl: ReadonlyArray<readonly [number, number]>, ageYears: number): number {
   if (ageYears <= tbl[0][0]) return 1 / tbl[0][1];
   if (ageYears >= tbl[tbl.length - 1][0]) return 1 / tbl[tbl.length - 1][1];
   for (let i = 0; i < tbl.length - 1; i++) {
@@ -68,8 +96,23 @@ export function t21TermRisk(ageYears: number): number {
   return 1 / tbl[tbl.length - 1][1];
 }
 
+/** Risco de T21 AO TERMO (Snijders) — mantido para exibição/refs do risco a termo. */
+export function t21TermRisk(ageYears: number): number {
+  return interpOneInN(T21_TERM_RISK_BY_AGE, ageYears);
+}
+
+/** Risco de T21 às ~12 SEMANAS (calibrado na calc oficial da FMF) — base do a priori. */
+export function t21Risk12wk(ageYears: number): number {
+  return interpOneInN(T21_RISK_12WK_BY_AGE, ageYears);
+}
+
 /**
- * Correção de idade gestacional do risco a priori (basal → 1º trimestre).
+ * Correção de idade gestacional do risco a priori (termo → 1º trimestre).
+ *
+ * ⚠️ REFERÊNCIA HISTÓRICA — não é mais usado pelo `ageRelatedRisk` (que agora
+ * lê `T21_RISK_12WK_BY_AGE`, calibrada direto na calc oficial). Mantido porque
+ * documenta a relação teórica termo→12 sem (e a correção de 12 sem via curva
+ * oficial é implicitamente ~1,3–1,7 dependendo da idade, não este fator fixo).
  *
  * Fonte: Nicolaides KH, "Screening for fetal aneuploidies at 11 to 13 weeks",
  * Prenat Diagn 2011;31:7-15 (revisão citando Snijders et al., UOG 1999;13:167):
@@ -88,23 +131,27 @@ export function t21TermRisk(ageYears: number): number {
  *
  * ⚠️ Fator fixo, verificado especificamente para ~12 semanas (ponto médio da
  * janela de rastreamento); aplicado uniformemente em 11–13+6 por falta de
- * curva semana-a-semana em fonte aberta. Aplicado somente ao T21 (fonte
- * específica) — T18/T13 herdam o mesmo fator por serem frações do T21 já
- * corrigido, o que tende a subestimar levemente essas duas (ver cabeçalho).
+ * curva semana-a-semana em fonte aberta. Aplicado ao T21; T18/T13 usam frações
+ * de 12 sem PRÓPRIAS (0,42 / 0,14), calibradas contra a calc oficial da FMF
+ * para refletir a perda fetal maior de T13/18 — não mais as razões a termo.
  */
 export const T21_FETAL_LOSS_RATE_12WK_TO_TERM = 0.30;
 export const EUPLOID_FETAL_LOSS_RATE_12WK_TO_TERM = 0.015;
 export const GA_PRIOR_CORRECTION_FACTOR =
   (1 - EUPLOID_FETAL_LOSS_RATE_12WK_TO_TERM) / (1 - T21_FETAL_LOSS_RATE_12WK_TO_TERM);
 
-/** Risco a priori BASAL (só idade, já corrigido para ~12 semanas) por trissomia. */
+/** Risco a priori BASAL (só idade, às ~12 semanas) por trissomia. T21 vem
+ *  direto da curva oficial da FMF (`t21Risk12wk`); T18/T13 como frações dela. */
 export function ageRelatedRisk(ageYears: number): Record<Trisomy, number> {
-  const t21 = Math.min(1, t21TermRisk(ageYears) * GA_PRIOR_CORRECTION_FACTOR);
+  const t21 = Math.min(1, t21Risk12wk(ageYears));
   return { t21, t18: t21 * T18_FRACTION_OF_T21, t13: t21 * T13_FRACTION_OF_T21 };
 }
 
 export const PROVISIONAL_TRISOMY_PARAMS: TrisomyModelParams = {
-  validated: false, // 🚫 conferir com casos-ouro antes de liberar
+  validated: true, // ✅ liberado (18/jul/2026) — a priori T21/T13-18 conferido
+  //   dígito-a-dígito contra a calc oficial da FMF (exato nas 6 idades) e todos
+  //   os marcadores (NT, bioquímica, ON/DV/TR, FHR) implementados de papers-fonte.
+  //   Gate assumido pelo usuário (apoio à decisão; NÃO é a calc oficial da FMF).
   version: 'trisomy-wright2008NT + kagan2008biochem + marcadores2009 + gaCorrection2011-v6',
 
   // ── TN: modelo de mistura (Wright 2008, Tabela 2) — EXATO ──────────────
@@ -164,5 +211,25 @@ export const PROVISIONAL_TRISOMY_PARAMS: TrisomyModelParams = {
       abnormal: { t21: 61.9, t18: 37.0, t13: 33.33 },
       normal: { t21: 0.447, t18: 0.673, t13: 0.706 },
     },
+  },
+
+  // ── FHR (frequência cardíaca fetal) — Kagan KO, Wright D, Valencia C, Maiz N,
+  //    Nicolaides KH. Hum Reprod 2008;23(9):1968-1975 (Tabela IV) — EXATO.
+  //    delta = FHR medido − esperado(IG); Gaussiana euploide vs afetada.
+  //    T21 quase não muda o risco de T21 (marcador secundário); o forte é a
+  //    TAQUICARDIA da T13 (média sobe ~16 bpm às 12 sem) e a bradicardia da T18.
+  //    Correlações com NT/bioquímica desprezíveis (Tab.IV) → fator independente.
+  //    Truncamento do delta a ±17,6 bpm (=3× DP euploide) calibrado contra a
+  //    calc oficial da FMF (casos FHR 130/175/190 aos 40a): sem ele a razão de
+  //    Gaussianas com DPs diferentes explode nas caudas (±5 DP).
+  fhr: {
+    expected: { a: 265.98, b: -1.7631, c: 0.0064445 },
+    normal: { mean: 0, sd: 5.8727 },
+    affected: {
+      t21: { meanIntercept: 1.3836, meanSlope: 0, sd: 7.2323 },
+      t18: { meanIntercept: -2.8089, meanSlope: 0, sd: 8.2202 },
+      t13: { meanIntercept: 52.43, meanSlope: -0.40476, sd: 8.1444 },
+    },
+    deltaTruncation: 17.6,
   },
 };

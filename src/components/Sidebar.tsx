@@ -7,7 +7,7 @@ import { useCollection } from '../hooks/useFirestore';
 import { useAllAccessibleClinics } from '../hooks/useAllAccessibleClinics';
 import { ExamRequest } from '../types';
 import {
-  LayoutDashboard, ClipboardList, UserCircle, FileSignature,
+  LayoutDashboard, ClipboardList, FileSignature,
   Calculator, Hospital, PanelLeftClose,
   PanelLeftOpen, ChevronDown, FilePlus, ShieldCheck, LifeBuoy,
   Users, LogOut, CalendarDays, Database, Search, X, Sun, Moon, Monitor, Plus
@@ -24,7 +24,9 @@ const items = [
   { key: 'calculators', label: 'Calculadoras', icon: Calculator, view: { name: 'calculators' as const }, roles: ['admin', 'medico'] },
   { key: 'clinics', label: 'Clínicas', icon: Hospital, view: { name: 'clinics' as const }, roles: ['admin', 'medico', 'recepcao'] },
   { key: 'dicom', label: 'PACS / DICOM', icon: Database, view: { name: 'dicom' as const }, roles: ['admin', 'medico'] },
-  { key: 'settings', label: 'Perfil', icon: UserCircle, view: { name: 'settings' as const }, roles: ['admin', 'medico', 'recepcao'] },
+  // Sem item "Perfil" aqui de propósito — o bloco de usuário no rodapé
+  // (foto/nome/e-mail, ou o avatar quando recolhido) já abre Configurações
+  // ao clicar, então um item de nav duplicado só adiciona ruído.
 ];
 
 /** Detects if viewport is tablet-sized (768–1023px) */
@@ -43,7 +45,8 @@ function useIsTablet() {
 export function Sidebar() {
   const {
     view, setView, selectedClinicId, setSelectedClinic,
-    showToast, setShowCreateExamModal, setShowSupportModal, settings, updateSettings
+    showToast, setShowCreateExamModal, setShowSupportModal, settings, updateSettings,
+    sidebarCollapsed: collapsed, setSidebarCollapsed: setCollapsed,
   } = useApp();
   const themePref = settings.theme || 'system';
   const { user, signOut } = useAuth();
@@ -52,7 +55,6 @@ export function Sidebar() {
   const isTablet = useIsTablet();
 
   // Auto-collapse on tablet, expanded on desktop
-  const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     setCollapsed(isTablet);
   }, [isTablet]);
@@ -341,37 +343,56 @@ export function Sidebar() {
       <div className="border-t border-ink-100 bg-ink-50/10">
         {collapsed && (
           <div className="flex flex-col items-center py-4 border-b border-ink-100/60 gap-3 animate-fade-in">
-            {user?.photoURL ? (
-              <img
-                src={user.photoURL}
-                onClick={() => setView({ name: 'settings' })}
-                alt="Perfil"
-                className="w-8 h-8 rounded-full border border-ink-200 object-cover cursor-pointer hover:scale-110 transition-transform shadow-sm"
-                title="Meu Perfil"
-              />
-            ) : (
-              <div
-                onClick={() => setView({ name: 'settings' })}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-black shadow-inner text-xs cursor-pointer hover:scale-110 transition-transform border-2 border-white"
-                title="Meu Perfil"
+            <div className="sidebar-nav-item relative group">
+              {user?.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  onClick={() => setView({ name: 'settings' })}
+                  alt="Perfil"
+                  className="w-8 h-8 rounded-full border border-ink-200 object-cover cursor-pointer hover:scale-110 transition-transform shadow-sm"
+                />
+              ) : (
+                <div
+                  onClick={() => setView({ name: 'settings' })}
+                  className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-black shadow-inner text-xs cursor-pointer hover:scale-110 transition-transform border-2 border-white"
+                >
+                  {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                </div>
+              )}
+              <span className="sidebar-tooltip">{user?.displayName || user?.email || 'Meu Perfil'}</span>
+            </div>
+
+            <div className="sidebar-nav-item relative group">
+              <button
+                onClick={() => updateSettings({ theme: themePref === 'light' ? 'dark' : themePref === 'dark' ? 'system' : 'light' })}
+                className="w-8 h-8 rounded-full bg-ink-50 text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-all duration-300 flex items-center justify-center border border-ink-200 shadow-sm hover:scale-110 active:scale-95"
               >
-                {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
-              </div>
-            )}
-            <button
-              onClick={() => updateSettings({ theme: themePref === 'light' ? 'dark' : themePref === 'dark' ? 'system' : 'light' })}
-              className="w-8 h-8 rounded-full bg-ink-50 text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-all duration-300 flex items-center justify-center border border-ink-200 shadow-sm hover:scale-110 active:scale-95"
-              title={`Tema: ${themePref === 'light' ? 'Claro' : themePref === 'dark' ? 'Escuro' : 'Automático'}`}
-            >
-              {themePref === 'light' ? <Sun size={13} /> : themePref === 'dark' ? <Moon size={13} /> : <Monitor size={13} />}
-            </button>
-            <button
-              onClick={signOut}
-              className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all duration-300 flex items-center justify-center border border-rose-100 shadow-sm hover:scale-110 active:scale-95"
-              title="Sair da Conta"
-            >
-              <LogOut size={13} />
-            </button>
+                {themePref === 'light' ? <Sun size={13} /> : themePref === 'dark' ? <Moon size={13} /> : <Monitor size={13} />}
+              </button>
+              <span className="sidebar-tooltip">
+                Tema: {themePref === 'light' ? 'Claro' : themePref === 'dark' ? 'Escuro' : 'Automático'}
+              </span>
+            </div>
+
+            <div className="sidebar-nav-item relative group">
+              <button
+                onClick={() => setShowSupportModal(true)}
+                className="w-8 h-8 rounded-full bg-ink-50 text-ink-600 hover:bg-ink-100 hover:text-ink-900 transition-all duration-300 flex items-center justify-center border border-ink-200 shadow-sm hover:scale-110 active:scale-95"
+              >
+                <LifeBuoy size={13} />
+              </button>
+              <span className="sidebar-tooltip">Suporte</span>
+            </div>
+
+            <div className="sidebar-nav-item relative group">
+              <button
+                onClick={signOut}
+                className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all duration-300 flex items-center justify-center border border-rose-100 shadow-sm hover:scale-110 active:scale-95"
+              >
+                <LogOut size={13} />
+              </button>
+              <span className="sidebar-tooltip">Sair da Conta</span>
+            </div>
           </div>
         )}
 

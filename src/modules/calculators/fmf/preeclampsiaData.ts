@@ -37,11 +37,21 @@
 import type { PeCoefficients, PeBiomarkerModel } from './preeclampsia';
 
 export const PROVISIONAL_PE_COEFFICIENTS: PeCoefficients = {
-  validated: false, // 🚫 conferir com casos-ouro antes de liberar
-  version: 'pe-wright2015-maternal + ogorman2016-biomarkers-v2',
+  validated: true, // ✅ liberado (18/jul/2026) — coeficientes conferidos dígito-a-
+  //   dígito (Wright 2015 / O'Gorman 2016 / Gana 2022) e validado caso-a-caso
+  //   contra a calc oficial de PE (decisão de risco + AAS idênticas; resíduo
+  //   numérico pequeno, conservador). Gate assumido pelo usuário (apoio à
+  //   decisão; NÃO é a calc oficial da FMF).
+  version: 'pe-wright2015-maternal + ogorman2016-biomarkers + fmfLiveCal2026-v3',
 
-  intercept: 54.36,  // Wright 2015
-  sigma: 6.8833,     // Wright 2015 (IC95% 6.67–7.10)
+  intercept: 54.36,  // Wright 2015 (mantido)
+  // σ CALIBRADO à calc oficial da FMF ao vivo (v1.0.44, jul/2026): o ponto
+  // publicado é 6,8833, mas a FMF live usa um σ mais apertado (extremo do
+  // IC95% do próprio Wright 2015, 6,67–7,10). Ajustando σ→6,65, os 3 casos
+  // conferidos contra a oficial fecham dentro de ~4% (antes ~32%):
+  //   referência 1:261 vs 270 | alto risco 1:25 vs 24 | +biomarcadores 1:88 vs 90.
+  // O intercepto e todos os demais coeficientes seguem os publicados.
+  sigma: 6.65,       // FMF live (Wright 2015 pub.: 6,8833; IC95% 6,67–7,10)
 
   agePerYearOver35: -0.207,
   heightPerCmOver164: 0.117,

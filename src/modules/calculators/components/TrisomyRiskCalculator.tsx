@@ -4,7 +4,7 @@ import { Dna, AlertTriangle, Info, ArrowRight } from 'lucide-react';
 import { CalculatorInput } from './CalculatorUI';
 import { classNames } from '../../../utils/format';
 import {
-  computeTrisomyRisk, ntExpectedMedianMm,
+  computeTrisomyRisk, ntExpectedMedianMm, fhrExpectedBpm,
   type MarkerState, type Trisomy, type TrisomyFactorBreakdown,
 } from '../fmf/trisomy';
 import { ageRelatedRisk, PROVISIONAL_TRISOMY_PARAMS } from '../fmf/trisomyData';
@@ -17,7 +17,7 @@ const MARKER_OPTIONS: { label: string; value: MarkerState }[] = [
 ];
 
 const FACTOR_LABEL: Record<keyof TrisomyFactorBreakdown, string> = {
-  nt: 'TN', biochem: 'Bioquímica', nasalBone: 'Osso Nasal',
+  nt: 'TN', biochem: 'Bioquímica', fhr: 'FCF', nasalBone: 'Osso Nasal',
   ductusVenosus: 'Ducto Venoso', tricuspid: 'Regurg. Tricúspide',
 };
 
@@ -129,6 +129,7 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
   const [ntMm, setNtMm] = useState(value?.ntMm || '');
   const [bhcgMoM, setBhcgMoM] = useState(value?.bhcgMoM || '');
   const [pappaMoM, setPappaMoM] = useState(value?.pappaMoM || '');
+  const [fhrBpm, setFhrBpm] = useState(value?.fhrBpm || '');
   const [nasalBone, setNasalBone] = useState<MarkerState>(value?.nasalBone || 'notAssessed');
   const [ductusVenosus, setDuctusVenosus] = useState<MarkerState>(value?.ductusVenosus || 'notAssessed');
   const [tricuspid, setTricuspid] = useState<MarkerState>(value?.tricuspid || 'notAssessed');
@@ -170,20 +171,21 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
         gestDays: gaWeeks ? Math.round(gaWeeks * 7) : undefined,
         freeBhcgMoM: bhcgMoM ? Number(bhcgMoM) : undefined,
         pappaMoM: pappaMoM ? Number(pappaMoM) : undefined,
+        fhrBpm: fhrBpm ? Number(fhrBpm) : undefined,
         nasalBone, ductusVenosus, tricuspid,
       },
       PROVISIONAL_TRISOMY_PARAMS,
     );
-  }, [hasResult, ageNum, ntMm, crlMm, gaWeeks, bhcgMoM, pappaMoM, nasalBone, ductusVenosus, tricuspid]);
+  }, [hasResult, ageNum, ntMm, crlMm, gaWeeks, bhcgMoM, pappaMoM, fhrBpm, nasalBone, ductusVenosus, tricuspid]);
 
   useEffect(() => {
     if (!risk) {
       // Preserva todos os campos digitados mesmo sem resultado (evita perda ao fechar).
-      onChange({ age, crlMm, ntMm, bhcgMoM, pappaMoM, nasalBone, ductusVenosus, tricuspid, _summary: null });
+      onChange({ age, crlMm, ntMm, bhcgMoM, pappaMoM, fhrBpm, nasalBone, ductusVenosus, tricuspid, _summary: null });
       return;
     }
     const fmt = formatOneInN;
-    const disclaimer = validated ? '' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
+    const disclaimer = validated ? 'Apoio à decisão (não é a calc oficial da FMF). ' : '⚠️ EM VALIDAÇÃO (não usar clinicamente) — ';
     const gaStr = gaWeeks ? ` IG (CCN): ${formatGa(gaWeeks)}.` : '';
     const ntStr = ntMm && ntMoM ? `, TN ${ntMm}mm (${ntMoM.toFixed(2)} MoM)` : '';
     const summary =
@@ -198,7 +200,7 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
     onChange({
       age, crlMm, igSemanas: gaWeeks ? formatGa(gaWeeks) : '',
       ntMm, ntMoM: ntMoM ? Number(ntMoM.toFixed(3)) : '',
-      bhcgMoM, pappaMoM, nasalBone, ductusVenosus, tricuspid,
+      bhcgMoM, pappaMoM, fhrBpm, nasalBone, ductusVenosus, tricuspid,
       riscoBasalT21: fmt(risk.priorOneInN.t21), riscoT21: fmt(risk.oneInN.t21),
       riscoBasalT18: fmt(risk.priorOneInN.t18), riscoT18: fmt(risk.oneInN.t18),
       riscoBasalT13: fmt(risk.priorOneInN.t13), riscoT13: fmt(risk.oneInN.t13),
@@ -219,13 +221,18 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
         </div>
       </div>
 
-      {!validated && (
+      {!validated ? (
         <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-200 flex gap-3 items-start">
           <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
           <div className="text-[11px] text-amber-800 font-bold leading-relaxed">
             EM VALIDAÇÃO — coeficientes provisórios (baseados em modelos publicados, ainda não conferidos).
             Não usar para decisão clínica. Não é a calculadora oficial da FMF.
           </div>
+        </div>
+      ) : (
+        <div className="p-3 rounded-xl bg-ink-50 border border-ink-200 text-[11px] text-ink-500 font-bold leading-relaxed">
+          Apoio à decisão clínica — não é a calculadora oficial da FMF. O risco final deve ser sempre
+          integrado ao julgamento clínico.
         </div>
       )}
 
@@ -244,6 +251,14 @@ export function TrisomyRiskCalculator({ value, onChange }: CalculatorProps) {
           </div>
           <CalculatorInput type="number" label="β-hCG livre" placeholder="MoM" value={bhcgMoM} onChange={setBhcgMoM} suffix="MoM" />
           <CalculatorInput type="number" label="PAPP-A" placeholder="MoM" value={pappaMoM} onChange={setPappaMoM} suffix="MoM" />
+          <div>
+            <CalculatorInput type="number" label="FCF (batimentos)" placeholder="bpm" value={fhrBpm} onChange={setFhrBpm} suffix="bpm" />
+            {gaWeeks && fhrBpm && (
+              <span className="text-[9px] font-black text-fuchsia-600 uppercase tracking-widest ml-1 mt-1 block">
+                Δ {(Number(fhrBpm) - fhrExpectedBpm(Math.round(gaWeeks * 7), PROVISIONAL_TRISOMY_PARAMS.fhr)).toFixed(0)} bpm vs esperado
+              </span>
+            )}
+          </div>
           {gaWeeks && (
             <div className="flex flex-col justify-end pb-1">
               <span className="text-[9px] font-black text-ink-400 uppercase tracking-widest">IG (CCN)</span>

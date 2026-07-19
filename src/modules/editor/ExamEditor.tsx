@@ -93,7 +93,7 @@ interface Props {
 
 export function ExamEditor({ examId }: Props) {
   const { isAdmin, role: currentRole } = useAdmin();
-  const { setView, settings, showToast } = useApp();
+  const { setView, settings, showToast, setSidebarCollapsed } = useApp();
   const confirm = useConfirm();
 
   // Firestore realtime listeners
@@ -320,6 +320,15 @@ export function ExamEditor({ examId }: Props) {
       setShowCopilot(false);
     }
   }, [exam?.status, showCopilot]);
+
+  // Ao entrar no editor de laudo (componente remonta a cada exame, via
+  // key={examId} no App.tsx), recolhe o menu global do LAUD.US de saída —
+  // o editor já é cheio de painéis próprios (PACS, Copiloto) e precisa do
+  // espaço horizontal. Roda uma vez por exame aberto.
+  useEffect(() => {
+    setSidebarCollapsed(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Actions Hook
   const {
@@ -558,11 +567,21 @@ export function ExamEditor({ examId }: Props) {
   const copilotSidebar = (exam && showCopilot && exam.status !== 'finalizado' && currentRole !== 'recepcao') ? (
     <motion.aside
       key="copilot-panel"
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
-      transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-      className="fixed inset-x-0 top-0 w-full h-dvh z-[300] lg:z-auto lg:static lg:w-[440px] lg:h-full lg:shrink-0 bg-white border-l border-ink-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] lg:shadow-none flex flex-col overflow-hidden"
+      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{
+        layout: { type: 'spring', damping: 32, stiffness: 320 },
+        opacity: { duration: 0.2, ease: 'easeOut' },
+      }}
+      className={classNames(
+        "fixed inset-x-0 top-0 w-full h-dvh z-[300] lg:z-auto lg:static lg:h-full lg:shrink-0 bg-white border-l border-ink-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] lg:shadow-none flex flex-col overflow-hidden",
+        // Com o visor PACS também aberto ao lado, encolhe pra sobrar espaço
+        // real pro editor (dois painéis de ~450-540px cada deixariam o
+        // editor espremido demais em notebooks de 1280-1440px).
+        showIntegratedViewer && !showFullScreenImage ? "lg:w-[360px]" : "lg:w-[440px]"
+      )}
     >
       {/* Premium Header with Mesh-style Gradient */}
       <div className="px-6 py-4 border-b border-ink-100 bg-ink-900 text-white flex items-center justify-between shrink-0 relative overflow-hidden">

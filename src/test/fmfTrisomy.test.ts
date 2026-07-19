@@ -200,9 +200,9 @@ describe('teto de exibição do risco "1:N" (mesma convenção da calculadora FM
   });
 });
 
-describe('trava de segurança', () => {
-  it('parâmetros não validados', () => {
-    expect(P.validated).toBe(false);
+describe('gate de validação', () => {
+  it('parâmetros validados (liberados jul/2026)', () => {
+    expect(P.validated).toBe(true);
   });
 });
 
