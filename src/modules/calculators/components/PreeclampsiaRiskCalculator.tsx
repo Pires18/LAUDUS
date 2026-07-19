@@ -114,7 +114,51 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
   const [plgfRaw, setPlgfRaw] = useState(value?.plgfRaw || '');
   const [psvRatioRaw, setPsvRatioRaw] = useState(value?.psvRatioRaw || '');
 
+  // Medidas detalhadas (protocolo FMF) — a MAP, a IP uterina média e a razão do
+  // PSV oftálmico são calculadas destes campos; caem de volta nos valores únicos
+  // acima (semente/entrada rápida) quando os detalhados estão vazios.
+  // PA: 2 aferições × 2 braços (sistólica/diastólica).
+  const [pa1rs, setPa1rs] = useState(value?.pa1rs || ''); const [pa1rd, setPa1rd] = useState(value?.pa1rd || '');
+  const [pa1ls, setPa1ls] = useState(value?.pa1ls || ''); const [pa1ld, setPa1ld] = useState(value?.pa1ld || '');
+  const [pa2rs, setPa2rs] = useState(value?.pa2rs || ''); const [pa2rd, setPa2rd] = useState(value?.pa2rd || '');
+  const [pa2ls, setPa2ls] = useState(value?.pa2ls || ''); const [pa2ld, setPa2ld] = useState(value?.pa2ld || '');
+  // IP das artérias uterinas: direita + esquerda → média.
+  const [utaR, setUtaR] = useState(value?.utaR || ''); const [utaL, setUtaL] = useState(value?.utaL || '');
+  // Artérias oftálmicas bilaterais: 1º e 2º pico sistólico por olho → razão média.
+  const [oftRp1, setOftRp1] = useState(value?.oftRp1 || ''); const [oftRp2, setOftRp2] = useState(value?.oftRp2 || '');
+  const [oftLp1, setOftLp1] = useState(value?.oftLp1 || ''); const [oftLp2, setOftLp2] = useState(value?.oftLp2 || '');
+
   const validated = PROVISIONAL_PE_COEFFICIENTS.validated;
+
+  // ── Cálculos automáticos das medidas detalhadas ──
+  /** MAP = média, sobre as aferições completas, de (sistólica + 2·diastólica)/3. */
+  const map4 = useMemo(() => {
+    const readings: Array<[string, string]> = [[pa1rs, pa1rd], [pa1ls, pa1ld], [pa2rs, pa2rd], [pa2ls, pa2ld]];
+    const maps = readings
+      .map(([s, d]) => { const S = Number(s), D = Number(d); return S > 0 && D > 0 && D <= S ? (S + 2 * D) / 3 : null; })
+      .filter((x): x is number => x != null);
+    return maps.length ? maps.reduce((a, b) => a + b, 0) / maps.length : null;
+  }, [pa1rs, pa1rd, pa1ls, pa1ld, pa2rs, pa2rd, pa2ls, pa2ld]);
+
+  /** IP uterina média (direita/esquerda). */
+  const utaMean = useMemo(() => {
+    const vals = [utaR, utaL].map(Number).filter((x) => x > 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }, [utaR, utaL]);
+
+  /** Razão do PSV oftálmico (2º/1º pico) média dos dois olhos (Gana 2022). */
+  const psvRatioBil = useMemo(() => {
+    const ratios: Array<[string, string]> = [[oftRp1, oftRp2], [oftLp1, oftLp2]];
+    const rs = ratios
+      .map(([p1, p2]) => { const P1 = Number(p1), P2 = Number(p2); return P1 > 0 && P2 > 0 ? P2 / P1 : null; })
+      .filter((x): x is number => x != null);
+    return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null;
+  }, [oftRp1, oftRp2, oftLp1, oftLp2]);
+
+  // Valores efetivos: detalhado (se houver) senão o único (semente/rápido).
+  const effMap = map4 != null ? map4.toFixed(1) : mapMmHg;
+  const effUta = utaMean != null ? utaMean.toFixed(2) : utaPiRaw;
+  const effPsv = psvRatioBil != null ? psvRatioBil.toFixed(3) : psvRatioRaw;
 
   const bmi = useMemo(() => {
     const w = Number(weightKg), h = Number(heightCm) / 100;
@@ -135,28 +179,28 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
     };
   }, [gaDays, weightKg, heightCm, age, racialOrigin, smoker, chronicHypertension, diabetes, conception, parity]);
 
-  const mapMoM = useMemo(() => (mapMmHg && covariates ? toMoM(Number(mapMmHg), mapMedianMmHg(covariates)) : undefined), [mapMmHg, covariates]);
-  const utaPiMoM = useMemo(() => (utaPiRaw && covariates ? toMoM(Number(utaPiRaw), utaPiMedian(covariates)) : undefined), [utaPiRaw, covariates]);
+  const mapMoM = useMemo(() => (effMap && covariates ? toMoM(Number(effMap), mapMedianMmHg(covariates)) : undefined), [effMap, covariates]);
+  const utaPiMoM = useMemo(() => (effUta && covariates ? toMoM(Number(effUta), utaPiMedian(covariates)) : undefined), [effUta, covariates]);
   const plgfMoM = useMemo(() => (plgfRaw && covariates ? toMoM(Number(plgfRaw), plgfMedian(covariates, analyzer)) : undefined), [plgfRaw, covariates, analyzer]);
   // PSV ratio da artéria oftálmica (Gana 2022) — delta bruto (medido −
   // esperado), NÃO é MoM. Ver comentário em `preeclampsia.ts`.
   const psvRatioDelta = useMemo(
-    () => (psvRatioRaw && covariates ? toDelta(Number(psvRatioRaw), psvRatioExpected(covariates)) : undefined),
-    [psvRatioRaw, covariates],
+    () => (effPsv && covariates ? toDelta(Number(effPsv), psvRatioExpected(covariates)) : undefined),
+    [effPsv, covariates],
   );
 
   const qcWarnings = useMemo(() => {
     const w: string[] = [];
-    if ((mapMmHg || utaPiRaw || plgfRaw || psvRatioRaw) && !covariates) w.push('Informe idade, peso, altura e IG para calcular o MoM/delta dos biomarcadores.');
+    if ((effMap || effUta || plgfRaw || effPsv) && !covariates) w.push('Informe idade, peso, altura e IG para calcular o MoM/delta dos biomarcadores.');
     if (!momPlausible(mapMoM)) w.push('MAP em MoM fora da faixa plausível (0,2–5,0).');
     if (!momPlausible(utaPiMoM)) w.push('IP uterinas em MoM fora da faixa plausível (0,2–5,0).');
     if (!momPlausible(plgfMoM)) w.push('PlGF em MoM fora da faixa plausível (0,2–5,0).');
-    if (psvRatioRaw && !psvRatioPlausible(Number(psvRatioRaw))) w.push('PSV ratio (artéria oftálmica) fora da faixa plausível (0,2–2,0).');
+    if (effPsv && !psvRatioPlausible(Number(effPsv))) w.push('PSV ratio (artéria oftálmica) fora da faixa plausível (0,2–2,0).');
     if (parity === 'parousPE' && previousPeGaWeeks && (Number(previousPeGaWeeks) < 20 || Number(previousPeGaWeeks) > 42)) {
       w.push('IG do parto na PE prévia fora de 20–42 semanas.');
     }
     return w;
-  }, [mapMmHg, utaPiRaw, plgfRaw, psvRatioRaw, covariates, mapMoM, utaPiMoM, plgfMoM, parity, previousPeGaWeeks]);
+  }, [effMap, effUta, plgfRaw, effPsv, covariates, mapMoM, utaPiMoM, plgfMoM, parity, previousPeGaWeeks]);
 
   const canCompute = !!(Number(age) && Number(weightKg) && Number(heightCm));
 
@@ -282,34 +326,80 @@ export function PreeclampsiaRiskCalculator({ value, onChange }: CalculatorProps)
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <label className="text-[10px] font-black text-ink-400 uppercase tracking-widest ml-1">Biomarcadores (opcional)</label>
-        <CategorySelector label="Analisador (para o MoM do PlGF)" options={ANALYZER_OPTIONS} current={analyzer} onSelect={(v: Analyzer) => setAnalyzer(v)} />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div>
-            <CalculatorInput type="number" label="MAP" placeholder="mmHg" value={mapMmHg} onChange={setMapMmHg} suffix="mmHg" />
-            {mapMoM !== undefined && <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest ml-1 mt-1 block">= {mapMoM.toFixed(2)} MoM</span>}
+
+        {/* Pressão arterial — 4 medidas (2 aferições × 2 braços) → MAP automática */}
+        <div className="space-y-1.5 p-3 rounded-2xl bg-rose-50/40 border border-rose-100">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">Pressão arterial — 4 medidas (protocolo FMF)</span>
+            {map4 != null && (
+              <span className="text-[10px] font-black text-rose-700">MAP {map4.toFixed(1)} mmHg{mapMoM !== undefined ? ` · ${mapMoM.toFixed(2)} MoM` : ''}</span>
+            )}
           </div>
-          <div>
-            <CalculatorInput type="number" label="IP Uterinas" placeholder="valor" value={utaPiRaw} onChange={setUtaPiRaw} suffix="PI" />
-            {utaPiMoM !== undefined && <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest ml-1 mt-1 block">= {utaPiMoM.toFixed(2)} MoM</span>}
+          <div className="grid grid-cols-[auto_1fr_1fr_1fr_1fr] gap-1.5 items-center">
+            <span />
+            <span className="text-[8px] font-black text-ink-400 uppercase text-center">Sist. D</span>
+            <span className="text-[8px] font-black text-ink-400 uppercase text-center">Diast. D</span>
+            <span className="text-[8px] font-black text-ink-400 uppercase text-center">Sist. E</span>
+            <span className="text-[8px] font-black text-ink-400 uppercase text-center">Diast. E</span>
+            <span className="text-[9px] font-black text-ink-500">1ª</span>
+            <CalculatorInput type="number" placeholder="—" value={pa1rs} onChange={setPa1rs} />
+            <CalculatorInput type="number" placeholder="—" value={pa1rd} onChange={setPa1rd} />
+            <CalculatorInput type="number" placeholder="—" value={pa1ls} onChange={setPa1ls} />
+            <CalculatorInput type="number" placeholder="—" value={pa1ld} onChange={setPa1ld} />
+            <span className="text-[9px] font-black text-ink-500">2ª</span>
+            <CalculatorInput type="number" placeholder="—" value={pa2rs} onChange={setPa2rs} />
+            <CalculatorInput type="number" placeholder="—" value={pa2rd} onChange={setPa2rd} />
+            <CalculatorInput type="number" placeholder="—" value={pa2ls} onChange={setPa2ls} />
+            <CalculatorInput type="number" placeholder="—" value={pa2ld} onChange={setPa2ld} />
           </div>
+          <p className="text-[8px] text-ink-400 font-medium">MAP = média de (sistólica + 2·diastólica)/3 das aferições completas. Ou informe a MAP direta abaixo.</p>
+          <CalculatorInput type="number" label="MAP direta (alternativa)" placeholder="mmHg" value={mapMmHg} onChange={setMapMmHg} suffix="mmHg" />
+        </div>
+
+        {/* IP das artérias uterinas — bilateral → média */}
+        <div className="space-y-1.5 p-3 rounded-2xl bg-rose-50/40 border border-rose-100">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">IP artérias uterinas (bilateral)</span>
+            {utaMean != null && (
+              <span className="text-[10px] font-black text-rose-700">média {utaMean.toFixed(2)}{utaPiMoM !== undefined ? ` · ${utaPiMoM.toFixed(2)} MoM` : ''}</span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CalculatorInput type="number" label="IP uterina D" placeholder="valor" value={utaR} onChange={setUtaR} suffix="PI" />
+            <CalculatorInput type="number" label="IP uterina E" placeholder="valor" value={utaL} onChange={setUtaL} suffix="PI" />
+          </div>
+        </div>
+
+        {/* Artérias oftálmicas — bilateral, 1º/2º pico por olho → razão média */}
+        <div className="space-y-1.5 p-3 rounded-2xl bg-rose-50/40 border border-rose-100">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-black text-ink-500 uppercase tracking-widest">Artérias oftálmicas (bilateral) — PSV ratio</span>
+            {psvRatioBil != null && (
+              <span className="text-[10px] font-black text-rose-700">razão {psvRatioBil.toFixed(2)}{psvRatioDelta !== undefined ? ` · Δ ${psvRatioDelta >= 0 ? '+' : ''}${psvRatioDelta.toFixed(3)}` : ''}</span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CalculatorInput type="number" label="P1 (1º pico) D" placeholder="cm/s" value={oftRp1} onChange={setOftRp1} suffix="cm/s" />
+            <CalculatorInput type="number" label="P2 (2º pico) D" placeholder="cm/s" value={oftRp2} onChange={setOftRp2} suffix="cm/s" />
+            <CalculatorInput type="number" label="P1 (1º pico) E" placeholder="cm/s" value={oftLp1} onChange={setOftLp1} suffix="cm/s" />
+            <CalculatorInput type="number" label="P2 (2º pico) E" placeholder="cm/s" value={oftLp2} onChange={setOftLp2} suffix="cm/s" />
+          </div>
+          <p className="text-[8px] text-ink-400 font-medium">Razão = média de (2º/1º pico) dos dois olhos (Gana et al., UOG 2022;59:731). Ou informe a razão direta:</p>
+          <CalculatorInput type="number" label="PSV ratio direto (alternativa)" placeholder="razão" value={psvRatioRaw} onChange={setPsvRatioRaw} suffix="razão" />
+        </div>
+
+        {/* PlGF (bioquímica) */}
+        <div className="space-y-1.5">
+          <CategorySelector label="Analisador (para o MoM do PlGF)" options={ANALYZER_OPTIONS} current={analyzer} onSelect={(v: Analyzer) => setAnalyzer(v)} />
           <div>
             <CalculatorInput type="number" label="PlGF" placeholder="pg/mL" value={plgfRaw} onChange={setPlgfRaw} suffix="pg/mL" />
             {plgfMoM !== undefined && <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest ml-1 mt-1 block">= {plgfMoM.toFixed(2)} MoM</span>}
           </div>
-          <div>
-            <CalculatorInput type="number" label="PSV Ratio (A. Oftálmica)" placeholder="razão" value={psvRatioRaw} onChange={setPsvRatioRaw} suffix="razão" />
-            {psvRatioDelta !== undefined && (
-              <span className="text-[9px] font-black text-rose-600 uppercase tracking-widest ml-1 mt-1 block">
-                delta {psvRatioDelta >= 0 ? '+' : ''}{psvRatioDelta.toFixed(3)}
-              </span>
-            )}
-          </div>
         </div>
         <p className="text-[9px] text-ink-400 font-medium ml-1">
-          MoM calculado automaticamente pela IG e covariáveis (medianas Tan 2018). Insira MAP em mmHg, IP uterinas (média) e PlGF em pg/mL do analisador selecionado.
-          PSV ratio: média de 4 medidas (olhos E/D, 2× cada) da razão do 2º/1º pico sistólico da artéria oftálmica (Gana et al., UOG 2022;59:731) — o campo converte para o delta esperado automaticamente.
+          MoM automático pela IG e covariáveis (medianas Tan 2018). As medidas detalhadas calculam MAP, IP uterina média e razão do PSV oftálmico; se preenchidas, têm prioridade sobre os campos diretos.
         </p>
       </div>
 

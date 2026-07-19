@@ -9,7 +9,7 @@ import {
   Save, User, Sliders, ShieldCheck,
   Signature, Building2, Bell, Mail,
   RotateCcw, Clock, Info, Upload, Loader2,
-  Printer, Receipt, Sparkles, ListChecks, ClipboardList, Wand2, Award
+  Printer, Receipt, Sparkles, ListChecks, ClipboardList, Wand2, Award, Lock
 } from 'lucide-react';
 import { classNames } from '../../utils/format';
 import { AuditDashboard } from './AuditDashboard';
@@ -20,6 +20,7 @@ import { updateProfile } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { storage, firestore, auth } from '../../lib/firebase';
 import { addAuditLog, getActivePacsUrl, getProxyEndpoint } from '../../store/db';
+import { mapAuthError } from '../../lib/authErrors';
 
 type SettingsTab = 'perfil' | 'laudia' | 'pdf' | 'audit' | 'assinatura';
 
@@ -63,16 +64,44 @@ function getFontFamilyFallback(family?: string) {
 
 export function Settings() {
   const { settings, updateSettings, showToast, view } = useApp();
-  const { user } = useAuth();
+  const { user, setPassword: linkAccountPassword } = useAuth();
   const { hasPacs } = useSubscription();
   const { data: clinics } = useCollection<Clinic>('clinics');
-  
+
   const [draft, setDraft] = useState(settings);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil');
 
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+
+  // ── Definir senha (contas que hoje só entram via Google) ──
+  const hasPasswordProvider = user?.providerData?.some((p) => p.providerId === 'password') ?? false;
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+
+  async function handleSetPassword() {
+    if (newPassword.length < 6) {
+      showToast('A senha precisa ter pelo menos 6 caracteres.', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('As senhas não coincidem.', 'error');
+      return;
+    }
+    setIsSettingPassword(true);
+    try {
+      await linkAccountPassword(newPassword);
+      showToast('Senha definida! Agora você também pode entrar com e-mail e senha.', 'success');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      showToast(mapAuthError(err, 'Erro ao definir a senha. Tente novamente.') || 'Erro ao definir a senha.', 'error');
+    } finally {
+      setIsSettingPassword(false);
+    }
+  }
 
 
 
@@ -289,6 +318,59 @@ export function Settings() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Senha de acesso — relevante pra contas que hoje só entram
+                    via Google e querem também poder entrar com e-mail/senha. */}
+                <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5">
+                  <h3 className="text-sm font-black text-ink-900 uppercase tracking-widest mb-1 flex items-center gap-2">
+                    <Lock size={14} className="text-ink-500" />
+                    Senha de Acesso
+                  </h3>
+                  {hasPasswordProvider ? (
+                    <p className="text-xs text-ink-500 leading-relaxed">
+                      Sua conta já tem uma senha definida, além do login com Google. Pra trocar, use "Esqueci minha senha" na tela de login.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-ink-500 leading-relaxed mb-4">
+                        Hoje você entra só com Google. Defina uma senha pra também poder entrar com e-mail e senha.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="label">Nova Senha</label>
+                          <input
+                            type="password"
+                            className="input h-12"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Mínimo 6 caracteres"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <div>
+                          <label className="label">Confirmar Senha</label>
+                          <input
+                            type="password"
+                            className="input h-12"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repita a senha"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSetPassword}
+                        disabled={isSettingPassword || !newPassword || !confirmPassword}
+                        className="mt-4 h-11 px-5 rounded-xl bg-ink-900 text-white text-xs font-black uppercase tracking-widest hover:bg-ink-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                      >
+                        {isSettingPassword ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                        Definir Senha
+                      </button>
+                    </>
+                  )}
                 </div>
 
               </div>

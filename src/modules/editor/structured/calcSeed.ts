@@ -241,6 +241,9 @@ export function seedForCalculator(
       age: numStr(values, 'mae_idade'),
       crlMm: numStr(values, 'ccn'),
       ntMm: numStr(values, 'nt'),
+      // FCF (batimentos) — marcador de FHR do rastreio combinado (Kagan 2008):
+      // taquicardia da T13, bradicardia da T18. Vem da vitalidade do exame.
+      fhrBpm: numStr(values, 'bcf'),
       pappaMoM: numStr(values, 'pappa_mom'),
       bhcgMoM: numStr(values, 'bhcg_mom'),
       // Osso nasal ausente/hipoplásico, onda A do DV ausente/reversa e

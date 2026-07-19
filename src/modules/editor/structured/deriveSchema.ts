@@ -7,6 +7,7 @@ import {
 } from '../../../types';
 import { enrichSections } from './fieldLibrary';
 import { findStandardSchema } from './standardSchemas';
+import { mergeStructuredSchemas, MergedStructuredSchema } from './mergeSchemas';
 import { sectionState, itemCount, itemFieldId } from './structuredKeys';
 import { sectionRepeatContainers } from './containers';
 
@@ -112,6 +113,33 @@ export function deriveStructuredSchema(
     ? parseMaskSections(template.analysisTemplate)
     : [];
   return { area, examName: template?.name, sections: enrichSections(area, parsed) };
+}
+
+/**
+ * Deriva o esquema estruturado de um exame COMBINADO (N máscaras): cada
+ * sub-esquema é derivado com a ÁREA DA PRÓPRIA MÁSCARA (crítico para o lookup
+ * de modelos padrão quando as máscaras são de áreas diferentes, ex.: Abdome
+ * Total [medicina-interna] + Pélvica [ginecologia]) e depois mesclado com a
+ * política de colisão de `mergeStructuredSchemas`. Com 0–1 máscara, delega
+ * para `deriveStructuredSchema` com a semântica atual (área do exame primeiro)
+ * — comportamento idêntico ao de exames simples.
+ */
+export function deriveCombinedStructuredSchema(
+  templates: Array<ReportTemplate | null | undefined>,
+  fallbackArea: string
+): MergedStructuredSchema {
+  const valid = templates.filter((t): t is ReportTemplate => Boolean(t));
+  if (valid.length <= 1) {
+    const t = valid[0] ?? null;
+    const schema = deriveStructuredSchema(t, fallbackArea || t?.area || '');
+    return { ...schema, perSource: [schema.sections] };
+  }
+  return mergeStructuredSchemas(
+    valid.map((t) => ({
+      schema: deriveStructuredSchema(t, t.area || fallbackArea),
+      examName: t.name,
+    }))
+  );
 }
 
 /** Texto compilável de um valor de campo (string ou objeto calc/triplet). */

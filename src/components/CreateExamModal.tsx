@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { classNames, parseDateInputValue, toDateInputValue } from '../utils/format';
 import { generateNumericId } from '../store/db';
-import { getInitialReportContent } from '../modules/templates/utils';
+import { getCombinedInitialReportContent, getCombinedTitle, combinedExamType } from '../modules/templates/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AreaIcon } from './AreaIcon';
 import { syncExamToOrthancWorklist, pickDefaultDicomDevice, getDevicesForClinic } from '../utils/dicom';
@@ -39,6 +39,10 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [selectedClinic, setSelectedClinic] = useState<Clinic | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
+  // Laudo combinado: 2ª máscara opcional e modo do passo 2 ("escolhendo o 2º exame").
+  const [secondaryTemplate, setSecondaryTemplate] = useState<ReportTemplate | null>(null);
+  const [pickingSecondary, setPickingSecondary] = useState(false);
+  const combinedEnabled = settings.combinedExamsEnabled !== false;
 
   const [hoveredTemplate, setHoveredTemplate] = useState<ReportTemplate | null>(null);
   const [anamnesis, setAnamnesis] = useState('');
@@ -120,17 +124,24 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
 
   const filteredTemplates = useMemo(() => {
     let list = templates;
+    // Modo "2º exame do laudo combinado": exclui a máscara já escolhida e as
+    // áreas fora do escopo v1 (fetal e procedimentos têm pipelines especiais).
+    if (pickingSecondary) {
+      list = list.filter(
+        (t) => t.id !== selectedTemplate?.id && t.area !== 'medicina-fetal' && t.area !== 'procedimentos'
+      );
+    }
     if (selectedArea && selectedArea !== 'todas') {
       list = list.filter(t => t.area === selectedArea);
     }
     if (templateSearch) {
       const s = templateSearch.toLowerCase();
-      list = list.filter(t => 
+      list = list.filter(t =>
         t.name.toLowerCase().includes(s)
       );
     }
     return [...list].sort((a, b) => a.name.localeCompare(b.name));
-  }, [templates, templateSearch, selectedArea]);
+  }, [templates, templateSearch, selectedArea, pickingSecondary, selectedTemplate?.id]);
 
   const handleQuickPatient = async () => {
     if (!newPatientName.trim()) return;
@@ -159,22 +170,26 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
     }
   };
 
-  const handleCreateDirect = async (template: ReportTemplate) => {
-    if (!selectedPatient) return;
+  const handleCreateDirect = async (tpls: ReportTemplate[]) => {
+    const template = tpls[0];
+    if (!selectedPatient || !template) return;
     setLoading(true);
     try {
       const createdNow = Date.now();
+      const examType = combinedExamType(tpls);
+      const consentTerm = tpls.map((t) => t.consentTemplate).filter(Boolean).join('\n\n');
       const examData: Partial<ExamRequest> = {
         friendlyId: generateNumericId(),
         patientId: selectedPatient.id,
         clinicId: selectedPatient.id === 'ANONIMO' ? '' : (selectedClinic?.id || clinics[0]?.id),
         area: template.area,
-        examType: template.name,
+        examType,
         templateId: template.id,
+        templateIds: tpls.map((t) => t.id),
         status: 'pendente',
-        reportContent: getInitialReportContent(template),
+        reportContent: getCombinedInitialReportContent(tpls),
         anamnesis: anamnesis.trim() || undefined,
-        consentTerm: template.consentTemplate || undefined,
+        consentTerm: consentTerm || undefined,
         consentAccepted: false,
         clinicalIndication: anamnesis.trim() || undefined,
         dicomDeviceId: selectedDeviceId || undefined,
@@ -190,7 +205,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
       // Sincronização local com a Worklist do Orthanc
       const { success, primarySuccess, backupSuccess, error } = await syncExamToOrthancWorklist(
         id,
-        template.name,
+        examType,
         { id: selectedPatient.id, name: selectedPatient.name, birthDate: selectedPatient.birthDate, gender: selectedPatient.gender },
         settings,
         selectedDeviceId,
@@ -287,14 +302,13 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                return (
                  <div key={s.step} className="flex items-center gap-2.5">
                     <div className="flex items-center gap-2 relative">
-                      <motion.div 
+                      <motion.div
                         initial={false}
-                        animate={{ 
-                          backgroundColor: isActive || isPast ? 'rgb(79, 70, 229)' : 'rgb(241, 245, 249)',
-                          color: isActive || isPast ? 'white' : 'rgb(148, 163, 184)',
-                          scale: isActive ? 1.1 : 1
-                        }}
-                        className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black shadow-sm z-10"
+                        animate={{ scale: isActive ? 1.1 : 1 }}
+                        className={classNames(
+                          "w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black shadow-sm z-10 transition-colors duration-300",
+                          isActive || isPast ? "bg-indigo-600 text-white" : "bg-ink-100 text-ink-400"
+                        )}
                       >
                         {s.step}
                       </motion.div>
@@ -581,6 +595,14 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                 exit={{ opacity: 0, x: -15 }}
                 className="space-y-4"
               >
+                 {pickingSecondary && selectedTemplate && (
+                   <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-50 border border-brand-200 text-brand-800">
+                     <Sparkles size={13} className="shrink-0" />
+                     <p className="text-[10px] font-black uppercase tracking-wider">
+                       Escolhendo o 2º exame do laudo combinado (1º: {selectedTemplate.name})
+                     </p>
+                   </div>
+                 )}
                  {/* Specialty Pills (Horizontal Compact Row) */}
                  <div className="space-y-2 shrink-0">
                    <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest ml-1 block">Filtrar Especialidade</label>
@@ -639,7 +661,13 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                           key={t.id}
                           onMouseEnter={() => setHoveredTemplate(t)}
                           onClick={() => {
-                            setSelectedTemplate(t);
+                            if (pickingSecondary) {
+                              setSecondaryTemplate(t);
+                              setPickingSecondary(false);
+                            } else {
+                              setSelectedTemplate(t);
+                              setSecondaryTemplate(null);
+                            }
                             setStep(3);
                             setTemplateSearch('');
                           }}
@@ -689,10 +717,44 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
               >
                 <div className="space-y-1 bg-ink-50 p-5 rounded-[1.5rem] border border-ink-200 shadow-sm relative overflow-hidden shrink-0">
                   <p className="text-[9px] font-black text-ink-500 uppercase tracking-widest leading-none mb-2 flex items-center gap-1.5 relative z-10">
-                    <Sparkles size={12} /> Procedimento Selecionado
+                    <Sparkles size={12} /> {secondaryTemplate ? 'Procedimentos Selecionados (Laudo Combinado)' : 'Procedimento Selecionado'}
                   </p>
                   <h4 className="text-sm font-black text-ink-900 truncate leading-tight relative z-10">{selectedTemplate.name}</h4>
                   <p className="text-[9px] text-ink-400 font-black uppercase tracking-wider mt-1 relative z-10">{selectedTemplate.area}</p>
+
+                  {secondaryTemplate ? (
+                    <div className="mt-3 pt-3 border-t border-ink-200 relative z-10 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-black text-ink-900 truncate leading-tight">{secondaryTemplate.name}</h4>
+                        <p className="text-[9px] text-ink-400 font-black uppercase tracking-wider mt-1">{secondaryTemplate.area}</p>
+                      </div>
+                      <button
+                        onClick={() => setSecondaryTemplate(null)}
+                        title="Remover o 2º exame"
+                        className="p-1.5 rounded-lg text-ink-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : combinedEnabled && (
+                    <button
+                      onClick={() => { setPickingSecondary(true); setTemplateSearch(''); setStep(2); }}
+                      className="mt-3 relative z-10 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-brand-600 hover:text-brand-800 transition-colors"
+                    >
+                      + Adicionar exame (laudo combinado)
+                    </button>
+                  )}
+
+                  {secondaryTemplate && (
+                    <div className="mt-3 relative z-10 space-y-1.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 border border-amber-200 text-amber-800 text-[9px] font-black uppercase tracking-widest">
+                        Consome 2 laudos da sua cota
+                      </span>
+                      <p className="text-[10px] text-ink-500 font-semibold leading-snug">
+                        Título do laudo: {getCombinedTitle([selectedTemplate, secondaryTemplate])}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -748,6 +810,11 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
                onClick={() => {
                  if (step === 3) {
                    setStep(2);
+                 } else if (pickingSecondary) {
+                   // Cancela a escolha do 2º exame e volta ao resumo.
+                   setPickingSecondary(false);
+                   setTemplateSearch('');
+                   setStep(3);
                  } else {
                    setStep(1);
                    setPatientSearch('');
@@ -782,7 +849,7 @@ export function CreateExamModal({ onClose }: CreateExamModalProps) {
              </button>
            ) : step === 3 ? (
              <button 
-               onClick={() => handleCreateDirect(selectedTemplate!)}
+               onClick={() => handleCreateDirect(secondaryTemplate ? [selectedTemplate!, secondaryTemplate] : [selectedTemplate!])}
                disabled={loading}
                className="flex items-center gap-2 px-6 h-12 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-bold text-[10px] uppercase tracking-widest hover:shadow-md disabled:opacity-50 transition-all active:scale-95 group shadow-sm"
              >

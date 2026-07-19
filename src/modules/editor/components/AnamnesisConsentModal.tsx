@@ -7,7 +7,7 @@ import { useCollection } from '../../../hooks/useFirestore';
 import { useApp } from '../../../store/app';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { useAdmin } from '../../../hooks/useAdmin';
-import { getInitialReportContent } from '../../templates/utils';
+import { getCombinedInitialReportContent, combinedExamType, examTemplateIds } from '../../templates/utils';
 import { PatientForm } from '../../patients/PatientForm';
 import { toDateInputValue, parseDateInputValue } from '../../../utils/format';
 
@@ -52,6 +52,8 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
   const [requestingPhysician, setRequestingPhysician] = useState(exam.requestingPhysician || '');
   const [clinicId, setClinicId] = useState(exam.clinicId || '');
   const [examTemplateId, setExamTemplateId] = useState(exam.templateId || '');
+  // Exame combinado: 2ª máscara ('' = exame simples).
+  const [secondaryTemplateId, setSecondaryTemplateId] = useState(exam.templateIds?.[1] || '');
   const [examDateStr, setExamDateStr] = useState(toDateInputValue(exam.examDate ?? exam.createdAt));
   const [loadingMetadata, setLoadingMetadata] = useState(false);
 
@@ -59,8 +61,56 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
     setRequestingPhysician(exam.requestingPhysician || '');
     setClinicId(exam.clinicId || '');
     setExamTemplateId(exam.templateId || '');
+    setSecondaryTemplateId(exam.templateIds?.[1] || '');
     setExamDateStr(toDateInputValue(exam.examDate ?? exam.createdAt));
   }, [patient, exam]);
+
+  /**
+   * Aplica a troca de máscara(s) do exame — simples ou combinada. Destrutivo:
+   * reinicia laudo, chat, anamnese, formulário estruturado e termo (o fluxo
+   * antigo de troca única não limpava structuredValue — bug latente corrigido
+   * aqui para os dois caminhos).
+   */
+  const applyMaskChange = async (primaryId: string, secondaryId: string) => {
+    const primary = allTemplates.find((t) => t.id === primaryId);
+    if (!primary) return;
+    const secondary = secondaryId ? allTemplates.find((t) => t.id === secondaryId) : null;
+    const tplList = secondary ? [primary, secondary] : [primary];
+    const ids = tplList.map((t) => t.id);
+    if (ids.join(',') === examTemplateIds(exam).join(',')) return;
+
+    const ok = await confirm({
+      title: secondary ? 'Alterar Combinação de Exames' : 'Alterar Máscara',
+      message: 'CUIDADO: Alterar o exame reiniciará o laudo para o padrão da(s) nova(s) máscara(s) e apagará as informações atuais, o formulário estruturado e o histórico do copiloto. Deseja prosseguir?',
+      confirmLabel: 'Prosseguir',
+      variant: 'danger',
+    });
+    if (!ok) {
+      setExamTemplateId(exam.templateId || '');
+      setSecondaryTemplateId(exam.templateIds?.[1] || '');
+      return;
+    }
+    try {
+      setLoadingMetadata(true);
+      await updateItem('exams', exam.id, {
+        templateId: primary.id,
+        templateIds: ids,
+        examType: combinedExamType(tplList),
+        area: primary.area,
+        reportContent: getCombinedInitialReportContent(tplList),
+        chatHistory: [],
+        anamnesis: '',
+        structuredValue: {},
+        consentTerm: tplList.map((t) => t.consentTemplate).filter(Boolean).join('\n\n') || '',
+      });
+      showToast('Exame alterado e reiniciado com sucesso!', 'success');
+      onClose();
+    } catch (err) {
+      showToast('Erro ao alterar exame.', 'error');
+    } finally {
+      setLoadingMetadata(false);
+    }
+  };
 
   // Sync with exam data updates
   useEffect(() => {
@@ -358,42 +408,14 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
 
               <div className="flex flex-col space-y-1.5 pt-2 border-t border-ink-100">
                 <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1">Tipo de Exame (Máscara)</label>
-                <select 
-                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60" 
-                  value={examTemplateId} 
-                  onChange={async (e) => {
+                <select
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60"
+                  value={examTemplateId}
+                  onChange={(e) => {
                     const newTemplateId = e.target.value;
-                    const newTemplate = allTemplates.find(t => t.id === newTemplateId);
-                    if (newTemplateId !== exam.templateId && newTemplate) {
-                      const ok = await confirm({
-                        title: 'Alterar Máscara',
-                        message: 'CUIDADO: Alterar o exame reiniciará o laudo para o padrão da nova máscara e apagará as informações atuais e o histórico do copiloto. Deseja prosseguir?',
-                        confirmLabel: 'Prosseguir',
-                        variant: 'danger',
-                      });
-                      if (ok) {
-                        try {
-                          setLoadingMetadata(true);
-                          await updateItem('exams', exam.id, {
-                            templateId: newTemplate.id,
-                            examType: newTemplate.name,
-                            area: newTemplate.area,
-                            reportContent: getInitialReportContent(newTemplate),
-                            chatHistory: [],
-                            anamnesis: '',
-                            consentTerm: newTemplate.consentTemplate || ''
-                          });
-                          showToast('Exame alterado e reiniciado com sucesso!', 'success');
-                          onClose();
-                        } catch (err) {
-                          showToast('Erro ao alterar exame.', 'error');
-                        } finally {
-                          setLoadingMetadata(false);
-                        }
-                      } else {
-                        setExamTemplateId(exam.templateId || '');
-                      }
-                    }
+                    if (!newTemplateId) return;
+                    setExamTemplateId(newTemplateId);
+                    applyMaskChange(newTemplateId, secondaryTemplateId);
                   }}
                   disabled={!isEditable}
                 >
@@ -402,8 +424,28 @@ export function AnamnesisConsentModal({ open, onClose, exam, patient, template: 
                     <option key={t.id} value={t.id}>{t.name} ({t.area})</option>
                   ))}
                 </select>
+                <label className="text-[10px] font-black uppercase text-ink-400 mb-1 ml-1 mt-2">2º Exame (Laudo Combinado)</label>
+                <select
+                  className="h-10 px-3 bg-ink-50 border border-ink-200 focus:border-brand-500 focus:bg-white rounded-xl text-xs font-semibold outline-none transition-all text-ink-850 shadow-sm disabled:opacity-60"
+                  value={secondaryTemplateId}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setSecondaryTemplateId(newId);
+                    applyMaskChange(examTemplateId, newId);
+                  }}
+                  disabled={!isEditable}
+                >
+                  <option value="">— nenhum (exame simples) —</option>
+                  {allTemplates
+                    .filter((t) => t.id !== examTemplateId && t.area !== 'medicina-fetal' && t.area !== 'procedimentos')
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.area})</option>
+                    ))}
+                </select>
                 <p className="text-[9px] text-amber-600 mt-1 ml-1 font-bold">
-                  * A troca de exame apaga o texto atual do laudo e o histórico do copiloto.
+                  * A troca de exame apaga o texto atual do laudo, o formulário estruturado e o histórico do copiloto.
+                  {secondaryTemplateId && ' Laudo combinado consome 2 laudos da cota por geração.'}
                 </p>
               </div>
             </div>

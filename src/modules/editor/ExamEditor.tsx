@@ -40,7 +40,7 @@ import { PromptPreviewModal } from './components/PromptPreviewModal';
 import { ExternalStudyUploadModal } from './components/ExternalStudyUploadModal';
 import { EditorHeader } from './components/EditorHeader';
 import { EditorToolbar } from './components/EditorToolbar';
-import { getInitialReportContent, sectionTogglesFromSettings } from '../templates/utils';
+import { getCombinedInitialReportContent, examTemplateIds, sectionTogglesFromSettings } from '../templates/utils';
 import { useConfirm } from '../../hooks/useConfirm';
 import { ExamHistoryModal } from './components/ExamHistoryModal';
 import { AnamnesisConsentModal } from './components/AnamnesisConsentModal';
@@ -102,7 +102,10 @@ export function ExamEditor({ examId }: Props) {
   const patient = exam?.patientId === 'ANONIMO' 
     ? ({ id: 'ANONIMO', name: 'Laudo Avulso / Sem Identificação', gender: 'O', createdAt: Date.now(), updatedAt: Date.now() } as Patient)
     : dbPatient;
-  const [template, setTemplate] = useState<ReportTemplate | null>(null);
+  // Exame combinado: todas as máscaras do exame (1ª = primária). O código
+  // legado continua lendo `template` (a primária).
+  const [templates, setTemplates] = useState<ReportTemplate[]>([]);
+  const template = templates[0] ?? null;
   const [clinic, setClinic] = useState<Clinic | null>(null);
 
   // Trilha de acesso LGPD: registra a abertura do laudo (exceto avulso/anônimo).
@@ -115,13 +118,20 @@ export function ExamEditor({ examId }: Props) {
   // Load related data
   useEffect(() => {
     if (!exam) return;
-    if (exam.templateId) {
-      getItem<ReportTemplate>('templates', exam.templateId).then((t) => setTemplate(t));
+    const ids = examTemplateIds(exam);
+    if (ids.length > 0) {
+      Promise.all(ids.map((id) => getItem<ReportTemplate>('templates', id))).then((loaded) => {
+        const found = loaded.filter((t): t is ReportTemplate => Boolean(t));
+        if (found.length > 0 && found.length < ids.length) {
+          showToast('Máscara do exame combinado não encontrada — operando com as restantes.', 'info');
+        }
+        setTemplates(found);
+      });
     }
     if (exam.clinicId) {
       getItem<Clinic>('clinics', exam.clinicId).then((c) => setClinic(c));
     }
-  }, [exam?.templateId, exam?.clinicId]);
+  }, [exam?.templateId, exam?.templateIds?.join(','), exam?.clinicId]);
 
   const [reportContent, setReportContent] = useState(exam?.reportContent || '');
   const [initialized, setInitialized] = useState(false);
@@ -306,7 +316,7 @@ export function ExamEditor({ examId }: Props) {
       if (exam.reportContent && exam.reportContent.trim() !== '') {
         setReportContent(exam.reportContent || '');
       } else {
-        const initial = getInitialReportContent(template, sectionTogglesFromSettings(settings));
+        const initial = getCombinedInitialReportContent(templates, sectionTogglesFromSettings(settings));
         setReportContent(initial);
         updateItem('exams', examId, { reportContent: initial });
       }
@@ -347,6 +357,7 @@ export function ExamEditor({ examId }: Props) {
     },
     patient,
     template,
+    templates,
     clinicalIndication: exam?.clinicalIndication,
     requestingPhysician: exam?.requestingPhysician,
     anamnesis: exam?.anamnesis,
@@ -464,12 +475,12 @@ export function ExamEditor({ examId }: Props) {
       variant: 'warning',
     });
     if (ok) {
-      const initial = getInitialReportContent(template, sectionTogglesFromSettings(settings));
+      const initial = getCombinedInitialReportContent(templates, sectionTogglesFromSettings(settings));
       setReportContent(initial);
       await updateItem('exams', examId, { reportContent: initial });
       showToast('Laudo reiniciado para o padrão da máscara', 'success');
     }
-  }, [template, examId, showToast, confirm]);
+  }, [template, templates, examId, showToast, confirm]);
 
 
 
@@ -618,6 +629,7 @@ export function ExamEditor({ examId }: Props) {
           setIsGenerating={setIsCopilotGenerating}
           exam={exam}
           template={template}
+          templates={templates}
           patient={patient}
           chatHistory={localChatHistory}
           onChatUpdate={handleChatUpdate}
@@ -792,7 +804,7 @@ export function ExamEditor({ examId }: Props) {
                 isTemplateMask={
                   template
                     ? (() => {
-                        const initialContent = getInitialReportContent(template, sectionTogglesFromSettings(settings));
+                        const initialContent = getCombinedInitialReportContent(templates, sectionTogglesFromSettings(settings));
                         const cleanCurrent = reportContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                         const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                         return cleanCurrent === '' || cleanCurrent === cleanInitial;
@@ -832,7 +844,7 @@ export function ExamEditor({ examId }: Props) {
 
               {/* ── Avaliação de Qualidade (auditoria + anti-alucinação) ── */}
               {!isGenerating && currentRole !== 'recepcao' && (() => {
-                const initialContent = template ? getInitialReportContent(template, sectionTogglesFromSettings(settings)) : '';
+                const initialContent = template ? getCombinedInitialReportContent(templates, sectionTogglesFromSettings(settings)) : '';
                 const cleanCurrent = reportContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                 const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
                 const isMask = cleanCurrent === '' || cleanCurrent === cleanInitial;
@@ -1204,17 +1216,17 @@ export function ExamEditor({ examId }: Props) {
 
       {/* Keyboard Shortcuts Bar */}
       <div className="hidden lg:flex items-center gap-5 px-4 py-1.5 bg-ink-900 text-ink-400 text-[10px] font-mono shrink-0">
-        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘G</kbd> Gerar IA</span>
-        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘⇧C</kbd> Copiar</span>
-        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘S</kbd> Salvar</span>
-        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-ink-300 mr-1">⌘↵</kbd> Finalizar</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-white/80 mr-1">⌘G</kbd> Gerar IA</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-white/80 mr-1">⌘⇧C</kbd> Copiar</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-white/80 mr-1">⌘S</kbd> Salvar</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-white/80 mr-1">⌘↵</kbd> Finalizar</span>
       </div>
 
       <AnimatePresence>
           {showCalculators && (
           <CalculatorModal
             initialCalcId={calcModalInitialId || undefined}
-            area={exam.area}
+            area={templates.length > 1 ? templates.map((t) => t.area) : exam.area}
             examDateMs={exam.examDate ?? exam.createdAt}
             onClose={() => { setShowCalculators(false); setCalcTargetField(null); }}
             structuredTargetLabel={calcTargetField?.label}

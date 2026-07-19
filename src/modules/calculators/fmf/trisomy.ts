@@ -183,7 +183,18 @@ export function biochemLR(bhcgMoM: number, pappaMoM: number, gestDays: number, b
 
   const fU = bivariatePdf(x, y, 0, 0, u.sdBhcg, u.sdPappa, u.rho);
   const fA = bivariatePdf(x, y, meanBhcg, meanPappa, a.sdBhcg, a.sdPappa, a.rho);
-  return fU > 0 ? fA / fU : 1;
+  const rawLR = fU > 0 ? fA / fU : 1;
+
+  // PISO DE SEGURANÇA (calibrado à calc oficial da FMF, jul/2026): a FMF trunca
+  // a LR bioquímica de modo que um padrão INCONSISTENTE com a trissomia (ex.:
+  // β-hCG baixo + PAPP-A alto para T21) NÃO reduza o risco abaixo do nível da
+  // bioquímica neutra (MoM 1/1) — evita falsa tranquilização. Caso oficial
+  // conferido: 42a, β-hCG 0,5 / PAPP-A 2,0 → a FMF mantém T21 em 1:740 (=neutro),
+  // enquanto a Gaussiana crua despencaria para ~1:8000. Piso = LR na mediana
+  // populacional log(0,0). No sentido pró-trissomia (rawLR > piso) nada muda.
+  const floorLR = bivariatePdf(0, 0, meanBhcg, meanPappa, a.sdBhcg, a.sdPappa, a.rho) /
+    bivariatePdf(0, 0, 0, 0, u.sdBhcg, u.sdPappa, u.rho);
+  return Math.max(rawLR, floorLR);
 }
 
 export function markerLR(state: MarkerState | undefined, lr: MarkerLR, t: Trisomy): number {

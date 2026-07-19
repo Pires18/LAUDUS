@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { signInWithPopup, signOut as firebaseSignOut, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithPopup, signOut as firebaseSignOut, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, linkWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { useApp } from '../store/app';
 import { storeGoogleAccessToken, clearGoogleAccessToken } from '../lib/googleAuth';
@@ -84,6 +84,27 @@ export function useAuth() {
     }
   }, []);
 
+  /**
+   * Vincula uma senha à conta atual (ex.: usuário que hoje só entra via
+   * Google e quer passar a poder entrar com e-mail/senha também). O valor da
+   * senha nunca sai do navegador do próprio usuário — só ele digita.
+   */
+  const setPassword = useCallback(async (password: string) => {
+    if (!auth.currentUser?.email) throw new Error('Usuário não autenticado.');
+    try {
+      setLoading(true);
+      setError(null);
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, password);
+      await linkWithCredential(auth.currentUser, credential);
+    } catch (err: unknown) {
+      const message = mapAuthError(err, 'Erro ao definir a senha. Tente novamente.');
+      if (message) setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const resendVerificationEmail = useCallback(async () => {
     if (!auth.currentUser) return;
     await sendEmailVerification(auth.currentUser);
@@ -107,6 +128,7 @@ export function useAuth() {
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
+    setPassword,
     resendVerificationEmail,
     signOut: signOutUser,
   };

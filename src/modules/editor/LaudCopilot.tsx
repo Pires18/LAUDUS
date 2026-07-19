@@ -10,7 +10,8 @@ import { updateItem, saveVersionSnapshot, getRecentFinalizedReports } from '../.
 import { logger } from '../../utils/logger';
 import { ExamRequest, Patient, ReportTemplate, StructuredFieldValue } from '../../types';
 import { StructuredTab } from './components/StructuredTab';
-import { deriveStructuredSchema, summarizeStructured } from './structured/deriveSchema';
+import { deriveCombinedStructuredSchema, summarizeStructured } from './structured/deriveSchema';
+import { combinedExamType } from '../templates/utils';
 import { computeDerivations, derivationsToLines } from './structured/liveCompute';
 import { itemCount, itemFieldId, countKey } from './structured/structuredKeys';
 import { findRepeatContainer } from './structured/containers';
@@ -188,6 +189,8 @@ interface LaudCopilotProps {
   setIsGenerating: (isGenerating: boolean) => void;
   exam: ExamRequest;
   template: ReportTemplate | null;
+  /** Exame combinado: todas as máscaras (1ª = primária). Ausente = [template]. */
+  templates?: ReportTemplate[];
   patient: Patient | null;
   chatHistory: Array<{ role: 'user' | 'assistant', content: string }>;
   onChatUpdate: (history: Array<{ role: 'user' | 'assistant', content: string }>) => void;
@@ -217,6 +220,7 @@ export function LaudCopilot({
   setIsGenerating,
   exam,
   template,
+  templates,
   patient,
   chatHistory,
   onChatUpdate,
@@ -272,10 +276,21 @@ export function LaudCopilot({
   const structuredSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestStructuredRef = useRef(structuredValues);
 
-  // Esquema estruturado derivado da máscara/área (memoizado por exame).
+  // Máscaras efetivas (combinado ou simples) e áreas distintas envolvidas.
+  const tpls = useMemo(
+    () => (templates && templates.length > 0 ? templates : template ? [template] : []),
+    [templates, template]
+  );
+  const examAreas = useMemo(() => {
+    const areas = [...new Set(tpls.map((t) => t.area).filter(Boolean))];
+    return areas.length > 0 ? areas : [exam.area || ''].filter(Boolean);
+  }, [tpls, exam.area]);
+
+  // Esquema estruturado derivado da(s) máscara(s)/área (memoizado por exame).
+  // Combinado: sub-esquema por máscara (área da própria máscara) + merge.
   const structuredSchema = useMemo(
-    () => deriveStructuredSchema(template, exam.area || template?.area || ''),
-    [template, exam.area]
+    () => deriveCombinedStructuredSchema(tpls, exam.area || template?.area || ''),
+    [tpls, template, exam.area]
   );
   const structuredSummary = useMemo(
     () => summarizeStructured(structuredSchema, structuredValues),
@@ -842,6 +857,7 @@ export function LaudCopilot({
           createdAt: exam.examDate || exam.createdAt
         },
         template,
+        templates: tpls,
         settings: effectiveSettings,
         previousExams,
         signal: controller.signal
@@ -891,6 +907,7 @@ export function LaudCopilot({
               examId: exam.id,
               currentReport: cleanProposal,
               template,
+              templates: tpls,
               patient,
               settings: effectiveSettings,
               clinicalIndication: exam.clinicalIndication,
@@ -985,10 +1002,10 @@ export function LaudCopilot({
       updateItem('exams', exam.id, { anamnesis: anamnesisText });
     }
 
-    const templateName = template?.name || exam.examType || 'Formulário';
-    const area = exam.area || template?.area || '';
+    const templateName = tpls.length > 1 ? combinedExamType(tpls) : (template?.name || exam.examType || 'Formulário');
+    const areaInstructions = (examAreas.length > 0 ? examAreas : ['']).map(buildAreaInstruction).join('');
 
-    let findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${buildAreaInstruction(area)}`;
+    let findingsSummary = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName}]${areaInstructions}`;
     if (anamnesisText.trim()) {
       findingsSummary += `\n\nANAMNESE DO PACIENTE:\n${anamnesisText.trim()}`;
     }
@@ -1126,14 +1143,27 @@ export function LaudCopilot({
       updateItem('exams', exam.id, { anamnesis: anamnesisText });
     }
 
-    const templateName = template?.name || exam.examType || 'Exame';
-    const area = exam.area || template?.area || '';
+    const templateName = tpls.length > 1 ? combinedExamType(tpls) : (template?.name || exam.examType || 'Exame');
+    const areaInstructions = (examAreas.length > 0 ? examAreas : ['']).map(buildAreaInstruction).join('');
 
-    let msg = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName} — Estruturado]${buildAreaInstruction(area)}`;
+    let msg = `[DADOS DE FORMULÁRIO COMPILADOS: ${templateName} — Estruturado]${areaInstructions}`;
     if (anamnesisText.trim()) {
       msg += `\n\nANAMNESE DO PACIENTE:\n${anamnesisText.trim()}`;
     }
-    msg += `\n\nDADOS DO FORMULÁRIO:\n${lines.join('\n')}`;
+    // Combinado: compila em blocos por máscara de origem (perSource), para a
+    // IA distribuir os achados nos compartimentos do exame correto.
+    if (tpls.length > 1 && structuredSchema.perSource) {
+      const blocks: string[] = [];
+      structuredSchema.perSource.forEach((sections, i) => {
+        const sub = summarizeStructured({ ...structuredSchema, sections }, structuredValues);
+        if (sub.filledCount > 0) {
+          blocks.push(`— EXAME ${i + 1}: ${tpls[i]?.name ?? ''} —\n${sub.lines.join('\n')}`);
+        }
+      });
+      msg += `\n\nDADOS DO FORMULÁRIO:\n${blocks.join('\n\n')}`;
+    } else {
+      msg += `\n\nDADOS DO FORMULÁRIO:\n${lines.join('\n')}`;
+    }
     const derivLines = derivationsToLines(structuredDerivations);
     if (derivLines.length) {
       msg += `\n\nCÁLCULOS AUTOMÁTICOS (já calculados a partir dos dados — use EXATAMENTE estes valores; NÃO recalcule e NÃO contradiga a categoria/escore nem a conduta aqui indicada: a classificação sistematizada [BI-RADS, TI-RADS, O-RADS, Bosniak, NASCET, FIGO etc.] e a recomendação de seguimento devem refletir fielmente estes resultados na CONCLUSÃO e nas RECOMENDAÇÕES):\n${derivLines.join('\n')}`;

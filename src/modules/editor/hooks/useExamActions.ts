@@ -7,7 +7,7 @@ import { verifyReport } from '../../ai/verification';
 import { classifyCorrection } from '../../ai/training/feedback';
 import { recordCorrectionSignal, recordQualityRecord } from '../../ai/training/feedbackStore';
 import { sanitizeHtml } from '../../../utils/sanitizeHtml';
-import { getInitialReportContent, sectionTogglesFromSettings } from '../../templates/utils';
+import { getCombinedInitialReportContent, combinedExamType, sectionTogglesFromSettings } from '../../templates/utils';
 import { logger } from '../../../utils/logger';
 
 interface UseExamActionsProps {
@@ -17,6 +17,8 @@ interface UseExamActionsProps {
   onReportChange: (html: string) => void;
   patient: Patient | null;
   template: ReportTemplate | null;
+  /** Exame combinado: todas as máscaras (1ª = primária). Ausente = [template]. */
+  templates?: ReportTemplate[];
   clinicalIndication?: string;
   requestingPhysician?: string;
   anamnesis?: string;
@@ -30,11 +32,15 @@ export function useExamActions({
   onReportChange,
   patient,
   template,
+  templates,
   clinicalIndication,
   requestingPhysician,
   anamnesis,
   examDateMs
 }: UseExamActionsProps) {
+  // Máscaras efetivas do exame (combinado ou simples) e suas áreas distintas.
+  const tpls = templates && templates.length > 0 ? templates : template ? [template] : [];
+  const examAreas = [...new Set(tpls.map((t) => t.area))];
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReasoning, setIsReasoning] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -135,7 +141,7 @@ export function useExamActions({
       if (hasKey) {
         // Detecta se é a primeira geração (máscara ainda limpa/não editada)
         // Nesse caso, usa buildPrompt (GERAÇÃO INICIAL) para melhor qualidade
-        const initialContent = getInitialReportContent(template, sectionTogglesFromSettings(settings));
+        const initialContent = getCombinedInitialReportContent(tpls, sectionTogglesFromSettings(settings));
         const cleanCurrent = currentReport.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
         const cleanInitial = initialContent.replace(/\s+/g, '').replace(/<[^>]*>/g, '');
         const isFirstGeneration = !customPrompt && (cleanCurrent === '' || cleanCurrent === cleanInitial);
@@ -147,6 +153,7 @@ export function useExamActions({
           html = await generateReportStream({
             examId,
             template,
+            templates: tpls,
             patient,
             settings: effectiveSettings,
             clinicalIndication,
@@ -172,6 +179,7 @@ export function useExamActions({
             examId,
             currentReport,
             template,
+            templates: tpls,
             patient,
             settings: effectiveSettings,
             clinicalIndication,
@@ -204,7 +212,7 @@ export function useExamActions({
           (settings.aiAutoRefineEnabled ?? false) &&
           html && html.trim().length > 10
         ) {
-          const audit = auditReportQuality(html, template.area);
+          const audit = auditReportQuality(html, examAreas);
           const hasErrors = audit.issues.some((i) => i.severity === 'error');
           if (hasErrors || audit.score < 70) {
             try {
@@ -212,6 +220,7 @@ export function useExamActions({
                 examId,
                 currentReport: html,
                 template,
+                templates: tpls,
                 patient,
                 settings: effectiveSettings,
                 clinicalIndication,
@@ -229,7 +238,7 @@ export function useExamActions({
               const refinedClean = sanitizeHtml(refined);
               if (
                 refinedClean && refinedClean.trim().length > 10 &&
-                auditReportQuality(refinedClean, template.area).score >= audit.score
+                auditReportQuality(refinedClean, examAreas).score >= audit.score
               ) {
                 html = refinedClean;
                 showToast('Auto-refino de qualidade aplicado ✓', 'info');
@@ -256,7 +265,7 @@ export function useExamActions({
           onReportChange(currentReport);
         }
       } else {
-        html = generateMockReport({ template, patient, settings });
+        html = generateMockReport({ template, templates: tpls, patient, settings });
         showToast('API Key não configurada — modo demonstração ativo', 'info');
         onReportChange(html);
         await updateItem('exams', examId, { reportContent: html });
@@ -313,7 +322,7 @@ export function useExamActions({
     if (!template) return;
     try {
       const motor = lastMotorRef.current;
-      const audit = auditReportQuality(finalReport, template.area);
+      const audit = auditReportQuality(finalReport, examAreas);
       const verification = verifyReport(finalReport, {
         area: template.area,
         anamnesis,
@@ -326,7 +335,7 @@ export function useExamActions({
       if (initial) {
         const signal = classifyCorrection(initial, finalReport, {
           area: template.area,
-          examType: template.name,
+          examType: combinedExamType(tpls),
           motor,
         });
         critical = signal.critical;
@@ -336,7 +345,7 @@ export function useExamActions({
       // NOTA de qualidade: registrada em toda finalização.
       void recordQualityRecord({
         area: template.area,
-        examType: template.name,
+        examType: combinedExamType(tpls),
         motor,
         auditScore: audit.score,
         refinementCount: refinementCountRef.current,

@@ -67,7 +67,11 @@ export async function syncExamToOrthancWorklist(
       String(now.getMinutes()).padStart(2, '0') + 
       String(now.getSeconds()).padStart(2, '0');
 
-    const stepDescription = examType.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    // VR LO (Scheduled Procedure Step Description) tem limite de 64 caracteres \u2014
+    // nomes de exame combinado ("A + B") podem ultrapassar; truncar \u00e9 obrigat\u00f3rio.
+    const stepDescription = examType
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+      .slice(0, 64);
 
     const legacyFallback = { aeTitle: settings.dicomModalityAETitle || 'MINDRAYMX7', modality: settings.dicomModalityType || 'US' };
     const targetDevice = deviceId

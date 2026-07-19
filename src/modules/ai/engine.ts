@@ -1,6 +1,12 @@
 import { ReportTemplate, Patient, AppSettings, ExamArea } from '../../types';
 import { DEFAULT_MASTER_PROMPT, DEFAULT_STRUCTURE_PROMPT, DEFAULT_GLOBAL_INSTRUCTIONS, DEFAULT_RIGID_RULES, DEFAULT_REFINEMENT_GOLDEN_RULES, DEFAULT_COPILOT_OVERRIDE, DEFAULT_AREA_PROMPTS } from './prompts';
-import { getInitialReportContent, sectionTogglesFromSettings } from '../templates/utils';
+import {
+  getInitialReportContent,
+  getCombinedInitialReportContent,
+  getCombinedTitle,
+  combinedExamType,
+  sectionTogglesFromSettings,
+} from '../templates/utils';
 import { doc, getDoc, runTransaction, updateDoc } from 'firebase/firestore';
 import { auth, firestore } from '../../lib/firebase';
 import { logAiUsage } from '../../store/db';
@@ -16,6 +22,8 @@ import { scrubForGeneration } from './training/anonymize';
 interface GenerateReportParams {
   examId?: string;
   template: ReportTemplate;
+  /** Exame combinado: máscaras ordenadas (1ª = primária). Ausente/1 = exame simples. */
+  templates?: ReportTemplate[];
   patient: Patient | null;
   settings: AppSettings;
   clinicalIndication?: string;
@@ -37,6 +45,8 @@ interface CopilotParams {
   previousExams?: string[];
   patientPreviousExams?: string[];
   template?: ReportTemplate | null;
+  /** Exame combinado: máscaras ordenadas (1ª = primária). Ausente/1 = exame simples. */
+  templates?: ReportTemplate[] | null;
   signal?: AbortSignal;
 }
 
@@ -44,6 +54,8 @@ interface RefineParams {
   examId?: string;
   currentReport: string;
   template: ReportTemplate;
+  /** Exame combinado: máscaras ordenadas (1ª = primária). Ausente/1 = exame simples. */
+  templates?: ReportTemplate[];
   patient: Patient | null;
   settings: AppSettings;
   clinicalIndication?: string;
@@ -276,6 +288,17 @@ Você deve pular as fases de auditoria e raciocínio prévio.`);
   return parts.join('\n\n');
 }
 
+/** Máscaras efetivas de uma chamada: `templates` (combinado) ou `[template]`. */
+function effectiveTemplates(
+  params: GenerateReportParams | CopilotParams | RefineParams
+): ReportTemplate[] {
+  const list = (params as { templates?: Array<ReportTemplate | null | undefined> | null }).templates;
+  const valid = (list || []).filter((t): t is ReportTemplate => Boolean(t));
+  if (valid.length > 0) return valid;
+  const single = (params as { template?: ReportTemplate | null }).template;
+  return single ? [single] : [];
+}
+
 /**
  * buildSpecificContext — monta o contexto de Camada 2 (Área) + Camada 3 (Exame).
  *
@@ -284,62 +307,99 @@ Você deve pular as fases de auditoria e raciocínio prévio.`);
  *   2. Diretriz padrão do sistema (DEFAULT_AREA_PROMPTS[area])
  *   3. Sem diretriz de área (se a área não tiver padrão definido)
  *
- * Após a diretriz de área, injeta as INSTRUÇÕES ESPECÍFICAS DO EXAME (template.aiInstructions).
+ * Após a(s) diretriz(es) de área, injeta as INSTRUÇÕES ESPECÍFICAS DO EXAME
+ * (template.aiInstructions). Exame COMBINADO: uma diretriz por área DISTINTA
+ * (ordem de aparição) e um bloco de Camada 3 por máscara, com cabeçalho
+ * identificando o exame.
  */
 function buildSpecificContext(
-  template?: ReportTemplate | null,
+  templates: Array<ReportTemplate | null | undefined>,
   settings?: AppSettings,
   fallbackArea?: string
 ): string {
-  const area = template?.area || fallbackArea;
+  const valid = templates.filter((t): t is ReportTemplate => Boolean(t));
+  const combined = valid.length > 1;
 
-  // Camada 2 — Diretriz de Área: customizada > padrão > vazia
-  const customAreaPrompt = area && settings?.aiAreaPrompts?.[area as ExamArea];
-  const defaultAreaPrompt = area && DEFAULT_AREA_PROMPTS[area];
-  const areaPrompt = (customAreaPrompt && customAreaPrompt.trim())
-    ? customAreaPrompt.trim()
-    : (defaultAreaPrompt && defaultAreaPrompt.trim())
-      ? defaultAreaPrompt.trim()
-      : null;
+  // Camada 2 — uma diretriz por área distinta (ordem de aparição)
+  const areas: string[] = [];
+  for (const t of valid) {
+    const a = t.area || fallbackArea;
+    if (a && !areas.includes(a)) areas.push(a);
+  }
+  if (areas.length === 0 && fallbackArea) areas.push(fallbackArea);
 
   const parts: string[] = [];
 
-  if (areaPrompt && area) {
-    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt}`);
+  for (const area of areas) {
+    const customAreaPrompt = settings?.aiAreaPrompts?.[area as ExamArea];
+    const defaultAreaPrompt = DEFAULT_AREA_PROMPTS[area];
+    const areaPrompt = (customAreaPrompt && customAreaPrompt.trim())
+      ? customAreaPrompt.trim()
+      : (defaultAreaPrompt && defaultAreaPrompt.trim())
+        ? defaultAreaPrompt.trim()
+        : null;
+    if (areaPrompt) {
+      parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES DA ÁREA DE ${area.toUpperCase()}:\n═══════════════════════════════════════════\n${areaPrompt}`);
+    }
   }
 
-  // Camada 3 — Instruções Específicas do Exame
-  if (template?.aiInstructions && template.aiInstructions.trim()) {
-    parts.push(`═══════════════════════════════════════════\nINSTRUÇÕES ESPECÍFICAS DO EXAME:\n═══════════════════════════════════════════\n${template.aiInstructions.trim()}`);
-  } else if (template && area === 'medicina-fetal') {
-    // Degradação silenciosa (auditoria D5): exame fetal sem Camada 3 gera laudo só com
-    // Camadas 1+2. Sinalizar para não passar despercebido (o template no Firestore pode
-    // estar sem aiInstructions — reexecutar o deploy: scripts/deploy-templates.mjs).
-    console.warn(`[LAUD.IA] Template de medicina-fetal sem aiInstructions (Camada 3 ausente): "${template.name || template.id}". Laudo será gerado apenas com as Camadas Universal + Área.`);
+  // Camada 3 — Instruções Específicas de cada Exame
+  for (const template of valid) {
+    const area = template.area || fallbackArea;
+    if (template.aiInstructions && template.aiInstructions.trim()) {
+      const header = combined
+        ? `INSTRUÇÕES ESPECÍFICAS DO EXAME — ${template.name}:`
+        : 'INSTRUÇÕES ESPECÍFICAS DO EXAME:';
+      parts.push(`═══════════════════════════════════════════\n${header}\n═══════════════════════════════════════════\n${template.aiInstructions.trim()}`);
+    } else if (area === 'medicina-fetal') {
+      // Degradação silenciosa (auditoria D5): exame fetal sem Camada 3 gera laudo só com
+      // Camadas 1+2. Sinalizar para não passar despercebido (o template no Firestore pode
+      // estar sem aiInstructions — reexecutar o deploy: scripts/deploy-templates.mjs).
+      console.warn(`[LAUD.IA] Template de medicina-fetal sem aiInstructions (Camada 3 ausente): "${template.name || template.id}". Laudo será gerado apenas com as Camadas Universal + Área.`);
+    }
   }
 
   return parts.join('\n\n');
 }
 
-function buildMaskHtml(template: ReportTemplate, settings?: AppSettings): string {
+function buildMaskHtml(templates: ReportTemplate[], settings?: AppSettings): string {
   const withClassification = settings?.laudIaClassificationEnabled !== false;
   const withRecommendations = settings?.laudIaRecommendationsEnabled !== false;
   const withObservations = settings?.laudIaMethodologicalObsEnabled !== false;
 
-  const parts = [
-    `TÍTULO:\n${template.title}`,
-    `TÉCNICA:\n${template.technique}`,
-    `ANÁLISE:\n${template.analysisTemplate}`,
-    `CONCLUSÃO:\n${template.conclusionTemplate}`,
-  ];
-  if (withClassification && template.classificationTemplate) {
-    parts.push(`CLASSIFICAÇÃO:\n${template.classificationTemplate}`);
-  }
-  if (withRecommendations) {
-    parts.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
-  }
-  if (withObservations && template.observationsTemplate) {
-    parts.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate}`);
+  const templateParts = (template: ReportTemplate): string[] => {
+    const sections = [
+      `TÍTULO:\n${template.title}`,
+      `TÉCNICA:\n${template.technique}`,
+      `ANÁLISE:\n${template.analysisTemplate}`,
+      `CONCLUSÃO:\n${template.conclusionTemplate}`,
+    ];
+    if (withClassification && template.classificationTemplate) {
+      sections.push(`CLASSIFICAÇÃO:\n${template.classificationTemplate}`);
+    }
+    if (withRecommendations) {
+      sections.push(`RECOMENDAÇÕES:\n${template.recommendationsTemplate}`);
+    }
+    if (withObservations && template.observationsTemplate) {
+      sections.push(`OBSERVAÇÕES METODOLÓGICAS:\n${template.observationsTemplate}`);
+    }
+    return sections;
+  };
+
+  const parts: string[] = [];
+  if (templates.length > 1) {
+    parts.push(
+      `LAUDO COMBINADO (${combinedExamType(templates)}): gere UM ÚNICO laudo com UM único <h1> exatamente "${getCombinedTitle(templates)}". ` +
+        `Mescle as seções por tipo: uma única TÉCNICA, uma única ANÁLISE contendo os compartimentos de todos os exames na ordem apresentada, ` +
+        `e CLASSIFICAÇÕES/CONCLUSÃO/RECOMENDAÇÕES/OBSERVAÇÕES METODOLÓGICAS únicas cobrindo os achados de todos os exames. ` +
+        `PROIBIDO empilhar dois laudos, repetir títulos de seção ou emitir mais de um <h1>.`
+    );
+    templates.forEach((t, i) => {
+      parts.push(`═══ EXAME ${i + 1} — ${t.name} ═══`);
+      parts.push(...templateParts(t));
+    });
+  } else if (templates[0]) {
+    parts.push(...templateParts(templates[0]));
   }
 
   // Seções desligadas pelo usuário são omitidas do corpo gerado pela IA.
@@ -572,34 +632,35 @@ Retorne APENAS um objeto JSON.`;
 
 // ─── Auditoria Estrutural Simples ──────────────────────────────────────────────────────
 
-export function buildPrompt({
-  template,
-  patient,
-  clinicalIndication,
-  requestingPhysician,
-  anamnesis,
-  settings,
-  previousExams = [],
-  patientPreviousExams = [],
-  examDateMs,
-}: GenerateReportParams): BuiltPrompt {
+export function buildPrompt(params: GenerateReportParams): BuiltPrompt {
+  const {
+    patient,
+    clinicalIndication,
+    requestingPhysician,
+    anamnesis,
+    settings,
+    previousExams = [],
+    patientPreviousExams = [],
+    examDateMs,
+  } = params;
+  const tpls = effectiveTemplates(params);
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildSpecificContext(template, settings);
+  const areaContext = buildSpecificContext(tpls, settings);
   // Guarda de tamanho de contexto (auditoria D3): as 3 camadas (Universal + Área + Exame)
   // são enviadas inteiras, sem truncagem. Avisar se o contexto de sistema ficar grande
   // demais para a janela do modelo — o corte ocorreria no proxy, sem sinal ao usuário.
   const SYSTEM_CONTEXT_TOKEN_WARN = 250_000;
   const systemTokens = estimateTokens(universalContext) + estimateTokens(areaContext);
   if (systemTokens > SYSTEM_CONTEXT_TOKEN_WARN) {
-    console.warn(`[LAUD.IA] Contexto de sistema grande (~${Math.round(systemTokens / 1000)}k tokens) para o exame "${template.name}". Risco de exceder a janela do modelo — revise as camadas de prompt (Universal + Área + Exame).`);
+    console.warn(`[LAUD.IA] Contexto de sistema grande (~${Math.round(systemTokens / 1000)}k tokens) para o exame "${combinedExamType(tpls)}". Risco de exceder a janela do modelo — revise as camadas de prompt (Universal + Área + Exame).`);
   }
-  const maskHtml = buildMaskHtml(template, settings);
+  const maskHtml = buildMaskHtml(tpls, settings);
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
 
   const contextMessage = buildContextMessage({
     mode: 'GERAÇÃO INICIAL',
-    examType: template.name,
+    examType: combinedExamType(tpls),
     patient,
     clinicalIndication: clinicalIndication || '',
     anamnesis,
@@ -623,21 +684,22 @@ Gere agora o laudo completo em HTML puro. O output deve começar diretamente com
 
 
 
-function buildRefinePrompt({
-  currentReport,
-  template,
-  patient,
-  settings,
-  clinicalIndication,
-  requestingPhysician,
-  anamnesis,
-  previousExams = [],
-  patientPreviousExams = [],
-  customPrompt,
-  examDateMs,
-}: RefineParams): BuiltPrompt {
+function buildRefinePrompt(params: RefineParams): BuiltPrompt {
+  const {
+    currentReport,
+    patient,
+    settings,
+    clinicalIndication,
+    requestingPhysician,
+    anamnesis,
+    previousExams = [],
+    patientPreviousExams = [],
+    customPrompt,
+    examDateMs,
+  } = params;
+  const tpls = effectiveTemplates(params);
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildSpecificContext(template, settings);
+  const areaContext = buildSpecificContext(tpls, settings);
   // Respeita regras de refinamento customizadas no settings
   const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
@@ -650,13 +712,13 @@ function buildRefinePrompt({
 
   const contextMessage = buildContextMessage({
     mode: 'REFINAMENTO',
-    examType: template.name,
+    examType: combinedExamType(tpls),
     patient,
     clinicalIndication: clinicalIndication || '',
     anamnesis,
     notes: refineNote,
     maskHtml: currentReport,
-    originalMaskHtml: getInitialReportContent(template, sectionTogglesFromSettings(settings)),
+    originalMaskHtml: getCombinedInitialReportContent(tpls, sectionTogglesFromSettings(settings)),
     requestingPhysician,
     previousExams: safePreviousExams,
     patientPreviousExams: safePatientExams,
@@ -685,16 +747,17 @@ ${formatRule}`;
   return { universalContext, areaContext, userMessage };
 }
 
-function buildCopilotPrompt({
-  instruction,
-  currentReport,
-  patient,
-  exam,
-  settings,
-  previousExams = [],
-  patientPreviousExams = [],
-  template,
-}: CopilotParams): BuiltPrompt {
+function buildCopilotPrompt(params: CopilotParams): BuiltPrompt {
+  const {
+    instruction,
+    currentReport,
+    patient,
+    exam,
+    settings,
+    previousExams = [],
+    patientPreviousExams = [],
+  } = params;
+  const tpls = effectiveTemplates(params);
   // Respeita override customizado no settings, com fallback para o default do sistema
   let copilotModeOverride = settings.aiCopilotOverride || DEFAULT_COPILOT_OVERRIDE;
   if (settings.aiFastMode) {
@@ -711,7 +774,7 @@ function buildCopilotPrompt({
   const refinementRules = settings.aiRefinementGoldenRules || DEFAULT_REFINEMENT_GOLDEN_RULES;
 
   const universalContext = buildUniversalContext(settings);
-  const areaContext = buildSpecificContext(template, settings, exam.area) + copilotModeOverride;
+  const areaContext = buildSpecificContext(tpls, settings, exam.area) + copilotModeOverride;
 
   const safePreviousExams = truncatePreviousExams(previousExams, settings);
   const safePatientExams = truncatePreviousExams(patientPreviousExams, settings, 2500);
@@ -724,7 +787,7 @@ function buildCopilotPrompt({
     anamnesis: exam.anamnesis,
     notes: instruction,
     maskHtml: currentReport,
-    originalMaskHtml: template ? getInitialReportContent(template, sectionTogglesFromSettings(settings)) : undefined,
+    originalMaskHtml: tpls.length > 0 ? getCombinedInitialReportContent(tpls, sectionTogglesFromSettings(settings)) : undefined,
     requestingPhysician: exam.requestingPhysician,
     previousExams: safePreviousExams,
     patientPreviousExams: safePatientExams,
@@ -819,9 +882,36 @@ async function augmentWithRetrieval(
 
 // ─── Helpers para Controle de Motor (Lite/Pro) e Quota de Laudos ─────────────
 
+/**
+ * Decisão pura da pré-checagem de cota do cliente. `units` = laudos consumidos
+ * pela chamada (1 por máscara — exame combinado de 2 máscaras consome 2).
+ * As mensagens de bloqueio DEVEM conter "cota mensal" (o catch de
+ * resolveMotorConfigAndCheckQuota só relança erros com essa expressão).
+ */
+export function evaluateClientQuota(
+  reportsUsed: number,
+  reportsQuota: number,
+  units = 1
+): { allowed: boolean; message?: string } {
+  const isUnlimited = reportsQuota === 0 || reportsQuota >= 9999;
+  if (isUnlimited || reportsUsed + units <= reportsQuota) return { allowed: true };
+  if (units > 1) {
+    const remaining = Math.max(0, reportsQuota - reportsUsed);
+    return {
+      allowed: false,
+      message: `Este laudo combinado consome ${units} laudos e restam ${remaining} na sua cota mensal. Faça um upgrade ou aguarde o reset mensal.`,
+    };
+  }
+  return {
+    allowed: false,
+    message: 'Sua cota mensal de laudos foi atingida. Faça um upgrade ou aguarde o reset mensal.',
+  };
+}
+
 async function resolveMotorConfigAndCheckQuota(
   settings: AppSettings,
-  mode: string
+  mode: string,
+  units = 1
 ): Promise<{ resolvedProvider: 'gemini'; resolvedModelName: string; resolvedMotor: 'lite' | 'pro'; uid?: string }> {
   const uid = auth.currentUser?.uid;
   let resolvedModelName = 'gemini-3.5-flash';
@@ -845,9 +935,9 @@ async function resolveMotorConfigAndCheckQuota(
       if (!isAdmin) {
         const reportsUsed = userData.reportsUsedThisMonth ?? 0;
         const reportsQuota = userData.reportsQuota ?? 100;
-        const isUnlimited = reportsQuota === 0 || reportsQuota >= 9999;
-        if (!isUnlimited && reportsUsed >= reportsQuota) {
-          throw new Error('Sua cota mensal de laudos foi atingida. Faça um upgrade ou aguarde o reset mensal.');
+        const quota = evaluateClientQuota(reportsUsed, reportsQuota, units);
+        if (!quota.allowed) {
+          throw new Error(quota.message);
         }
       }
 
@@ -887,7 +977,7 @@ async function resolveMotorConfigAndCheckQuota(
   return { resolvedProvider: 'gemini', resolvedModelName, resolvedMotor, uid };
 }
 
-async function incrementReportUsage(uid: string) {
+async function incrementReportUsage(uid: string, units = 1) {
   // O contador do doc do USUÁRIO é a fonte de verdade e é incrementado de forma
   // isolada — assim uma eventual falha ao espelhar na assinatura (doc ausente,
   // regra, userId divergente) NÃO impede a contagem de avançar.
@@ -900,7 +990,7 @@ async function incrementReportUsage(uid: string) {
       if (!userSnap.exists()) return;
       const userData = userSnap.data();
       subscriptionId = userData.subscriptionId;
-      newUsed = (userData.reportsUsedThisMonth ?? 0) + 1;
+      newUsed = (userData.reportsUsedThisMonth ?? 0) + units;
       transaction.update(userRef, { reportsUsedThisMonth: newUsed, updatedAt: Date.now() });
     });
   } catch (err) {
@@ -923,13 +1013,28 @@ async function incrementReportUsage(uid: string) {
 
 // ─── API pública ─────────────────────────────────────────────────────────────
 
+/**
+ * maxOutputTokens de uma chamada: por área (caso simples) ou a soma das áreas
+ * das máscaras (laudo combinado — o output cobre os dois exames), com teto.
+ */
+function callHelpers(tpls: ReportTemplate[]) {
+  if (tpls.length <= 1) return helpers;
+  const maxTokens = Math.min(
+    tpls.reduce((sum, t) => sum + getMaxTokens(t.area), 0),
+    20480
+  );
+  return { ...helpers, getMaxTokens: () => maxTokens };
+}
+
 export async function generateReport(params: GenerateReportParams | CopilotParams | RefineParams): Promise<string> {
   const { settings, signal } = params as any;
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
+  const tpls = effectiveTemplates(params);
+  const units = Math.max(1, tpls.length);
 
-  const { resolvedModelName, resolvedMotor, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+  const { resolvedModelName, resolvedMotor, uid } = await resolveMotorConfigAndCheckQuota(settings, mode, units);
 
   const callSettings = {
     ...settings,
@@ -952,7 +1057,7 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
     let text: string;
     let scratchpad: string | undefined;
 
-    text = await new GeminiProvider().generate(built, callSettings, area, mode, signal, (sp) => scratchpad = sp, helpers);
+    text = await new GeminiProvider().generate(built, callSettings, area, mode, signal, (sp) => scratchpad = sp, callHelpers(tpls));
 
     recordMetrics({
       examId: (params as any).examId,
@@ -971,8 +1076,9 @@ export async function generateReport(params: GenerateReportParams | CopilotParam
 
     // Toda chamada de IA (geração, refino ou copiloto) consome tokens/custo
     // real e por isso conta para a cota do plano — não só a geração inicial.
+    // Exame combinado: 1 unidade por máscara.
     if (uid) {
-      await incrementReportUsage(uid);
+      await incrementReportUsage(uid, units);
     }
 
     return text;
@@ -1002,8 +1108,10 @@ export async function generateReportStream(
   const mode = detectMode(params);
   const area = detectArea(params);
   const t0 = Date.now();
+  const tpls = effectiveTemplates(params);
+  const units = Math.max(1, tpls.length);
 
-  const { resolvedModelName, resolvedMotor, uid } = await resolveMotorConfigAndCheckQuota(settings, mode);
+  const { resolvedModelName, resolvedMotor, uid } = await resolveMotorConfigAndCheckQuota(settings, mode, units);
 
   const callSettings = {
     ...settings,
@@ -1026,7 +1134,7 @@ export async function generateReportStream(
     let text: string;
     let scratchpad: string | undefined;
 
-    text = await new GeminiProvider().stream(built, callSettings, area, mode, onChunk, signal, (sp) => scratchpad = sp, helpers);
+    text = await new GeminiProvider().stream(built, callSettings, area, mode, onChunk, signal, (sp) => scratchpad = sp, callHelpers(tpls));
 
     recordMetrics({
       examId: (params as any).examId,
@@ -1045,8 +1153,9 @@ export async function generateReportStream(
 
     // Toda chamada de IA (geração, refino ou copiloto) consome tokens/custo
     // real e por isso conta para a cota do plano — não só a geração inicial.
+    // Exame combinado: 1 unidade por máscara.
     if (uid) {
-      await incrementReportUsage(uid);
+      await incrementReportUsage(uid, units);
     }
 
     return text;
@@ -1079,7 +1188,10 @@ interface QualityReport {
   }>;
 }
 
-export function auditReportQuality(html: string, area?: string): QualityReport {
+export function auditReportQuality(html: string, area?: string | string[]): QualityReport {
+  // Exame combinado: as regras área-específicas disparam para TODAS as áreas
+  // envolvidas (ex.: Bosniak E O-RADS num Abdome + Pélvica).
+  const areas = (Array.isArray(area) ? area : area ? [area] : []).filter(Boolean);
   const issues: QualityReport['issues'] = [];
   let score = 100;
 
@@ -1100,7 +1212,7 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     }
   }
 
-  const isFetalOrVascular = area === 'medicina-fetal' || area === 'vascular';
+  const isFetalOrVascular = areas.includes('medicina-fetal') || areas.includes('vascular');
   
   // Extrai o conteúdo da seção de Observações Metodológicas
   const obsMatch = html.match(/<h2[^>]*>OBSERVA[ÇC][ÕO]ES\s+METODOL[OÓ]GICAS<\/h2>([\s\S]*?)(?=<h2|$)/i);
@@ -1187,7 +1299,7 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     score -= 5;
   }
 
-  if (area === 'medicina-fetal') {
+  if (areas.includes('medicina-fetal')) {
     const hasZeroEnd = /di[aá]stole\s+zero|fluxo\s+ausente|ausência\s+de\s+diástole/i.test(html);
     const hasAlerta = /ALERTA/i.test(html);
     if (hasZeroEnd && !hasAlerta) {
@@ -1226,8 +1338,8 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
     // Estenose carotídea exige graduação (NASCET/SRU) — aceita percentual/severidade como grau válido.
     { area: 'vascular', organRe: /(est[ée]nos)[^.]{0,45}(car[óo]tid|\bACI\b|bulbo)|(car[óo]tid|\bACI\b|bulbo car[óo]t)[^.]{0,70}(est[ée]nos)/i, classRe: /NASCET|SRU|\d{2}\s*[–\-a]\s*\d{2}\s*%|est[ée]nose\s+(leve|moderada|acentuada|importante|cr[íi]tica)|<\s*50\s*%|≥?\s*70\s*%/i },
   ];
-  if (area) {
-    const rules = classRules.filter((r) => r.area === area);
+  if (areas.length) {
+    const rules = classRules.filter((r) => areas.includes(r.area));
     if (rules.length) {
       const analiseMatch = html.match(/<h2[^>]*>AN[ÁA]LISE<\/h2>([\s\S]*?)(?=<h2|$)/i);
       const analise = analiseMatch ? analiseMatch[1] : '';
@@ -1276,20 +1388,27 @@ export function auditReportQuality(html: string, area?: string): QualityReport {
 // ─── Mock (modo sem API) ──────────────────────────────────────────────────────
 
 export function generateMockReport(params: GenerateReportParams): string {
-  const { template, settings } = params;
+  const { settings } = params;
+  const tpls = effectiveTemplates(params);
   const withRecommendations = settings?.laudIaRecommendationsEnabled !== false;
   const withObservations = settings?.laudIaMethodologicalObsEnabled !== false;
 
+  const title = tpls.length > 1 ? getCombinedTitle(tpls) : tpls[0].title;
+  const analysis = tpls.map((t) => t.analysisTemplate).join('\n');
+  const conclusion = tpls.map((t) => t.conclusionTemplate).join('\n');
+  const recsBody = tpls.map((t) => t.recommendationsTemplate).filter(Boolean).join('\n');
+  const obsBody = tpls.map((t) => t.observationsTemplate).filter(Boolean).join('\n');
+
   const recs = withRecommendations
-    ? `\n<h2>RECOMENDAÇÕES</h2>\n${template.recommendationsTemplate}`
+    ? `\n<h2>RECOMENDAÇÕES</h2>\n${recsBody}`
     : '';
-  const obs = withObservations && template.observationsTemplate
-    ? `\n<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n${template.observationsTemplate}`
+  const obs = withObservations && obsBody
+    ? `\n<h2>OBSERVAÇÕES METODOLÓGICAS</h2>\n${obsBody}`
     : '';
 
-  return `<h1>${template.title}</h1>
+  return `<h1>${title}</h1>
 <h2>ANÁLISE</h2>
-${template.analysisTemplate}
+${analysis}
 <h2>CONCLUSÃO</h2>
-${template.conclusionTemplate}${recs}${obs}`;
+${conclusion}${recs}${obs}`;
 }

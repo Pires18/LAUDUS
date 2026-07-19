@@ -12,7 +12,8 @@ import { useApp } from '../../store/app';
 import { useSubscription } from '../../hooks/useSubscription';
 
 interface Props {
-  area?: ExamArea;
+  /** Área do exame — exame combinado passa as áreas de todas as máscaras. */
+  area?: ExamArea | ExamArea[];
   onClose: () => void;
   onSendToCopilot: (result: string) => void;
   onInsertToReport?: (html: string) => void;
@@ -57,8 +58,9 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
   const [activeTab, setActiveTab] = useState<'params' | 'result'>('params');
   const [updateKey, setUpdateKey] = useState(0);
 
+  const areaList = Array.isArray(area) ? area : area ? [area] : [];
   const filteredCalculators = CALCULATORS.filter(calc =>
-    (showAll || !area || calc.areas.includes(area)) &&
+    (showAll || areaList.length === 0 || areaList.some((a) => calc.areas.includes(a))) &&
     (!search || calc.name.toLowerCase().includes(search.toLowerCase()) || calc.description.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -229,7 +231,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
                       !showAll ? 'bg-brand-600 text-white border-brand-500' : 'bg-ink-50 text-ink-500 border-ink-200 hover:bg-ink-100'
                     )}
                   >
-                    {area ? area.replace(/-/g, ' ') : 'Geral'}
+                    {areaList.length > 0 ? areaList.map((a) => a.replace(/-/g, ' ')).join(' + ') : 'Geral'}
                   </button>
                   <button
                     onClick={() => setShowAll(true)}
@@ -257,7 +259,7 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
                     className="group flex items-center gap-3 text-left px-3 py-3 rounded-xl border border-ink-100 bg-white hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-sm transition-all"
                   >
                     <div className="w-9 h-9 rounded-xl bg-ink-50 text-ink-400 flex items-center justify-center group-hover:bg-brand-600 group-hover:text-white transition-all border border-ink-100 shrink-0">
-                      <AreaIcon area={showAll ? calc.areas[0] : (area || calc.areas[0])} size={18} />
+                      <AreaIcon area={showAll ? calc.areas[0] : (areaList.find((a) => calc.areas.includes(a)) || calc.areas[0])} size={18} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-black text-ink-800 text-xs group-hover:text-brand-700 transition-colors truncate">{calc.name}</h4>

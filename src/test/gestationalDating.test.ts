@@ -223,6 +223,11 @@ describe('seedForCalculator — calculadora abre com os dados do formulário', (
     expect(seed.tricuspid).toBe('notAssessed'); // ausente do formulário
   });
 
+  it('fmf-trisomy-risk: FCF (bcf) do exame semeia a FHR do rastreio combinado', () => {
+    const seed = seedForCalculator('fmf-trisomy-risk', { ccn: '65', bcf: '162' })!;
+    expect(seed.fhrBpm).toBe('162');
+  });
+
   it('fmf-preeclampsia-risk: exame físico → PAM, enums traduzidos e P2/P1', () => {
     const seed = seedForCalculator('fmf-preeclampsia-risk', {
       mae_idade: '41', mae_peso: '82', mae_altura: '165',

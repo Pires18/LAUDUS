@@ -6,8 +6,11 @@ import { ExamArea } from '../../../types';
  * fonte única — evita duplicar a lista). Usado pela aba Estruturado para
  * oferecer os atalhos de cálculo corretos por exame.
  */
-export function calculatorsForArea(area: ExamArea | string): CalculatorDef[] {
-  return CALCULATORS.filter((c) => c.areas.includes(area as ExamArea));
+export function calculatorsForArea(
+  area: ExamArea | string | Array<ExamArea | string>
+): CalculatorDef[] {
+  const areas = Array.isArray(area) ? area : [area];
+  return CALCULATORS.filter((c) => areas.some((a) => c.areas.includes(a as ExamArea)));
 }
 
 /** Metadados leves de uma calculadora (nome/descrição) para exibição. */

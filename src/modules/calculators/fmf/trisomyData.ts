@@ -152,7 +152,7 @@ export const PROVISIONAL_TRISOMY_PARAMS: TrisomyModelParams = {
   //   dígito-a-dígito contra a calc oficial da FMF (exato nas 6 idades) e todos
   //   os marcadores (NT, bioquímica, ON/DV/TR, FHR) implementados de papers-fonte.
   //   Gate assumido pelo usuário (apoio à decisão; NÃO é a calc oficial da FMF).
-  version: 'trisomy-wright2008NT + kagan2008biochem + marcadores2009 + gaCorrection2011-v6',
+  version: 'trisomy-wright2008NT + kagan2008biochem(+pisoFMF) + kagan2008FHR + marcadores2009 + aprioriFmfLive2026-v7',
 
   // ── TN: modelo de mistura (Wright 2008, Tabela 2) — EXATO ──────────────
   nt: {

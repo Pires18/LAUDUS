@@ -3,6 +3,8 @@ import { ReportTemplate, Patient, AppSettings } from '../../types';
 export interface GenerateReportParams {
   examId?: string;
   template: ReportTemplate;
+  /** Exame combinado: máscaras ordenadas (1ª = primária). Ausente/1 = exame simples. */
+  templates?: ReportTemplate[];
   patient: Patient | null;
   settings: AppSettings;
   clinicalIndication?: string;
@@ -22,6 +24,8 @@ export interface CopilotParams {
   settings: AppSettings;
   previousExams?: string[];
   template?: ReportTemplate | null;
+  /** Exame combinado: máscaras ordenadas (1ª = primária). Ausente/1 = exame simples. */
+  templates?: ReportTemplate[] | null;
   signal?: AbortSignal;
 }
 
@@ -29,6 +33,8 @@ export interface RefineParams {
   examId?: string;
   currentReport: string;
   template: ReportTemplate;
+  /** Exame combinado: máscaras ordenadas (1ª = primária). Ausente/1 = exame simples. */
+  templates?: ReportTemplate[];
   patient: Patient | null;
   settings: AppSettings;
   clinicalIndication?: string;

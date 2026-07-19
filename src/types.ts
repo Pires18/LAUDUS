@@ -431,6 +431,8 @@ export interface AppSettings {
   laudIaMethodologicalObsEnabled?: boolean;
   /** Se a seção de CLASSIFICAÇÃO (BI-RADS, TI-RADS, etc.) deve ser incluída (default: sim). */
   laudIaClassificationEnabled?: boolean;
+  /** Exames combinados (2 máscaras num só laudo) habilitados (default: sim). */
+  combinedExamsEnabled?: boolean;
 
   /** Banco de frases prontas do usuário */
   snippets?: { id: string; title: string; content: string; area?: string }[];

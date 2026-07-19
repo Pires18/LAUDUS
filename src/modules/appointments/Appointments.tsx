@@ -206,6 +206,9 @@ export function Appointments() {
         area: confirmingApp.area,
         examType: confirmingApp.examType,
         templateId: confirmingApp.templateId,
+        // Normalização: exames novos sempre gravam templateIds (agenda = 1 máscara;
+        // laudo combinado via agenda fica para a fase 2 do rollout).
+        templateIds: confirmingApp.templateId ? [confirmingApp.templateId] : undefined,
         status: 'pendente',
         scheduledAt: confirmingApp.scheduledAt,
         clinicalIndication: confirmingApp.notes || undefined,

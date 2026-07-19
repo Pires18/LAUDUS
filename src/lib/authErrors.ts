@@ -28,6 +28,11 @@ const MESSAGES: Record<string, string | null> = {
   'auth/cancelled-popup-request': null,
   'auth/popup-blocked': 'O navegador bloqueou a janela de login do Google. Permita popups e tente novamente.',
   'auth/account-exists-with-different-credential': 'Este e-mail já está vinculado a outro método de login. Tente entrar com e-mail e senha.',
+
+  // Vincular/trocar senha de uma conta que hoje só entra via Google
+  'auth/provider-already-linked': 'Esta conta já tem uma senha definida.',
+  'auth/credential-already-in-use': 'Essa senha já está associada a outra conta.',
+  'auth/requires-recent-login': 'Por segurança, saia e entre novamente antes de definir a senha.',
 };
 
 /** Extrai o código `auth/...` de um erro do Firebase (se houver). */
