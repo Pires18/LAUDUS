@@ -384,7 +384,11 @@ const MORFOLOGICO_2T = (): StructuredSection[] => [
   VITALIDADE(),
   BIOMETRIA(true),
   ...ANATOMIA_2T(),
-  DOPPLER_FETAL(),
+  // oftálmicas incluídas no 2T como marcador Doppler de pré-eclâmpsia (rastreio
+  // 20–28 sem, ISUOG/§8): a razão P2/P1 é GA-independente e o chip ao vivo já a
+  // computa. NÃO habilita o risco QUANTITATIVO da FMF aqui — o modelo implementado
+  // (O'Gorman 2016 + medianas Tan 2018) é de 1º trimestre; ver liveCompute (trava 1ºT).
+  DOPPLER_FETAL({ oftalmicas: true }),
   CORDAO(),
   PLACENTA(),
   LIQUIDO(),

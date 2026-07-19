@@ -776,15 +776,19 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    ÍNDICE CARDIOTORÁCICO: normal 0,25–0,35 (área coração/área tórax).
    EIXO CARDÍACO: normal 45° ± 20° (apontando para hemitórax E).
 
-   RECOMENDAÇÃO DE ECOCARDIOGRAFIA FETAL — DOIS NÍVEIS (aplicar em todo exame de 1T/2T):
-     ► NÍVEL ROTINA (todas as gestantes): recomendar ecocardiografia fetal de rotina entre 24–28 semanas
-       como complemento do rastreio cardíaco (que se inicia no morfológico 2T). Redigir como recomendação de
-       seguimento, não como urgência. (Alinha-se ao acesso ampliado do rastreio cardíaco no pré-natal — MS/Lei
-       14.598/2023; a triagem cardíaca básica ocorre no morfológico 2T.)
-     ► NÍVEL INDICAÇÃO FORMAL (torna a eco PRIORITÁRIA/mandatória, não apenas recomendada): TN ≥3,5 mm/>P99,
-       DV com onda "a" alterada, regurgitação tricúspide, malformação extracardíaca, DM pré-gestacional/mau
-       controle, cardiopatia congênita familiar, teratógenos, gemelar monocoriônica, arritmia fetal, hidropsia.
-       Nesses casos: "ecocardiografia fetal formalmente indicada" (FEBRASGO 2023/SBC), preferencialmente 24–28 sem.
+   RECOMENDAÇÃO DE ECOCARDIOGRAFIA FETAL — DOIS NÍVEIS:
+     ► NÍVEL ROTINA — EXCLUSIVO DO MORFOLÓGICO DE 2º TRIMESTRE: recomendar ecocardiografia fetal de rotina,
+       preferencialmente entre 24–28 semanas (SEMPRE com a janela de data-calendário calculada — ver §19.j),
+       como complemento do rastreio cardíaco realizado NESTE exame. Redigir como recomendação de seguimento,
+       não como urgência. (Alinha-se ao acesso ampliado do rastreio cardíaco no pré-natal — MS/Lei 14.598/2023.)
+       ⚠️ NÃO emitir esta recomendação de ROTINA em NENHUM outro exame (morfológico 1T, obstétrica com/sem
+       Doppler, cervicometria, neurossonografia, ecocardiograma, gemelar). Nesses, a eco só é citada por gatilho
+       formal (nível abaixo) ou como rastreio cardíaco já executado no próprio exame — nunca como eco de rotina.
+     ► NÍVEL INDICAÇÃO FORMAL (torna a eco PRIORITÁRIA/mandatória; aplicável em QUALQUER exame quando presente o
+       gatilho): TN ≥3,5 mm/>P99, DV com onda "a" alterada, regurgitação tricúspide, malformação extracardíaca,
+       DM pré-gestacional/mau controle, cardiopatia congênita familiar, teratógenos, gemelar monocoriônica,
+       arritmia fetal, hidropsia. Nesses casos: "ecocardiografia fetal formalmente indicada" (FEBRASGO 2023/SBC),
+       preferencialmente entre 24–28 sem, com a janela de data-calendário (§19.j).
 
 15. NEUROSSONOGRAFIA FETAL — Estruturas-chave
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -871,8 +875,8 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    STFF Estadio II–V: ATIVAR R6 — "ALERTA OBSTÉTRICO: STFF avançado — fetosc. a laser em centro de ref. urgente."
    Colo curto (<25 mm): "Avaliação perinatológica — cervicagem ou progesterona vaginal conforme IG e indicação."
    Colo <10 mm: ATIVAR R6 — "ALERTA OBSTÉTRICO: colo muito curto — internação e avaliação obstétrica."
-   Eco fetal de rotina: "Recomenda-se ecocardiografia fetal entre 24–28 semanas como complemento do rastreio cardíaco."
-   Eco fetal indicada (gatilho formal): "Ecocardiografia fetal formalmente indicada por [achado] (FEBRASGO/SBC) — priorizar entre 24–28 semanas."
+   Eco fetal de rotina (SOMENTE no morfológico de 2º trimestre): "Recomenda-se ecocardiografia fetal como complemento do rastreio cardíaco realizado neste exame, preferencialmente entre DD/MM/AAAA e DD/MM/AAAA (correspondente a 24–28 semanas)."
+   Eco fetal indicada (gatilho formal — qualquer exame): "Ecocardiografia fetal formalmente indicada por [achado] (FEBRASGO/SBC) — priorizar entre DD/MM/AAAA e DD/MM/AAAA (correspondente a 24–28 semanas)."
    Doppler oftálmico normal (<0,65): "Razão P2/P1 da artéria oftálmica abaixo do limiar — sem sinal Doppler de risco aumentado para pré-eclâmpsia."
    Doppler oftálmico alterado (≥0,65): "[ALERTA DE RISCO OBSTÉTRICO] Razão P2/P1 da artéria oftálmica ≥0,65 — risco aumentado para pré-eclâmpsia; integrar ao rastreio combinado (PAM, IP das uterinas, PlGF) e considerar AAS 150 mg antes de 16 sem."
    PAPP-A baixo isolado (<0,4 MoM): "PAPP-A reduzida com cariótipo/rastreio normais — risco aumentado de insuficiência placentária (RCIU/PE); vigilância de crescimento e Doppler; considerar AAS."
@@ -895,7 +899,16 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
    g. SÍNTESE DOPPLER (exames com Doppler): obrigatória na conclusão, mesmo normal.
    h. MÚLTIPLA GESTAÇÃO: sempre declarar corionicidade e amnionicidade.
       Monocoriônica sem corionicidade determinada = R6 (medicina fetal urgente).
-   i. ORDEM DA CONCLUSÃO: N4 → N3 → N2 → N1 → N0. Nunca inverter.`,
+   i. ORDEM DA CONCLUSÃO: N4 → N3 → N2 → N1 → N0. Nunca inverter.
+   j. AGENDAMENTO COM FAIXA DE DATA (OBRIGATÓRIO): toda recomendação de exame futuro ou de reavaliação DEVE
+      trazer a janela de data-calendário, calculada a partir da DATA DO EXAME e da IG de referência
+      (data-alvo = data do exame + [IG-alvo − IG de referência]). Formato padrão: "preferencialmente entre
+      DD/MM/AAAA e DD/MM/AAAA (correspondente a XX–XX semanas)". PROIBIDO recomendar um exame apenas por
+      semanas-alvo sem a data-calendário. A urgência define o intervalo (N2: 2–4 sem; N3: 1–2 sem; N4:
+      dias/imediato). Âncora cronológica: usar SEMPRE a data do exame fornecida, nunca a data real do sistema.
+   k. ECOCARDIOGRAFIA DE ROTINA — ESCOPO ÚNICO: a recomendação de eco fetal de ROTINA (complemento do rastreio)
+      é emitida APENAS no morfológico de 2º trimestre (ver §14). Nos demais exames, a eco só aparece por gatilho
+      formal ou como rastreio cardíaco já realizado no próprio exame — nunca como recomendação de rotina.`,
 
   // ═══════════════════════════════════════════════════════════════
   // GINECOLOGIA
@@ -2902,8 +2915,8 @@ MAPA DE EXAMES DESTA ÁREA (6 templates de Camada 3):
    IR ACM neonatal               │ 0,60–0,80                      │ >0,90 = HIC → R6
    Ângulo alfa (Graf)            │ ≥60° = tipo I (maduro)         │ <43° = luxado → N4
    Cobertura cefálica (quadril)  │ >50%                           │ <50% = displasia → N3
-   Espessura muscular piloro      │ <4 mm                          │ ≥4 mm = EHP → R6
-   Comprimento canal pilórico    │ <17 mm                         │ ≥17 mm = EHP → R6
+   Espessura muscular piloro      │ <4 mm                          │ ≥4 mm = alterado (EHP = AMBOS)
+   Comprimento canal pilórico    │ <17 mm                         │ ≥17 mm = alterado (EHP = AMBOS)
    Apêndice (diâm.)              │ <6 mm, compressível            │ >6 mm incompress. → R6
    DAP renal (neonato)           │ <7 mm                          │ >10 mm = HN significativa
    DAP renal (criança)           │ <7 mm                          │ >15 mm → N4 urologia

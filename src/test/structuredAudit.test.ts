@@ -236,7 +236,10 @@ describe('AUDITORIA — calculadoras integradas', () => {
     // as que não têm âncora em campo são ferramentas de consulta avulsa —
     // continuam acessíveis pelo menu de calculadoras da área
     const semCampo = CALCULATORS.filter((c) => !porCampo.has(c.id)).map((c) => c.id).sort();
-    expect(semCampo).toEqual(['organ-refs', 'pleural-effusion']);
+    // fmf-preeclampsia-risk-2t: calculadora de 2ª visita EM VALIDAÇÃO, disponível
+    // como ferramenta avulsa do menu de medicina fetal (não ancorada a campo, pois
+    // o risco quantitativo de 2º T ainda não entra em laudo automaticamente).
+    expect(semCampo).toEqual(['fmf-preeclampsia-risk-2t', 'organ-refs', 'pleural-effusion']);
   });
 
   it('os escores com calculadora dedicada estão vinculados ao campo de categoria', () => {
@@ -418,16 +421,23 @@ describe('AUDITORIA — limiares clínicos: motor × prompt da IA', () => {
   const tplPed = { id: 't', area: 'pediatria', name: 'ABDOME TOTAL PEDIÁTRICO', title: '', technique: '', analysisTemplate: '<p><strong>X:</strong> y.</p>', conclusionTemplate: '', recommendationsTemplate: '', createdAt: 0, updatedAt: 0 } as never;
   const tplGyn = { id: 't', area: 'ginecologia', name: 'PÉLVICA TRANSVAGINAL', title: '', technique: '', analysisTemplate: '<p><strong>X:</strong> y.</p>', conclusionTemplate: '', recommendationsTemplate: '', createdAt: 0, updatedAt: 0 } as never;
 
-  it('PILORO (EHP): músculo ≥ 4 mm · canal ≥ 17 mm — cortes do prompt', () => {
+  it('PILORO (EHP): exige AMBOS — músculo ≥ 4 mm E canal ≥ 17 mm (casado com o prompt)', () => {
     const s = deriveStructuredSchema(tplPed, 'pediatria');
-    const est = (val: Record<string, string>) => computeDerivations(s, val).find((x) => x.id === 'piloro__est')?.alert;
-    // fronteiras exatas: 3,9/16 ainda é normal; 4/17 já é estenose
-    expect(est({ piloro_musculo: '3,9' }), 'músculo 3,9 mm').toBe(false);
-    expect(est({ piloro_musculo: '4' }), 'músculo 4 mm').toBe(true);
-    expect(est({ piloro_canal: '16' }), 'canal 16 mm').toBe(false);
-    expect(est({ piloro_canal: '17' }), 'canal 17 mm').toBe(true);
-    // qualquer um dos dois critérios basta
-    expect(est({ piloro_musculo: '2', piloro_canal: '18' })).toBe(true);
+    const chip = (val: Record<string, string>) => computeDerivations(s, val).find((x) => x.id === 'piloro__est');
+    // EHP plena = os DOIS critérios (o prompt afirma "EHP = AMBOS")
+    const full = chip({ piloro_musculo: '4', piloro_canal: '17' });
+    expect(full?.text).toContain('estenose hipertrófica');
+    expect(full?.alert).toBe(true);
+    // um só no limiar → parcial: alerta para medir o outro, NÃO afirma EHP
+    const soMusculo = chip({ piloro_musculo: '4' });
+    expect(soMusculo?.alert, 'músculo 4 mm isolado alerta').toBe(true);
+    expect(soMusculo?.text).toMatch(/limiar/);
+    expect(soMusculo?.text).not.toContain('estenose hipertrófica');
+    const soCanal = chip({ piloro_canal: '17' });
+    expect(soCanal?.text).toMatch(/limiar/);
+    // fronteiras exatas: 3,9/16 ainda é normal (ambos abaixo)
+    expect(chip({ piloro_musculo: '3,9', piloro_canal: '16' })?.alert, '3,9/16').toBe(false);
+    expect(chip({ piloro_musculo: '3,9' })?.alert).toBe(false);
   });
 
   it('APÊNDICE: > 6 mm — o corte não mudou', () => {

@@ -424,14 +424,32 @@ export function computeDerivations(
   const pilMusc = num(v['piloro_musculo']);
   const pilCanal = num(v['piloro_canal']);
   if (pilMusc != null || pilCanal != null) {
-    // cortes da tabela de referência do prompt da área (areaPrompts.ts):
-    // músculo ≥ 4 mm · canal ≥ 17 mm. O chip e o laudo da IA têm de concordar.
-    const est = (pilMusc != null && pilMusc >= 4) || (pilCanal != null && pilCanal >= 17);
-    out.push({ id: 'piloro__est', sectionId: secOf('piloro_musculo', 'piloro'), label: 'Piloro', text: est ? 'critérios de estenose hipertrófica' : 'dentro dos limites', alert: est });
+    // EHP exige AMBOS (não um isolado): espessura muscular ≥ 4 mm E comprimento
+    // do canal ≥ 17 mm (areaPrompts pediatria). Um só no limiar → medir o outro.
+    const muscHigh = pilMusc != null && pilMusc >= 4;
+    const canalHigh = pilCanal != null && pilCanal >= 17;
+    const est = muscHigh && canalHigh;
+    const parcial = !est && (muscHigh || canalHigh);
+    const text = est
+      ? 'critérios de estenose hipertrófica (músculo ≥ 4 e canal ≥ 17)'
+      : parcial
+        ? 'uma medida no limiar de EHP — medir/confirmar o outro parâmetro'
+        : 'dentro dos limites';
+    out.push({ id: 'piloro__est', sectionId: secOf('piloro_musculo', 'piloro'), label: 'Piloro', text, alert: est || parcial });
   }
   const apDiam = num(v['apendice_diam']);
   if (apDiam != null) {
     out.push({ id: 'apendice__diam', sectionId: secOf('apendice_diam', 'apendice'), label: 'Apêndice', text: `${fmt(apDiam, 0)} mm${apDiam > 6 ? ' — sugestivo de apendicite (> 6)' : ''}`, alert: apDiam > 6 });
+  }
+
+  // ── Fetal (ecocardiograma): relação cardiotorácica — cardiomegalia se > 0,35 ──
+  // O campo `rct` tem faixa normal aproximada ('≈ 0,3'), que o abnormalRange NÃO
+  // auto-classifica; o chip aplica o mesmo corte da tabela do prompt (§14:
+  // normal 0,25–0,35), mantendo motor e IA em concordância.
+  const rct = num(v['rct']);
+  if (rct != null && rct > 0) {
+    const cardiomegalia = rct > 0.35;
+    out.push({ id: 'rct__card', sectionId: secOf('rct', 'situs'), label: 'Relação cardiotorácica', text: `${fmt(rct)}${cardiomegalia ? ' — cardiomegalia (> 0,35)' : ''}`, alert: cardiomegalia });
   }
 
   // ── Átrio ventricular: ventriculomegalia (> 10 mm) ──

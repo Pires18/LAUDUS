@@ -19,6 +19,7 @@ import { IvcIndexCalculator } from './components/IvcIndexCalculator';
 import { VenousCartographyCalculator } from './components/VenousCartographyCalculator';
 import { TrisomyRiskCalculator } from './components/TrisomyRiskCalculator';
 import { PreeclampsiaRiskCalculator } from './components/PreeclampsiaRiskCalculator';
+import { Preeclampsia2tRiskCalculator } from './components/Preeclampsia2tRiskCalculator';
 
 import { ExamArea } from '../../types';
 
@@ -251,6 +252,17 @@ export const CALCULATORS: CalculatorDef[] = [
     reference: {
       text: 'Implementação AUDITADA e fiel aos modelos publicados (fatores maternos Wright D et al., AJOG 2015; riscos competitivos O\'Gorman 2016; medianas Tan et al., UOG 2018; PSV oftálmico Gana 2022; conduta AAS por ASPRE, Rolnik et al., NEJM 2017), validada caso-a-caso contra a calculadora OFICIAL de PE da FMF (jul/2026; risco e conduta AAS idênticos) — apoio à decisão; não substitui a calculadora oficial nem o julgamento clínico.',
       link: 'https://pubmed.ncbi.nlm.nih.gov/25724400/'
+    }
+  },
+  {
+    id: 'fmf-preeclampsia-risk-2t',
+    name: 'Risco de Pré-eclâmpsia (2º trimestre) — EM VALIDAÇÃO',
+    description: 'Rastreamento de 2ª visita (19–24+6 sem) por fatores maternos + MAP, IP uterinas e PlGF (riscos competitivos). EM VALIDAÇÃO (para teste): ainda não conferida contra a calculadora oficial da FMF.',
+    component: Preeclampsia2tRiskCalculator,
+    areas: ['medicina-fetal'],
+    reference: {
+      text: 'Modelo de 2º trimestre transcrito das fontes: fatores maternos Wright D et al., AJOG 2015 (prior compartilhado); biomarcadores por riscos competitivos Gallo DM et al., AJOG 2016;214:619; medianas "nos três trimestres" de Tayyar A et al. (IP uterino, UOG 2015;45:689), Wright A et al. (MAP, UOG 2015;45:698) e Tsiakkas A et al. (PlGF, UOG 2015;45:591). EM VALIDAÇÃO — pendente de conferência caso-a-caso contra a calculadora OFICIAL da FMF (2ª visita); não usar para decisão clínica.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/26645684/'
     }
   },
 
