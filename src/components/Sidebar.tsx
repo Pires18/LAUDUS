@@ -54,6 +54,9 @@ export function Sidebar() {
   const { isAdmin, role } = useAdmin();
   const { hasPacs, hasCalculators, hasAppointments, hasClinics } = useSubscription();
   const isTablet = useIsTablet();
+  // Recepção não tem assinatura própria: os módulos liberados ao papel são
+  // exibidos sempre (o acesso real é limitado pelo vínculo e pelas regras).
+  const isReception = role === 'recepcao';
 
   // Auto-collapse on tablet, expanded on desktop
   useEffect(() => {
@@ -241,26 +244,28 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto custom-scrollbar">
-        {/* New Exam CTA */}
-        <button
-          onClick={() => setShowCreateExamModal(true)}
-          className={classNames(
-            'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-ink-900 text-white hover:bg-ink-800 active:scale-95 shadow-sm',
-            collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
-          )}
-          title="Novo Laudo"
-        >
-          <FilePlus size={collapsed ? 18 : 16} className="shrink-0" />
-          {!collapsed && <span className="animate-fade-in">Novo Laudo</span>}
-        </button>
+        {/* New Exam CTA — recepção não cria laudos */}
+        {!isReception && (
+          <button
+            onClick={() => setShowCreateExamModal(true)}
+            className={classNames(
+              'w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 mb-4 bg-ink-900 text-white hover:bg-ink-800 active:scale-95 shadow-sm',
+              collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+            )}
+            title="Novo Laudo"
+          >
+            <FilePlus size={collapsed ? 18 : 16} className="shrink-0" />
+            {!collapsed && <span className="animate-fade-in">Novo Laudo</span>}
+          </button>
+        )}
 
         {items
           .filter(item => item.roles.includes(role || 'medico'))
           .filter(item => {
             if (item.key === 'dicom') return hasPacs;
             if (item.key === 'calculators') return hasCalculators;
-            if (item.key === 'appointments') return hasAppointments;
-            if (item.key === 'clinics') return hasClinics;
+            if (item.key === 'appointments') return hasAppointments || isReception;
+            if (item.key === 'clinics') return hasClinics || isReception;
             return true;
           })
           .map(item => {

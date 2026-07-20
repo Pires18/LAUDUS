@@ -13,7 +13,7 @@
 
 export interface ClinicOwnerInfo {
   ownerId: string;
-  role: 'editor' | 'viewer';
+  role: 'editor' | 'viewer' | 'recepcao';
 }
 
 let clinicOwnerMap: Record<string, ClinicOwnerInfo> = {};
@@ -32,7 +32,7 @@ export function getClinicOwnerInfo(clinicId: string | null | undefined): ClinicO
   return clinicOwnerMap[clinicId] || null;
 }
 
-const CLINIC_SCOPED_COLLECTIONS = new Set(['patients', 'exams', 'appointments']);
+const CLINIC_SCOPED_COLLECTIONS = new Set(['patients', 'exams', 'appointments', 'clinical_records']);
 
 /**
  * Resolve o uid da subárvore a usar para um `collectionName`.

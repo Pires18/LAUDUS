@@ -30,7 +30,7 @@ export function useClinicMemberships(): void {
       (snapshot) => {
         const map: Record<string, ClinicOwnerInfo> = {};
         snapshot.forEach((d) => {
-          const data = d.data() as { clinicId?: string; ownerId?: string; role?: 'editor' | 'viewer' };
+          const data = d.data() as { clinicId?: string; ownerId?: string; role?: 'editor' | 'viewer' | 'recepcao' };
           if (data.clinicId && data.ownerId) {
             map[data.clinicId] = { ownerId: data.ownerId, role: data.role || 'viewer' };
           }

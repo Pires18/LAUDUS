@@ -10,10 +10,13 @@ import {
   ChevronRight, CheckCircle2, RotateCcw, X, Users
 } from 'lucide-react';
 import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
+import { useAdmin } from '../../hooks/useAdmin';
 
 export function Clinics() {
   const { setView, selectedClinicId, setSelectedClinic } = useApp();
   const { hasClinics, clinicsQuota } = useSubscription();
+  // Recepção acessa a lista para ver as clínicas compartilhadas com ela.
+  const { role } = useAdmin();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'todas' | 'ativas' | 'inativas'>('todas');
 
@@ -42,7 +45,7 @@ export function Clinics() {
     inactive: clinics.filter(c => !c.active).length,
   }), [clinics]);
 
-  if (!hasClinics) {
+  if (!hasClinics && role !== 'recepcao') {
     return (
       <FeatureLocked
         title="Módulo de Clínicas"

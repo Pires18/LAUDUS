@@ -3,6 +3,7 @@ import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { deleteItem } from '../../store/db';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ClinicTeamCard } from '../../components/ClinicTeamCard';
+import { ReceptionAccessCard } from '../../components/ReceptionAccessCard';
 import { Clinic, ExamRequest } from '../../types';
 import { 
   Building2, MapPin, Phone, Mail, 
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { classNames, formatCNPJ, formatPhone } from '../../utils/format';
+import { useAdmin } from '../../hooks/useAdmin';
 
 interface Props {
   clinicId: string;
@@ -19,6 +21,9 @@ interface Props {
 
 export function ClinicDetail({ clinicId }: Props) {
   const { setView, showToast, selectedClinicId, setSelectedClinic, clinicOwnerMap } = useApp();
+  // Gestão de equipe/recepção é do dono da clínica — oculta para a recepção.
+  const { role } = useAdmin();
+  const isReception = role === 'recepcao';
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Só força a clínica ativa quando é COMPARTILHADA (dono != usuário atual):
@@ -282,7 +287,13 @@ export function ClinicDetail({ clinicId }: Props) {
               </div>
             )}
 
-            <ClinicTeamCard clinicId={clinicId} />
+            {!isReception && (
+              <>
+                <ClinicTeamCard clinicId={clinicId} />
+
+                <ReceptionAccessCard clinicId={clinicId} />
+              </>
+            )}
 
             {/* Address & Info */}
             <div className="bg-white rounded-2xl border border-ink-200 shadow-sm p-5 space-y-4">

@@ -1,6 +1,6 @@
 import { getDb, getAdminAuth } from './_firebase.js';
 
-const VALID_ROLES = ['editor', 'viewer'];
+const VALID_ROLES = ['editor', 'viewer', 'recepcao'];
 
 /**
  * Convida um usuário existente para colaborar em uma clínica do chamador.

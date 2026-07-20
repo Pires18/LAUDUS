@@ -11,9 +11,13 @@ import { UserPlus, Search, Trash2, Users as UsersIcon, Loader2, X, Star } from '
 import { calculateAge, formatDate, formatCPF, formatPhone, classNames } from '../../utils/format';
 import { PatientForm } from './PatientForm';
 import { ListSkeleton } from '../../components/SkeletonLoader';
+import { useAdmin } from '../../hooks/useAdmin';
 
 export function Patients() {
   const { setView, showToast, patientsSearch: search, setPatientsSearch: setSearch } = useApp();
+  // Recepção lista, cadastra e edita pacientes — mas não exclui.
+  const { role } = useAdmin();
+  const isReception = role === 'recepcao';
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; examCount: number } | null>(null);
   const [followUpOnly, setFollowUpOnly] = useState(false);
@@ -242,12 +246,14 @@ export function Patients() {
                         <td className="px-4 py-3 text-ink-600 font-mono text-xs">{p.cpf ? formatCPF(p.cpf) : '—'}</td>
                         <td className="px-4 py-3 text-ink-600 text-sm truncate">{p.insurance || '—'}</td>
                         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => handleRequestDelete(p.id, p.name, e)}
-                            className="text-ink-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-xl hover:bg-red-50"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {!isReception && (
+                            <button
+                              onClick={(e) => handleRequestDelete(p.id, p.name, e)}
+                              className="text-ink-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-xl hover:bg-red-50"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -288,12 +294,14 @@ export function Patients() {
                         {p.phone && <><span>·</span><span>{formatPhone(p.phone)}</span></>}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleRequestDelete(p.id, p.name, e); }}
-                      className="p-2 text-ink-400 hover:text-red-600 active:bg-red-50 rounded-xl"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {!isReception && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRequestDelete(p.id, p.name, e); }}
+                        className="p-2 text-ink-400 hover:text-red-600 active:bg-red-50 rounded-xl"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

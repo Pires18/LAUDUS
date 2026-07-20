@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { useAuth } from '../../hooks/useAuth';
+import { useAdmin } from '../../hooks/useAdmin';
 import { getAiUsageStats } from '../../store/db';
 import { useSubscription } from '../../hooks/useSubscription';
 import { ExamRequest, Patient, Clinic, EXAM_AREAS, Appointment } from '../../types';
@@ -29,6 +30,9 @@ import { SetupChecklist } from '../../components/SetupChecklist';
 export function Dashboard() {
   const { user } = useAuth();
   const { setView, selectedClinicId, settings, updateSettings, setShowCreateExamModal } = useApp();
+  // Recepção: o painel só considera laudos finalizados (mesma regra da fila).
+  const { role } = useAdmin();
+  const isReception = role === 'recepcao';
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: clinics } = useCollection<Clinic>('clinics');
@@ -66,10 +70,11 @@ export function Dashboard() {
     }).catch(() => {});
   }, []);
 
-  const filteredExams = useMemo(() =>
-    selectedClinicId ? exams.filter(e => e.clinicId === selectedClinicId) : exams,
-    [exams, selectedClinicId]
-  );
+  const filteredExams = useMemo(() => {
+    let result = selectedClinicId ? exams.filter(e => e.clinicId === selectedClinicId) : exams;
+    if (isReception) result = result.filter(e => e.status === 'finalizado');
+    return result;
+  }, [exams, selectedClinicId, isReception]);
 
   const stats = useMemo(() => {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -188,13 +193,15 @@ export function Dashboard() {
               <LayoutList size={14} />
               <span className="hidden sm:inline">Worklist</span>
             </button>
-            <button
-              onClick={() => setShowCreateExamModal(true)}
-              className="h-9 px-4 rounded-xl bg-ink-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-ink-800 transition-all flex items-center gap-2 active:scale-95 shadow-sm"
-            >
-              <FilePlus size={14} />
-              <span className="hidden sm:inline">Novo Laudo</span>
-            </button>
+            {!isReception && (
+              <button
+                onClick={() => setShowCreateExamModal(true)}
+                className="h-9 px-4 rounded-xl bg-ink-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-ink-800 transition-all flex items-center gap-2 active:scale-95 shadow-sm"
+              >
+                <FilePlus size={14} />
+                <span className="hidden sm:inline">Novo Laudo</span>
+              </button>
+            )}
           </div>
         </div>
 

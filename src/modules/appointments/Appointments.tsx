@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useApp } from '../../store/app';
 import { useCollection } from '../../hooks/useFirestore';
 import { useSubscription } from '../../hooks/useSubscription';
+import { useAdmin } from '../../hooks/useAdmin';
 import { FeatureLocked } from '../../components/FeatureLocked';
 import { addItemWithId, genId, updateItem, deleteItem, generateNumericId } from '../../store/db';
 import { Patient, ReportTemplate, Clinic, ExamRequest, Appointment } from '../../types';
@@ -31,6 +32,9 @@ import { ShiftConfigPanel } from './components/ShiftConfigPanel';
 export function Appointments() {
   const { setView, selectedClinicId, showToast, settings } = useApp();
   const { hasAppointments } = useSubscription();
+  // Recepção não tem assinatura própria — o módulo abre pelo papel; o alcance
+  // real é dado pelo vínculo de clínica e pelas regras do Firestore.
+  const { role } = useAdmin();
   const { data: appointments, loading: loadingAppointments } = useCollection<Appointment>('appointments');
   const { data: patients } = useCollection<Patient>('patients');
   const { data: templates } = useCollection<ReportTemplate>('templates');
@@ -403,7 +407,7 @@ export function Appointments() {
     }
   };
 
-  if (!hasAppointments) {
+  if (!hasAppointments && role !== 'recepcao') {
     return (
       <FeatureLocked
         title="Módulo de Agendamentos"

@@ -4,7 +4,7 @@ import { Clinic } from '../types';
 import { classNames } from '../utils/format';
 
 interface Props {
-  clinics: (Clinic & { shared?: boolean; role?: 'editor' | 'viewer' })[];
+  clinics: (Clinic & { shared?: boolean; role?: 'editor' | 'viewer' | 'recepcao' })[];
   onSelect: (clinicId: string | null, remember: boolean) => void;
 }
 

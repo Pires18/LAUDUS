@@ -12,6 +12,7 @@ import { where } from 'firebase/firestore';
 import { AnamnesisConsentModal } from '../editor/components/AnamnesisConsentModal';
 import { ClinicalRecordsSection } from './components/ClinicalRecordsSection';
 import { deleteField } from '../../store/db';
+import { useAdmin } from '../../hooks/useAdmin';
 
 interface Props {
   patientId: string;
@@ -19,6 +20,10 @@ interface Props {
 
 export function PatientDetail({ patientId }: Props) {
   const { setView, showToast, selectedClinicId, setShowCreateExamModal, setCreateExamDefaultPatient } = useApp();
+  // Recepção: edita dados cadastrais, mas não vê prontuário clínico nem cria
+  // laudos; o histórico de exames dela mostra apenas os finalizados.
+  const { role } = useAdmin();
+  const isReception = role === 'recepcao';
   const [editing, setEditing] = useState(false);
   const [selectedExamForModal, setSelectedExamForModal] = useState<ExamRequest | null>(null);
   const [modalTab, setModalTab] = useState<'metadata' | 'patient' | 'consent'>('metadata');
@@ -52,9 +57,11 @@ export function PatientDetail({ patientId }: Props) {
 
   // Apply clinic filter if selected
   const filteredExams = useMemo(() => {
-    if (!selectedClinicId) return sortedExams;
-    return sortedExams.filter(e => e.clinicId === selectedClinicId);
-  }, [sortedExams, selectedClinicId]);
+    let result = sortedExams;
+    if (selectedClinicId) result = result.filter(e => e.clinicId === selectedClinicId);
+    if (isReception) result = result.filter(e => e.status === 'finalizado');
+    return result;
+  }, [sortedExams, selectedClinicId, isReception]);
 
   if (patientLoading) {
     return (
@@ -207,16 +214,18 @@ export function PatientDetail({ patientId }: Props) {
                 <span className="hidden sm:inline">Editar Dados</span>
                 <span className="sm:hidden">Editar</span>
               </button>
-              <button
-                onClick={() => {
-                  setCreateExamDefaultPatient(patient);
-                  setShowCreateExamModal(true);
-                }}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
-              >
-                <Plus size={11} />
-                Novo Laudo
-              </button>
+              {!isReception && (
+                <button
+                  onClick={() => {
+                    setCreateExamDefaultPatient(patient);
+                    setShowCreateExamModal(true);
+                  }}
+                  className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                >
+                  <Plus size={11} />
+                  Novo Laudo
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -369,8 +378,8 @@ export function PatientDetail({ patientId }: Props) {
           </div>
         </div>
 
-        {/* ─── PRONTUÁRIO CLÍNICO ─── */}
-        <ClinicalRecordsSection patientId={patientId} />
+        {/* ─── PRONTUÁRIO CLÍNICO (conteúdo médico — oculto para a recepção) ─── */}
+        {!isReception && <ClinicalRecordsSection patientId={patientId} />}
 
         {/* ─── EXAMS LIST CONTAINER ─── */}
         <div className="bg-white rounded-2xl border border-ink-200 shadow-sm overflow-hidden">

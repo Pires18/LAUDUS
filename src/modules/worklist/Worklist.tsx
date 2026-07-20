@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '../../components/SkeletonLoader';
 import { AreaIcon } from '../../components/AreaIcon';
+import { useAdmin } from '../../hooks/useAdmin';
 import { syncExamToOrthancWorklist } from '../../utils/dicom';
 import { logger } from '../../utils/logger';
 import type { LucideIcon } from 'lucide-react';
@@ -34,6 +35,10 @@ export function Worklist() {
   } = useApp();
   
   const PAGE_SIZE = 100;
+  // Recepção: a fila mostra APENAS laudos finalizados, sem ações de escrita
+  // (as regras do Firestore também bloqueiam qualquer escrita em exams).
+  const { role } = useAdmin();
+  const isReception = role === 'recepcao';
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showAreaFilter, setShowAreaFilter] = useState(false);
   const [editExamId, setEditExamId] = useState<string | null>(null);
@@ -141,9 +146,13 @@ export function Worklist() {
 
   const filtered = useMemo(() => {
     let result = filteredWithoutStatus;
-    if (statusFilter !== 'todos') result = result.filter(e => e.status === statusFilter);
+    if (isReception) {
+      result = result.filter(e => e.status === 'finalizado');
+    } else if (statusFilter !== 'todos') {
+      result = result.filter(e => e.status === statusFilter);
+    }
     return result.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [filteredWithoutStatus, statusFilter]);
+  }, [filteredWithoutStatus, statusFilter, isReception]);
 
   const visibleExams = filtered;
   const hasMore = hasMoreFromServer;
@@ -157,7 +166,7 @@ export function Worklist() {
   // específico), carregamos TODAS as páginas do servidor. Isso garante que a
   // lista exibida corresponda às contagens reais — sem isso, ao clicar em
   // "Finalizado" a lista mostraria só os finalizados da 1ª página de 100.
-  const shouldLoadAll = secondaryFilterActive || statusFilter !== 'todos';
+  const shouldLoadAll = secondaryFilterActive || statusFilter !== 'todos' || isReception;
   const clearAllFilters = () => {
     setStatusFilter('todos');
     setAreaFilter('todas');
@@ -284,27 +293,40 @@ export function Worklist() {
             <div className="min-w-0">
               <h1 className="text-base font-black text-ink-900 tracking-tight leading-none">Fila de Exames</h1>
               <p className="text-[11px] text-ink-500 font-medium mt-0.5 truncate">
-                {counts.todos} exame{counts.todos !== 1 ? 's' : ''}
-                {counts.pendente > 0 && (
-                  <span className="ml-1.5 text-amber-600 font-bold">· {counts.pendente} aguardando</span>
+                {isReception ? (
+                  <span>{counts.finalizado} laudo{counts.finalizado !== 1 ? 's' : ''} finalizado{counts.finalizado !== 1 ? 's' : ''}</span>
+                ) : (
+                  <>
+                    {counts.todos} exame{counts.todos !== 1 ? 's' : ''}
+                    {counts.pendente > 0 && (
+                      <span className="ml-1.5 text-amber-600 font-bold">· {counts.pendente} aguardando</span>
+                    )}
+                  </>
                 )}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowCreateExamModal(true)}
-            className="h-9 px-4 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 active:scale-95"
-          >
-            <FilePlus size={14} />
-            <span className="hidden sm:inline">Novo Laudo</span>
-          </button>
+          {isReception ? (
+            <span className="h-9 px-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shrink-0">
+              <CheckCircle2 size={13} />
+              <span className="hidden sm:inline">Somente Finalizados</span>
+            </span>
+          ) : (
+            <button
+              onClick={() => setShowCreateExamModal(true)}
+              className="h-9 px-4 rounded-xl bg-ink-900 hover:bg-ink-800 text-white font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 shrink-0 active:scale-95"
+            >
+              <FilePlus size={14} />
+              <span className="hidden sm:inline">Novo Laudo</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* ─── STATUS FILTER + SEARCH BAR em linha ─── */}
       <div className="bg-white border border-ink-200 rounded-2xl shadow-sm mb-4 overflow-hidden">
-        {/* Status pills */}
-        <div className="px-4 pt-4 flex items-center gap-1.5 overflow-x-auto pb-3 border-b border-ink-100">
+        {/* Status pills — recepção não filtra por status (vê só finalizados) */}
+        <div className={classNames("px-4 pt-4 flex items-center gap-1.5 overflow-x-auto pb-3 border-b border-ink-100", isReception && "hidden")}>
           {(['todos', 'pendente', 'em-andamento', 'finalizado'] as const).map(s => {
             const isActive = statusFilter === s;
             const activeColors: Record<string, string> = {
@@ -566,37 +588,41 @@ export function Worklist() {
                             <FileText className="w-4 h-4" />
                           </a>
                         )}
-                        <button
-                          onClick={() => {
-                            setEditData({
-                              requestingPhysician: exam.requestingPhysician || '',
-                              clinicalIndication: exam.clinicalIndication || '',
-                              clinicId: exam.clinicId || '',
-                              status: exam.status,
-                              examDate: toDateInputValue(exam.examDate ?? exam.createdAt)
-                            });
-                            setEditExamId(exam.id);
-                          }}
-                          className="p-2 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 border border-transparent hover:border-brand-100 transition-all"
-                          title="Ajustar Metadados"
-                        >
-                          <UserCog className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender); }}
-                          disabled={syncingExamId === exam.id}
-                          className="p-2 rounded-xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 disabled:opacity-50 transition-all"
-                          title="Enviar para Worklist Orthanc"
-                        >
-                          {syncingExamId === exam.id ? <Loader2 className="w-4 h-4 animate-spin text-emerald-500" /> : <RefreshCw className="w-4 h-4" />}
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(exam.id)}
-                          className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!isReception && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditData({
+                                  requestingPhysician: exam.requestingPhysician || '',
+                                  clinicalIndication: exam.clinicalIndication || '',
+                                  clinicId: exam.clinicId || '',
+                                  status: exam.status,
+                                  examDate: toDateInputValue(exam.examDate ?? exam.createdAt)
+                                });
+                                setEditExamId(exam.id);
+                              }}
+                              className="p-2 rounded-xl text-ink-400 hover:text-brand-600 hover:bg-brand-50 border border-transparent hover:border-brand-100 transition-all"
+                              title="Ajustar Metadados"
+                            >
+                              <UserCog className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender); }}
+                              disabled={syncingExamId === exam.id}
+                              className="p-2 rounded-xl text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 disabled:opacity-50 transition-all"
+                              title="Enviar para Worklist Orthanc"
+                            >
+                              {syncingExamId === exam.id ? <Loader2 className="w-4 h-4 animate-spin text-emerald-500" /> : <RefreshCw className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(exam.id)}
+                              className="p-2 rounded-xl text-ink-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 transition-all"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
                         <div className="hidden xl:flex w-8 h-8 rounded-xl bg-ink-50 text-ink-400 items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0">
                           <ChevronRight className="w-4 h-4" />
                         </div>
@@ -699,19 +725,23 @@ export function Worklist() {
                           <FileText size={14} />
                         </a>
                       )}
-                      <button onClick={() => { setEditData({ requestingPhysician: exam.requestingPhysician || '', clinicalIndication: exam.clinicalIndication || '', clinicId: exam.clinicId || '', status: exam.status, examDate: toDateInputValue(exam.examDate ?? exam.createdAt) }); setEditExamId(exam.id); }}
-                        className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
-                        <UserCog size={14} />
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender); }}
-                        disabled={syncingExamId === exam.id}
-                        className="p-2 rounded-lg text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 transition-colors">
-                        {syncingExamId === exam.id ? <Loader2 size={14} className="animate-spin text-emerald-500" /> : <RefreshCw size={14} />}
-                      </button>
-                      <button onClick={() => setDeleteId(exam.id)}
-                        className="p-2 rounded-lg text-ink-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+                      {!isReception && (
+                        <>
+                          <button onClick={() => { setEditData({ requestingPhysician: exam.requestingPhysician || '', clinicalIndication: exam.clinicalIndication || '', clinicId: exam.clinicId || '', status: exam.status, examDate: toDateInputValue(exam.examDate ?? exam.createdAt) }); setEditExamId(exam.id); }}
+                            className="p-2 rounded-lg text-ink-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
+                            <UserCog size={14} />
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleSyncOrthanc(exam, patient?.name || '', patient?.birthDate, patient?.gender); }}
+                            disabled={syncingExamId === exam.id}
+                            className="p-2 rounded-lg text-ink-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 transition-colors">
+                            {syncingExamId === exam.id ? <Loader2 size={14} className="animate-spin text-emerald-500" /> : <RefreshCw size={14} />}
+                          </button>
+                          <button onClick={() => setDeleteId(exam.id)}
+                            className="p-2 rounded-lg text-ink-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -34,10 +34,14 @@ export function BottomNav() {
                     view.name.includes('exam') || view.name === 'worklist' ? 'worklist' :
                     view.name;
 
+  // Recepção não cria laudos: o botão central vira o acesso à Agenda.
+  const isReception = role === 'recepcao';
   const navItems = [
     { key: 'dashboard', label: 'Início', icon: LayoutDashboard, view: { name: 'dashboard' as const } },
-    { key: 'worklist', label: 'Exames', icon: ClipboardList, view: { name: 'worklist' as const }, badge: pendingCount },
-    { key: 'new-exam', label: 'Novo', icon: FilePlus, onClick: () => setShowCreateExamModal(true) },
+    { key: 'worklist', label: 'Exames', icon: ClipboardList, view: { name: 'worklist' as const }, badge: isReception ? 0 : pendingCount },
+    isReception
+      ? { key: 'new-exam', label: 'Agenda', icon: CalendarDays, onClick: () => setView({ name: 'appointments' }) }
+      : { key: 'new-exam', label: 'Novo', icon: FilePlus, onClick: () => setShowCreateExamModal(true) },
     { key: 'patients', label: 'Pacientes', icon: Users, view: { name: 'patients' as const } },
     { key: 'menu', label: 'Mais', icon: Menu, onClick: () => setIsMenuOpen(true) },
   ];
@@ -60,8 +64,8 @@ export function BottomNav() {
     .filter(item => {
       if (item.key === 'dicom') return hasPacs;
       if (item.key === 'calculators') return hasCalculators;
-      if (item.key === 'appointments') return hasAppointments;
-      if (item.key === 'clinics') return hasClinics;
+      if (item.key === 'appointments') return hasAppointments || isReception;
+      if (item.key === 'clinics') return hasClinics || isReception;
       return true;
     });
 
