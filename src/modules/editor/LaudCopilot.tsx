@@ -13,6 +13,7 @@ import { StructuredTab } from './components/StructuredTab';
 import { deriveCombinedStructuredSchema, summarizeStructured } from './structured/deriveSchema';
 import { combinedExamType } from '../templates/utils';
 import { computeDerivations, derivationsToLines } from './structured/liveCompute';
+import { PatientContext, patientPrefillPatch } from './structured/patientContext';
 import { itemCount, itemFieldId, countKey } from './structured/structuredKeys';
 import { findRepeatContainer } from './structured/containers';
 import { generateReportStream, stripScratchpad } from '../ai/engine';
@@ -192,6 +193,8 @@ interface LaudCopilotProps {
   /** Exame combinado: todas as máscaras (1ª = primária). Ausente = [template]. */
   templates?: ReportTemplate[];
   patient: Patient | null;
+  /** Dados já conhecidos do paciente (idade/sexo/peso/altura) p/ pré-preencher o Estruturado. */
+  patientContext?: PatientContext;
   chatHistory: Array<{ role: 'user' | 'assistant', content: string }>;
   onChatUpdate: (history: Array<{ role: 'user' | 'assistant', content: string }>) => void;
   onShowCalculators: (calcId?: string) => void;
@@ -222,6 +225,7 @@ export function LaudCopilot({
   template,
   templates,
   patient,
+  patientContext,
   chatHistory,
   onChatUpdate,
   onShowCalculators,
@@ -298,8 +302,8 @@ export function LaudCopilot({
   );
   // Cálculo em tempo real (volume, RCP, IG/DPP, índices Doppler…) sem abrir modal.
   const structuredDerivations = useMemo(
-    () => computeDerivations(structuredSchema, structuredValues, exam.examDate || exam.createdAt),
-    [structuredSchema, structuredValues, exam.examDate, exam.createdAt]
+    () => computeDerivations(structuredSchema, structuredValues, exam.examDate || exam.createdAt, patientContext),
+    [structuredSchema, structuredValues, exam.examDate, exam.createdAt, patientContext]
   );
 
   const cancelActiveRequest = () => {
@@ -1037,6 +1041,33 @@ export function LaudCopilot({
     setStructuredValues(next);
     persistStructured(next);
   };
+
+  // Pré-preenche os campos do Estruturado com o que o app JÁ sabe do paciente
+  // (idade da data de nascimento, sexo do cadastro, peso/altura do prontuário) —
+  // só em campos VAZIOS que existam na máscara. Agiliza sem redigitação e
+  // continua editável. Cada id é auto-preenchido no máximo uma vez por exame:
+  // se o médico apagar, não reinsere; se dados chegam depois (peso/altura do
+  // prontuário são assíncronos), completa o que faltava.
+  const prefilledRef = useRef<{ examId: string; ids: Set<string> }>({ examId: '', ids: new Set() });
+  useEffect(() => {
+    if (!patientContext || structuredSchema.sections.length === 0) return;
+    if (prefilledRef.current.examId !== exam.id) {
+      prefilledRef.current = { examId: exam.id, ids: new Set() };
+    }
+    const already = prefilledRef.current.ids;
+    const patch = patientPrefillPatch(structuredSchema, latestStructuredRef.current, patientContext);
+    const fresh: Record<string, StructuredFieldValue> = {};
+    for (const [id, val] of Object.entries(patch)) {
+      if (already.has(id)) continue;
+      fresh[id] = val;
+      already.add(id);
+    }
+    if (Object.keys(fresh).length === 0) return;
+    const next = { ...latestStructuredRef.current, ...fresh };
+    setStructuredValues(next);
+    persistStructured(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exam.id, structuredSchema, patientContext]);
 
   // Polimento: preenche os campos VAZIOS de uma seção como normais (texto →
   // frase-placeholder; select → 1ª opção, que por convenção é a normal).

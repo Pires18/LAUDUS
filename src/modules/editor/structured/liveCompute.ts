@@ -4,6 +4,7 @@ import { itemCount, itemFieldId } from './structuredKeys';
 import { effectiveSectionState } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
 import { meanArterialPressure, bodyMassIndex, seedForCalculator } from './calcSeed';
+import type { PatientContext } from './patientContext';
 import { trisomyRiskFromForm, trisomyHasEvidence, peRiskFromForm } from '../../calculators/fmf/fromForm';
 import { formatOneInN, crlToGaWeeks } from '../../calculators/fmf/qc';
 import type { MarkerState } from '../../calculators/fmf/trisomy';
@@ -81,11 +82,16 @@ function fmtDate(d: Date): string {
 export function computeDerivations(
   schema: StructuredSchema,
   values: Values,
-  examDateMs?: number
+  examDateMs?: number,
+  ctx?: PatientContext
 ): Derivation[] {
   const v = values || {};
   const out: Derivation[] = [];
-  const ref = examDateMs ? new Date(examDateMs) : new Date();
+  // examDate carrega a hora do dia; a datação compara DATAS. Sem truncar para a
+  // meia-noite local, um exame à tarde arredonda a IG +1 dia vs. a calculadora
+  // (que usa 'T00:00:00') — e todos os percentis derivados deslocam junto.
+  const refRaw = examDateMs ? new Date(examDateMs) : new Date();
+  const ref = new Date(refRaw.getFullYear(), refRaw.getMonth(), refRaw.getDate());
 
   // F2 — mapa campo→seção: garante que o chip de "cálculo automático" apareça no
   // compartimento certo (o slug real do heading, ex.: "biometria-fetal"/"dopplerfluxometria",
@@ -284,6 +290,13 @@ export function computeDerivations(
     const vd = loboD ? ellipsoidVolume(loboD[0], loboD[1], loboD[2], 'cm') || 0 : 0;
     const ve = loboE ? ellipsoidVolume(loboE[0], loboE[1], loboE[2], 'cm') || 0 : 0;
     if (vd + ve > 0) out.push({ id: 'tireoide__voltotal', sectionId: secOf('lobo_d_dims', 'istmo'), label: 'Volume tireoidiano total', text: `${fmt(vd + ve)} cm³${vd + ve > 18 ? ' — aumentado' : ''}`, alert: vd + ve > 18 });
+  }
+
+  // ── Tireoide: espessura do istmo (espessado > 0,4 cm) ──
+  const istmo = num(v['istmo']);
+  if (istmo != null) {
+    const esp = istmo > 0.4;
+    out.push({ id: 'istmo__esp', sectionId: secOf('istmo', 'istmo'), label: 'Istmo', text: `${fmt(istmo, 1)} cm${esp ? ' — espessado (> 0,4)' : ''}`, alert: esp });
   }
 
   // ── Fetal: PFE (Hadlock IV) + percentil a partir de DBP/CC/CA/CF ──
@@ -506,6 +519,44 @@ export function computeDerivations(
     }
   }
 
+  // ── Abdome: colédoco dilatado. Limiar sobe com a idade (≤ 8 mm em > 70 anos,
+  // pela idade JÁ conhecida do paciente) e no pós-colecistectomia (≤ 10 mm). ──
+  const coledoco = num(v['coledoco']);
+  if (coledoco != null) {
+    const idoso = ctx?.ageYears != null && ctx.ageYears > 70;
+    const limiar = idoso ? 8 : 6;
+    const dil = coledoco > limiar;
+    out.push({
+      id: 'coledoco__cal',
+      sectionId: secOf('coledoco', 'vias-biliares'),
+      label: 'Colédoco',
+      text: `${fmt(coledoco, 1)} mm${dil ? ` — dilatado (> ${limiar}${idoso ? ' · > 70 anos' : ''})` : ''}`,
+      alert: dil,
+    });
+  }
+
+  // ── Pâncreas: ducto de Wirsung dilatado (≥ 3 mm) ──
+  const wirsung = num(v['wirsung']);
+  if (wirsung != null) {
+    const dil = wirsung >= 3;
+    out.push({ id: 'wirsung__cal', sectionId: secOf('wirsung', 'pancreas'), label: 'Ducto de Wirsung', text: `${fmt(wirsung, 1)} mm${dil ? ' — dilatado (≥ 3)' : ''}`, alert: dil });
+  }
+
+  // ── Aorta abdominal: ectasia (2,5–2,9 cm) / aneurisma (≥ 3,0 cm) ──
+  const aorta = num(v['aorta']);
+  if (aorta != null && aorta > 0) {
+    const cls = aorta >= 3.0 ? ' — aneurisma (≥ 3,0)' : aorta >= 2.5 ? ' — ectasia (2,5–2,9)' : '';
+    out.push({ id: 'aorta__cal', sectionId: secOf('aorta', 'aorta'), label: 'Aorta', text: `${fmt(aorta, 1)} cm${cls}`, alert: aorta >= 3.0 });
+  }
+
+  // ── Nervo mediano: área seccional no túnel do carpo (STC se ≥ 10 mm²;
+  // 10–13 leve, > 13 moderado/grave) ──
+  const csaMediano = num(v['csa_mediano']);
+  if (csaMediano != null && csaMediano > 0) {
+    const cls = csaMediano > 13 ? ' — STC moderado/grave (> 13)' : csaMediano >= 10 ? ' — STC (≥ 10; leve 10–13)' : '';
+    out.push({ id: 'csa_mediano__stc', sectionId: secOf('csa_mediano', 'tunel-do-carpo'), label: 'Nervo mediano (CSA)', text: `${fmt(csaMediano, 0)} mm²${cls}`, alert: csaMediano >= 10 });
+  }
+
   // ── Fetal: RCP = IP ACM / IP AU — percentil por IG (F5, getCprRef); alerta se < p5 ou < 1 ──
   const ipAcm = num(v['ip_acm']);
   const ipAu = num(v['ip_au']);
@@ -660,7 +711,7 @@ export function computeDerivations(
 
   // Trissomias (seção Marcadores)
   if (firstTrimester && !fieldValueToText(v['risco_trissomias_fmf']).trim()) {
-    const s = seedForCalculator('fmf-trisomy-risk', v, examDateMs);
+    const s = seedForCalculator('fmf-trisomy-risk', v, examDateMs, ctx);
     const triInput = s && {
       ageYears: n(s.age), crlMm: n(s.crlMm), ntMm: n(s.ntMm), fhrBpm: n(s.fhrBpm),
       freeBhcgMoM: n(s.bhcgMoM), pappaMoM: n(s.pappaMoM),
@@ -681,7 +732,7 @@ export function computeDerivations(
 
   // Pré-eclâmpsia (seção Doppler do 1º trimestre)
   if (firstTrimester && !fieldValueToText(v['risco_pe_fmf']).trim()) {
-    const s = seedForCalculator('fmf-preeclampsia-risk', v, examDateMs);
+    const s = seedForCalculator('fmf-preeclampsia-risk', v, examDateMs, ctx);
     // só mostra quando há PELO MENOS um biomarcador (PAM/IP uterina/PlGF/PSV) —
     // fatores maternos sozinhos dão o basal, mas não vale poluir o formulário.
     const hasBiomarker = !!s && [s.mapMmHg, s.utaPiRaw, s.plgfRaw, s.psvRatioRaw].some((x) => n(x) != null);

@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useDocument } from '../../hooks/useFirestore';
+import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess, deleteWorklistEntry } from '../../store/db';
 import { useApp } from '../../store/app';
-import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest } from '../../types';
+import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest, ClinicalRecord } from '../../types';
+import { where } from 'firebase/firestore';
 import { LaudCopilot } from './LaudCopilot';
 import { seedForCalculator } from './structured/calcSeed';
+import { buildPatientContext } from './structured/patientContext';
 import { RichEditor, RichEditorRef } from './RichEditor';
 import { copyReportToClipboard } from '../export/docxExport';
 import { deleteField } from 'firebase/firestore';
@@ -99,9 +101,28 @@ export function ExamEditor({ examId }: Props) {
   // Firestore realtime listeners
   const { data: exam } = useDocument<ExamRequest>('exams', examId);
   const { data: dbPatient } = useDocument<Patient>('patients', exam?.patientId === 'ANONIMO' ? '' : (exam?.patientId || ''));
-  const patient = exam?.patientId === 'ANONIMO' 
+  const patient = exam?.patientId === 'ANONIMO'
     ? ({ id: 'ANONIMO', name: 'Laudo Avulso / Sem Identificação', gender: 'O', createdAt: Date.now(), updatedAt: Date.now() } as Patient)
     : dbPatient;
+
+  // Prontuário clínico do paciente → peso/altura mais recentes (exame físico) para
+  // pré-preencher o Estruturado (IMC materno, etc.) sem redigitar. Só busca quando
+  // há paciente real (não avulso).
+  const realPatientId = patient && patient.id !== 'ANONIMO' ? patient.id : '';
+  const { data: clinicalRecords } = useCollection<ClinicalRecord>('clinical_records', {
+    constraints: realPatientId ? [where('patientId', '==', realPatientId)] : undefined,
+    enabled: !!realPatientId,
+  });
+  const latestVitals = useMemo(() => {
+    const withVitals = clinicalRecords
+      .filter((r) => r.type === 'exame-fisico' && r.vitals && (r.vitals.weightKg || r.vitals.heightCm))
+      .sort((a, b) => (b.recordDate || b.createdAt || 0) - (a.recordDate || a.createdAt || 0));
+    return withVitals[0]?.vitals ?? null;
+  }, [clinicalRecords]);
+  const patientContext = useMemo(
+    () => buildPatientContext(patient, latestVitals, exam?.examDate ?? exam?.createdAt),
+    [patient, latestVitals, exam?.examDate, exam?.createdAt]
+  );
   // Exame combinado: todas as máscaras do exame (1ª = primária). O código
   // legado continua lendo `template` (a primária).
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
@@ -185,10 +206,10 @@ export function ExamEditor({ examId }: Props) {
   const calculatorDataWithSeed = useMemo(() => {
     const saved = exam?.calculatorData || {};
     if (!calcModalInitialId) return saved;
-    const seed = seedForCalculator(calcModalInitialId, exam?.structuredValue, exam?.examDate ?? exam?.createdAt);
+    const seed = seedForCalculator(calcModalInitialId, exam?.structuredValue, exam?.examDate ?? exam?.createdAt, patientContext);
     if (!seed) return saved;
     return { ...saved, [calcModalInitialId]: { ...seed, ...(saved[calcModalInitialId] || {}) } };
-  }, [exam?.calculatorData, exam?.structuredValue, exam?.examDate, exam?.createdAt, calcModalInitialId]);
+  }, [exam?.calculatorData, exam?.structuredValue, exam?.examDate, exam?.createdAt, calcModalInitialId, patientContext]);
   const [showSnippets, setShowSnippets] = useState(false);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [snippetSearch, setSnippetSearch] = useState('');
@@ -631,6 +652,7 @@ export function ExamEditor({ examId }: Props) {
           template={template}
           templates={templates}
           patient={patient}
+          patientContext={patientContext}
           chatHistory={localChatHistory}
           onChatUpdate={handleChatUpdate}
           onShowCalculators={(id) => {

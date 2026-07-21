@@ -96,9 +96,11 @@ export function GestationalAgeCalculator({ value, onChange, examDateMs }: Calcul
         (others.length ? ` Comparação — ${others.join('; ')}.` : '')
       : null;
 
+    // Persiste a ESCOLHA do médico ('' = Automático), não o parâmetro resolvido —
+    // senão reabrir o modal travaria o parâmetro auto como se fosse manual.
     onChange({
       referenceDate, method, dumDate, prevUsgDate, prevUsgWeeks, prevUsgDays,
-      ccn, bpd, hc, bioParam: usedParam || '',
+      ccn, bpd, hc, bioParam,
       currentGa, edd: eddStr, sourceLabel, comparison: others,
       _summary: summary,
     });

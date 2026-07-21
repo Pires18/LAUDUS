@@ -248,3 +248,46 @@ describe('computeDerivations — riscos FMF AO VIVO (integração calculadora↔
     expect(d.find((x) => x.id === 'pam__calc')).toBeDefined();
   });
 });
+
+describe('computeDerivations — novos cálculos (abdome, tireoide, nervo)', () => {
+  const abdome = () => deriveStructuredSchema(tpl('medicina-interna', 'ABDOME TOTAL'), 'medicina-interna');
+
+  it('colédoco: dilatado > 6 mm; limiar sobe para 8 mm em > 70 anos (idade do paciente)', () => {
+    const dNoCtx = computeDerivations(abdome(), { coledoco: '7' });
+    expect(dNoCtx.find((x) => x.id === 'coledoco__cal')?.alert).toBe(true);
+    expect(dNoCtx.find((x) => x.id === 'coledoco__cal')?.text).toContain('dilatado (> 6');
+
+    const idoso = { ageYears: 80, sex: 'M' as const, weightKg: null, heightCm: null };
+    const dCtx = computeDerivations(abdome(), { coledoco: '7' }, undefined, idoso);
+    expect(dCtx.find((x) => x.id === 'coledoco__cal')?.alert).toBeFalsy();
+
+    const dCtxHigh = computeDerivations(abdome(), { coledoco: '9' }, undefined, idoso);
+    expect(dCtxHigh.find((x) => x.id === 'coledoco__cal')?.text).toContain('> 70 anos');
+  });
+
+  it('ducto de Wirsung: dilatado se ≥ 3 mm', () => {
+    expect(computeDerivations(abdome(), { wirsung: '2' }).find((x) => x.id === 'wirsung__cal')?.alert).toBeFalsy();
+    expect(computeDerivations(abdome(), { wirsung: '3,5' }).find((x) => x.id === 'wirsung__cal')?.alert).toBe(true);
+  });
+
+  it('aorta abdominal: ectasia (2,5–2,9) e aneurisma (≥ 3,0)', () => {
+    expect(computeDerivations(abdome(), { aorta: '2,2' }).find((x) => x.id === 'aorta__cal')?.text).not.toMatch(/ectasia|aneurisma/);
+    expect(computeDerivations(abdome(), { aorta: '2,7' }).find((x) => x.id === 'aorta__cal')?.text).toContain('ectasia');
+    const aneur = computeDerivations(abdome(), { aorta: '3,4' }).find((x) => x.id === 'aorta__cal');
+    expect(aneur?.text).toContain('aneurisma');
+    expect(aneur?.alert).toBe(true);
+  });
+
+  it('istmo tireoidiano: espessado se > 0,4 cm', () => {
+    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'TIREOIDE'), 'pequenas-partes');
+    expect(computeDerivations(schema, { istmo: '0,3' }).find((x) => x.id === 'istmo__esp')?.alert).toBeFalsy();
+    expect(computeDerivations(schema, { istmo: '0,6' }).find((x) => x.id === 'istmo__esp')?.alert).toBe(true);
+  });
+
+  it('nervo mediano (CSA): STC ≥ 10 mm², moderado/grave > 13', () => {
+    const schema = deriveStructuredSchema(tpl('musculoesqueletico', 'PUNHO'), 'musculoesqueletico');
+    expect(computeDerivations(schema, { csa_mediano: '8' }).find((x) => x.id === 'csa_mediano__stc')?.alert).toBeFalsy();
+    expect(computeDerivations(schema, { csa_mediano: '11' }).find((x) => x.id === 'csa_mediano__stc')?.text).toContain('STC (≥ 10');
+    expect(computeDerivations(schema, { csa_mediano: '15' }).find((x) => x.id === 'csa_mediano__stc')?.text).toContain('moderado/grave');
+  });
+});

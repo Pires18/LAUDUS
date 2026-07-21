@@ -1,6 +1,7 @@
 import { StructuredFieldValue } from '../../../types';
 import { fieldValueToText } from './deriveSchema';
 import { parseIgLabel, resolveReferenceGa } from '../../calculators/formulas';
+import type { PatientContext } from './patientContext';
 
 /**
  * SEMENTE das calculadoras a partir do formulário Estruturado.
@@ -86,10 +87,21 @@ export function bodyMassIndex(weightKg: number, heightCm: number): number | null
   return weightKg / Math.pow(heightCm / 100, 2);
 }
 
-/** dd/mm/aaaa → Date | null. */
+/** dd/mm/aaaa → Date LOCAL (meia-noite) | null. `new Date('aaaa-mm-dd')` seria
+ *  UTC — no fuso local viraria a véspera e deslocaria a IG em 1 dia. */
 function toDate(br: string): Date | null {
-  const iso = toIsoDate(br);
-  return iso ? new Date(iso) : null;
+  const m = br.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
+  const yr = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  const dt = new Date(yr, Number(m[2]) - 1, Number(m[1]));
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+/** Momento do exame truncado para a meia-noite LOCAL — a datação compara datas,
+ *  não horários (o mesmo truncamento do liveCompute e da calculadora). */
+function examMidnight(examDateMs?: number): Date {
+  const d = examDateMs ? new Date(examDateMs) : new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 /**
@@ -112,7 +124,7 @@ function referenceGa(v: Values, examDateMs?: number): { weeks: number; days: num
     usgWeeks: usgIg?.weeks ?? null,
     usgDays: usgIg?.days ?? null,
     biometry: { ccn: n('ccn'), dbp: n('dbp'), cc: n('cc') },
-    examDate: examDateMs ? new Date(examDateMs) : new Date(),
+    examDate: examMidnight(examDateMs),
   });
   if (!igRef) return null;
   return { weeks: igRef.weeks, days: igRef.days };
@@ -125,21 +137,48 @@ function referenceGa(v: Values, examDateMs?: number): { weeks: number; days: num
 export function seedForCalculator(
   calcId: string,
   values: Values,
-  examDateMs?: number
+  examDateMs?: number,
+  ctx?: PatientContext
 ): Record<string, unknown> | null {
-  const isoExam = examDateMs
-    ? new Date(examDateMs).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+  // Data do exame em aaaa-mm-dd LOCAL (toISOString seria UTC: um exame às
+  // 22h no Brasil semearia a calculadora com o dia SEGUINTE → IG +1 dia).
+  const examDay = examMidnight(examDateMs);
+  const isoExam = `${examDay.getFullYear()}-${String(examDay.getMonth() + 1).padStart(2, '0')}-${String(examDay.getDate()).padStart(2, '0')}`;
+
+  // Fallbacks vindos do cadastro/prontuário do paciente: usados quando o campo
+  // correspondente do formulário está vazio (o valor do formulário prevalece).
+  const ageOr = (id: string) => numStr(values, id) || (ctx?.ageYears != null ? String(ctx.ageYears) : '');
+  const weightOr = (id: string) => numStr(values, id) || (ctx?.weightKg != null ? String(ctx.weightKg) : '');
+  const heightOr = (id: string) => numStr(values, id) || (ctx?.heightCm != null ? String(ctx.heightCm) : '');
 
   if (calcId === 'gestational-age') {
     const metodo = txt(values, 'ig_metodo').toLowerCase();
-    const method = /biometr/.test(metodo) ? 'bio' : /dum|menstrua/.test(metodo) ? 'dum' : 'usg';
     const usgIg = parseIgLabel(txt(values, 'usg_ig'));
+    const dumIso = toIsoDate(txt(values, 'dum'));
+    const usgDateIso = toIsoDate(txt(values, 'usg_data'));
+    const declared = /biometr/.test(metodo)
+      ? 'bio'
+      : /usg|ultrass/.test(metodo)
+        ? 'usg'
+        : /dum|menstrua/.test(metodo)
+          ? 'dum'
+          : null;
+    // Sem método declarado, abre na aba que TEM dados (mesma hierarquia do
+    // motor: USG > DUM > biometria) — antes caía sempre em 'usg' e a
+    // calculadora podia abrir vazia com o chip do formulário mostrando IG.
+    const method = declared
+      ?? (usgDateIso && usgIg
+        ? 'usg'
+        : dumIso
+          ? 'dum'
+          : numStr(values, 'ccn') || numStr(values, 'dbp') || numStr(values, 'cc')
+            ? 'bio'
+            : 'usg');
     return {
       referenceDate: isoExam,
       method,
-      dumDate: toIsoDate(txt(values, 'dum')),
-      prevUsgDate: toIsoDate(txt(values, 'usg_data')),
+      dumDate: dumIso,
+      prevUsgDate: usgDateIso,
       prevUsgWeeks: usgIg ? String(usgIg.weeks) : '',
       prevUsgDays: usgIg ? String(usgIg.days) : '',
       ccn: numStr(values, 'ccn'),
@@ -190,13 +229,15 @@ export function seedForCalculator(
   }
 
   if (calcId === 'imt-elsa-br') {
-    // a curva ELSA-Brasil depende de idade E sexo — ambos vêm do card
+    // a curva ELSA-Brasil depende de idade E sexo — ambos vêm do card, com
+    // fallback para o cadastro do paciente (idade da DN, sexo do cadastro).
     const sexo = txt(values, 'emi_sexo').toLowerCase();
+    const sexFromCtx = ctx?.sex === 'F' ? 'female' : ctx?.sex === 'M' ? 'male' : '';
     return {
       imtRight: numStr(values, 'emi_d'),
       imtLeft: numStr(values, 'emi_e'),
-      age: numStr(values, 'emi_idade'),
-      sex: /femin/.test(sexo) ? 'female' : 'male',
+      age: ageOr('emi_idade'),
+      sex: /femin/.test(sexo) ? 'female' : /mascul/.test(sexo) ? 'male' : sexFromCtx || 'male',
     };
   }
 
@@ -238,7 +279,7 @@ export function seedForCalculator(
 
   if (calcId === 'fmf-trisomy-risk') {
     return {
-      age: numStr(values, 'mae_idade'),
+      age: ageOr('mae_idade'),
       crlMm: numStr(values, 'ccn'),
       ntMm: numStr(values, 'nt'),
       // FCF (batimentos) — marcador de FHR do rastreio combinado (Kagan 2008):
@@ -268,9 +309,9 @@ export function seedForCalculator(
     const p2 = Number(numStr(values, 'oft_p2'));
     const psvRatio = p1 > 0 && p2 > 0 ? (p2 / p1).toFixed(2) : '';
     return {
-      age: numStr(values, 'mae_idade'),
-      weightKg: numStr(values, 'mae_peso'),
-      heightCm: numStr(values, 'mae_altura'),
+      age: ageOr('mae_idade'),
+      weightKg: weightOr('mae_peso'),
+      heightCm: heightOr('mae_altura'),
       racialOrigin: RACIAL[etnia] || 'white',
       conception: CONCEPTION[conc] || 'spontaneous',
       parity: PARITY[par] || 'nulliparous',
@@ -285,6 +326,44 @@ export function seedForCalculator(
       utaPiRaw: numStr(values, 'ip_uta'),
       plgfRaw: numStr(values, 'plgf_mom'),
       psvRatioRaw: psvRatio,
+    };
+  }
+
+  if (calcId === 'fmf-preeclampsia-risk-2t') {
+    // Rastreio de PE de 2ª visita (19–24+6): mesmos fatores maternos do 1º T +
+    // IG de referência do laudo. Biomarcadores de 2ª visita (MAP/IP uterino/PlGF)
+    // e razão P2/P1 oftálmica. Antes esta calculadora abria sempre vazia.
+    const sys = Number(numStr(values, 'pa_sistolica'));
+    const dia = Number(numStr(values, 'pa_diastolica'));
+    const map = meanArterialPressure(sys, dia);
+    const etnia = txt(values, 'mae_etnia');
+    const conc = txt(values, 'mae_concepcao');
+    const par = txt(values, 'mae_paridade');
+    const dm = txt(values, 'mae_diabetes');
+    const analyzer = txt(values, 'bio_analisador');
+    const ga = referenceGa(values, examDateMs);
+    return {
+      age: ageOr('mae_idade'),
+      weightKg: weightOr('mae_peso'),
+      heightCm: heightOr('mae_altura'),
+      gaWeeks: ga ? String(ga.weeks + ga.days / 7) : '',
+      racialOrigin: RACIAL[etnia] || 'white',
+      conception: CONCEPTION[conc] || 'spontaneous',
+      parity: PARITY[par] || 'nulliparous',
+      previousPeGaWeeks: numStr(values, 'mae_pe_ig'),
+      diabetes: DIABETES[dm] || 'none',
+      chronicHypertension: has(values, 'mae_comorbidades', 'hipertensão crônica'),
+      sleOrAps: has(values, 'mae_comorbidades', 'LES'),
+      familyHistoryPE: has(values, 'mae_comorbidades', 'história familiar'),
+      smoker: has(values, 'mae_comorbidades', 'tabagismo'),
+      analyzer: ANALYZER[analyzer] || 'cobas',
+      mapMmHg: map != null ? map.toFixed(1) : '',
+      // o componente lê IP uterino de utaR/utaL (média) → semeia no direito.
+      utaR: numStr(values, 'ip_uta'),
+      plgfRaw: numStr(values, 'plgf_mom'),
+      // razão P2/P1 oftálmica: semeia o par direito (o componente calcula a média).
+      oftRp1: numStr(values, 'oft_p1'),
+      oftRp2: numStr(values, 'oft_p2'),
     };
   }
 

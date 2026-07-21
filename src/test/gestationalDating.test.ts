@@ -261,3 +261,58 @@ describe('seedForCalculator — calculadora abre com os dados do formulário', (
     expect(seedForCalculator('volume-elipsoide', { dims: '1 x 2 x 3' })).toBeNull();
   });
 });
+
+describe('datação insensível a hora do dia e a fuso (chip = semente = modal)', () => {
+  // DUM 01/05/2026 → 21/07/2026 = 81 dias = 11s 4d.
+  const DUM = '01/05/2026';
+
+  it('IG do chip pela DUM não muda com a hora do exame', () => {
+    const schema = deriveStructuredSchema(tpl('OBSTÉTRICA'), 'medicina-fetal');
+    const igAt = (h: number, min: number) =>
+      computeDerivations(schema, { dum: DUM }, new Date(2026, 6, 21, h, min).getTime())
+        .find((x) => x.id === 'ig__ref')?.text;
+    expect(igAt(0, 0)).toContain('11s 4d');
+    expect(igAt(14, 30)).toBe(igAt(0, 0)); // antes: 14:30 arredondava p/ 11s 5d
+    expect(igAt(23, 59)).toBe(igAt(0, 0));
+  });
+
+  it('semente da calculadora de IG usa a data LOCAL do exame (não UTC)', () => {
+    // Exame às 22h BRT: toISOString() viraria o dia seguinte (22/07).
+    const lateEvening = new Date(2026, 6, 21, 22, 0).getTime();
+    const seed = seedForCalculator('gestational-age', { dum: DUM }, lateEvening)!;
+    expect(seed.referenceDate).toBe('2026-07-21');
+  });
+
+  it('IG semeada no Doppler = IG do chip (DUM local, exame à tarde)', () => {
+    const afternoon = new Date(2026, 6, 21, 14, 30).getTime();
+    const seed = seedForCalculator('doppler-fetal', { dum: DUM }, afternoon)!;
+    expect(seed.gaWeeks).toBe('11');
+    expect(seed.gaDays).toBe('4');
+  });
+});
+
+describe('semente da calculadora de IG — método pela hierarquia quando não declarado', () => {
+  it('só DUM preenchida → abre pela DUM (antes abria "Pela USG" vazia)', () => {
+    const seed = seedForCalculator('gestational-age', { dum: '01/05/2026' }, EXAM.getTime())!;
+    expect(seed.method).toBe('dum');
+  });
+
+  it('USG anterior completa tem prioridade sobre a DUM', () => {
+    const seed = seedForCalculator('gestational-age', {
+      usg_data: '01/03/2026', usg_ig: '12s3d', dum: '01/01/2026',
+    }, EXAM.getTime())!;
+    expect(seed.method).toBe('usg');
+  });
+
+  it('só biometria → abre pela biometria', () => {
+    const seed = seedForCalculator('gestational-age', { dbp: '70' }, EXAM.getTime())!;
+    expect(seed.method).toBe('bio');
+  });
+
+  it('método declarado no laudo continua prevalecendo', () => {
+    const seed = seedForCalculator('gestational-age', {
+      ig_metodo: 'DUM', dum: '01/01/2026', usg_data: '01/03/2026', usg_ig: '12s3d',
+    }, EXAM.getTime())!;
+    expect(seed.method).toBe('dum');
+  });
+});

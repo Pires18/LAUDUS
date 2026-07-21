@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { X, Upload, CheckCircle2, XCircle, Loader2, FileWarning, RotateCcw, AlertTriangle } from 'lucide-react';
+import { X, Upload, CheckCircle2, XCircle, Loader2, FileWarning, RotateCcw, AlertTriangle, FileArchive } from 'lucide-react';
 import { useApp } from '../../../store/app';
 import { updateItem } from '../../../store/db';
 import { uploadExternalDicomFile, ExternalDicomUploadResult, DICOM_LARGE_FILE_BYTES, hasDirectDicomAgent } from '../../../utils/dicom';
+import { extractDicomFilesFromZip, isZipFile } from '../../../utils/dicomZip';
 
 interface ExternalStudyUploadModalProps {
   examId: string;
@@ -39,14 +40,49 @@ export function ExternalStudyUploadModal({ examId, currentUids, onClose, onLinke
   const [files, setFiles] = useState<FileState[]>([]);
   const [uploading, setUploading] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
   function updateFile(idx: number, patch: Partial<FileState>) {
     setFiles((prev) => prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
   }
 
-  function handleSelectFiles(list: FileList | null) {
+  async function handleSelectFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    setFiles(Array.from(list).map((file) => ({ file, status: 'pending' as const, progress: 0 })));
+    const selected = Array.from(list);
+    const zips = selected.filter(isZipFile);
+    const loose = selected.filter((f) => !isZipFile(f));
+
+    let extracted: File[] = [];
+    if (zips.length > 0) {
+      setExtracting(true);
+      try {
+        let ignoredCount = 0;
+        for (const zip of zips) {
+          try {
+            const result = await extractDicomFilesFromZip(zip);
+            extracted = extracted.concat(result.files);
+            ignoredCount += result.ignored.length;
+          } catch (err: any) {
+            showToast(err.message || `Falha ao descompactar ${zip.name}.`, 'error');
+          }
+        }
+        if (extracted.length > 0) {
+          showToast(
+            `${extracted.length} arquivo${extracted.length > 1 ? 's' : ''} DICOM extraído${extracted.length > 1 ? 's' : ''} do ZIP` +
+              (ignoredCount > 0 ? ` (${ignoredCount} não-DICOM ignorado${ignoredCount > 1 ? 's' : ''})` : '') + '.',
+            'success'
+          );
+        } else if (zips.length > 0 && loose.length === 0) {
+          showToast('Nenhum arquivo DICOM encontrado dentro do ZIP.', 'error');
+        }
+      } finally {
+        setExtracting(false);
+      }
+    }
+
+    const all = [...loose, ...extracted];
+    if (all.length === 0) return;
+    setFiles(all.map((file) => ({ file, status: 'pending' as const, progress: 0 })));
   }
 
   async function uploadFileAt(idx: number, file: File) {
@@ -115,7 +151,7 @@ export function ExternalStudyUploadModal({ examId, currentUids, onClose, onLinke
         <div className="p-5 border-b border-ink-100 flex items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-black text-ink-900">Importar estudo externo</h3>
-            <p className="text-[11px] text-ink-500 font-medium mt-0.5">Para exames feitos fora do sistema (sem aparelho conectado) — envie os arquivos DICOM (.dcm) do estudo.</p>
+            <p className="text-[11px] text-ink-500 font-medium mt-0.5">Para exames feitos fora do sistema (sem aparelho conectado) — envie os arquivos DICOM (.dcm) do estudo, ou um ZIP contendo as imagens.</p>
           </div>
           <button onClick={onClose} className="shrink-0 p-1.5 rounded-lg text-ink-400 hover:bg-ink-100 transition-all">
             <X size={16} />
@@ -124,12 +160,20 @@ export function ExternalStudyUploadModal({ examId, currentUids, onClose, onLinke
 
         <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
           {files.length === 0 ? (
-            <label className="flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed border-ink-200 text-ink-400 cursor-pointer hover:border-violet-300 hover:text-violet-500 transition-all">
-              <Upload size={24} />
-              <span className="text-xs font-bold">Selecionar arquivos .dcm</span>
-              <span className="text-[10px] text-center">Pode selecionar todos os arquivos do estudo de uma vez (um estudo real costuma ter vários)</span>
-              <input type="file" multiple accept=".dcm,application/dicom" className="hidden" onChange={(e) => handleSelectFiles(e.target.files)} />
-            </label>
+            extracting ? (
+              <div className="flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed border-violet-200 text-violet-500">
+                <FileArchive size={24} className="animate-pulse" />
+                <span className="text-xs font-bold flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Descompactando ZIP…</span>
+                <span className="text-[10px] text-center text-ink-400">Procurando arquivos DICOM dentro do arquivo</span>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2 p-8 rounded-xl border-2 border-dashed border-ink-200 text-ink-400 cursor-pointer hover:border-violet-300 hover:text-violet-500 transition-all">
+                <Upload size={24} />
+                <span className="text-xs font-bold">Selecionar arquivos .dcm ou .zip</span>
+                <span className="text-[10px] text-center">Pode selecionar todos os arquivos do estudo de uma vez, ou um ZIP com o estudo inteiro — ele é descompactado aqui mesmo e todas as imagens entram na fila</span>
+                <input type="file" multiple accept=".dcm,.zip,application/dicom,application/zip,application/x-zip-compressed" className="hidden" onChange={(e) => handleSelectFiles(e.target.files)} />
+              </label>
+            )
           ) : (
             <>
               {hasLargeFiles && !directAgentOk && (
