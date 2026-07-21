@@ -1,6 +1,7 @@
 import { AppSettings } from '../../../types';
 import { AiProvider, BuiltPrompt } from '../types';
 import { robustJsonParse } from '../json';
+import { geminiHttpError } from '../retry';
 import { logger } from '../../../utils/logger';
 import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
@@ -89,7 +90,7 @@ export class GeminiProvider implements AiProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Erro na API do Gemini (${response.status}): ${errText}`);
+      throw geminiHttpError(response.status, errText);
     }
 
     const result = await response.json();
@@ -126,7 +127,7 @@ export class GeminiProvider implements AiProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Erro na API do Gemini (${response.status}): ${errText}`);
+      throw geminiHttpError(response.status, errText);
     }
 
     const reader = response.body?.getReader();
@@ -212,7 +213,7 @@ export class GeminiProvider implements AiProvider {
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`Erro na API do Gemini JSON (${response.status}): ${errText}`);
+        throw geminiHttpError(response.status, errText, 'Gemini JSON');
       }
 
       const result = await response.json();

@@ -2,6 +2,7 @@ import { AppSettings, ExamArea } from '../../types';
 import { logger } from '../../utils/logger';
 import { getRecentFinalizedReports } from '../../store/db';
 import { robustJsonParse } from './json';
+import { withRetry, geminiHttpError } from './retry';
 import { auth } from '../../lib/firebase';
 import { getIdToken } from '../../lib/authToken';
 
@@ -97,10 +98,10 @@ Gere o JSON da máscara do laudo agora.`;
 
   let text = '';
   {
-    const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.2, settings.geminiApiKey);
+    const resp = await withRetry(() => geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.2, settings.geminiApiKey));
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Erro na API do Gemini (${resp.status}): ${errText}`);
+      throw geminiHttpError(resp.status, errText);
     }
     const result = await resp.json();
     text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -148,10 +149,10 @@ export async function generateTemplateField(
     userMessage = `Gere o Termo de Consentimento para o exame de "${examName}" (Área: ${area}).`;
   }
 
-  const resp = await geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.3, settings.geminiApiKey);
+  const resp = await withRetry(() => geminiProxyFetch(resolveGeminiModel(settings.geminiModel), systemContext, userMessage, 0.3, settings.geminiApiKey));
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`Erro na API do Gemini (${resp.status}): ${errText}`);
+    throw geminiHttpError(resp.status, errText);
   }
   const result = await resp.json();
   let text: string = result.candidates?.[0]?.content?.parts?.[0]?.text || '';

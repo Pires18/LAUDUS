@@ -181,38 +181,9 @@ function getModeTemperature(mode: string, override?: number, settings?: AppSetti
 }
 
 // ─── Retry com exponential backoff ──────────────────────────────────────────
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      if ((err instanceof Error && err.name === 'AbortError') || String(err).toLowerCase().includes('abort')) {
-        throw err;
-      }
-      lastError = err;
-      const msg = String(err);
-      const isRetryable =
-        msg.includes('429') ||
-        msg.includes('503') ||
-        msg.includes('overloaded') ||
-        msg.includes('rate_limit') ||
-        msg.includes('RESOURCE_EXHAUSTED');
-      if (attempt < maxRetries && isRetryable) {
-        const wait = 1000 * Math.pow(2, attempt);   // 1s, 2s
-        await sleep(wait);
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw lastError;
-}
+// Implementação movida para retry.ts: além de exceções, re-tenta respostas
+// HTTP com status transitório (fetch não lança em 429/503).
+import { withRetry } from './retry';
 
 // ─── Helpers utilitários ─────────────────────────────────────────────────────
 
