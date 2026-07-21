@@ -64,6 +64,21 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/clinic_memberships/$(clinicMembershipId(ownerId, clinicId))).data.role != 'viewer';
     }
 
+    // Acesso clínico pleno (médico colaborador). A recepção fica de fora:
+    // ela agenda e cadastra pacientes, mas não escreve laudos, não exclui
+    // pacientes e não toca no prontuário clínico.
+    function hasClinicEditorAccess(ownerId, clinicId) {
+      return hasClinicAccess(ownerId, clinicId)
+        && get(/databases/$(database)/documents/clinic_memberships/$(clinicMembershipId(ownerId, clinicId))).data.role == 'editor';
+    }
+
+    // Leitura do prontuário clínico: editor e viewer (perfis médicos) leem;
+    // recepção não.
+    function hasClinicClinicalReadAccess(ownerId, clinicId) {
+      return hasClinicAccess(ownerId, clinicId)
+        && get(/databases/$(database)/documents/clinic_memberships/$(clinicMembershipId(ownerId, clinicId))).data.role in ['editor', 'viewer'];
+    }
+
     // Campos que definem privilégio/cota/assinatura — SOMENTE admin (ou
     // Admin SDK no servidor) pode alterá-los. Impede que um usuário comum
     // se auto-promova a admin ou infle a própria cota.
@@ -134,14 +149,17 @@ service cloud.firestore {
         allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
         allow update: if isOwner(userId) || isAdmin()
           || (hasClinicWriteAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
-        allow delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+        // Excluir paciente é ato clínico/administrativo — recepção não exclui.
+        allow delete: if isOwner(userId) || isAdmin() || hasClinicEditorAccess(userId, resource.data.clinicId);
       }
+      // Laudos: escrita é exclusiva de perfis médicos (editor). A recepção
+      // lê (a UI restringe a lista dela aos finalizados), mas nunca escreve.
       match /exams/{examId} {
         allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
-        allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
+        allow create: if isOwner(userId) || isAdmin() || hasClinicEditorAccess(userId, request.resource.data.clinicId);
         allow update: if isOwner(userId) || isAdmin()
-          || (hasClinicWriteAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
-        allow delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+          || (hasClinicEditorAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
+        allow delete: if isOwner(userId) || isAdmin() || hasClinicEditorAccess(userId, resource.data.clinicId);
       }
       match /appointments/{apptId} {
         allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
@@ -150,14 +168,15 @@ service cloud.firestore {
           || (hasClinicWriteAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
         allow delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
       }
-      // Prontuário clínico (notas, exame físico, laboratório): mesmo modelo
-      // de acesso dos pacientes — dono/admin total; membro escreve, viewer lê.
+      // Prontuário clínico (notas, exame físico, laboratório): conteúdo
+      // médico — dono/admin total; editor escreve, viewer lê, recepção NÃO
+      // tem acesso (nem leitura).
       match /clinical_records/{recordId} {
-        allow read: if isOwner(userId) || isAdmin() || hasClinicAccess(userId, resource.data.clinicId);
-        allow create: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, request.resource.data.clinicId);
+        allow read: if isOwner(userId) || isAdmin() || hasClinicClinicalReadAccess(userId, resource.data.clinicId);
+        allow create: if isOwner(userId) || isAdmin() || hasClinicEditorAccess(userId, request.resource.data.clinicId);
         allow update: if isOwner(userId) || isAdmin()
-          || (hasClinicWriteAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
-        allow delete: if isOwner(userId) || isAdmin() || hasClinicWriteAccess(userId, resource.data.clinicId);
+          || (hasClinicEditorAccess(userId, resource.data.clinicId) && request.resource.data.clinicId == resource.data.clinicId);
+        allow delete: if isOwner(userId) || isAdmin() || hasClinicEditorAccess(userId, resource.data.clinicId);
       }
 
       // Demais dados da subárvore do usuário (settings, ai_usage, etc.):

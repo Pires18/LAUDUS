@@ -9,7 +9,7 @@ import { logger } from '../utils/logger';
 export interface AccessibleClinic extends Clinic {
   /** Presente quando a clínica é de outro dono (convite de equipe). */
   shared?: boolean;
-  role?: 'editor' | 'viewer';
+  role?: 'editor' | 'viewer' | 'recepcao';
   ownerId?: string;
 }
 

@@ -663,8 +663,14 @@ export interface Clinic {
   updatedAt: number;
 }
 
-/** Papel de um membro de equipe convidado para uma clínica (não o dono). */
-export type ClinicMemberRole = 'editor' | 'viewer';
+/**
+ * Papel de um membro de equipe convidado para uma clínica (não o dono).
+ * - editor: acesso clínico completo (médico colaborador)
+ * - viewer: somente leitura
+ * - recepcao: recepção — agenda e pacientes com escrita (sem excluir),
+ *   laudos somente finalizados, sem prontuário clínico
+ */
+export type ClinicMemberRole = 'editor' | 'viewer' | 'recepcao';
 
 /** Doc em clinic_memberships/ (coleção global), id = `${ownerId}_${clinicId}_${memberUid}`. */
 export interface ClinicMembership {

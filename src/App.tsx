@@ -332,6 +332,11 @@ function UserAccessGate({ children }: { children: ReactNode }) {
           setIsAllowed(true);
         } else if (userData.active === false) {
           setIsAllowed(false);
+        } else if (userData.role === 'recepcao') {
+          // Conta de recepção não tem assinatura própria: o acesso dela vem
+          // do vínculo com a(s) clínica(s) do dono (clinic_memberships) e das
+          // regras do Firestore — o gate de assinatura não se aplica.
+          setIsAllowed(true);
         } else {
           const hasLegacyLicense = userData.licenseExpiresAt && userData.licenseExpiresAt > Date.now();
           const isAllowedStatus = ['trialing', 'active', 'past_due'].includes(userData.subscriptionStatus);

@@ -82,6 +82,7 @@ export function ClinicTeamCard({ clinicId }: Props) {
         >
           <option value="editor">Editor</option>
           <option value="viewer">Somente leitura</option>
+          <option value="recepcao">Recepção</option>
         </select>
         <button
           type="submit"
@@ -103,7 +104,9 @@ export function ClinicTeamCard({ clinicId }: Props) {
             <li key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-ink-50 rounded-xl">
               <div className="min-w-0">
                 <p className="text-xs font-bold text-ink-900 truncate">{m.memberEmail}</p>
-                <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest">{m.role === 'editor' ? 'Editor' : 'Somente leitura'}</p>
+                <p className="text-[10px] font-black text-ink-400 uppercase tracking-widest">
+                  {m.role === 'editor' ? 'Editor' : m.role === 'recepcao' ? 'Recepção' : 'Somente leitura'}
+                </p>
               </div>
               <button onClick={() => handleRemove(m.id)} className="text-ink-400 hover:text-rose-600 p-1.5 shrink-0" title="Remover">
                 <Trash2 size={14} />

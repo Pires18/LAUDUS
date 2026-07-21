@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../store/app';
 import { useCollection } from '../hooks/useFirestore';
+import { useAdmin } from '../hooks/useAdmin';
 import { Patient, ExamRequest, ReportTemplate, EXAM_AREAS } from '../types';
 import {
   Search, Users, FileText, LayoutList, Settings,
@@ -22,6 +23,8 @@ interface CommandItem {
 
 export function CommandPalette() {
   const { setView, setShowCreateExamModal } = useApp();
+  const { role } = useAdmin();
+  const isReception = role === 'recepcao';
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -59,12 +62,15 @@ export function CommandPalette() {
   const navItems: CommandItem[] = useMemo(() => [
     { id: 'nav-dashboard', type: 'nav', label: 'Dashboard', icon: <LayoutDashboard size={16} />, action: () => setView({ name: 'dashboard' }) },
     { id: 'nav-worklist', type: 'nav', label: 'Worklist', icon: <LayoutList size={16} />, action: () => setView({ name: 'worklist' }) },
-    { id: 'nav-new-exam', type: 'nav', label: 'Novo Laudo', icon: <FilePlus size={16} />, action: () => setShowCreateExamModal(true) },
+    // Recepção não cria laudos nem usa máscaras/LAUD.IA
+    ...(!isReception ? [
+      { id: 'nav-new-exam', type: 'nav' as const, label: 'Novo Laudo', icon: <FilePlus size={16} />, action: () => setShowCreateExamModal(true) },
+      { id: 'nav-templates', type: 'nav' as const, label: 'Máscaras', icon: <FileText size={16} />, action: () => setView({ name: 'templates' }) },
+      { id: 'nav-laudia', type: 'nav' as const, label: 'LAUD.IA', icon: <BrainCircuit size={16} />, action: () => setView({ name: 'laud-ia' }) },
+    ] : []),
     { id: 'nav-patients', type: 'nav', label: 'Pacientes', icon: <Users size={16} />, action: () => setView({ name: 'patients' }) },
-    { id: 'nav-templates', type: 'nav', label: 'Máscaras', icon: <FileText size={16} />, action: () => setView({ name: 'templates' }) },
-    { id: 'nav-laudia', type: 'nav', label: 'LAUD.IA', icon: <BrainCircuit size={16} />, action: () => setView({ name: 'laud-ia' }) },
     { id: 'nav-settings', type: 'nav', label: 'Configurações', icon: <Settings size={16} />, action: () => setView({ name: 'settings' }) },
-  ], [setView]);
+  ], [setView, isReception]);
 
   const allItems: CommandItem[] = useMemo(() => {
     const items: CommandItem[] = [...navItems];
