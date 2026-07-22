@@ -4,6 +4,7 @@ import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { robustJsonParse } from '../../ai/json';
 import { resolveGeminiModel } from '../../ai/engine';
+import { withRetry } from '../../ai/retry';
 import { logger } from '../../../utils/logger';
 
 export interface CopilotSuggestion {
@@ -37,7 +38,8 @@ export function useCopilotSuggestions(settings: AppSettings) {
       const plainText = reportHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000);
       const userMessage = `Área: ${area}\n\nLaudo:\n${plainText}`;
 
-      const response = await fetch('/api/gemini', {
+      // Sugestões são latency-sensitive: apenas 1 retry em 429/503.
+      const response = await withRetry(async () => fetch('/api/gemini', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,7 +54,7 @@ export function useCopilotSuggestions(settings: AppSettings) {
           generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
         }),
         signal: controller.signal
-      });
+      }), 1);
 
       if (!response.ok) return;
       const result = await response.json();

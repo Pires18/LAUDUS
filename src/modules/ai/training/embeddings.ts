@@ -2,6 +2,7 @@ import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { logger } from '../../../utils/logger';
+import { withRetry } from '../retry';
 
 // ═══════════════════════════════════════════════════════════════
 // EMBEDDINGS — vetorização para retrieval semântico
@@ -109,7 +110,7 @@ export async function embedText(
   if (clean.length < 3) return [];
 
   try {
-    const response = await fetch('/api/gemini', {
+    const response = await withRetry(async () => fetch('/api/gemini', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -123,7 +124,7 @@ export async function embedText(
         content: { parts: [{ text: clean }] },
       }),
       signal,
-    });
+    }));
 
     if (!response.ok) {
       logger.warn('[Embeddings] Proxy falhou:', response.status);
@@ -155,47 +156,38 @@ export async function embedTextBatch(
 
   const empties = () => cleaned.map(() => [] as number[]);
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getIdToken()}`,
-          'x-uid': auth.currentUser?.uid || 'anonymous',
-          'x-gemini-model': model,
-          'x-gemini-task': 'embed-batch',
-        },
-        body: JSON.stringify({
-          requests: cleaned.map((text) => ({
-            model: `models/${model}`,
-            content: { parts: [{ text: text || ' ' }] },
-          })),
-        }),
-        signal,
-      });
+  try {
+    const response = await withRetry(async () => fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getIdToken()}`,
+        'x-uid': auth.currentUser?.uid || 'anonymous',
+        'x-gemini-model': model,
+        'x-gemini-task': 'embed-batch',
+      },
+      body: JSON.stringify({
+        requests: cleaned.map((text) => ({
+          model: `models/${model}`,
+          content: { parts: [{ text: text || ' ' }] },
+        })),
+      }),
+      signal,
+    }));
 
-      if (response.status === 429 || response.status === 503) {
-        if (attempt < 2) { await new Promise((r) => setTimeout(r, 4000)); continue; }
-        logger.warn('[Embeddings] Batch rate-limited:', response.status);
-        return empties();
-      }
-      if (!response.ok) {
-        logger.warn('[Embeddings] Batch proxy falhou:', response.status);
-        return empties();
-      }
-      const result = await response.json();
-      const embeddings = result?.embeddings;
-      if (!Array.isArray(embeddings)) return empties();
-      return cleaned.map((_, i) => {
-        const v = embeddings[i]?.values;
-        return Array.isArray(v) ? v : [];
-      });
-    } catch (err) {
-      if (attempt < 2) { await new Promise((r) => setTimeout(r, 2000)); continue; }
-      logger.warn('[Embeddings] Erro no batch de vetorização:', err);
+    if (!response.ok) {
+      logger.warn('[Embeddings] Batch proxy falhou:', response.status);
       return empties();
     }
+    const result = await response.json();
+    const embeddings = result?.embeddings;
+    if (!Array.isArray(embeddings)) return empties();
+    return cleaned.map((_, i) => {
+      const v = embeddings[i]?.values;
+      return Array.isArray(v) ? v : [];
+    });
+  } catch (err) {
+    logger.warn('[Embeddings] Erro no batch de vetorização:', err);
+    return empties();
   }
-  return empties();
 }
