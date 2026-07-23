@@ -327,6 +327,40 @@ export function computeDerivations(
     out.push({ id: 'istmo__esp', sectionId: secOf('istmo', 'istmo'), label: 'Istmo', text: `${fmt(istmo, 1)} cm${esp ? ' — espessado (> 0,4)' : ''}`, alert: esp });
   }
 
+  // ── Testículos: atrofia (< 12 cm³) e assimetria volumétrica (> 20%) ──
+  {
+    const td = triplet(v['test_d_dims']);
+    const te = triplet(v['test_e_dims']);
+    const vtd = td ? ellipsoidVolume(td[0], td[1], td[2], 'cm') : null;
+    const vte = te ? ellipsoidVolume(te[0], te[1], te[2], 'cm') : null;
+    if ((vtd != null && vtd > 0) || (vte != null && vte > 0)) {
+      const flags: string[] = [];
+      let alert = false;
+      if (vtd != null && vtd > 0 && vtd < 12) { flags.push('atrofia à D (< 12)'); alert = true; }
+      if (vte != null && vte > 0 && vte < 12) { flags.push('atrofia à E (< 12)'); alert = true; }
+      if (vtd != null && vte != null && vtd > 0 && vte > 0) {
+        const maxV = Math.max(vtd, vte);
+        const assim = Math.abs(vtd - vte) / maxV;
+        if (assim > 0.2) { flags.push(`assimetria ${Math.round(assim * 100)}% (> 20%)`); alert = true; }
+      }
+      const pair = `D ${vtd != null ? fmt(vtd) : '—'} · E ${vte != null ? fmt(vte) : '—'} cm³`;
+      out.push({ id: 'test__vol', sectionId: secOf('test_d_dims', 'testiculos'), label: 'Volume testicular', text: `${pair}${flags.length ? ' — ' + flags.join('; ') : ''}`, alert });
+    }
+  }
+
+  // ── Linfonodo cervical: suspeição por córtex ≥ 3 mm ou perda do hilo ──
+  {
+    const cort = num(v['linf_cortical']);
+    const hiloAus = /ausente|desloc/i.test(fieldValueToText(v['linf_hilo']));
+    if ((cort != null && cort > 0) || hiloAus) {
+      const susp = (cort != null && cort >= 3) || hiloAus;
+      const parts: string[] = [];
+      if (cort != null && cort > 0) parts.push(`córtex ${fmt(cort, 1)} mm`);
+      if (hiloAus) parts.push('hilo ausente/deslocado');
+      out.push({ id: 'linf__susp', sectionId: secOf('linf_cortical', 'linfonodos-regionais'), label: 'Linfonodo', text: `${parts.join(' · ')}${susp ? ' — características suspeitas' : ''}`, alert: susp });
+    }
+  }
+
   // ── Fetal: PFE (Hadlock IV) + percentil a partir de DBP/CC/CA/CF ──
   // O percentil usa a MESMA curva-padrão da calculadora de biometria
   // (DEFAULT_BIOMETRY_REFERENCE = Hadlock, com fallback OMS quando fora da

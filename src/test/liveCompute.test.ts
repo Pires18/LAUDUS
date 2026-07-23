@@ -101,6 +101,26 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(fis?.alert).toBe(false);
   });
 
+  it('pequenas partes: testículo atrofia (< 12) e assimetria (> 20%)', () => {
+    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'BOLSA ESCROTAL'), 'pequenas-partes');
+    // D ~4x3x2,5 = 15,7 cm³ ; E ~3x2x1,5 = 4,7 cm³ → E atrófico + assimetria
+    const d = computeDerivations(schema, { test_d_dims: '4 x 3 x 2,5', test_e_dims: '3 x 2 x 1,5' });
+    const t = d.find((x) => x.id === 'test__vol');
+    expect(t?.text).toMatch(/atrofia à E/);
+    expect(t?.text).toMatch(/assimetria/);
+    expect(t?.alert).toBe(true);
+    // simétricos normais → sem alerta
+    const d2 = computeDerivations(schema, { test_d_dims: '4 x 3 x 2,5', test_e_dims: '4 x 3 x 2,5' });
+    expect(d2.find((x) => x.id === 'test__vol')?.alert).toBe(false);
+  });
+
+  it('pequenas partes: linfonodo córtex ≥ 3 mm ou hilo ausente = suspeito', () => {
+    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'CERVICAL'), 'pequenas-partes');
+    expect(computeDerivations(schema, { linf_cortical: '4' }).find((x) => x.id === 'linf__susp')?.alert).toBe(true);
+    expect(computeDerivations(schema, { linf_hilo: 'ausente/deslocado' }).find((x) => x.id === 'linf__susp')?.alert).toBe(true);
+    expect(computeDerivations(schema, { linf_cortical: '2' }).find((x) => x.id === 'linf__susp')?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

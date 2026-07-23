@@ -83,7 +83,7 @@ const LOBO_TIREOIDE = (side: 'direito' | 'esquerdo'): StructuredSection => {
     id: `lobo-${side}`,
     label: `Lobo ${side === 'direito' ? 'Direito' : 'Esquerdo'}`,
     fields: [
-      { id: `lobo_${s}_dims`, label: 'Dimensões (L × AP × T)', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide', normal: '≤ 20 cm³ ♂ / 15 cm³ ♀ (total)', hint: 'volume por lobo (soma automática)' },
+      { id: `lobo_${s}_dims`, label: 'Dimensões (L × AP × T)', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide', normal: 'total ≤ 18 cm³', hint: 'volume por lobo (soma automática); bócio se total > 18 cm³' },
     ],
   };
 };
@@ -258,7 +258,9 @@ const LINFONODOS_REGIONAIS = (): StructuredSection => ({
   normalable: true,
   normalText: 'de aspecto habitual, morfologia ovalada, hilo ecogênico preservado',
   fields: [
-    { id: 'linf_desc', label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'cadeia, maior/menor eixo, hilo, córtex, vascularização' },
+    { id: 'linf_cortical', label: 'Espessura cortical', kind: 'measure', unit: 'mm', hint: 'suspeito se ≥ 3 mm (espessamento excêntrico) — auto' },
+    { id: 'linf_hilo', label: 'Hilo ecogênico', kind: 'select', options: ['preservado/central', 'ausente/deslocado'], hint: 'perda do hilo = suspeição' },
+    { id: 'linf_desc', label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'cadeia, maior/menor eixo, vascularização (hilar/periférica)' },
   ],
 });
 

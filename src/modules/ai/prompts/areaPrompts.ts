@@ -2339,8 +2339,8 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
 2. TIREOIDE — Dimensões, Parênquima e Tireoidites
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    DIMENSÕES: cada lobo = comprimento × largura × espessura (AP). Volume = FASE 4.1.
-   Normal: ♀ 4–15 cm³/lobo; ♂ 6–20 cm³/lobo. Istmo: ≤3 mm (AP).
-   Bócio: volume total >25 cm³ (♀) ou >30 cm³ (♂). Bócio mergulhante: extensão retroesternal.
+   Normal: ♀ 4–15 cm³/lobo; ♂ 6–20 cm³/lobo. Istmo: ≤4 mm (AP).
+   Bócio: volume total > 18 cm³ (o motor soma os lobos). Bócio mergulhante: extensão retroesternal.
 
    PARÊNQUIMA NORMAL: ecogenicidade homogênea, ligeiramente maior que músculo adjacente.
 
@@ -2583,8 +2583,8 @@ MAPA DE EXAMES DESTA ÁREA (10 templates de Camada 3):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     Estrutura                  │ Normal                      │ Alerta / Ação
     ───────────────────────────┼─────────────────────────────┼────────────────────────
-    Lobo tireoidiano (vol.)    │ ♀ 4–15 cm³ · ♂ 6–20 cm³    │ Vol. total >25 cm³(♀)/>30 cm³(♂) = bócio
-    Istmo tireoidiano          │ ≤3 mm                       │ >5 mm = bócio/tireoidite
+    Lobo tireoidiano (vol.)    │ ♀ 4–15 cm³ · ♂ 6–20 cm³    │ Vol. total > 18 cm³ = bócio
+    Istmo tireoidiano          │ ≤4 mm                       │ > 4 mm = espessado
     Nódulo tireoidiano         │ Classificar TI-RADS          │ TI-RADS 4–5 → biópsia
     EMI carotídeo (bulbo)      │ <0,9 mm                     │ >1,2 mm = placa
     VPS ACI normal             │ 50–80 cm/s                  │ >125 cm/s = estenose ≥50%
