@@ -517,6 +517,22 @@ export function computeDerivations(
     out.push({ id: 'apendice__diam', sectionId: secOf('apendice_diam', 'apendice'), label: 'Apêndice', text: `${fmt(apDiam, 0)} mm${apDiam > 6 ? ' — sugestivo de apendicite (> 6)' : ''}`, alert: apDiam > 6 });
   }
 
+  // ── Pediatria: dilatação pielocalicinal pelo DAP da pelve (pós-natal) ──
+  // < 7 normal · 7–9 leve (UTD ~A1) · 10–14 moderada · ≥ 15 grave (UTD A2-3).
+  for (const [side, id] of [['D', 'dap_d'], ['E', 'dap_e']] as const) {
+    const dap = num(v[id]);
+    if (dap != null && dap > 0) {
+      const grau = dap >= 15 ? 'grave (≥ 15)' : dap >= 10 ? 'moderada (10–14)' : dap >= 7 ? 'leve (7–9)' : '';
+      out.push({
+        id: `dap__${side.toLowerCase()}`,
+        sectionId: secOf(id, 'sistema-coletor'),
+        label: `DAP pelve ${side}`,
+        text: `${fmt(dap, 0)} mm${grau ? ` — dilatação ${grau}` : ''}`,
+        alert: dap >= 10,
+      });
+    }
+  }
+
   // ── Fetal (ecocardiograma): relação cardiotorácica — cardiomegalia se > 0,35 ──
   // O campo `rct` tem faixa normal aproximada ('≈ 0,3'), que o abnormalRange NÃO
   // auto-classifica; o chip aplica o mesmo corte da tabela do prompt (§14:

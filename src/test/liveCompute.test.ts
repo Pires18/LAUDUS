@@ -142,6 +142,15 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(ok?.alert).toBe(false);
   });
 
+  it('pediatria: DAP da pelve gradua dilatação (< 7 normal · ≥ 10 alerta)', () => {
+    const schema = deriveStructuredSchema(tpl('pediatria', 'RINS E VIAS URINÁRIAS PEDIÁTRICO'), 'pediatria');
+    expect(computeDerivations(schema, { dap_d: '12' }).find((x) => x.id === 'dap__d')?.text).toContain('moderada');
+    expect(computeDerivations(schema, { dap_d: '12' }).find((x) => x.id === 'dap__d')?.alert).toBe(true);
+    expect(computeDerivations(schema, { dap_e: '8' }).find((x) => x.id === 'dap__e')?.text).toContain('leve');
+    expect(computeDerivations(schema, { dap_e: '8' }).find((x) => x.id === 'dap__e')?.alert).toBe(false);
+    expect(computeDerivations(schema, { dap_d: '5' }).find((x) => x.id === 'dap__d')?.text).toBe('5 mm');
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

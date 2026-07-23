@@ -2783,7 +2783,7 @@ MAPA DE EXAMES DESTA ÁREA (6 templates de Camada 3):
 4. ABDOME TOTAL PEDIÁTRICO — Achados Prioritários
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ESTENOSE HIPERTRÓFICA DO PILORO (EHP):
-   Espessura da parede muscular >4 mm + comprimento canal >17 mm.
+   EHP exige AMBOS: espessura muscular ≥4 mm E comprimento do canal ≥17 mm.
    Sinal do "ombro" pilórico. Ausência de trânsito gástrico.
    Perfil: lactente 3–8 semanas, vômitos em jato, alcalose hipoclorêmica.
    → ATIVAR R6 — avaliação cirúrgica urgente.

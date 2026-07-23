@@ -186,7 +186,7 @@ const ABDOME_PEDIATRICO = (): StructuredSection[] => [
     normalable: true,
     normalText: 'piloro de espessura muscular e canal normais, sem sinais de estenose hipertrófica',
     fields: [
-      { id: 'piloro_musculo', label: 'Espessura muscular', kind: 'measure', unit: 'mm', alwaysShow: true, normal: '< 4 mm', hint: '≥ 4 mm ou canal ≥ 17 mm = estenose hipertrófica (auto)' },
+      { id: 'piloro_musculo', label: 'Espessura muscular', kind: 'measure', unit: 'mm', alwaysShow: true, normal: '< 4 mm', hint: 'EHP exige AMBOS: músculo ≥ 4 mm E canal ≥ 17 mm (auto)' },
       { id: 'piloro_canal', label: 'Comprimento do canal', kind: 'measure', unit: 'mm', alwaysShow: true, normal: '< 17 mm' },
     ],
   },
