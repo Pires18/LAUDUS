@@ -385,7 +385,7 @@ describe('AUDITORIA — valores de referência', () => {
       ['OMBRO', 'bursa_esp', /< 2 mm/],
       ['OMBRO', 'espaco_subacromial', /≥ 7 mm/],
       ['OMBRO', 'biceps_esp', /4–6 mm/],
-      ['COTOVELO', 'csa_ulnar', /≤ 2,5 mm²/],
+      ['COTOVELO', 'csa_ulnar', /≤ 8 mm²/],
       ['PUNHO', 'csa_mediano', /≤ 9 mm²/],
       ['MÃO E PUNHO', 'csa_mediano', /≤ 9 mm²/],
       ['JOELHO', 'quadricipital_esp', /5–7 mm/],

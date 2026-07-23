@@ -117,7 +117,7 @@ const COTOVELO = (): StructuredSection[] => [
   compartimento('medial', 'Compartimento Medial', 'tendão flexor-pronador comum íntegro; ligamento colateral medial preservado; nervo ulnar tópico',
     tendao('flexor_pronador', 'Flexor-pronador comum', undefined, 'epicondilite medial ("cotovelo do golfista")').concat([
       { id: 'lcm_cotovelo', label: 'Ligamento colateral medial', kind: 'select', options: ['íntegro', 'espessado', 'lesão parcial', 'lesão completa'] },
-      { id: 'csa_ulnar', label: 'Nervo ulnar — CSA (túnel cubital)', kind: 'measure', unit: 'mm²', alwaysShow: true, normal: '≤ 2,5 mm²', hint: '≥ 3,5 mm² = compressão' },
+      { id: 'csa_ulnar', label: 'Nervo ulnar — CSA (túnel cubital)', kind: 'measure', unit: 'mm²', alwaysShow: true, normal: '≤ 8 mm²', hint: '≥ 10 mm² = compressão (média normal ~7 mm² no epicôndilo medial) — auto' },
       { id: 'ulnar_luxacao', label: 'Nervo ulnar à flexão', kind: 'select', options: ['estável', 'subluxa', 'luxa'] },
     ])),
   compartimento('lateral', 'Compartimento Lateral', 'tendão extensor comum íntegro; ligamento colateral lateral preservado',

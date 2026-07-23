@@ -161,6 +161,20 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(inativa?.alert).toBe(false);
   });
 
+  it('MSK: nervo ulnar CSA ≥ 10 mm² = compressão (túnel cubital)', () => {
+    const schema = deriveStructuredSchema(tpl('musculoesqueletico', 'COTOVELO'), 'musculoesqueletico');
+    expect(computeDerivations(schema, { csa_ulnar: '12' }).find((x) => x.id === 'csa_ulnar__comp')?.alert).toBe(true);
+    expect(computeDerivations(schema, { csa_ulnar: '7' }).find((x) => x.id === 'csa_ulnar__comp')?.text).toBe('7 mm²');
+  });
+
+  it('MSK: derrame do quadril > 5 mm alerta (artrite séptica se febre)', () => {
+    const schema = deriveStructuredSchema(tpl('musculoesqueletico', 'QUADRIL'), 'musculoesqueletico');
+    const d = computeDerivations(schema, { derrame_colo: '7' }).find((x) => x.id === 'derrame_colo__d');
+    expect(d?.text).toMatch(/artrite séptica/);
+    expect(d?.alert).toBe(true);
+    expect(computeDerivations(schema, { derrame_colo: '2' }).find((x) => x.id === 'derrame_colo__d')?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

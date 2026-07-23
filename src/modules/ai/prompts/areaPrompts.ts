@@ -1785,7 +1785,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
      Tendinose/entesopatia: mesmos critérios.
    NERVO ULNAR:
      Sulco epitroclear-olecraneano: normal ≤2,5 mm de área de secção transversa (AST).
-     AST >3,5 mm = edema/compressão (síndrome do túnel cubital).
+     AST ≥ 10 mm² = edema/compressão (síndrome do túnel cubital; normal ~6–8 mm²).
      Subluxação: avaliar com flexão do cotovelo (nervo sai do sulco).
    BÍCEPS DISTAL: inserção na tuberosidade do rádio. Rotura = gap + retração proximal.
    TRÍCEPS DISTAL: inserção no olécrano. Rotura em atletas/uso de corticoide local.
@@ -1889,7 +1889,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
     │ NERVO / SÍNDROME          │ LOCAL DE MEDIDA            │ AST NORMAL / PATOL.  │
     ├───────────────────────────┼────────────────────────────┼──────────────────────┤
     │ Mediano (STC)             │ Pisiforme / proximal       │ ≤9 mm² / ≥10 mm²     │
-    │ Ulnar (Túnel Cubital)     │ Sulco epitroclear          │ ≤2,5 mm² / ≥3,5 mm² │
+    │ Ulnar (Túnel Cubital)     │ Sulco epitroclear          │ ≤8 mm² / ≥10 mm²    │
     │ Ulnar (Canal de Guyon)    │ Pisiforme no punho         │ ≤5 mm² / ≥7,5 mm²   │
     │ Fibular (Col. Fib.)       │ Colo da fíbula             │ ≤9 mm² / ≥12 mm²    │
     │ Tibial posterior          │ Túnel do tarso             │ ≤9 mm² / ≥12 mm²    │
@@ -1938,7 +1938,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
     Bíceps L. porção (sulco intertub) │ 4–6 mm               │ >7 mm = tendinose
     Tibial posterior               │ 3–5 mm                    │ >6 mm = tendinose
     Nervo mediano (STC — pisiforme)│ ≤9 mm²                    │ ≥10 mm² = STC
-    Nervo ulnar (túnel cubital)    │ ≤2,5 mm²                  │ ≥3,5 mm² = compressão
+    Nervo ulnar (túnel cubital)    │ ≤8 mm²                    │ ≥10 mm² = compressão
     Espaço subacromial             │ ≥7 mm                     │ <5 mm = impacto crítico
     Bursa subacromial-subdeltoidea │ <2 mm                     │ ≥2 mm = bursite
     Derrame articular do quadril   │ <3 mm (colo femoral ant.) │ >5 mm = moderado

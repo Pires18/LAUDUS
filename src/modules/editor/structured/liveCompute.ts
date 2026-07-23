@@ -665,6 +665,22 @@ export function computeDerivations(
     out.push({ id: 'csa_mediano__stc', sectionId: secOf('csa_mediano', 'tunel-do-carpo'), label: 'Nervo mediano (CSA)', text: `${fmt(csaMediano, 0)} mm²${cls}`, alert: csaMediano >= 10 });
   }
 
+  // ── Nervo ulnar: CSA no túnel cubital (compressão ≥ 10 mm²; normal ~6–8) ──
+  const csaUlnar = num(v['csa_ulnar']);
+  if (csaUlnar != null && csaUlnar > 0) {
+    const comp = csaUlnar >= 10;
+    out.push({ id: 'csa_ulnar__comp', sectionId: secOf('csa_ulnar', 'tunel-cubital'), label: 'Nervo ulnar (CSA)', text: `${fmt(csaUlnar, 0)} mm²${comp ? ' — compressão (≥ 10; síndrome do túnel cubital)' : ''}`, alert: comp });
+  }
+
+  // ── Quadril: derrame do colo femoral anterior (> 5 mm moderado; artrite séptica c/ febre) ──
+  const derrameColo = num(v['derrame_colo']);
+  if (derrameColo != null && derrameColo > 0) {
+    const mod = derrameColo > 5;
+    const disc = derrameColo > 3 && derrameColo <= 5;
+    const txt = mod ? ' — derrame moderado (> 5) · com febre/dor, excluir artrite séptica (R6)' : disc ? ' — derrame discreto (> 3)' : '';
+    out.push({ id: 'derrame_colo__d', sectionId: secOf('derrame_colo', 'quadril'), label: 'Derrame do quadril', text: `${fmt(derrameColo, 0)} mm${txt}`, alert: mod });
+  }
+
   // ── Fetal: RCP = IP ACM / IP AU — percentil por IG (F5, getCprRef); alerta se < p5 ou < 1 ──
   const ipAcm = num(v['ip_acm']);
   const ipAu = num(v['ip_au']);
