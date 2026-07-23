@@ -907,6 +907,21 @@ export function computeDerivations(
         alert: nActive > 0,
       });
     }
+
+    // ── Sacroilíacas: Power Doppler por lado (PD ≥ 1 = sacroileíte ativa) ──
+    for (const side of ['d', 'e'] as const) {
+      const pd = grade(v[`si_pd_${side}`]);
+      if (pd != null) {
+        const ativa = pd >= 1;
+        out.push({
+          id: `si_pd__${side}`,
+          sectionId: secOf(`si_pd_${side}`, `sacroiliaca-${side}`),
+          label: `Sacroilíaca ${side.toUpperCase()}`,
+          text: `PD grau ${pd}${ativa ? ' — sacroileíte ativa (correlação ASAS/RM)' : ' — sem atividade ao Doppler'}`,
+          alert: ativa,
+        });
+      }
+    }
   }
 
   // ── Mastologia: suspeição do linfonodo axilar (grupo repetível). Córtex ≥ 3 mm

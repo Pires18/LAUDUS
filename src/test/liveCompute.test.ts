@@ -151,6 +151,16 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(computeDerivations(schema, { dap_d: '5' }).find((x) => x.id === 'dap__d')?.text).toBe('5 mm');
   });
 
+  it('reumato: sacroilíaca PD ≥ 1 = sacroileíte ativa (por lado)', () => {
+    const schema = deriveStructuredSchema(tpl('reumatologico', 'SACROILÍACAS'), 'reumatologico');
+    const ativa = computeDerivations(schema, { si_pd_d: '2 (moderado)' }).find((x) => x.id === 'si_pd__d');
+    expect(ativa?.text).toContain('sacroileíte ativa');
+    expect(ativa?.alert).toBe(true);
+    const inativa = computeDerivations(schema, { si_pd_e: '0 (ausente)' }).find((x) => x.id === 'si_pd__e');
+    expect(inativa?.text).toContain('sem atividade');
+    expect(inativa?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

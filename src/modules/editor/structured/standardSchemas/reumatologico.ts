@@ -137,8 +137,8 @@ const PDUS_28 = (): StructuredSection[] => [
     id: 'escore-combinado',
     label: 'Escore Combinado (GLOESS)',
     fields: [
-      { id: 'gsus_total', label: 'Soma GSUS (0–84)', kind: 'measure', alwaysShow: true, hint: '28 articulações × 0–3' },
-      { id: 'pdus_total', label: 'Soma PDUS (0–84)', kind: 'measure', alwaysShow: true },
+      { id: 'gsus_total', label: 'Soma GSUS (0–84)', kind: 'measure', alwaysShow: true, hint: '28 art. × 0–3 · o chip "Soma GSUS" calcula automático quando as articulações são itemizadas acima' },
+      { id: 'pdus_total', label: 'Soma PDUS (0–84)', kind: 'measure', alwaysShow: true, hint: 'idem — o chip "Soma PDUS" é a fonte quando itemizado' },
       { id: 'gloess', label: 'GLOESS', kind: 'measure', alwaysShow: true, hint: 'escore global OMERACT-EULAR de sinovite' },
       { id: 'n_ativas', label: 'Articulações com atividade (PD ≥ 1)', kind: 'measure', alwaysShow: true, hint: 'define atividade inflamatória' },
       { id: 'gloess_desc', label: 'Interpretação', kind: 'text', fullWidth: true, placeholder: 'comparar com exame anterior para resposta terapêutica' },
