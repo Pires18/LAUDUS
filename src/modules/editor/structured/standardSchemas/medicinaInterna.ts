@@ -50,7 +50,7 @@ const FIGADO = (): StructuredSection => ({
   normalText: 'dimensões normais, contornos regulares, bordas afiladas, ecotextura homogênea, sem esteatose ou lesões focais',
   fields: [
     { id: 'figado_lobo_d', label: 'Lobo direito (longitudinal)', kind: 'measure', unit: 'cm', normal: '≤ 15–16 cm', alwaysShow: true, hint: 'hepatomegalia se > 16 cm (linha médio-clavicular)' },
-    { id: 'esteatose', label: 'Esteatose', kind: 'select', options: ['ausente', 'grau I (leve)', 'grau II (moderada)', 'grau III (acentuada)'] },
+    { id: 'esteatose', label: 'Esteatose', kind: 'select', options: ['ausente', 'grau I (leve)', 'grau II (moderada)', 'grau III (acentuada)'], hint: 'graduação qualitativa ao US; quantificação objetiva requer índice hepatorrenal ou elastografia (CAP)' },
     { id: 'figado_contornos', label: 'Contornos', kind: 'select', options: ['regulares', 'lobulados', 'irregulares/nodulares (hepatopatia crônica)'] },
     { id: 'figado_obs', label: 'Outros achados', kind: 'text', fullWidth: true, placeholder: 'hepatopatia crônica, hipertrofia do caudado, ecotextura grosseira…' },
   ],
@@ -125,11 +125,14 @@ const RINS_RESUMO = (): StructuredSection => ({
   fields: [
     { id: 'rim_d_eixo', label: 'Rim direito (maior eixo)', kind: 'measure', unit: 'cm', normal: '9–12 cm', alwaysShow: true },
     { id: 'rim_e_eixo', label: 'Rim esquerdo (maior eixo)', kind: 'measure', unit: 'cm', normal: '9–12 cm', alwaysShow: true },
-    { id: 'rins_achados', label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'litíase, cisto, hidronefrose (lado, medida, grau SFU)' },
+    { id: 'rins_achados', label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'litíase, cisto, hidronefrose (lado, medida, grau G1–G4)' },
   ],
 });
 
-const SFU = ['ausente', 'SFU I', 'SFU II', 'SFU III', 'SFU IV'];
+// Hidronefrose do ADULTO — graduação por diâmetro AP da pelve renal (plano
+// transverso), alinhada à Camada 2. (SFU I–IV é sistema pediátrico; usado só
+// na área de pediatria.)
+const HIDRONEFROSE = ['ausente', 'G1 — pelviectasia (5–9 mm)', 'G2 — leve (10–14 mm)', 'G3 — moderada (15–20 mm)', 'G4 — grave (> 20 mm)'];
 
 /**
  * Cistos/lesões focais de UM rim — ficam ANINHADOS na seção do rim (grupo
@@ -167,7 +170,7 @@ const RIM = (side: 'direito' | 'esquerdo', opts: { bosniak?: boolean } = {}): St
       // ids canônicos: volume via calculadora + convenção da fieldLibrary
       { id: `rim_${s}_dims`, label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide', normal: '9–12 cm (eixo)', alwaysShow: true, hint: 'volume renal por elipsoide' },
       { id: `rim_${s}_parenquima`, label: 'Espessura parenquimatosa', kind: 'measure', unit: 'mm', normal: '> 15 mm', alwaysShow: true, hint: 'cortical > 10 mm' },
-      { id: `rim_${s}_dilat`, label: 'Dilatação pielocalicinal (SFU)', kind: 'select', options: SFU },
+      { id: `rim_${s}_dilat`, label: 'Dilatação pielocalicinal (G1–G4)', kind: 'select', options: HIDRONEFROSE, hint: 'graduação por diâmetro AP da pelve (plano transverso)' },
       { id: `rim_${s}_achados`, label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'ecogenicidade cortical, nefropatia (G1–G5), massa' },
     ],
     // cistos/lesões do rim: aninhados, aparecem sob 'Alterado'
