@@ -125,7 +125,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
        (a) Parede >4 mm com duplo halo; (b) Murphy sonográfico positivo;
        (c) Cálculo impactado no infundíbulo; (d) Líquido perivesicular; (e) Debris intraluminais.
        ≥3 critérios = colecistite aguda provável → ATIVAR R6.
-     Pólipo vesicular (classificar via GRADS — ACR 2021): sessil, sem sombra. <6 mm → controle anual.
+     Pólipo vesicular (manejo por tamanho): séssil, sem sombra. <6 mm → controle anual.
        6–9 mm → controle 6 meses. ≥10 mm → avaliação cirúrgica (risco oncológico).
 
 3. PÂNCREAS — Avaliação sistemática
@@ -916,7 +916,7 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
   /**
    * @area ginecologia
    * @scope Pélvico Feminino (TV/TA), Transvaginal, Morfologia Uterina,
-   *        Cistos Ovarianos, SOMP, Endometriose, Miomatose, etc.
+   *        Cistos Ovarianos, SOP/PCOS, Endometriose, Miomatose, etc.
    */
   'ginecologia': `DIRETRIZES CLÍNICAS — GINECOLOGIA (V2.0 — LAUD.IA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1068,13 +1068,15 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
      Acima de 50 anos: NÃO classificar nenhum cisto como funcional. Aplicar
      O-RADS rigoroso mesmo para cistos aparentemente simples.
 
-   SOMP — Síndrome Ovariana Metabólica Poliendócrina (antiga SOP/PCOS) — Critério de morfologia
+   SOP / PCOS — Síndrome dos Ovários Policísticos — Critério de morfologia (PCOM)
    [Diretriz Internacional SOP 2023 — Monash/ESHRE/ASRM]:
      ≥20 folículos de 2–9 mm por ovário (transdutor ≥8 MHz) OU volume ovariano ≥10 mL.
      AMH sérica pode SUBSTITUIR o US na definição de morfologia (adultas).
      NÃO usar US para morfologia em adolescentes <8 anos pós-menarca (alta prevalência fisiológica).
-     Relatar: "Morfologia compatível com ovários policísticos, sugestiva de SOMP (antiga SOP).
-     Achado isolado; correlação clínico-laboratorial para os critérios de SOMP."
+     Relatar: "Morfologia compatível com ovários policísticos (PCOM), sugestiva de SOP/PCOS.
+     Achado isolado; correlação clínico-laboratorial para os critérios de SOP."
+     (Obs.: há proposta recente [2025/2026] de renomear SOP para "Síndrome Ovariana Metabólica
+      Poliendócrina — SOMP", ainda não incorporada às diretrizes; manter SOP como termo do laudo.)
      ATENÇÃO: morfologia isolada NÃO é diagnóstico — requer 2 de 3 (oligo/anovulação,
      hiperandrogenismo clínico/laboratorial, morfologia ovariana).
 
@@ -1249,7 +1251,7 @@ MAPA DE EXAMES DESTA ÁREA (5 templates de Camada 3):
    Endométrio pós-meno >5 mm s/ sangramento: "Controle US em 6 meses; se >8 mm → histo."
    Endométrio pós-meno >5 mm c/ sangramento: "Histeroscopia diagnóstica urgente."
    Pólipo endometrial: "SHG (sonoistero) ou histeroscopia diagnóstica para confirmação."
-   SOMP morfológico: "Correlação clínica e laboratorial para diagnóstico de SOMP (Síndrome Ovariana Metabólica Poliendócrina) — critérios diagnósticos completos (Diretriz Internacional 2023)."
+   SOP morfológico (PCOM): "Correlação clínica e laboratorial para diagnóstico de SOP/PCOS — critérios diagnósticos completos (Diretriz Internacional 2023)."
    Hidrossalpinge: "Avaliação ginecológica para investigação de DIP / infertilidade."
    Piosalpinge / ATO: ATIVAR R6 — "ALERTA INFECCIOSO: internação + ATB IV + avaliação cirúrgica."
    Gestação ectópica suspeita: ATIVAR R6 — "ALERTA OBSTÉTRICO: avaliação emergencial."

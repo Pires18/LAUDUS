@@ -760,6 +760,47 @@ export function computeDerivations(
     }
   }
 
+  // ── Reumatológico: agregação OMERACT das articulações (soma GSUS/PDUS e nº
+  // de articulações com atividade PD ≥ 1). Os graus 0–3 vêm dos itens do grupo
+  // repetível de sinovite; a soma é objetiva (não fabrica um "GLOESS" numérico). ──
+  if (schema.area === 'reumatologico') {
+    const grade = (val: StructuredFieldValue | undefined): number | null => {
+      const m = fieldValueToText(val).match(/[0-3]/);
+      return m ? parseInt(m[0], 10) : null;
+    };
+    let gsusSum = 0, pdusSum = 0, nActive = 0, nJoints = 0;
+    let anchor = 'escore-combinado';
+    for (const section of schema.sections) {
+      for (const container of sectionRepeatContainers(section)) {
+        const hasGsus = container.fields.some((f) => f.id === 'gsus');
+        const hasPdus = container.fields.some((f) => f.id === 'pdus');
+        if (!hasGsus && !hasPdus) continue;
+        const n = itemCount(v, container.containerId);
+        for (let i = 0; i < n; i++) {
+          const g = grade(v[itemFieldId(container.containerId, i, 'gsus')]);
+          const p = grade(v[itemFieldId(container.containerId, i, 'pdus')]);
+          if (g == null && p == null) continue;
+          nJoints++;
+          if (g != null) gsusSum += g;
+          if (p != null) { pdusSum += p; if (p >= 1) nActive++; }
+        }
+      }
+    }
+    if (schema.sections.some((s) => s.id === 'escore-combinado')) anchor = 'escore-combinado';
+    else anchor = secOf('art_lista', 'sinovite');
+    if (nJoints > 0) {
+      const jl = `${nJoints} articulaç${nJoints > 1 ? 'ões' : 'ão'}`;
+      out.push({ id: 'reuma__gsus', sectionId: anchor, label: 'Soma GSUS (Σ 0–3)', text: `${gsusSum} — ${jl}` });
+      out.push({ id: 'reuma__pdus', sectionId: anchor, label: 'Soma PDUS (Σ 0–3)', text: `${pdusSum}`, alert: pdusSum > 0 });
+      out.push({
+        id: 'reuma__ativas', sectionId: anchor,
+        label: 'Articulações com atividade (PD ≥ 1)',
+        text: nActive > 0 ? `${nActive} — atividade inflamatória` : '0 — sem atividade ao Doppler',
+        alert: nActive > 0,
+      });
+    }
+  }
+
   return out;
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { computeDerivations, derivationsToLines } from '../modules/editor/structured/liveCompute';
 import { deriveStructuredSchema } from '../modules/editor/structured/deriveSchema';
-import { countKey, itemFieldId } from '../modules/editor/structured/structuredKeys';
+import { countKey, itemFieldId, groupContainerId, normalKey } from '../modules/editor/structured/structuredKeys';
 import { ReportTemplate } from '../types';
 
 function tpl(area: string, name: string, compartments: string[] = []): ReportTemplate {
@@ -22,6 +22,31 @@ describe('computeDerivations — cálculo em tempo real', () => {
     const vol = d.find((x) => x.id === 'lobo_d_dims__vol');
     // 4 * 1,5 * 1,2 * 0,523 = 3,7656 → 3,77
     expect(vol?.text).toBe('3,77 cm³');
+  });
+
+  it('reumato: soma GSUS/PDUS e conta articulações com atividade (PD ≥ 1)', () => {
+    const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
+    const cid = groupContainerId('articulacoes', 'item');
+    const v: Record<string, string> = {
+      [normalKey('articulacoes')]: 'altered',
+      [countKey(cid)]: '2',
+      [itemFieldId(cid, 0, 'gsus')]: '2 (moderado)',
+      [itemFieldId(cid, 0, 'pdus')]: '1 (leve)',
+      [itemFieldId(cid, 1, 'gsus')]: '3 (acentuado)',
+      [itemFieldId(cid, 1, 'pdus')]: '0 (ausente)',
+    };
+    const d = computeDerivations(schema, v);
+    expect(d.find((x) => x.id === 'reuma__gsus')?.text).toBe('5 — 2 articulações'); // 2+3
+    expect(d.find((x) => x.id === 'reuma__pdus')?.text).toBe('1');                   // 1+0
+    const ativas = d.find((x) => x.id === 'reuma__ativas');
+    expect(ativas?.text).toContain('1');                                             // só a 1ª tem PD≥1
+    expect(ativas?.alert).toBe(true);
+  });
+
+  it('reumato: sem articulações preenchidas → não emite soma', () => {
+    const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
+    const d = computeDerivations(schema, {});
+    expect(d.some((x) => x.id.startsWith('reuma__'))).toBe(false);
   });
 
   it('RCP = IP ACM / IP AU, com alerta se < 1', () => {

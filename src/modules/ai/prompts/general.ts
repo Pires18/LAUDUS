@@ -462,13 +462,13 @@ Mapeamento principal (exemplos — não exaustivo):
   "centralização" → "redistribuição do fluxo fetal com centralização hemodinâmica — relação RCP reduzida, sugerindo hipóxia crônica com poupamento de órgãos nobres".
 
 SISTEMA HEPÁTICO E BILIAR:
-  "esteatose leve" / "fígado com eco aumentado grau 1" → "esteatose hepática de grau leve (S1): ecogenicidade hepática discretamente aumentada em relação ao parênquima renal, com preservação da visualização dos vasos hepáticos e do diafragma";
-  "esteatose moderada" / "fígado gorduroso grau 2" → "esteatose hepática de grau moderado (S2): ecogenicidade hepática aumentada com redução da nitidez dos vasos intra-hepáticos e atenuação do feixe posterior — diafragma ainda visível";
-  "esteatose grave" / "fígado gorduroso grau 3" → "esteatose hepática de grau acentuado (S3): ecogenicidade hepática marcadamente aumentada com perda da definição dos vasos hepáticos e não visualização do diafragma por atenuação do feixe";
+  "esteatose leve" / "fígado com eco aumentado grau 1" → "esteatose hepática de grau leve: ecogenicidade hepática discretamente aumentada em relação ao parênquima renal, com preservação da visualização dos vasos hepáticos e do diafragma";
+  "esteatose moderada" / "fígado gorduroso grau 2" → "esteatose hepática de grau moderado: ecogenicidade hepática aumentada com redução da nitidez dos vasos intra-hepáticos e atenuação do feixe posterior — diafragma ainda visível";
+  "esteatose grave" / "fígado gorduroso grau 3" → "esteatose hepática de grau acentuado: ecogenicidade hepática marcadamente aumentada com perda da definição dos vasos hepáticos e não visualização do diafragma por atenuação do feixe";
   "textura grosseira" / "textura heterogênea fígado" → "ecotextura hepática difusamente heterogênea, com aumento da ecogenicidade e irregularidade do parênquima — aspecto sugestivo de hepatopatia crônica difusa (DD: cirrose, fibrose, esteatose heterogênea)";
   "hepatoesplenomegalia" → "hepatoesplenomegalia — fígado e baço com dimensões aumentadas para o padrão etário; correlacionar com hemograma, função hepática e contexto clínico";
-  "espessamento focal da parede da vesícula biliar" → "espessamento focal parietal da vesícula biliar, medindo (…) mm, de aspecto [séssil / pediculado / difuso] — (DD: pólipo colesterol, adenomiose vesicular, adenocarcinoma em estágio inicial — avaliar GRADS ACR 2021)";
-  "pólipo VB" / "pólipo vesícula" → "formação polipóide séssil / pediculada no interior da vesícula biliar, medindo (…) mm, de ecogenicidade [aumentada / mista], sem sombra acústica — avaliar com critérios GRADS ACR 2021";
+  "espessamento focal da parede da vesícula biliar" → "espessamento focal parietal da vesícula biliar, medindo (…) mm, de aspecto [séssil / pediculado / difuso] — (DD: pólipo de colesterol, adenomiose vesicular, adenocarcinoma em estágio inicial); correlacionar com clínica e seguimento";
+  "pólipo VB" / "pólipo vesícula" → "formação polipóide séssil / pediculada no interior da vesícula biliar, medindo (…) mm, de ecogenicidade [aumentada / mista], sem sombra acústica — manejo por tamanho: <6 mm seguimento de rotina; 6–9 mm controle ecográfico; ≥10 mm ou crescimento → avaliação especializada";
   "vias biliares dilatadas" / "VBD dilatadas" → "dilatação das vias biliares intra e/ou extra-hepáticas — ducto biliar principal medindo (…) mm de diâmetro (normal até 6 mm; até 8 mm em colecistectomizados) — investigar obstrução biliar";
   "coledocolitíase suspeita" → "imagem hiperecoica com sombra acústica posterior no interior do ducto biliar principal — suspeita de coledocolitíase; correlacionar com enzimas canaliculares e TC/CPRE".
 
@@ -721,7 +721,6 @@ REGRAS PARA SEÇÃO CLASSIFICAÇÃO — REGRA UNIFICADA:
     • Formação ovariana → O-RADS (ACR US, v2022);
     • Lesão hepática suspeita em cirrótico/HBV → LI-RADS US (ACR 2017);
     • Cisto renal com características complexas → Bosniak (2019);
-    • Pólipo de vesícula biliar → GRADS (ACR 2021);
     • Estadiamento ginecológico → FIGO (2021).
   NÃO INCLUIR em:
     • Exames 100% normais sem achado focal classificável;
@@ -935,7 +934,6 @@ Versões oficiais vigentes a utilizar EXCLUSIVAMENTE (não misturar):
   O-RADS: ACR 2022 — único válido para ovário/pelve;
   LI-RADS: ACR LI-RADS US (2017) — para fígado em risco de CHC (US convencional não atribui categoria definitiva; citar "(ACR LI-RADS US, 2017)");
   CEUS-LI-RADS: sistema DISTINTO do US-LI-RADS — aplicável somente quando contraste ultrassonográfico (SonoVue/Lumason) é utilizado; NÃO confundir com US convencional;
-  GRADS: ACR 2021 — Gallbladder Reporting and Data System, para nódulos/pólipos de vesícula biliar (citar "(GRADS ACR 2021)");
   Bosniak: ACR 2019 (v2019) — para cistos renais;
   PI-RADS: ACR v2.1 — para próstata em RM; US transretal usa adaptação própria — NÃO aplicar PI-RADS de RM ao US sem ressalva;
   FIGO: 2021 — para estadiamento ginecológico.
@@ -946,11 +944,11 @@ Além dos sistemas "RADS" acima, as camadas de área/exame podem aplicar sistema
 gradação reconhecidos. Quando o template do exame os definir, eles são VÁLIDOS e devem ser usados:
   — Ovário: IOTA Simple Rules / IOTA ADNEX (adjuntos ao O-RADS); FIGO-PALM-COEIN (SUA); FIGO miomas 0-8;
   — Tireoide: pontuação ACR TI-RADS, EU-TIRADS, padrão vascular de Chammas, citologia de Bethesda;
-  — Hepático/biliar/renal: graduação de esteatose S1-S3, Tokyo TG18 (colecistite), SFU/UTD (hidronefrose);
+  — Hepático/biliar/renal: graduação de esteatose (leve/moderada/acentuada), Tokyo TG18 (colecistite), SFU/UTD (hidronefrose);
   — Vascular: NASCET/SRU 2003 (carótida), CEAP (venoso), Rutherford/Fontaine + ITB (arterial);
   — MSK/Reumato: OMERACT + EULAR-OMERACT 0-3, Ellman (manguito), BAMIC (muscular);
   — Mama/linfonodo: léxico BI-RADS + Bedi (cortical linfonodal); Robbins (níveis cervicais).
-LOCALIZAÇÃO NO LAUDO: apenas os sistemas "RADS" e Bosniak/GRADS/FIGO usam a seção <h2>CLASSIFICAÇÃO</h2>.
+LOCALIZAÇÃO NO LAUDO: apenas os sistemas "RADS" e Bosniak/FIGO usam a seção <h2>CLASSIFICAÇÃO</h2>.
 Sistemas de gradação (SFU, CEAP, Rutherford, OMERACT, Bedi, Tokyo, BAMIC) e adjuntos (IOTA, Chammas)
 são declarados DENTRO da ANÁLISE, nunca em seção CLASSIFICAÇÃO separada. Citar sempre a entidade/ano.`;
 
