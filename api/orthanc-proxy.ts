@@ -1,6 +1,12 @@
+import dns from 'node:dns';
 import type { IncomingMessage, ServerResponse } from 'http';
 import { verifyFirebaseIdToken } from './_edgeAuth.js';
 import { hasPacsEntitlement } from './_entitlements.js';
+
+// Mesmo motivo do api/worklist.ts: o host do agente (Tailscale Funnel) é dual-stack
+// e o egress da Vercel não roteia IPv6. Preferir IPv4 evita "fetch failed" quando
+// este proxy fala server-side com o Funnel.
+dns.setDefaultResultOrder('ipv4first');
 
 // Desabilita o bodyParser padrão do Vercel Serverless Functions.
 // Isso impede que a Vercel tente analisar payloads binários brutos (como arquivos DICOM)
