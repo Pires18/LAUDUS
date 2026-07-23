@@ -3,7 +3,7 @@ import { tiradsScore, TIRADS_OPTIONS, biradsSuggest, oradsSuggest, grafType, car
 import { deriveStructuredSchema, summarizeStructured } from '../modules/editor/structured/deriveSchema';
 import { computeDerivations } from '../modules/editor/structured/liveCompute';
 import { normalKey, countKey, itemFieldId } from '../modules/editor/structured/structuredKeys';
-import { ReportTemplate } from '../types';
+import { ReportTemplate, StructuredSchema } from '../types';
 
 function tpl(area: string, name: string, compartments: string[] = []): ReportTemplate {
   const analysisTemplate = compartments
@@ -129,6 +129,25 @@ describe('summarize — seções normal/alterado e repetíveis', () => {
     const { lines } = summarizeStructured(abdome, { [normalKey(bacoId)]: 'altered', baco_eixo: '14' });
     expect(lines.join('\n')).toMatch(/14/);
     expect(lines.join('\n')).not.toMatch(/Baço: sem alterações/);
+  });
+
+  it('campo oculto por showIf com valor residual não compila nem conta', () => {
+    // Regressão: mudar o controlador (ex.: flap 'presente' → 'ausente') ocultava
+    // o campo na UI, mas o valor antigo seguia vazando para o laudo/IA.
+    const schema: StructuredSchema = {
+      area: 'vascular',
+      sections: [{
+        id: 'aorta', label: 'Aorta', fields: [
+          { id: 'flap', label: 'Flap intimal', kind: 'select', options: ['ausente', 'presente'] },
+          { id: 'debakey', label: 'DeBakey', kind: 'select', options: ['DeBakey I (tipo A)'], showIf: { field: 'flap', equals: 'presente' } },
+        ],
+      }],
+    };
+    const shown = summarizeStructured(schema, { flap: 'presente', debakey: 'DeBakey I (tipo A)' });
+    expect(shown.lines.join('\n')).toMatch(/DeBakey/);
+    const hidden = summarizeStructured(schema, { flap: 'ausente', debakey: 'DeBakey I (tipo A)' });
+    expect(hidden.lines.join('\n')).not.toMatch(/DeBakey/);
+    expect(hidden.filledCount).toBe(1); // só o flap conta como preenchido
   });
 
   it('seção repetível itera instâncias por índice', () => {

@@ -1,5 +1,6 @@
 import { StructuredSection, StructuredFieldValue, StructuredFieldDef } from '../../../types';
 import { normalKey, itemFieldId, itemCount } from './structuredKeys';
+import { sectionRepeatContainers } from './containers';
 
 /**
  * ALTERADO AUTOMÁTICO — interpreta o texto de faixa normal de um campo
@@ -96,7 +97,13 @@ export function fieldDefAbnormal(field: StructuredFieldDef, value: StructuredFie
   return fieldValueAbnormal(value, field.normal);
 }
 
-/** Verdadeiro se ALGUM campo com faixa numérica da seção tem valor alterado. */
+/**
+ * Verdadeiro se a seção tem ACHADO: campo fixo com valor fora de faixa OU
+ * qualquer campo preenchido numa instância repetível (lesão/nódulo registrado
+ * é um achado por definição — não existe lesão "normal" digitada à toa).
+ * As instâncias usam o containerId real (`section` ou `section#group`), não
+ * `section.id` cru — grupos aninhados guardam em `<section>#<group>@<i>@<campo>`.
+ */
 export function sectionHasAbnormalValue(
   section: StructuredSection,
   values: Record<string, StructuredFieldValue> | undefined,
@@ -105,12 +112,11 @@ export function sectionHasAbnormalValue(
   for (const f of section.fields) {
     if ((f.normal || f.normalOption) && fieldDefAbnormal(f, values[f.id])) return true;
   }
-  const rg = section.repeatGroup;
-  if (rg) {
-    const cnt = itemCount(values, section.id);
+  for (const c of sectionRepeatContainers(section)) {
+    const cnt = itemCount(values, c.containerId);
     for (let i = 0; i < cnt; i++) {
-      for (const f of rg.fields) {
-        if ((f.normal || f.normalOption) && fieldDefAbnormal(f, values[itemFieldId(section.id, i, f.id)])) return true;
+      for (const f of c.fields) {
+        if (asText(values[itemFieldId(c.containerId, i, f.id)])) return true;
       }
     }
   }

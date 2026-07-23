@@ -3,6 +3,7 @@ import { fieldValueToText } from './deriveSchema';
 import { itemCount, itemFieldId } from './structuredKeys';
 import { effectiveSectionState } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
+import { visibleValues } from './visibility';
 import { meanArterialPressure, bodyMassIndex, seedForCalculator } from './calcSeed';
 import type { PatientContext } from './patientContext';
 import { trisomyRiskFromForm, trisomyHasEvidence, peRiskFromForm } from '../../calculators/fmf/fromForm';
@@ -89,7 +90,9 @@ export function computeDerivations(
   examDateMs?: number,
   ctx?: PatientContext
 ): Derivation[] {
-  const v = values || {};
+  // Campos ocultos por `showIf` não calculam (ex.: tempo de refluxo antigo não
+  // pode seguir gerando chip "patológico" após marcar refluxo 'ausente').
+  const v = visibleValues(schema, values) || {};
   const out: Derivation[] = [];
   // examDate carrega a hora do dia; a datação compara DATAS. Sem truncar para a
   // meia-noite local, um exame à tarde arredonda a IG +1 dia vs. a calculadora
@@ -749,8 +752,9 @@ export function computeDerivations(
     const rcp = ipAcm / ipAu;
     let text = fmt(rcp);
     let alert = rcp < 1;
-    if (weeksGA != null && weeksGA >= DOPPLER_GA_MIN && weeksGA <= DOPPLER_GA_MAX) {
-      const [m, s] = getCprRef(weeksGA);
+    const cprRef = weeksGA != null && weeksGA >= DOPPLER_GA_MIN && weeksGA <= DOPPLER_GA_MAX ? getCprRef(weeksGA) : null;
+    if (cprRef && cprRef[1] > 0) {
+      const [m, s] = cprRef;
       const p = zToPercentile((rcp - m) / s);
       text = `${fmt(rcp)} · p${p}`;
       alert = p < 5 || rcp < 1;

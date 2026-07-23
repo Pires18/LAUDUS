@@ -1,10 +1,12 @@
-// Só negrito, alinhamento e espaçamento (entrelinha/entre letras) sobrevivem
-// no HTML copiado — o resto (fonte, tamanho, cor, itálico/sublinhado, etc.) é
-// removido para colar limpo em qualquer lugar (WhatsApp, Word, e-mail) com a
-// letra do destino.
+// Só negrito, pulos de linha e alinhamento sobrevivem no HTML copiado — o
+// resto (fonte, tamanho, cor, itálico/sublinhado, entrelinha, espaçamento
+// entre letras e margens) é removido para colar limpo em qualquer lugar
+// (WhatsApp, Word, e-mail) com a letra do destino e sem espaçamentos extras.
 const FONT_STYLE_PROPS = [
   'font-family', 'font-size', 'color', 'background-color',
-  'font-style', 'text-decoration',
+  'font-style', 'text-decoration', 'line-height', 'letter-spacing',
+  'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+  'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
 ];
 
 function isBoldWeight(weight: string): boolean {
@@ -16,10 +18,10 @@ function isBoldWeight(weight: string): boolean {
 
 /**
  * Reduz o HTML do corpo do laudo ao básico pra copiar/colar: mantém só
- * negrito, alinhamento e espaçamento (entrelinha/entre letras), remove
- * fonte/tamanho/cor/itálico/sublinhado/tachado, e converte títulos (h1-h6)
- * em parágrafo negrito — sem isso o tamanho de título do navegador vazaria
- * mesmo removendo o style.
+ * negrito, alinhamento e os pulos de linha, remove fonte/tamanho/cor/
+ * itálico/sublinhado/tachado e todo espaçamento (entrelinha, entre letras e
+ * margens de parágrafo), e converte títulos (h1-h6) em parágrafo negrito —
+ * sem isso o tamanho de título do navegador vazaria mesmo removendo o style.
  */
 function buildPlainReportBody(reportHtml: string): string {
   const container = document.createElement('div');
@@ -32,8 +34,6 @@ function buildPlainReportBody(reportHtml: string): string {
     p.appendChild(strong);
     const headingStyle = (heading as HTMLElement).style;
     if (headingStyle.textAlign) p.style.textAlign = headingStyle.textAlign;
-    if (headingStyle.lineHeight) p.style.lineHeight = headingStyle.lineHeight;
-    if (headingStyle.letterSpacing) p.style.letterSpacing = headingStyle.letterSpacing;
 
     // Uma linha em branco antes de cada seção (Título, Técnica, Análise,
     // Conclusão, Recomendações, Observações Metodológicas) — exceto quando a
@@ -61,6 +61,14 @@ function buildPlainReportBody(reportHtml: string): string {
   });
 
   container.querySelectorAll('[class]').forEach((el) => el.removeAttribute('class'));
+
+  // Zera explicitamente as margens dos blocos: sem isso o destino (Word,
+  // Google Docs, e-mail) aplica o "espaço depois do parágrafo" padrão dele e o
+  // laudo cola com espaçamentos extras. Os pulos de linha reais (parágrafos e
+  // linhas em branco) permanecem.
+  container.querySelectorAll<HTMLElement>('p, div, ul, ol, li').forEach((el) => {
+    el.style.margin = '0';
+  });
 
   return container.innerHTML;
 }

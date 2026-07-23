@@ -93,12 +93,17 @@ describe('computeDerivations — cálculo em tempo real', () => {
 
   it('vascular: refluxo superficial > 0,5 s é patológico', () => {
     const schema = deriveStructuredSchema(tpl('vascular', 'VENOSO MEMBRO INFERIOR'), 'vascular');
-    const pat = computeDerivations(schema, { 'refluxo_tempo_vs-d': '0,8' }).find((x) => x.id === 'refluxo_vs_d');
+    // o tempo só existe (showIf) com refluxo 'presente' — como na UI
+    const pat = computeDerivations(schema, { 'refluxo_vs-d': 'presente', 'refluxo_tempo_vs-d': '0,8' }).find((x) => x.id === 'refluxo_vs_d');
     expect(pat?.text).toContain('patológico');
     expect(pat?.alert).toBe(true);
-    const fis = computeDerivations(schema, { 'refluxo_tempo_vs-e': '0,3' }).find((x) => x.id === 'refluxo_vs_e');
+    const fis = computeDerivations(schema, { 'refluxo_vs-e': 'presente', 'refluxo_tempo_vs-e': '0,3' }).find((x) => x.id === 'refluxo_vs_e');
     expect(fis?.text).toContain('fisiológico');
     expect(fis?.alert).toBe(false);
+    // refluxo marcado 'ausente' → tempo residual oculto não deriva chip
+    expect(
+      computeDerivations(schema, { 'refluxo_vs-d': 'ausente', 'refluxo_tempo_vs-d': '0,8' }).find((x) => x.id === 'refluxo_vs_d')
+    ).toBeUndefined();
   });
 
   it('pequenas partes: testículo atrofia (< 12) e assimetria (> 20%)', () => {

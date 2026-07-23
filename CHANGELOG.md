@@ -9,6 +9,27 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 Trabalho acumulado desde a 2.2.0 (auditoria final 22–23/07).
 
+### Formulário Estruturado (achados → Copiloto)
+- **FIX crítico — lesão/nódulo preenchido compilava "sem alterações"**: seções
+  `normalable` com grupo repetível (nódulo TI-RADS, lesões hepáticas/mamárias,
+  cistos renais — ~19 grupos) nunca viravam "Alterado" (a UI não tem o toggle e
+  o auto-alterado lia chaves erradas do grupo aninhado). O laudo/IA recebia
+  normalidade contradizendo os descritores digitados, sem escore nem volume.
+  Agora qualquer campo preenchido numa instância vira a seção para Alterado
+  sozinho (escolha manual continua vencendo); `sectionHasAbnormalValue` usa o
+  `containerId` real (`seção#grupo`).
+- **FIX — campos ocultos por `showIf` vazavam**: valor residual de campo oculto
+  (ex.: DeBakey após flap 'ausente', tempo de refluxo após refluxo 'ausente',
+  DUM após trocar o método de datação) seguia entrando na compilação p/ IA e
+  nos cálculos ao vivo. Novo `visibility.ts` é a fonte única do critério
+  (UI, compilação e liveCompute) — o que o médico vê é o que compila.
+- **FIX — badge de preenchidos da seção**: contava campos ocultos e não contava
+  itens de grupo aninhado (mesmas chaves erradas); agora usa os containers
+  reais e respeita `showIf`.
+- **Guarda de divisão** no percentil da RCP (`getCprRef` com desvio 0).
+- Testes: regressões cobertas (nódulo sem clique em Alterado compila e deriva
+  TR; showIf não vaza; Normal manual segue suprimindo).
+
 ### LAUD.IA (motores Gemini)
 - **Motor Pro default → `gemini-2.5-pro`** (GA, por confiabilidade). O
   `gemini-3.1-pro-preview` (preview, sujeito a 503) virou opt-in via Admin.

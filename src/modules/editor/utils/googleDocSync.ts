@@ -2,7 +2,7 @@ import { updateItem } from '../../../store/db';
 import { logger } from '../../../utils/logger';
 import { Patient, ExamRequest, Clinic, AppSettings } from '../../../types';
 import { copyFile, deleteFile } from '../../../lib/googleDrive';
-import { replaceRichTextInDoc, RichTextRun } from '../../../lib/googleDocs';
+import { replaceRichTextInDoc, RichTextRun, RichParagraphStyle } from '../../../lib/googleDocs';
 import { calculateAge, formatDate } from '../../../utils/format';
 import { deleteField } from 'firebase/firestore';
 
@@ -102,7 +102,8 @@ export async function syncGoogleDoc(
       else if (header.includes('OBSERVAÇ')) currentSection = 'observacao_laudo';
       else if (header.includes('RECOMENDAÇ')) currentSection = 'recomendacao_laudo';
       else if (!currentSection) {
-        sectionRuns.titulo_laudo.push({ text });
+        // Padronização oficial: título do laudo em caixa alta e negrito
+        sectionRuns.titulo_laudo.push({ text: text.toUpperCase(), bold: true });
         currentSection = 'titulo_laudo';
       }
     } else if (currentSection) {
@@ -132,8 +133,21 @@ export async function syncGoogleDoc(
 
   // Fallback para o título se estiver vazio
   if (sectionRuns.titulo_laudo.length === 0) {
-    sectionRuns.titulo_laudo.push({ text: exam.examType.toUpperCase() });
+    sectionRuns.titulo_laudo.push({ text: exam.examType.toUpperCase(), bold: true });
   }
+
+  // Padronização oficial do laudo (mesma do PDF/impressão): título
+  // centralizado; corpo justificado (ou à esquerda, conforme configuração).
+  const bodyAlignment = settings.pdfTextAlign === 'left' ? 'START' : 'JUSTIFIED';
+  const paragraphStyles: Record<string, RichParagraphStyle> = {
+    titulo_laudo: { alignment: 'CENTER' },
+    tecnica_laudo: { alignment: bodyAlignment },
+    analise_laudo: { alignment: bodyAlignment },
+    conclusao_laudo: { alignment: bodyAlignment },
+    classificacao_laudo: { alignment: bodyAlignment },
+    observacao_laudo: { alignment: bodyAlignment },
+    recomendacao_laudo: { alignment: bodyAlignment },
+  };
 
   const plainReplacements: Record<string, string> = {
     'PACIENTE_NOME': patient.name,
@@ -151,7 +165,7 @@ export async function syncGoogleDoc(
     'data_nascimento': patient.birthDate ? formatDate(patient.birthDate) : '—'
   };
 
-  await replaceRichTextInDoc(docId, plainReplacements, sectionRuns);
+  await replaceRichTextInDoc(docId, plainReplacements, sectionRuns, paragraphStyles);
 
   const url = `https://docs.google.com/document/d/${docId}/edit`;
   await updateItem('exams', examId, {

@@ -12,21 +12,24 @@ import { Derivation } from '../structured/liveCompute';
 import { itemCount, itemFieldId } from '../structured/structuredKeys';
 import { isAutoAltered, fieldDefAbnormal } from '../structured/abnormalRange';
 import { sectionRepeatContainers, RepeatContainer } from '../structured/containers';
+import { fieldVisible } from '../structured/visibility';
 
 /** Quantos campos da seção (fixos + itens repetíveis) têm valor — pro resumo
  * visível no card retraído, sem precisar expandir pra saber o que já foi
  * preenchido. */
 function sectionFilledCount(section: StructuredSection, values: Record<string, StructuredFieldValue>): number {
   let n = 0;
-  for (const f of section.fields) {
-    if (fieldValueToText(values[f.id])) n++;
+  if (!section.repeatable) {
+    for (const f of section.fields) {
+      if (fieldVisible(f, values) && fieldValueToText(values[f.id])) n++;
+    }
   }
-  const rg = section.repeatGroup;
-  if (rg) {
-    const count = itemCount(values, section.id);
+  for (const c of sectionRepeatContainers(section)) {
+    const count = itemCount(values, c.containerId);
     for (let i = 0; i < count; i++) {
-      for (const f of rg.fields) {
-        if (fieldValueToText(values[itemFieldId(section.id, i, f.id)])) n++;
+      const keyFor = (fid: string) => itemFieldId(c.containerId, i, fid);
+      for (const f of c.fields) {
+        if (fieldVisible(f, values, keyFor) && fieldValueToText(values[keyFor(f.id)])) n++;
       }
     }
   }
@@ -285,11 +288,7 @@ export function StructuredTab({
   /** Grade de campos usando um mapeador de id de armazenamento (identidade ou instância). */
   const renderGrid = (fields: StructuredFieldDef[], keyFor: (fieldId: string) => string) => (
     <div className="grid grid-cols-2 gap-2.5">
-      {fields.filter((field) => {
-        if (!field.showIf) return true;
-        const cur = fieldValueToText(values[keyFor(field.showIf.field)]);
-        return field.showIf.equals != null ? cur === field.showIf.equals : !!cur;
-      }).map((field) => (
+      {fields.filter((field) => fieldVisible(field, values, keyFor)).map((field) => (
         <div key={field.id} className={classNames(field.kind === 'triplet' || field.kind === 'calc' || field.kind === 'multiselect' || field.fullWidth ? 'col-span-2' : '')}>
           <FieldRenderer
             field={field}

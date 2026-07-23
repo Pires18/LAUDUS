@@ -563,7 +563,8 @@ describe('AUDITORIA — calculadoras multi-campo integradas ao card completo', (
     }
     // o percentil de cada vaso já é derivado ao vivo pelo motor
     const s = deriveStructuredSchema(tvDop, 'medicina-fetal');
-    const d = computeDerivations(s, { dum: '01/01/2026', ip_au: '2,5' });
+    // a DUM só existe (showIf) com o método de datação 'DUM' — como na UI
+    const d = computeDerivations(s, { ig_metodo: 'DUM', dum: '01/01/2026', ip_au: '2,5' });
     expect(d.some((x) => x.id === 'dop_ip_au'), 'IP AU sem percentil derivado').toBe(true);
   });
 

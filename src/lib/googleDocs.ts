@@ -48,6 +48,14 @@ export interface RichTextRun {
   italic?: boolean;
 }
 
+/** Alinhamento de parágrafo da API do Google Docs. */
+export type DocParagraphAlignment = 'START' | 'CENTER' | 'END' | 'JUSTIFIED';
+
+/** Estilo de parágrafo aplicado ao bloco inserido no lugar de um placeholder. */
+export interface RichParagraphStyle {
+  alignment?: DocParagraphAlignment;
+}
+
 /**
  * Lê a estrutura JSON de um Google Doc.
  */
@@ -101,11 +109,15 @@ function findPlaceholderRange(elements: any[], placeholder: string): { startInde
 /**
  * Substitui placeholders comuns com texto simples e placeholders de texto rico formatado,
  * aplicando negrito e itálico em ordem reversa para evitar o deslocamento dos índices.
+ * `paragraphStyles` aplica, por placeholder, o estilo de parágrafo (alinhamento)
+ * ao bloco inserido — é assim que o laudo mantém a padronização oficial
+ * (título centralizado, corpo justificado) dentro do documento.
  */
 export async function replaceRichTextInDoc(
   docId: string,
   plainReplacements: Record<string, string>,
-  richReplacements: Record<string, RichTextRun[]>
+  richReplacements: Record<string, RichTextRun[]>,
+  paragraphStyles: Record<string, RichParagraphStyle> = {}
 ): Promise<void> {
   // Fase 1: Substitui os placeholders comuns de texto puro
   if (Object.keys(plainReplacements).length > 0) {
@@ -114,13 +126,14 @@ export async function replaceRichTextInDoc(
 
   // Fase 2: Carrega a estrutura atualizada para identificar as posições exatas dos placeholders de texto rico
   const doc = await getDoc(docId);
-  const placeholdersToReplace: { placeholder: string; startIndex: number; endIndex: number; runs: RichTextRun[] }[] = [];
+  const placeholdersToReplace: { key: string; placeholder: string; startIndex: number; endIndex: number; runs: RichTextRun[] }[] = [];
 
   for (const [key, runs] of Object.entries(richReplacements)) {
     const placeholder = `{{${key}}}`;
     const range = findPlaceholderRange(doc.body.content, placeholder);
     if (range) {
       placeholdersToReplace.push({
+        key,
         placeholder,
         startIndex: range.startIndex,
         endIndex: range.endIndex,
@@ -179,6 +192,23 @@ export async function replaceRichTextInDoc(
       });
 
       currentOffset += run.text.length;
+    }
+
+    // 5. Aplica o estilo de parágrafo (alinhamento) sobre todo o bloco inserido
+    const paragraphStyle = paragraphStyles[item.key];
+    if (paragraphStyle?.alignment) {
+      requests.push({
+        updateParagraphStyle: {
+          range: {
+            startIndex: item.startIndex,
+            endIndex: item.startIndex + fullText.length
+          },
+          paragraphStyle: {
+            alignment: paragraphStyle.alignment
+          },
+          fields: 'alignment'
+        }
+      });
     }
   }
 

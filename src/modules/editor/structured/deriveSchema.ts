@@ -11,6 +11,7 @@ import { mergeStructuredSchemas, MergedStructuredSchema } from './mergeSchemas';
 import { itemCount, itemFieldId } from './structuredKeys';
 import { effectiveSectionState } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
+import { visibleValues } from './visibility';
 
 /** Placeholders de preenchimento usados nas máscaras (fetal `(...)` / não-fetal `[__]`). */
 const PLACEHOLDER_RE = /\(\.\.\.\)|\(…\)|\[_{2,}\]|\[inserir\]/g;
@@ -167,7 +168,9 @@ export function summarizeStructured(
 ): { lines: string[]; filledCount: number } {
   const lines: string[] = [];
   let filledCount = 0;
-  const vals = values || {};
+  // Campos ocultos por `showIf` ficam FORA da compilação (o médico não os vê;
+  // um valor residual antigo não pode vazar para o laudo/IA).
+  const vals = visibleValues(schema, values) || {};
 
   for (const section of schema.sections) {
     // Seção normalable em estado EFETIVO 'normal' → emite a normalidade e,

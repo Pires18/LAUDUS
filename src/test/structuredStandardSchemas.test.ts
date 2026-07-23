@@ -222,6 +222,27 @@ describe('standardSchemas — cálculo ao vivo em pequenas partes', () => {
     expect(tr?.text).toContain('TR5');
   });
 
+  it('nódulo preenchido SEM clique em Alterado: TI-RADS deriva e compila (não "sem alterações")', () => {
+    // Regressão: a UI não tem toggle de estado — o preenchimento do nódulo
+    // precisa virar a seção para Alterado sozinho, senão o laudo/IA recebia
+    // "sem alterações" contradizendo os descritores digitados.
+    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'TIREOIDE'), 'pequenas-partes');
+    const c = groupContainerId('nodulos', 'item');
+    const values = {
+      [countKey(c)]: '1',
+      [itemFieldId(c, 0, 'composicao')]: 'sólida',
+      [itemFieldId(c, 0, 'ecogenicidade')]: 'muito hipoecoico',
+      [itemFieldId(c, 0, 'forma')]: 'mais alto que largo',
+      [itemFieldId(c, 0, 'margem')]: 'lobulada/irregular',
+      [itemFieldId(c, 0, 'dims')]: '1,8 x 1,2 x 1,1',
+    };
+    expect(computeDerivations(schema, values).find((x) => x.id.includes('__tr'))?.text).toContain('TR5');
+    const text = summarizeStructured(schema, values).lines.join('\n');
+    expect(text).toMatch(/Nódulo 1:/);
+    expect(text).toMatch(/muito hipoecoico/);
+    expect(text).not.toMatch(/Achados Nodulares: sem alterações/);
+  });
+
   it('cisto renal ANINHADO no rim: Bosniak deriva por instância na seção do rim', () => {
     const schema = deriveStructuredSchema(tpl('medicina-interna', 'RINS E VIAS URINÁRIAS COM DOPPLER'), 'medicina-interna');
     const c = groupContainerId('rim-direito', 'lesao'); // lesões aninhadas no rim direito
@@ -284,13 +305,25 @@ describe('standardSchemas — grupo de lesões ANINHADO (Alterado) + valores de 
   const abdomeSchema = () => deriveStructuredSchema(tpl('medicina-interna', 'ABDOME TOTAL'), 'medicina-interna');
   const figadoLesao = groupContainerId('figado', 'lesoes');
 
-  it('fígado NORMAL não compila lesões nem revela o grupo', () => {
+  it('lesão preenchida vira a seção para Alterado sozinha e compila (sem clique)', () => {
     const s = abdomeSchema();
     const { lines } = summarizeStructured(s, {
       [countKey(figadoLesao)]: '1',
       [itemFieldId(figadoLesao, 0, 'segmento')]: 'S6',
     });
-    // Sem marcar 'Alterado', a seção fígado compila como normalidade.
+    // Lesão registrada É um achado: compila mesmo sem marcar 'Alterado'
+    // (a UI não tem toggle de estado — o auto-alterado é o caminho real).
+    expect(lines.join('\n')).not.toMatch(/Fígado: sem alterações/);
+    expect(lines.join('\n')).toMatch(/S6/);
+  });
+
+  it('escolha MANUAL de Normal vence e oculta a lesão residual', () => {
+    const s = abdomeSchema();
+    const { lines } = summarizeStructured(s, {
+      [normalKey('figado')]: 'normal',
+      [countKey(figadoLesao)]: '1',
+      [itemFieldId(figadoLesao, 0, 'segmento')]: 'S6',
+    });
     expect(lines.join('\n')).toMatch(/Fígado: sem alterações/);
     expect(lines.join('\n')).not.toMatch(/S6/);
   });
@@ -362,13 +395,18 @@ describe('standardSchemas — biometria registrada MESMO em normalidade (alwaysS
     expect(baco?.alert).toBe(false);
   });
 
-  it('lesões (grupo aninhado) continuam ocultas na seção NORMAL', () => {
+  it('lesão preenchida deriva volume (auto-alterado); Normal MANUAL oculta', () => {
     const c = groupContainerId('figado', 'lesoes');
-    const d = computeDerivations(abdome(), {
+    const values = {
       [countKey(c)]: '1',
       [itemFieldId(c, 0, 'dims')]: '2 x 2 x 2',
-    });
-    expect(d.find((x) => x.id.includes(c))).toBeUndefined();
+    };
+    // preencheu a lesão → seção vira Alterado sozinha → volume deriva
+    expect(computeDerivations(abdome(), values).find((x) => x.id.includes(c))?.text).toContain('cm³');
+    // escolha manual de Normal vence e suprime a derivação residual
+    expect(
+      computeDerivations(abdome(), { ...values, [normalKey('figado')]: 'normal' }).find((x) => x.id.includes(c))
+    ).toBeUndefined();
   });
 });
 
@@ -592,13 +630,18 @@ describe('standardSchemas — cálculo ao vivo em mastologia', () => {
     expect(micro?.alert).toBe(true);
   });
 
-  it('lesões não derivam com o parênquima em NORMAL', () => {
-    const d = computeDerivations(mamas(), {
+  it('lesão preenchida deriva BI-RADS sozinha; Normal MANUAL suprime', () => {
+    const values = {
       [countKey(c)]: '1',
       [itemFieldId(c, 0, 'forma')]: 'irregular',
       [itemFieldId(c, 0, 'margem')]: 'espiculada',
-    });
-    expect(d.find((x) => x.id.includes('__bi'))).toBeUndefined();
+    };
+    // descritores preenchidos → parênquima vira Alterado sozinho → BI-RADS deriva
+    expect(computeDerivations(mamas(), values).find((x) => x.id.includes('__bi'))?.alert).toBe(true);
+    // escolha manual de Normal vence e suprime
+    expect(
+      computeDerivations(mamas(), { ...values, [normalKey('parenquima')]: 'normal' }).find((x) => x.id.includes('__bi'))
+    ).toBeUndefined();
   });
 });
 
@@ -703,7 +746,8 @@ describe('standardSchemas — cálculo ao vivo em medicina fetal', () => {
   });
 
   it('RCP automática (ACM/AU) e percentis Doppler caem na seção doppler', () => {
-    const d = computeDerivations(obst(), { dum, ip_au: '1,4', ip_acm: '1,1' }, examDate);
+    // a DUM só existe (showIf) com o método de datação 'DUM' — como na UI
+    const d = computeDerivations(obst(), { ig_metodo: 'DUM', dum, ip_au: '1,4', ip_acm: '1,1' }, examDate);
     const rcp = d.find((x) => x.id === 'rcp__calc');
     expect(rcp?.sectionId).toBe('doppler');
     expect(rcp?.alert).toBe(true); // 1,1/1,4 < 1 → reduzida
