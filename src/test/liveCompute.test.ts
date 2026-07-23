@@ -182,6 +182,28 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(computeDerivations(schema, { ln_cortex: '2', ln_hilo: 'preservado/central' }).find((x) => x.id === 'ln__susp')?.alert).toBe(false);
   });
 
+  it('fetal 1ºT: líquido amniótico subjetivo (reduzido = oligoâmnio) e sem ILA/MBV no schema', () => {
+    const schema = deriveStructuredSchema(tpl('medicina-fetal', 'MORFOLÓGICA DO PRIMEIRO TRIMESTRE'), 'medicina-fetal');
+    const la = schema.sections.find((s: any) => s.id === 'liquido-amniotico');
+    const ids = (la?.fields || []).map((f: any) => f.id);
+    expect(ids).toContain('la_subjetivo');
+    expect(ids).not.toContain('mbv'); // 1ºT não usa MBV/ILA
+    const d = computeDerivations(schema, { la_subjetivo: 'reduzido' });
+    const chip = d.find((x) => x.id === 'la__subj');
+    expect(chip?.text).toContain('oligoâmnio');
+    expect(chip?.alert).toBe(true);
+  });
+
+  it('fetal 2ºT: MBV é o método principal, ILA opcional presente', () => {
+    const schema = deriveStructuredSchema(tpl('medicina-fetal', 'MORFOLÓGICO DE SEGUNDO TRIMESTRE'), 'medicina-fetal');
+    const la = schema.sections.find((s: any) => s.id === 'liquido-amniotico');
+    const ids = (la?.fields || []).map((f: any) => f.id);
+    expect(ids).toContain('mbv');
+    expect(ids).toContain('ila'); // opcional, mas presente
+    // MBV baixo → oligoâmnio
+    expect(computeDerivations(schema, { mbv: '15' }).find((x) => x.id === 'la__mbv')?.alert).toBe(true);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

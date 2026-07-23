@@ -803,6 +803,13 @@ export function computeDerivations(
     const c = mbvMm < 20 ? 'oligoâmnio' : mbvMm <= 80 ? 'volume normal' : 'polidrâmnio';
     out.push({ id: 'la__mbv', sectionId: secOf('mbv', 'liquido-amniotico'), label: 'MBV', text: `${fmt(mbvMm, 0)} mm — ${c}`, alert: mbvMm < 20 || mbvMm > 80 });
   }
+  // Avaliação SUBJETIVA (principal no 1º trimestre; complementar no 2º/3º) ──
+  const laSubj = fieldValueToText(v['la_subjetivo']).toLowerCase();
+  if (laSubj) {
+    const anormal = /reduzido|aumentado/.test(laSubj);
+    const c = /reduzido/.test(laSubj) ? 'oligoâmnio (subjetivo)' : /aumentado/.test(laSubj) ? 'polidrâmnio (subjetivo)' : 'volume subjetivamente normal';
+    out.push({ id: 'la__subj', sectionId: secOf('la_subjetivo', 'liquido-amniotico'), label: 'Líquido (subjetivo)', text: c, alert: anormal });
+  }
 
   // ── VCI: índice de colapsabilidade = (máx − mín)/máx. < 50% sugere congestão. ──
   const vciMax = num(v['vci_max']);

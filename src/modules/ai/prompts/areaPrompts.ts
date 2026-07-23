@@ -591,8 +591,11 @@ MAPA DE EXAMES DESTA ÁREA (9 templates de Camada 3):
 
 7. LÍQUIDO AMNIÓTICO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   ILA (índice dos 4 quadrantes): Normal 8–24 cm.
-   MBA (maior bolsão): Normal 2–8 cm (técnica de 1 quadrante).
+   MÉTODO POR TRIMESTRE: 1º trimestre → avaliação SUBJETIVA/qualitativa (reduzido/
+   normal/aumentado; ILA e MBV não se aplicam). 2º e 3º trimestres → MBV/maior
+   bolsão é o método PRINCIPAL; o ILA é OPCIONAL (complementar).
+   MBV/MBA (maior bolsão): Normal 2–8 cm (método de eleição no 2º/3ºT).
+   ILA (índice dos 4 quadrantes, opcional): Normal 8–24 cm.
    ┌────────────────────┬──────────────────────────┬──────────────────────────┐
    │ CLASSIFICAÇÃO      │ ILA (cm)                 │ MBA (cm)                 │
    ├────────────────────┼──────────────────────────┼──────────────────────────┤

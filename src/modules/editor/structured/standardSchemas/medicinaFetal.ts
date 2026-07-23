@@ -194,18 +194,40 @@ const PLACENTA = (): StructuredSection => ({
  * calculadora usam o MESMO valor — o motor classifica em cm, a calculadora em
  * mm, com os mesmos cortes; a semente converte cm→mm).
  */
-const LIQUIDO = (): StructuredSection => ({
-  id: 'liquido-amniotico',
-  label: 'Líquido Amniótico',
-  fields: [
-    { id: 'ila_q1', label: 'Quadrante superior direito', kind: 'measure', unit: 'cm', alwaysShow: true },
-    { id: 'ila_q2', label: 'Quadrante superior esquerdo', kind: 'measure', unit: 'cm', alwaysShow: true },
-    { id: 'ila_q3', label: 'Quadrante inferior direito', kind: 'measure', unit: 'cm', alwaysShow: true },
-    { id: 'ila_q4', label: 'Quadrante inferior esquerdo', kind: 'measure', unit: 'cm', alwaysShow: true },
-    { id: 'ila', label: 'ILA (total)', kind: 'measure', unit: 'cm', calcId: 'amniotic-fluid', normal: '8–24 cm', alwaysShow: true, hint: 'soma dos 4 quadrantes (auto) ou total manual · < 5 oligo · > 24 polidrâmnio · classificação automática' },
-    { id: 'mbv', label: 'MBV (maior bolsão vertical)', kind: 'measure', unit: 'mm', normal: '20–80 mm', alwaysShow: true, hint: 'método do bolsão único · < 20 oligo · > 80 polidrâmnio (auto)' },
-  ],
-});
+/**
+ * Líquido amniótico com método por trimestre:
+ * - 1º trimestre → avaliação SUBJETIVA (qualitativa); ILA/MBV não se aplicam;
+ * - 2º/3º trimestre → MBV (bolsão único) como método PRINCIPAL, ILA OPCIONAL.
+ * O motor classifica o que estiver preenchido (subjetivo/MBV/ILA).
+ */
+const LIQUIDO = (opts?: { trimestre?: 1 | 23 }): StructuredSection => {
+  const t1 = opts?.trimestre === 1;
+  const subjetivo: StructuredFieldDef = {
+    id: 'la_subjetivo',
+    label: t1 ? 'Avaliação subjetiva' : 'Impressão subjetiva',
+    kind: 'select',
+    options: ['reduzido', 'normal', 'aumentado'],
+    alwaysShow: true,
+    hint: t1
+      ? 'no 1º trimestre a avaliação do líquido é qualitativa (ILA/MBV não se aplicam)'
+      : 'complementar — no 2º/3º trimestre o MBV é o método principal',
+  };
+  return {
+    id: 'liquido-amniotico',
+    label: 'Líquido Amniótico',
+    fields: t1
+      ? [subjetivo, { id: 'la_desc', label: 'Observação', kind: 'text', fullWidth: true }]
+      : [
+          subjetivo,
+          { id: 'mbv', label: 'MBV (maior bolsão vertical)', kind: 'measure', unit: 'mm', normal: '20–80 mm', alwaysShow: true, hint: 'MÉTODO PRINCIPAL (2º/3ºT) · < 20 mm oligo · > 80 mm polidrâmnio (auto)' },
+          { id: 'ila_q1', label: 'ILA — quadrante superior direito (opcional)', kind: 'measure', unit: 'cm' },
+          { id: 'ila_q2', label: 'ILA — quadrante superior esquerdo (opcional)', kind: 'measure', unit: 'cm' },
+          { id: 'ila_q3', label: 'ILA — quadrante inferior direito (opcional)', kind: 'measure', unit: 'cm' },
+          { id: 'ila_q4', label: 'ILA — quadrante inferior esquerdo (opcional)', kind: 'measure', unit: 'cm' },
+          { id: 'ila', label: 'ILA total (opcional)', kind: 'measure', unit: 'cm', calcId: 'amniotic-fluid', normal: '8–24 cm', hint: 'OPCIONAL · soma dos 4 quadrantes (auto) ou manual · < 5 oligo · 5–8 limítrofe · > 24 polidrâmnio' },
+        ],
+  };
+};
 
 const CORDAO = (): StructuredSection => ({
   id: 'cordao',
@@ -374,7 +396,7 @@ const MORFOLOGICA_1T = (): StructuredSection[] => [
     ],
   },
   PLACENTA(),
-  LIQUIDO(),
+  LIQUIDO({ trimestre: 1 }),
   CORDAO(),
 ];
 
