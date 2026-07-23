@@ -26,6 +26,15 @@ Trabalho acumulado desde a 2.2.0 (auditoria final 22–23/07).
 - **FIX — badge de preenchidos da seção**: contava campos ocultos e não contava
   itens de grupo aninhado (mesmas chaves erradas); agora usa os containers
   reais e respeita `showIf`.
+- **FIX — campos Achados/Observações (texto), selects clínicos e multiselects
+  eram engolidos na seção "Normal"**: 566 campos fixos de seções `normalable`
+  (ex.: "Achados" dos compartimentos MSK, esteatose grau II, 'cálculo(s)' na
+  vesícula, estenoses vasculares) não disparavam o auto-alterado — o laudo/IA
+  recebia "sem alterações" descartando o que foi digitado. Regra nova em
+  `fieldContentIsFinding`: texto ≠ auto-preenchimento (placeholder/'sem
+  alterações'), select ≠ 1ª opção (a normal, por convenção do botão Normal) e
+  qualquer chip de multiselect caracterizam achado e viram a seção para
+  Alterado sozinhos. Medidas sem faixa seguem no card Normal (`alwaysShow`).
 - **Guarda de divisão** no percentil da RCP (`getCprRef` com desvio 0).
 - Testes: regressões cobertas (nódulo sem clique em Alterado compila e deriva
   TR; showIf não vaza; Normal manual segue suprimindo).

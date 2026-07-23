@@ -375,14 +375,43 @@ describe('standardSchemas — biometria registrada MESMO em normalidade (alwaysS
 
   it('seção NORMAL compila a frase de normalidade + as medidas registradas', () => {
     const { lines, filledCount } = summarizeStructured(abdome(), {
-      baco_eixo: '11',        // baço normal, medida registrada
-      esteatose: 'grau II',   // não deve compilar (seção normal, campo não-alwaysShow)
+      baco_eixo: '11',        // baço normal (dentro da faixa), medida registrada
     });
     const text = lines.join('\n');
     expect(text).toMatch(/Baço: sem alterações/);
     expect(text).toMatch(/Maior eixo longitudinal: 11 cm/);
-    expect(text).not.toMatch(/grau II/);
     expect(filledCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('select clínico fora da 1ª opção vira a seção para Alterado e compila', () => {
+    // Regressão: esteatose 'grau II (moderada)' (select sem normalOption) era
+    // ENGOLIDA — compilava "Fígado: sem alterações" contradizendo o achado.
+    const { lines } = summarizeStructured(abdome(), { esteatose: 'grau II (moderada)' });
+    const text = lines.join('\n');
+    expect(text).toMatch(/grau II/);
+    expect(text).not.toMatch(/Fígado: sem alterações/);
+    // 1ª opção ('ausente' = normal por convenção) NÃO altera a seção
+    const normal = summarizeStructured(abdome(), { esteatose: 'ausente' }).lines.join('\n');
+    expect(normal).toMatch(/Fígado: sem alterações/);
+  });
+
+  it('multiselect com chip marcado vira a seção para Alterado e compila', () => {
+    // 'cálculo(s)' na vesícula era engolido como "sem alterações".
+    const { lines } = summarizeStructured(abdome(), { vesicula_achados: 'cálculo(s)' });
+    const text = lines.join('\n');
+    expect(text).toMatch(/cálculo/);
+    expect(text).not.toMatch(/Vesícula Biliar: sem alterações/);
+  });
+
+  it('texto digitado em campo Achados/Observação vira Alterado e compila', () => {
+    // Campos de texto livre eram engolidos na seção normal.
+    const { lines } = summarizeStructured(abdome(), { rim_d_achados: 'nefropatia parenquimatosa G3' });
+    const text = lines.join('\n');
+    expect(text).toMatch(/nefropatia parenquimatosa G3/);
+    expect(text).not.toMatch(/Rim Direito: sem alterações/);
+    // auto-preenchimento do botão Normal NÃO conta como achado
+    const auto = summarizeStructured(abdome(), { rim_d_achados: 'sem alterações' }).lines.join('\n');
+    expect(auto).toMatch(/Rim Direito: sem alterações/);
   });
 
   it('cálculo ao vivo segue rodando na seção NORMAL (volume renal e baço)', () => {

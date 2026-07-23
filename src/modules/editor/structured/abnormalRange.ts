@@ -98,9 +98,32 @@ export function fieldDefAbnormal(field: StructuredFieldDef, value: StructuredFie
 }
 
 /**
- * Verdadeiro se a seção tem ACHADO: campo fixo com valor fora de faixa OU
- * qualquer campo preenchido numa instância repetível (lesão/nódulo registrado
- * é um achado por definição — não existe lesão "normal" digitada à toa).
+ * Conteúdo DIGITADO num campo fixo que caracteriza achado mesmo sem faixa:
+ * - texto livre (Achados/Observações): qualquer coisa diferente do
+ *   auto-preenchimento do botão Normal (o placeholder ou 'sem alterações');
+ * - select sem `normalOption`: opção diferente da 1ª (que por convenção é a
+ *   normal — a mesma regra que o botão Normal usa para preencher);
+ * - multiselect: qualquer chip marcado (o botão Normal nunca preenche
+ *   multiselect, e muitos são listas puras de achados, ex. 'cálculo(s)').
+ * Medidas/cálculos sem faixa NÃO contam — biometria de rotina se registra no
+ * card Normal via `alwaysShow`.
+ */
+function fieldContentIsFinding(field: StructuredFieldDef, value: StructuredFieldValue | undefined): boolean {
+  if (field.alwaysShow || field.normal || field.normalOption) return false;
+  const t = asText(value);
+  if (!t) return false;
+  if (field.kind === 'text') {
+    return t !== (field.placeholder || '').trim() && t.toLowerCase() !== 'sem alterações';
+  }
+  if (field.kind === 'select') return !!field.options?.length && t !== field.options[0];
+  return field.kind === 'multiselect';
+}
+
+/**
+ * Verdadeiro se a seção tem ACHADO: campo fixo com valor fora de faixa, campo
+ * fixo com conteúdo digitado que caracteriza achado (texto/select/multiselect —
+ * ver `fieldContentIsFinding`) OU qualquer campo preenchido numa instância
+ * repetível (lesão/nódulo registrado é um achado por definição).
  * As instâncias usam o containerId real (`section` ou `section#group`), não
  * `section.id` cru — grupos aninhados guardam em `<section>#<group>@<i>@<campo>`.
  */
@@ -111,6 +134,7 @@ export function sectionHasAbnormalValue(
   if (!values) return false;
   for (const f of section.fields) {
     if ((f.normal || f.normalOption) && fieldDefAbnormal(f, values[f.id])) return true;
+    if (fieldContentIsFinding(f, values[f.id])) return true;
   }
   for (const c of sectionRepeatContainers(section)) {
     const cnt = itemCount(values, c.containerId);
