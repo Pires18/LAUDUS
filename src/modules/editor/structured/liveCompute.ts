@@ -361,6 +361,23 @@ export function computeDerivations(
     }
   }
 
+  // ── Procedimentos: suspeição do linfonodo-alvo (córtex ≥ 3 mm, hilo ausente ou L:T < 2) ──
+  {
+    const lnCort = num(v['ln_cortex']);
+    const lnHilo = fieldValueToText(v['ln_hilo']);
+    const lnForma = fieldValueToText(v['ln_forma']);
+    const hiloSusp = /ausente|desloc/i.test(lnHilo);
+    const formaSusp = /arredondad|<\s*2/i.test(lnForma);
+    if ((lnCort != null && lnCort > 0) || hiloSusp || formaSusp) {
+      const susp = (lnCort != null && lnCort >= 3) || hiloSusp || formaSusp;
+      const parts: string[] = [];
+      if (lnCort != null && lnCort > 0) parts.push(`córtex ${fmt(lnCort, 1)} mm`);
+      if (hiloSusp) parts.push(`hilo ${/ausente/i.test(lnHilo) ? 'ausente' : 'deslocado'}`);
+      if (formaSusp) parts.push('L:T < 2');
+      out.push({ id: 'ln__susp', sectionId: secOf('ln_cortex', 'linfonodo-alvo'), label: 'Linfonodo-alvo', text: `${parts.join(' · ') || 'avaliado'}${susp ? ' — características suspeitas' : ''}`, alert: susp });
+    }
+  }
+
   // ── Fetal: PFE (Hadlock IV) + percentil a partir de DBP/CC/CA/CF ──
   // O percentil usa a MESMA curva-padrão da calculadora de biometria
   // (DEFAULT_BIOMETRY_REFERENCE = Hadlock, com fallback OMS quando fora da

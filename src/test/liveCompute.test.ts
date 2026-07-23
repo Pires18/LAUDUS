@@ -175,6 +175,13 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(computeDerivations(schema, { derrame_colo: '2' }).find((x) => x.id === 'derrame_colo__d')?.alert).toBe(false);
   });
 
+  it('procedimentos: linfonodo-alvo suspeito por córtex ≥ 3 mm ou hilo ausente', () => {
+    const schema = deriveStructuredSchema(tpl('procedimentos', 'PUNÇÃO/BIÓPSIA DE LINFONODO'), 'procedimentos');
+    expect(computeDerivations(schema, { ln_cortex: '4' }).find((x) => x.id === 'ln__susp')?.alert).toBe(true);
+    expect(computeDerivations(schema, { ln_hilo: 'ausente' }).find((x) => x.id === 'ln__susp')?.alert).toBe(true);
+    expect(computeDerivations(schema, { ln_cortex: '2', ln_hilo: 'preservado/central' }).find((x) => x.id === 'ln__susp')?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});
