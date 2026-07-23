@@ -8,8 +8,10 @@ import {
 import { getStudyInstanceUID, getNumericUidFromFirestoreId } from '../utils/dicom';
 import { resolveGeminiModel, isValidGeminiModel, getFallbackModel, VALID_GEMINI_MODELS, GEMINI_LITE_MODEL, GEMINI_PRO_MODEL } from '../modules/ai/engine';
 
-// Ambiente de teste é 'node' → `window` é undefined, então getActivePacsUrl/
-// getWorklistEndpoint tomam o ramo não-Vercel (comportamento local/on-premise).
+// Ambiente de teste é 'node' → `window` é undefined. getActivePacsUrl ainda tem
+// ramos por ambiente; getProxyEndpoint e getWorklistEndpoint NÃO — eles preferem
+// o Agente HTTPS (Funnel) em qualquer ambiente, inclusive na nuvem (a Vercel não
+// alcança o Funnel server-side, então o navegador fala direto com o agente).
 
 describe('getProxyEndpoint', () => {
   it('roteia pelo Agente quando há URL HTTPS (Funnel/nuvem)', () => {

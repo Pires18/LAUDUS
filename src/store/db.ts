@@ -1126,25 +1126,22 @@ export function getDicomAuthParams(
  * a escolha entre agente principal/backup é feita via `localAgentUrl` no corpo.
  */
 export function getWorklistEndpoint(settings: AppSettings, isBackup = false): string {
-  const isVercel = typeof window !== 'undefined' &&
-    (window.location.hostname.includes('laud.us') || window.location.hostname.includes('vercel.app'));
-  // Na nuvem (Vercel): função serverless same-origin, que valida o login e
-  // encaminha server-side ao agente (localAgentUrl do corpo).
-  if (isVercel) return '/api/worklist';
-  // Fora do Vercel (localhost/dev): se há Agente HTTPS (Funnel) configurado,
-  // fala DIRETO com ele — assim o dev local também grava o .wl na VM da nuvem
-  // (não nesta máquina). Sem agente HTTPS, cai no middleware do Vite (grava local).
   const agent = isBackup ? settings.dicomBackupLocalAgentUrl : settings.dicomLocalAgentUrl;
+  // Havendo Agente HTTPS (Tailscale Funnel), fala DIRETO com ele em QUALQUER
+  // ambiente — inclusive na nuvem (laud.us/vercel.app) — igual getProxyEndpoint
+  // faz com as imagens. Motivo: o egress serverless da Vercel NÃO alcança o
+  // ingress do Funnel (conexão estoura em timeout, IPv4 e IPv6); só o navegador,
+  // que está na tailnet, alcança o agente. O agente valida via x-agent-secret e
+  // já responde CORS (Access-Control-Allow-Origin: *). O tenant (VM compartilhada)
+  // vai na QUERY (?tenantId=) — o agente não resolve o tenant pelo corpo.
   if (agent && /^https:\/\//i.test(agent)) {
-    // O agente multi-tenant só resolve o tenant pela QUERY STRING (?tenantId=),
-    // nunca pelo corpo — é assim que o proxy do Vercel já encaminha (ver
-    // api/worklist.ts). Indo direto ao agente (como aqui), é preciso montar essa
-    // mesma query, senão o agente responde "tenantId inválido ou ausente".
     const tenantQs = (!isBackup && settings.dicomTenantId)
       ? `?tenantId=${encodeURIComponent(settings.dicomTenantId)}`
       : '';
     return `${agent.replace(/\/$/, '')}/api/worklist${tenantQs}`;
   }
+  // Sem Agente HTTPS: same-origin '/api/worklist' — serverless da Vercel
+  // (on-premise sem Funnel) OU middleware do Vite no dev (grava o .wl local).
   return '/api/worklist';
 }
 
