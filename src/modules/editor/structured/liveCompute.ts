@@ -893,6 +893,39 @@ export function computeDerivations(
     }
   }
 
+  // ── Mastologia: suspeição do linfonodo axilar (grupo repetível). Córtex ≥ 3 mm
+  // (critério mais sensível), hilo ausente/deslocado ou forma arredondada (L:T < 2). ──
+  if (schema.area === 'mastologia') {
+    for (const section of schema.sections) {
+      for (const container of sectionRepeatContainers(section)) {
+        if (!container.fields.some((f) => f.id === 'cortex')) continue;
+        const n = itemCount(v, container.containerId);
+        for (let i = 0; i < n; i++) {
+          const cortex = num(v[itemFieldId(container.containerId, i, 'cortex')]);
+          const hilo = fieldValueToText(v[itemFieldId(container.containerId, i, 'hilo')]);
+          const forma = fieldValueToText(v[itemFieldId(container.containerId, i, 'forma')]);
+          const nivel = fieldValueToText(v[itemFieldId(container.containerId, i, 'nivel')]);
+          const hiloSusp = /ausente|desloc/i.test(hilo);
+          const formaSusp = /arredondad|<\s*2/i.test(forma);
+          if (cortex == null && !hiloSusp && !formaSusp) continue; // sem dado relevante
+          const susp = (cortex != null && cortex >= 3) || hiloSusp || formaSusp;
+          const parts: string[] = [];
+          if (cortex != null) parts.push(`córtex ${fmt(cortex, 1)} mm`);
+          if (hiloSusp) parts.push(`hilo ${/ausente/i.test(hilo) ? 'ausente' : 'deslocado'}`);
+          if (formaSusp) parts.push('L:T < 2');
+          const nivelTxt = nivel ? ` (${nivel.split('—')[0].trim()})` : '';
+          out.push({
+            id: `linf_ax_${container.containerId}@${i}`,
+            sectionId: container.sectionId,
+            label: `Linfonodo axilar${nivelTxt}`,
+            text: `${parts.join(' · ') || 'avaliado'}${susp ? ' — características suspeitas' : ''}`,
+            alert: susp,
+          });
+        }
+      }
+    }
+  }
+
   return out;
 }
 

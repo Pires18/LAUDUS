@@ -121,6 +121,27 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(computeDerivations(schema, { linf_cortical: '2' }).find((x) => x.id === 'linf__susp')?.alert).toBe(false);
   });
 
+  it('mastologia: linfonodo axilar suspeito por córtex ≥ 3 mm', () => {
+    const schema = deriveStructuredSchema(tpl('mastologia', 'MAMAS E AXILAS'), 'mastologia');
+    const cid = groupContainerId('axilas', 'item');
+    const susp = computeDerivations(schema, {
+      [normalKey('axilas')]: 'altered',
+      [countKey(cid)]: '1',
+      [itemFieldId(cid, 0, 'cortex')]: '4',
+      [itemFieldId(cid, 0, 'nivel')]: 'I — axila baixa',
+    }).find((x) => x.id.startsWith('linf_ax_'));
+    expect(susp?.text).toContain('características suspeitas');
+    expect(susp?.alert).toBe(true);
+    // córtex ≤ 3 mm, hilo preservado → não suspeito
+    const ok = computeDerivations(schema, {
+      [normalKey('axilas')]: 'altered',
+      [countKey(cid)]: '1',
+      [itemFieldId(cid, 0, 'cortex')]: '2',
+      [itemFieldId(cid, 0, 'hilo')]: 'preservado/central',
+    }).find((x) => x.id.startsWith('linf_ax_'));
+    expect(ok?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});
