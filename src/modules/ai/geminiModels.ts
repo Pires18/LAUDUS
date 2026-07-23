@@ -34,10 +34,9 @@ export const VALID_GEMINI_MODELS: readonly string[] = [
   'gemini-3.6-flash',       // GA, mais novo e mais barato que o 3.5-flash
   'gemini-3.5-flash',       // Lite (default)
   'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-3.1-pro-preview', // Pro (default)
+  'gemini-3.1-pro-preview', // Pro (opt-in, preview)
   'gemini-2.5-flash',
-  'gemini-2.5-pro',
+  'gemini-2.5-pro',         // Pro (default)
   'gemini-2.5-flash-lite',
   'gemini-flash-latest',    // alias GA (aponta para o 3.5-flash hoje)
 ];
@@ -46,6 +45,16 @@ export const VALID_GEMINI_MODELS: readonly string[] = [
 export function isValidGeminiModel(id: string | undefined): boolean {
   const raw = (id || '').trim().toLowerCase();
   return VALID_GEMINI_MODELS.some((m) => m.toLowerCase() === raw);
+}
+
+/**
+ * Classe de motor de um modelo (para telemetria/UI): qualquer modelo "pro" é
+ * Pro; todo o resto (flash/flash-lite) é Lite. Fonte ÚNICA da classificação —
+ * antes havia listas hardcoded paralelas (TelemetryDashboard/Dashboard) que
+ * precisavam ser atualizadas a cada troca de modelo e esqueciam o Pro atual.
+ */
+export function motorForModel(model: string | undefined): 'lite' | 'pro' {
+  return (model || '').toLowerCase().includes('pro') ? 'pro' : 'lite';
 }
 
 /**
@@ -61,7 +70,6 @@ export const GEMINI_FALLBACK: Readonly<Record<string, string>> = {
   'gemini-3.6-flash': 'gemini-3.5-flash',
   'gemini-3.5-flash': 'gemini-2.5-flash',
   'gemini-3.5-flash-lite': 'gemini-2.5-flash-lite',
-  'gemini-3.1-flash-lite': 'gemini-2.5-flash-lite',
 };
 
 /** Retorna o modelo de contingência para `model`, ou undefined se não houver. */

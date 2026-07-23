@@ -156,9 +156,9 @@ firestore.rules            # RBAC · firestore.indexes.json · vercel.json · fi
 
 ## 5. Sistema de IA (LAUD.IA)
 
-**Provedor:** **Google Gemini apenas** (Anthropic removido). Fonte única de modelos em `ai/engine.ts`:
-- **Lite** = `gemini-3.5-flash` · **Pro** = `gemini-3.1-pro-preview`.
-- `resolveGeminiModel()` nunca emite IDs mortos (2.5/1.5 → normaliza).
+**Provedor:** **Google Gemini apenas** (Anthropic removido). Fonte única de modelos em `ai/geminiModels.ts`:
+- **Lite** = `gemini-3.5-flash` · **Pro** = `gemini-2.5-pro` (GA, por confiabilidade; o `gemini-3.1-pro-preview` é opt-in via Admin).
+- `resolveGeminiModel()` só emite IDs do allowlist (`VALID_GEMINI_MODELS`); há fallback automático de modelo em 503/404.
 
 **Motor (`ai/engine.ts`):**
 - Modos: `generation | refine | copilot | template`; `detectMode()` decide.

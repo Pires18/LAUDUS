@@ -21,6 +21,7 @@ import {
   isValidGeminiModel,
   resolveGeminiModel,
   getFallbackModel,
+  motorForModel,
 } from './geminiModels';
 import { retrieveFewShotBlock } from './training/augment';
 import { scrubForGeneration } from './training/anonymize';
@@ -799,6 +800,7 @@ export {
   isValidGeminiModel,
   resolveGeminiModel,
   getFallbackModel,
+  motorForModel,
 };
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {

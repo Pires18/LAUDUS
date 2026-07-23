@@ -67,55 +67,6 @@ const AREA_SUGGESTIONS: Record<string, Array<{ label: string; text: string }>> =
   ],
 };
 
-interface StructuredField {
-  id: string;
-  label: string;
-  placeholder: string;
-  unit?: string;
-  type?: 'text' | 'select';
-  options?: string[];
-}
-
-const FETAL_FIELDS: StructuredField[] = [
-  { id: 'dum', label: 'DUM', placeholder: 'ex: 10/01/2025' },
-  { id: 'dbp', label: 'DBP', placeholder: 'ex: 75', unit: 'mm' },
-  { id: 'dof', label: 'DOF', placeholder: 'ex: 95', unit: 'mm' },
-  { id: 'cc', label: 'CC', placeholder: 'ex: 285', unit: 'mm' },
-  { id: 'ca', label: 'CA', placeholder: 'ex: 270', unit: 'mm' },
-  { id: 'cf', label: 'CF', placeholder: 'ex: 54', unit: 'mm' },
-  { id: 'pfe', label: 'PFE / Percentil', placeholder: 'ex: 1888 g / P45' },
-  { id: 'bcf', label: 'BCF', placeholder: 'ex: 148', unit: 'bpm' },
-  { id: 'ip_au', label: 'IP Art. Umbilical', placeholder: 'ex: 0.92' },
-  { id: 'ip_acm', label: 'IP ACM', placeholder: 'ex: 1.45' },
-  { id: 'placenta', label: 'Placenta', placeholder: 'ex: posterior grau I' },
-  { id: 'ila', label: 'ILA / MBV', placeholder: 'ex: 14.2 cm / 52 mm' },
-  { id: 'apresentacao', label: 'Apresentação', placeholder: 'ex: cefálica' },
-];
-
-const GYNECO_FIELDS: StructuredField[] = [
-  { id: 'utero_pos', label: 'Posição Uterina', placeholder: 'ex: anteversoflexão', type: 'select', options: ['anteversoflexão', 'retroversão', 'retroflexão', 'medioversão'] },
-  { id: 'utero_dims', label: 'Dimensões Uterinas', placeholder: 'ex: 8.2 x 5.1 x 4.8 cm' },
-  { id: 'endometrio', label: 'Endométrio', placeholder: 'ex: 9 mm, homogêneo' },
-  { id: 'miometrio', label: 'Miométrio', placeholder: 'ex: homogêneo, sem nódulos' },
-  { id: 'ovario_d', label: 'Ovário Direito', placeholder: 'ex: 3.2 x 2.1 x 1.8 cm' },
-  { id: 'ovario_e', label: 'Ovário Esquerdo', placeholder: 'ex: 3.0 x 2.0 x 1.6 cm' },
-  { id: 'anexos', label: 'Anexos / Formações', placeholder: 'ex: cisto simples 2 cm à esquerda' },
-  { id: 'douglas', label: 'Fundo de Saco', placeholder: 'ex: livre, sem líquido' },
-];
-
-const VASCULAR_FIELDS: StructuredField[] = [
-  { id: 'vps_acd', label: 'VPS ACD', placeholder: 'ex: 0.98', unit: 'm/s' },
-  { id: 'vdf_acd', label: 'VDF ACD', placeholder: 'ex: 0.24', unit: 'm/s' },
-  { id: 'ir_acd', label: 'IR ACD', placeholder: 'ex: 0.75' },
-  { id: 'vps_ace', label: 'VPS ACE', placeholder: 'ex: 1.10', unit: 'm/s' },
-  { id: 'vdf_ace', label: 'VDF ACE', placeholder: 'ex: 0.28', unit: 'm/s' },
-  { id: 'ir_ace', label: 'IR ACE', placeholder: 'ex: 0.74' },
-  { id: 'imt_d', label: 'EIM Direita', placeholder: 'ex: 0.8', unit: 'mm' },
-  { id: 'imt_e', label: 'EIM Esquerda', placeholder: 'ex: 0.7', unit: 'mm' },
-  { id: 'placa', label: 'Placas', placeholder: 'ex: sem placas visíveis' },
-  { id: 'veias', label: 'Veias', placeholder: 'ex: compressíveis, sem trombo' },
-];
-
 /**
  * Instrução de inserção padronizada por área — compartilhada pela aba
  * Formulário (texto livre) e pela aba Estruturado (campos tipados).
@@ -149,38 +100,6 @@ function buildAreaInstruction(area: string): string {
     return `\n\nINSTRUÇÃO OBRIGATÓRIA — PROCEDIMENTOS:\nDescrever alvo, técnica (agulha/via/passagens), material coletado e controle pós-procedimento com intercorrências; aplicar TI-RADS/BI-RADS ao alvo quando informado; substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
   }
   return `\n\nINSTRUÇÃO OBRIGATÓRIA:\nInserir cada achado no campo correspondente da ANÁLISE, substituir placeholders, não inventar dados, atualizar CONCLUSÃO e RECOMENDAÇÕES.`;
-}
-
-function StructuredFormField({ field, value, onChange }: { field: StructuredField; value: string; onChange: (v: string) => void }) {
-  if (field.type === 'select') {
-    return (
-      <div className="flex flex-col gap-1">
-        <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest">{field.label}</label>
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          className="h-8 px-2 bg-white border border-ink-200 focus:border-brand-400 rounded-lg text-xs font-medium text-ink-800 outline-none transition-all"
-        >
-          <option value="">—</option>
-          {field.options?.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[9px] font-black text-ink-500 uppercase tracking-widest">
-        {field.label}{field.unit && <span className="text-ink-400 normal-case font-normal ml-1">({field.unit})</span>}
-      </label>
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={field.placeholder}
-        className="h-8 px-2 bg-white border border-ink-200 focus:border-brand-400 rounded-lg text-xs font-medium text-ink-800 placeholder-ink-300 outline-none transition-all"
-      />
-    </div>
-  );
 }
 
 interface LaudCopilotProps {
@@ -409,14 +328,6 @@ export function LaudCopilot({
 
   // Consciência do roteador: detecta red flags na instrução atual + clínica
   // para sinalizar quando o Motor Pro será acionado por segurança.
-  const routerDecision = useMemo(() => routeMotor({
-    area: exam.area || template?.area || '',
-    examType: exam.examType,
-    clinicalIndication: exam.clinicalIndication,
-    anamnesis: [exam.anamnesis, prompt].filter(Boolean).join(' '),
-    userMotor: selectedMotor,
-  }), [exam.area, template?.area, exam.examType, exam.clinicalIndication, exam.anamnesis, prompt, selectedMotor]);
-
   const handleFormTextChange = (val: string) => {
     setFormText(val);
     latestValueRef.current = val;
@@ -821,8 +732,6 @@ export function LaudCopilot({
       return;
     }
     lastCallRef.current = now;
-
-    const hasKey = true; // Sempre tenta usar a API (chaves de fallback integradas no servidor)
 
     cancelActiveRequest();
     const controller = new AbortController();

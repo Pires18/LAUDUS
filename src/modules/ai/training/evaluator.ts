@@ -2,7 +2,7 @@ import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { robustJsonParse } from '../json';
-import { resolveGeminiModel } from '../engine';
+import { resolveGeminiModel, GEMINI_PRO_MODEL } from '../engine';
 import { logger } from '../../../utils/logger';
 import {
   GoldenCase,
@@ -51,9 +51,10 @@ const DIMENSIONS: EvalDimension[] = ['fidelity', 'completeness', 'safety', 'nume
 
 /** Força o juiz a usar sempre o motor Pro, independente do que o usuário escolheu. */
 function resolveJudgeModel(settings: AppSettings): string {
-  // Preferimos o modelo Pro configurado; cai no resolvedor por alias.
-  const proHint = settings.geminiModelPro || 'gemini-3.1-pro-preview';
-  return resolveGeminiModel(proHint);
+  // Preferimos o modelo Pro configurado; senão o default Pro (GA). O motor 'pro'
+  // garante que qualquer valor inválido caia num modelo Pro, não Lite.
+  const proHint = settings.geminiModelPro || GEMINI_PRO_MODEL;
+  return resolveGeminiModel(proHint, 'pro');
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

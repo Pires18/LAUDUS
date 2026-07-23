@@ -15,7 +15,7 @@ LAUD.US é um sistema web PWA de gestão clínica para laudos de ultrassonografi
 | Estado Global | Zustand |
 | Banco de Dados | Firebase Firestore (realtime) |
 | Autenticação | Firebase Auth (Google + Email) |
-| IA | Google Gemini via proxy server-side (Lite: `gemini-3.5-flash` · Pro: `gemini-3.1-pro-preview`) |
+| IA | Google Gemini via proxy server-side (Lite: `gemini-3.5-flash` · Pro: `gemini-2.5-pro`) |
 | PACS | Orthanc gerenciado (VM multi-tenant self-service na nuvem) ou standalone — via Agente/Proxy HTTP |
 | Editor | Tiptap (ProseMirror) |
 | Animações | Framer Motion |

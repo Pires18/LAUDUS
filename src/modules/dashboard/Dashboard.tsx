@@ -4,6 +4,7 @@ import { useCollection } from '../../hooks/useFirestore';
 import { useAuth } from '../../hooks/useAuth';
 import { useAdmin } from '../../hooks/useAdmin';
 import { getAiUsageStats } from '../../store/db';
+import { motorForModel } from '../ai/geminiModels';
 import { useSubscription } from '../../hooks/useSubscription';
 import { ExamRequest, Patient, Clinic, EXAM_AREAS, Appointment } from '../../types';
 import { LAUDIA_VERSION } from '../../version';
@@ -58,7 +59,7 @@ export function Dashboard() {
     const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     getAiUsageStats(monthStart.getTime(), Date.now()).then(logs => {
-      const isLiteModel = (model: string) => !!(model && (model.includes('flash') || model === 'gemini-3.5-flash'));
+      const isLiteModel = (model: string) => motorForModel(model) === 'lite';
       const isProModel = (model: string) => !!(model && model.includes('pro'));
       const totalCost = logs.reduce((s, l) => s + (l.costUsd || 0), 0);
       const todayCost = logs.filter(l => l.timestamp >= todayStart.getTime()).reduce((s, l) => s + (l.costUsd || 0), 0);

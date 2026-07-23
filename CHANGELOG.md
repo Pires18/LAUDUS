@@ -5,6 +5,50 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [Não lançado]
+
+Trabalho acumulado desde a 2.2.0 (auditoria final 22–23/07).
+
+### LAUD.IA (motores Gemini)
+- **Motor Pro default → `gemini-2.5-pro`** (GA, por confiabilidade). O
+  `gemini-3.1-pro-preview` (preview, sujeito a 503) virou opt-in via Admin.
+- **Fallback automático de modelo** em 503/404 (sobrecarga/indisponível): cai
+  para um GA equivalente em todos os caminhos (geração, refino, copiloto,
+  estruturado, sugestões inline).
+- **Fonte única de modelos unificada** (`ai/geminiModels.ts`): removidos os
+  literais/resolvedores gêmeos em SharedLaudIA, Dashboard, TelemetryDashboard,
+  Admin, evaluator; novo helper `motorForModel` para classificação Lite/Pro.
+- **Custos por modelo atualizados** (preços oficiais jul/2026); TelemetryDashboard
+  desduplicado (usa `modelPricing.ts`).
+
+### Atualização de sistema (PWA)
+- **`version.json` + `__BUILD_ID__`**: detecção de novo deploy independente do
+  Service Worker (funciona até com SW travado). Mais gatilhos de checagem.
+- **Force-update crítico**: Admin → Saúde do Sistema empurra a versão para todos
+  os clientes, inclusive telas de trabalho.
+
+### PACS/DICOM
+- **Worklist browser-direct**: o navegador fala direto com o Agente (Funnel),
+  contornando o egress serverless da Vercel que **não alcança o Tailscale Funnel**
+  (timeout IPv4/IPv6). Proxies mantidos como fallback on-premise com IPv4-forcing.
+- Mensagens de erro do proxy expõem a causa real (`err.cause`/código).
+
+### Correções
+- **Proxy Gemini**: distingue "chave ausente/ inválida" de "modelo sobrecarregado"
+  (antes ambos apareciam como 503 genérico).
+- **Firestore**: regra de collection-group `nf` (corrige permission-denied na aba
+  de NF do admin); índice `support_tickets(userId, updatedAt)` versionado; índice
+  `ai_usage.timestamp` com escopo COLLECTION (corrige `getAiUsageStats`); índice
+  morto `exams(patientId, createdAt)` removido do arquivo.
+
+### Higiene
+- Removidas ~470 linhas de código morto (4 arquivos órfãos + subsistema legado do
+  `LaudCopilot`). `.gitignore` sem globs quebrados; `.env.example` documenta
+  `ORTHANC_PROXY_ALLOWED_HOST_SUFFIXES`. Docs de modelo (README/DOCUMENTACAO)
+  alinhados ao Pro atual.
+
+---
+
 ## [2.2.0] — 2026-07-19
 
 Release de consolidação — corta em produção todo o trabalho acumulado desde a

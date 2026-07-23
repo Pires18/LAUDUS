@@ -6,6 +6,7 @@ import { logger } from '../../../utils/logger';
 import { classNames } from '../../../utils/format';
 import { useApp } from '../../../store/app';
 import { useConfirm } from '../../../hooks/useConfirm';
+import { GEMINI_LITE_MODEL, GEMINI_PRO_MODEL } from '../../ai/geminiModels';
 import { Activity, CheckCircle2, AlertTriangle, XCircle, Loader2, Cpu, CreditCard, ShieldCheck, Database, RefreshCw } from 'lucide-react';
 
 type Health = 'ok' | 'warn' | 'down' | 'unknown';
@@ -99,7 +100,7 @@ export function AdminHealth() {
       lines: [
         { k: 'Laudos processados', v: reports30.toLocaleString('pt-BR') },
         { k: 'Custo estimado', v: `US$ ${cost30.toFixed(2)}` },
-        { k: 'Modelos', v: 'gemini-3.5-flash / 3.1-pro' },
+        { k: 'Modelos', v: `${GEMINI_LITE_MODEL} / ${GEMINI_PRO_MODEL}` },
       ],
     },
     {

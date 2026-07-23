@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { firestore } from '../../lib/firebase';
+import { GEMINI_LITE_MODEL, GEMINI_PRO_MODEL } from '../ai/geminiModels';
 import { useApp } from '../../store/app';
 import { useAdmin } from '../../hooks/useAdmin';
 import {
@@ -313,7 +314,7 @@ function AdminOverview({ onNavigate }: { onNavigate: (tab: AdminTab) => void }) 
                 <div>
                    <p className="text-xs font-bold text-brand-900">Google Gemini</p>
                    <p className="text-[10px] text-brand-600 font-mono">
-                     Lite: gemini-3.5-flash · Pro: gemini-3.1-pro-preview
+                     Lite: {GEMINI_LITE_MODEL} · Pro: {GEMINI_PRO_MODEL}
                    </p>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />

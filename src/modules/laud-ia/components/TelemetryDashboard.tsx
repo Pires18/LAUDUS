@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, BarChart3, BrainCircuit, CheckCircle2, Download, Database, Coins, Clock, TrendingUp } from 'lucide-react';
-import { callMetricsHistory, type CallMetrics } from '../../ai/engine';
+import { callMetricsHistory, motorForModel, type CallMetrics } from '../../ai/engine';
 import { GEMINI_MODEL_PRICING } from '../../ai/modelPricing';
 import { classNames } from '../../../utils/format';
 
@@ -138,12 +138,10 @@ export function TelemetryDashboard({
       {/* Motor breakdown */}
       <div className="px-3 pt-3 pb-2 border-t border-ink-100 bg-ink-50/30">
         {(() => {
-          const liteModels = ['gemini-3.5-flash', 'gemini-2.5-flash-preview-05-20'];
-          const proModels = ['gemini-3.1-pro-preview', 'gemini-2.5-pro-preview-06-05'];
-          const liteCalls = filteredMetrics.filter(m => m.modelName && liteModels.some(lm => m.modelName!.includes(lm.split('-preview')[0].split('-flash')[0])));
-          const proCalls = filteredMetrics.filter(m => m.modelName && proModels.some(pm => m.modelName!.includes(pm.split('-preview')[0].split('-pro')[0]) && m.modelName!.includes('pro')));
-          const liteCount = filteredMetrics.filter(m => m.modelName && (m.modelName.includes('flash') || m.modelName === 'gemini-3.5-flash')).length;
-          const proCount = filteredMetrics.filter(m => m.modelName && (m.modelName.includes('pro'))).length;
+          // Classificação de tier pela fonte única (motorForModel) — antes havia
+          // listas hardcoded paralelas com IDs datados que esqueciam o Pro atual.
+          const proCount = filteredMetrics.filter(m => m.modelName && motorForModel(m.modelName) === 'pro').length;
+          const liteCount = filteredMetrics.filter(m => m.modelName && motorForModel(m.modelName) === 'lite').length;
           const total = filteredMetrics.length;
           const litePct = total > 0 ? Math.round((liteCount / total) * 100) : 0;
           const proPct = total > 0 ? Math.round((proCount / total) * 100) : 0;

@@ -32,9 +32,9 @@ yarn-error.log*
 *.wl
 # Exports de dados clínicos gerados por operações de admin (contêm PHI — nunca commitar)
 clear-clinical-findings-report-*.json
-# Pastas geradas com caminho Windows literal no macOS/Linux (qualquer caixa)
+# Pastas geradas com caminho Windows literal no macOS/Linux (qualquer caixa).
+# NÃO usar barra invertida — no gitignore ela é escape e quebra ferramentas
+# (rg/glob); as variantes com '/' cobrem o mesmo caso.
 C:/
-C:\
-[Cc]:\[Oo]rthanc*
 [Cc]:/[Oo]rthanc*
 .env*
