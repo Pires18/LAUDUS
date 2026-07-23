@@ -1,7 +1,20 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, BarChart3, BrainCircuit, CheckCircle2, Download, Database, Coins, Clock, TrendingUp } from 'lucide-react';
 import { callMetricsHistory, type CallMetrics } from '../../ai/engine';
+import { GEMINI_MODEL_PRICING } from '../../ai/modelPricing';
 import { classNames } from '../../../utils/format';
+
+// Preços de modelos Claude que aparecem só em métricas HISTÓRICAS (o runtime hoje
+// é Gemini-only). Os preços Gemini vêm da fonte única (modelPricing.ts) — antes
+// eram duplicados aqui e ficavam defasados. USD por 1M tokens (input/output).
+const PRICING_REF: Record<string, { input: number; output: number }> = {
+  'claude-sonnet-4-6':        { input: 3.0,  output: 15.0 },
+  'claude-3-5-sonnet-latest': { input: 3.0,  output: 15.0 },
+  'claude-3-7-sonnet-latest': { input: 3.0,  output: 15.0 },
+  'claude-opus-4-5':          { input: 15.0, output: 75.0 },
+  'claude-3-haiku-20240307':  { input: 0.25, output: 1.25 },
+  ...GEMINI_MODEL_PRICING,
+};
 
 // Painel de telemetria de IA — extraído de SharedLaudIA (autocontido).
 export function TelemetryDashboard({
@@ -28,17 +41,6 @@ export function TelemetryDashboard({
     const rows = [
       ['Modo','Provider','Modelo','Area','Tokens In','Tokens Out','Latência (ms)','Custo USD','Custo BRL','Sucesso','Timestamp'],
       ...filteredMetrics.map(m => {
-        const PRICING_REF: Record<string, { input: number; output: number }> = {
-          'claude-sonnet-4-6':           { input: 3.0, output: 15.0 },
-          'claude-3-5-sonnet-latest':    { input: 3.0, output: 15.0 },
-          'claude-3-7-sonnet-latest':    { input: 3.0, output: 15.0 },
-          'claude-opus-4-5':             { input: 15.0, output: 75.0 },
-          'claude-3-haiku-20240307':     { input: 0.25, output: 1.25 },
-          'gemini-3.5-flash':            { input: 0.075, output: 0.30 },
-          'gemini-3.1-pro-preview':      { input: 1.25, output: 5.0 },
-          'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
-          'gemini-2.5-pro-preview-06-05':   { input: 1.25, output: 10.0 },
-        };
         const p = m.modelName ? (PRICING_REF[m.modelName] || { input: 0, output: 0 }) : { input: 0, output: 0 };
         const costUsd = ((m.estimatedInputTokens / 1e6) * p.input) + ((m.estimatedOutputTokens / 1e6) * p.output);
         const costBrl = costUsd * conversionRate;
@@ -76,17 +78,6 @@ export function TelemetryDashboard({
   const avgLatency = filteredMetrics.length > 0 ? Math.round(filteredMetrics.reduce((s, m) => s + m.latencyMs, 0) / filteredMetrics.length) : 0;
   const successRate = filteredMetrics.length > 0 ? Math.round((filteredMetrics.filter(m => m.success).length / filteredMetrics.length) * 100) : 0;
 
-  const PRICING_REF: Record<string, { input: number; output: number }> = {
-    'claude-sonnet-4-6':           { input: 3.0, output: 15.0 },
-    'claude-3-5-sonnet-latest':    { input: 3.0, output: 15.0 },
-    'claude-3-7-sonnet-latest':    { input: 3.0, output: 15.0 },
-    'claude-opus-4-5':             { input: 15.0, output: 75.0 },
-    'claude-3-haiku-20240307':     { input: 0.25, output: 1.25 },
-    'gemini-3.5-flash':            { input: 0.075, output: 0.30 },
-    'gemini-3.1-pro-preview':      { input: 1.25, output: 5.0 },
-    'gemini-2.5-flash-preview-05-20': { input: 0.15, output: 0.60 },
-    'gemini-2.5-pro-preview-06-05': { input: 1.25, output: 10.0 },
-  };
   const totalCostUsd = filteredMetrics.reduce((s, m) => {
     const p = m.modelName ? (PRICING_REF[m.modelName] || { input: 0, output: 0 }) : { input: 0, output: 0 };
     return s + ((m.estimatedInputTokens / 1e6) * p.input) + ((m.estimatedOutputTokens / 1e6) * p.output);

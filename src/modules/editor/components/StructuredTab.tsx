@@ -1,15 +1,37 @@
-import { Calculator, Sparkles, Loader2, RotateCcw, LayoutGrid, Zap, CheckCircle2, Plus, X, Ruler } from 'lucide-react';
+import { useState } from 'react';
+import { Calculator, Sparkles, Loader2, RotateCcw, LayoutGrid, Zap, CheckCircle2, Plus, X, ChevronDown } from 'lucide-react';
 import { classNames } from '../../../utils/format';
 import {
   StructuredSchema,
+  StructuredSection,
   StructuredFieldDef,
   StructuredFieldValue,
 } from '../../../types';
 import { fieldValueToText } from '../structured/deriveSchema';
 import { Derivation } from '../structured/liveCompute';
-import { itemCount, itemFieldId, normalKey } from '../structured/structuredKeys';
-import { effectiveSectionState, isAutoAltered, fieldDefAbnormal } from '../structured/abnormalRange';
+import { itemCount, itemFieldId } from '../structured/structuredKeys';
+import { isAutoAltered, fieldDefAbnormal } from '../structured/abnormalRange';
 import { sectionRepeatContainers, RepeatContainer } from '../structured/containers';
+
+/** Quantos campos da seção (fixos + itens repetíveis) têm valor — pro resumo
+ * visível no card retraído, sem precisar expandir pra saber o que já foi
+ * preenchido. */
+function sectionFilledCount(section: StructuredSection, values: Record<string, StructuredFieldValue>): number {
+  let n = 0;
+  for (const f of section.fields) {
+    if (fieldValueToText(values[f.id])) n++;
+  }
+  const rg = section.repeatGroup;
+  if (rg) {
+    const count = itemCount(values, section.id);
+    for (let i = 0; i < count; i++) {
+      for (const f of rg.fields) {
+        if (fieldValueToText(values[itemFieldId(section.id, i, f.id)])) n++;
+      }
+    }
+  }
+  return n;
+}
 
 /**
  * Texto SEM trim, pro valor ao vivo do campo de digitação livre — fieldValueToText
@@ -242,6 +264,19 @@ export function StructuredTab({
   filledCount,
   preview,
 }: StructuredTabProps) {
+  // Cards retraídos por padrão (só o nome da estrutura) — melhor pra escanear
+  // e escolher qual estrutura preencher. Rastreia os EXPANDIDOS (não os
+  // retraídos): assim, uma seção nova (ex.: máscara trocada) já nasce
+  // retraída sem precisar listar todos os ids de antemão.
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const toggleSection = (id: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const derivBySection = derivations.reduce<Record<string, Derivation[]>>((acc, d) => {
     (acc[d.sectionId] = acc[d.sectionId] || []).push(d);
     return acc;
@@ -325,34 +360,28 @@ export function StructuredTab({
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
         {schema.sections.map((section) => {
-          const isNormal = section.normalable && effectiveSectionState(section, values) === 'normal';
           const autoAltered = section.normalable && isAutoAltered(section, values);
+          const isExpanded = expandedSections.has(section.id);
+          const filled = sectionFilledCount(section, values);
           return (
           <div key={section.id} className="rounded-2xl border border-ink-200 bg-white overflow-hidden shadow-sm">
-            <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-ink-100">
-              <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest">{section.label}</span>
-              <div className="flex items-center gap-1.5">
-                {autoAltered && (
-                  <span className="px-1.5 py-px rounded bg-amber-100 border border-amber-300 text-amber-700 text-[8px] font-black uppercase tracking-wide" title="Alterado automaticamente por valor fora da faixa">auto</span>
+            <button
+              type="button"
+              onClick={() => toggleSection(section.id)}
+              className="w-full px-3.5 pt-3 pb-2.5 flex items-center justify-between gap-2 border-b border-ink-100 hover:bg-ink-50/60 transition-colors text-left"
+            >
+              <span className="flex items-center gap-1.5 min-w-0">
+                <ChevronDown size={13} className={classNames('text-ink-400 shrink-0 transition-transform', !isExpanded && '-rotate-90')} />
+                <span className="text-[10px] font-black text-ink-600 uppercase tracking-widest truncate">{section.label}</span>
+                {filled > 0 && (
+                  <span className="shrink-0 px-1.5 py-px rounded-full bg-brand-50 border border-brand-100 text-brand-600 text-[8px] font-black">{filled}</span>
                 )}
-                {section.normalable ? (
-                  <div className="flex items-center rounded-lg border border-ink-200 overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => onChange(normalKey(section.id), 'normal')}
-                      className={classNames('px-2 py-1 text-[9px] font-black uppercase tracking-wide transition-colors', isNormal ? 'bg-emerald-500 text-white' : 'bg-white text-ink-500 hover:bg-ink-50')}
-                    >
-                      Normal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onChange(normalKey(section.id), 'altered')}
-                      className={classNames('px-2 py-1 text-[9px] font-black uppercase tracking-wide transition-colors', !isNormal ? 'bg-amber-500 text-white' : 'bg-white text-ink-500 hover:bg-ink-50')}
-                    >
-                      Alterado
-                    </button>
-                  </div>
-                ) : !section.repeatable ? (
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                {autoAltered && (
+                  <span className="px-1.5 py-px rounded bg-amber-100 border border-amber-300 text-amber-700 text-[8px] font-black uppercase tracking-wide" title="Valor fora da faixa de normalidade">alterado</span>
+                )}
+                {!section.repeatable && (
                   <button
                     type="button"
                     onClick={() => onSectionNormal(section.id)}
@@ -362,8 +391,8 @@ export function StructuredTab({
                     <CheckCircle2 size={10} />
                     Normal
                   </button>
-                ) : null}
-                {section.calcId && !isNormal && (
+                )}
+                {section.calcId && (
                   <button
                     type="button"
                     onClick={() => onOpenCalc(section.calcId!, `${section.id}__section`, section.label)}
@@ -374,57 +403,45 @@ export function StructuredTab({
                   </button>
                 )}
               </div>
-            </div>
+            </button>
 
-            {isNormal ? (
+            {isExpanded && (
               <>
-                <div className="px-3.5 py-2.5 text-[11px] font-semibold text-emerald-700/80 flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-emerald-500" /> Sem alterações{section.normalText ? ` — ${section.normalText}` : ''}.
-                </div>
-                {/* Biometria que se registra mesmo na normalidade (dimensões, volume, índices). */}
-                {section.fields.some((f) => f.alwaysShow) && (
-                  <div className="px-3 pb-1">
-                    <div className="mb-1.5 flex items-center gap-1 text-[8px] font-black text-ink-400 uppercase tracking-widest">
-                      <Ruler size={9} /> Medidas do exame
+                {section.repeatable ? (
+                  // Seção-lista pura (nódulos/lesões como a seção inteira).
+                  renderRepeatList(sectionRepeatContainers(section)[0])
+                ) : (
+                  // Seção com campos fixos + (opcional) grupo de lesões repetível aninhado.
+                  <>
+                    {section.fields.length > 0 && <div className="p-3 pb-1">{renderGrid(section.fields, (fid) => fid)}</div>}
+                    {sectionRepeatContainers(section)
+                      .filter((c) => c.nested)
+                      .map((c) => (
+                        <div key={c.containerId} className="mt-1 mx-3 mb-1 rounded-xl border border-ink-100 bg-ink-50/30">
+                          <div className="px-3 pt-2 flex items-center gap-1.5 text-[9px] font-black text-ink-500 uppercase tracking-widest">
+                            <Plus size={10} className="text-brand-500" /> {c.itemLabel ? `${c.itemLabel}s` : 'Lesões'}
+                          </div>
+                          {renderRepeatList(c)}
+                        </div>
+                      ))}
+                  </>
+                )}
+
+                {/* Cálculos automáticos de campos FIXOS da seção (itens têm o seu inline). */}
+                {!section.repeatable && derivBySection[section.id]?.filter((d) => !d.id.includes('@')).length > 0 && (
+                  <div className="mx-3 mb-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70 px-3 py-2 space-y-1">
+                    <div className="flex items-center gap-1 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
+                      <Zap size={9} /> Cálculo automático
                     </div>
-                    {renderGrid(section.fields.filter((f) => f.alwaysShow), (fid) => fid)}
+                    {derivBySection[section.id].filter((d) => !d.id.includes('@')).map((d) => (
+                      <div key={d.id} className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold text-emerald-800/80">{d.label}</span>
+                        <span className={classNames('text-[11px] font-black tabular-nums', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </>
-            ) : section.repeatable ? (
-              // Seção-lista pura (nódulos/lesões como a seção inteira).
-              renderRepeatList(sectionRepeatContainers(section)[0])
-            ) : (
-              // Seção com campos fixos + (opcional) grupo de lesões repetível aninhado.
-              <>
-                {section.fields.length > 0 && <div className="p-3 pb-1">{renderGrid(section.fields, (fid) => fid)}</div>}
-                {sectionRepeatContainers(section)
-                  .filter((c) => c.nested)
-                  .map((c) => (
-                    <div key={c.containerId} className="mt-1 mx-3 mb-1 rounded-xl border border-ink-100 bg-ink-50/30">
-                      <div className="px-3 pt-2 flex items-center gap-1.5 text-[9px] font-black text-ink-500 uppercase tracking-widest">
-                        <Plus size={10} className="text-brand-500" /> {c.itemLabel ? `${c.itemLabel}s` : 'Lesões'}
-                      </div>
-                      {renderRepeatList(c)}
-                    </div>
-                  ))}
-              </>
-            )}
-
-            {/* Cálculos automáticos de campos FIXOS da seção (itens têm o seu inline).
-                Vale também em 'Normal': a biometria registrada segue calculando. */}
-            {!section.repeatable && derivBySection[section.id]?.filter((d) => !d.id.includes('@')).length > 0 && (
-              <div className="mx-3 mb-3 rounded-xl bg-emerald-50/70 border border-emerald-200/70 px-3 py-2 space-y-1">
-                <div className="flex items-center gap-1 text-[8px] font-black text-emerald-700 uppercase tracking-widest">
-                  <Zap size={9} /> Cálculo automático
-                </div>
-                {derivBySection[section.id].filter((d) => !d.id.includes('@')).map((d) => (
-                  <div key={d.id} className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-semibold text-emerald-800/80">{d.label}</span>
-                    <span className={classNames('text-[11px] font-black tabular-nums', d.alert ? 'text-red-600' : 'text-emerald-800')}>{d.text}</span>
-                  </div>
-                ))}
-              </div>
             )}
           </div>
           );

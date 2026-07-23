@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firestore } from '../../../lib/firebase';
 import { getDailyMetrics, getMetricsSummary, type DailyMetric, type MetricsSummary } from '../../../store/db';
 import { logger } from '../../../utils/logger';
 import { classNames } from '../../../utils/format';
-import { Activity, CheckCircle2, AlertTriangle, XCircle, Loader2, Cpu, CreditCard, ShieldCheck, Database } from 'lucide-react';
+import { useApp } from '../../../store/app';
+import { useConfirm } from '../../../hooks/useConfirm';
+import { Activity, CheckCircle2, AlertTriangle, XCircle, Loader2, Cpu, CreditCard, ShieldCheck, Database, RefreshCw } from 'lucide-react';
 
 type Health = 'ok' | 'warn' | 'down' | 'unknown';
 
@@ -143,6 +145,75 @@ export function AdminHealth() {
           <span>A agregação de métricas não roda há mais de 12h. Verifique o cron <code>/api/cron-aggregate-metrics</code> no painel da Vercel e o <code>CRON_SECRET</code>.</span>
         </div>
       )}
+
+      <ForceUpdateCard />
+    </div>
+  );
+}
+
+/**
+ * Empurra a versão mais recente para TODOS os clientes abertos escrevendo
+ * `global_config/app_config.forceReloadAt`. Clientes que carregaram ANTES desse
+ * instante recarregam — inclusive em telas de trabalho (após um respiro pro
+ * auto-save). Use para correções críticas; um deploy normal já é pego sozinho
+ * pelo version.json (auto em tela segura, banner em tela de trabalho).
+ */
+function ForceUpdateCard() {
+  const { showToast } = useApp();
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [lastForced, setLastForced] = useState<number | null>(null);
+
+  useEffect(() => {
+    getDoc(doc(firestore, 'global_config', 'app_config'))
+      .then((s) => {
+        const v = s.exists() ? (s.data() as { forceReloadAt?: number }).forceReloadAt : undefined;
+        if (typeof v === 'number') setLastForced(v);
+      })
+      .catch(() => {});
+  }, []);
+
+  const force = async () => {
+    const ok = await confirm({
+      title: 'Forçar atualização de todos os clientes?',
+      message:
+        'Todos os usuários com o app aberto vão recarregar para a versão mais recente — inclusive quem está numa tela de trabalho (após alguns segundos, para o auto-save salvar). Use apenas para correções críticas.',
+      variant: 'danger',
+      confirmLabel: 'Forçar atualização',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const now = Date.now();
+      await setDoc(doc(firestore, 'global_config', 'app_config'), { forceReloadAt: now }, { merge: true });
+      setLastForced(now);
+      showToast('Atualização forçada enviada a todos os clientes.', 'success');
+    } catch (e: any) {
+      showToast('Falha ao forçar atualização: ' + (e?.message || 'erro'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-ink-100 shadow-sm p-5 flex items-center justify-between gap-4">
+      <div className="min-w-0">
+        <h4 className="text-xs font-black text-ink-800 uppercase tracking-wider flex items-center gap-2">
+          <RefreshCw size={14} className="text-brand-600" /> Forçar atualização
+        </h4>
+        <p className="text-[11px] text-ink-500 mt-1">
+          Empurra a versão mais recente para TODOS os clientes abertos, inclusive telas de trabalho (após aviso).
+          Para correções críticas — um deploy normal já é aplicado sozinho.
+          {lastForced ? ` Última: ${ago(lastForced)}.` : ''}
+        </p>
+      </div>
+      <button
+        onClick={force}
+        disabled={busy}
+        className="shrink-0 h-10 px-4 rounded-xl bg-brand-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-brand-700 disabled:opacity-60 flex items-center gap-2 transition-colors"
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />} Forçar agora
+      </button>
     </div>
   );
 }

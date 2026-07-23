@@ -403,12 +403,36 @@ const appVersion = JSON.parse(
   fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'),
 ).version as string;
 
+// Identificador ÚNICO por deploy (versão + commit da Vercel, ou timestamp no
+// build local). Diferente de __APP_VERSION__ (só o package.json, que não muda a
+// cada deploy): o __BUILD_ID__ muda SEMPRE, permitindo detectar uma nova versão
+// no ar comparando com /version.json (ver src/utils/appVersion.ts).
+const buildId = `${appVersion}+${(process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || Date.now().toString(36)}`;
+
+// Emite /version.json no build — o cliente busca (no-store) e compara com o
+// __BUILD_ID__ embutido para saber que há um deploy novo, independente do SW
+// (cobre até o caso de service worker travado).
+function emitVersionJsonPlugin() {
+  return {
+    name: 'emit-version-json',
+    generateBundle(this: any) {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ buildId, version: appVersion }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_ID__: JSON.stringify(buildId),
   },
   plugins: [
     react(),
+    emitVersionJsonPlugin(),
     localOrthancWorklistPlugin(),
     VitePWA({
       // Modo "prompt": o usuário decide quando aplicar a nova versão

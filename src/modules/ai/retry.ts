@@ -57,7 +57,34 @@ export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promis
  * Chamado depois que o withRetry esgotou as tentativas.
  */
 export function geminiHttpError(status: number, errText: string, context = 'Gemini'): Error {
-  if (status === 503 || errText.toLowerCase().includes('overloaded')) {
+  const lower = (errText || '').toLowerCase();
+
+  // ATENÇÃO: um 503 NÃO significa necessariamente "modelo sobrecarregado". O
+  // próprio proxy (api/gemini.ts) devolve 503 quando GOOGLE_API_KEY está ausente,
+  // e o Google devolve 403/permission quando a chave é inválida/sem billing.
+  // Detectamos config ANTES de assumir sobrecarga — senão o erro real fica oculto
+  // atrás de uma mensagem genérica de "tente de novo".
+  const isConfigError =
+    lower.includes('api key not configured') ||
+    lower.includes('key not configured') ||
+    lower.includes('api key not valid') ||
+    lower.includes('api_key_invalid') ||
+    lower.includes('permission_denied') ||
+    lower.includes('unregistered callers') ||
+    lower.includes('billing') ||
+    lower.includes('google_api_key') ||   // mensagens (prod/dev) que citam a env var
+    lower.includes('chave de ia ausente'); // proxy de dev (vite middleware)
+  if (isConfigError) {
+    return new Error(
+      'IA indisponível: a chave do servidor (GOOGLE_API_KEY) está ausente, inválida ou sem billing. ' +
+      'Isso NÃO é sobrecarga — configure/renove a chave no ambiente (Vercel) e tente novamente. ' +
+      `Detalhe: ${errText}`
+    );
+  }
+
+  // Sobrecarga REAL do modelo (503 UNAVAILABLE ou "overloaded" vindo do Google) —
+  // transitória e não-acionável, mensagem limpa sem despejar o erro cru.
+  if (status === 503 || lower.includes('overloaded') || lower.includes('unavailable')) {
     return new Error(
       'O modelo do Gemini está sobrecarregado no momento (erro 503). ' +
       'Já re-tentamos automaticamente sem sucesso — aguarde alguns segundos e tente novamente.'

@@ -45,6 +45,27 @@
   confirmação de ativação do billing export pelo usuário.
   Origem: `docs/archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md` (Fase D).
 
+## 🔄 Atualização de sistema (PWA)
+
+- **[FEITO] Detecção de deploy mais rápida e à prova de SW travado** — `PWAUpdatePrompt`
+  ganhou gatilhos (imediato, foco, visibilitychange, online, cada troca de tela) com
+  cleanup, e um `version.json` (emitido no build via `__BUILD_ID__`, único por deploy)
+  que o cliente compara — sinal independente do Service Worker (recarrega até com SW
+  travado). Headers: `sw.js`/`index.html`/`version.json` revalidam; `/assets/*` imutável.
+- **[FEITO] Forçar atualização (crítica)** — Admin→Saúde do Sistema tem botão que grava
+  `global_config/app_config.forceReloadAt`; clientes que carregaram antes recarregam,
+  inclusive em tela de trabalho (após respiro pro auto-save). Rules já cobriam o doc
+  (leitura por logados, escrita só admin) — sem deploy de rules.
+
+## 💰 Custos de IA (pricing por modelo)
+
+- **[FEITO] Preços atualizados e desduplicados** — `modelPricing.ts` (fonte única)
+  corrigido com valores verificados na doc oficial do Google (21/jul/2026): 3.5-flash
+  1.50/9.00, 3.6-flash 1.50/7.50, 2.5-pro 1.25/10.0, 3.1-pro-preview 2.0/12.0, etc.
+  (antes reusava preços do 1.5-flash, ~20x defasado). `TelemetryDashboard` deixou de
+  duplicar a tabela e passou a importar da fonte única; `DEFAULT_MOTOR` (custo/laudo)
+  recalibrado com token split realista.
+
 ## 🤖 IA / LAUD.IA (motores Gemini)
 
 - **[FEITO] IDs de modelo consolidados numa fonte única** (achados B+C da auditoria
@@ -70,6 +91,16 @@
   e o resolvedor local próprio de `ai/generateTemplate.ts`. Não migrados por serem
   território do processo paralelo (risco de conflito de merge). Apontar ambos para
   `GEMINI_LITE_MODEL`/`resolveGeminiModel` quando a janela permitir.
+
+- **[CORRIGIDO] "503 sobrecarregado" mascarava o erro real** — o proxy `api/gemini.ts`
+  devolve **status 503 em dois casos distintos**: (a) modelo do Google sobrecarregado
+  e (b) `GOOGLE_API_KEY` ausente no ambiente. O cliente (`geminiHttpError`) traduzia
+  QUALQUER 503 para "modelo sobrecarregado", escondendo o problema de configuração.
+  Corrigido: `geminiHttpError` agora detecta erros de config/chave (key not configured,
+  API key not valid, PERMISSION_DENIED, billing) e mostra mensagem acionável distinta,
+  ANTES de assumir sobrecarga. **Investigar em produção**: se o erro persiste em todos
+  os modelos, a causa mais provável é `GOOGLE_API_KEY` ausente/inválida/sem billing na
+  Vercel (env de Production) — confirmar via DevTools→Network→resposta de `/api/gemini`.
 
 ## 🟠 Legal / LGPD
 

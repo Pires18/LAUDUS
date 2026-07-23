@@ -1404,9 +1404,15 @@ const LITE_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-l
 // GA primeiro (default); o preview fica como opção consciente.
 const PRO_MODELS  = ['gemini-2.5-pro', 'gemini-3.1-pro-preview'];
 
+// Estimativa "custo por laudo" (editável no Admin). tokensPerReport = TOTAL de
+// tokens por laudo (o contexto de entrada — universal+área+máscara+exames
+// anteriores — domina, ~20k in / ~2k out). costPerThousandTokens = custo BLENDED
+// por 1k, derivado do pricing atual (ver GEMINI_MODEL_PRICING, a fonte por-modelo):
+//   lite gemini-3.5-flash: (20k·1.50 + 2k·9.00)/1M ≈ US$0.048/laudo → ~0.0022/1k
+//   pro  gemini-2.5-pro:   (20k·1.25 + 2k·10.0)/1M ≈ US$0.045/laudo → ~0.0021/1k
 const DEFAULT_MOTOR = {
-  lite: { model: 'gemini-3.5-flash', tokensPerReport: 2000, costPerThousandTokens: 0.075 },
-  pro:  { model: 'gemini-2.5-pro',   tokensPerReport: 4000, costPerThousandTokens: 1.25  },
+  lite: { model: 'gemini-3.5-flash', tokensPerReport: 22000, costPerThousandTokens: 0.0022 },
+  pro:  { model: 'gemini-2.5-pro',   tokensPerReport: 22000, costPerThousandTokens: 0.0021 },
 };
 
 function IACostsTab() {

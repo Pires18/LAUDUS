@@ -84,4 +84,22 @@ describe('geminiHttpError', () => {
     const err = geminiHttpError(404, 'not found');
     expect(err.message).toBe('Erro na API do Gemini (404): not found');
   });
+
+  it('distingue erro de CONFIGURAÇÃO (chave ausente) de sobrecarga, mesmo em 503', () => {
+    const err = geminiHttpError(503, '{"error":"Gemini API key not configured on server (defina GOOGLE_API_KEY no ambiente/Vercel)."}');
+    expect(err.message).toContain('GOOGLE_API_KEY');
+    expect(err.message).not.toContain('sobrecarregado');
+  });
+
+  it('trata chave inválida/sem billing (403 PERMISSION_DENIED) como config, não sobrecarga', () => {
+    const err = geminiHttpError(403, 'PERMISSION_DENIED: API key not valid');
+    expect(err.message).toContain('chave do servidor');
+    expect(err.message).not.toContain('sobrecarregado');
+  });
+
+  it('trata o 503 do proxy de DEV (chave ausente no .env) como config, não sobrecarga', () => {
+    const err = geminiHttpError(503, '{"error":"Chave de IA ausente no servidor de dev. Defina GOOGLE_API_KEY no .env e reinicie o \\"npm run dev\\"."}');
+    expect(err.message).toContain('GOOGLE_API_KEY');
+    expect(err.message).not.toContain('sobrecarregado');
+  });
 });

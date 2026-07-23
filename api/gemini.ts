@@ -135,7 +135,12 @@ export default async function handler(req: Request) {
       apiKey = (process.env.GOOGLE_API_KEY || '').trim();
     }
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'Gemini API key not configured on server' }), { status: 503 });
+      // NÃO é sobrecarga: a env var da chave não está no ambiente. Corpo explícito
+      // para o cliente distinguir de um 503 real do Google (ver geminiHttpError).
+      return new Response(
+        JSON.stringify({ error: 'Gemini API key not configured on server (defina GOOGLE_API_KEY no ambiente/Vercel).' }),
+        { status: 503 }
+      );
     }
 
     const model = req.headers.get('x-gemini-model') || 'gemini-3.5-flash';
