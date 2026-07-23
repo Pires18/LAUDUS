@@ -239,7 +239,7 @@ describe('AUDITORIA — calculadoras integradas', () => {
     // fmf-preeclampsia-risk-2t: calculadora de 2ª visita EM VALIDAÇÃO, disponível
     // como ferramenta avulsa do menu de medicina fetal (não ancorada a campo, pois
     // o risco quantitativo de 2º T ainda não entra em laudo automaticamente).
-    expect(semCampo).toEqual(['fmf-preeclampsia-risk-2t', 'organ-refs', 'pleural-effusion']);
+    expect(semCampo).toEqual(['fmf-preeclampsia-risk-2t', 'liver-elastography', 'organ-refs', 'pleural-effusion']);
   });
 
   it('os escores com calculadora dedicada estão vinculados ao campo de categoria', () => {

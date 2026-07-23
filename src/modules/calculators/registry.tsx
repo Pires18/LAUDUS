@@ -11,6 +11,7 @@ import { BarcelonaFetalGrowthCalculator } from './components/BarcelonaFetalGrowt
 import { GrowthVelocityCalculator } from './components/GrowthVelocityCalculator';
 import { ProstateWeightCalculator } from './components/ProstateWeightCalculator';
 import { ImtCalculator } from './components/ImtCalculator';
+import { ElastographyCalculator } from './components/ElastographyCalculator';
 import { AmnioticFluidCalculator } from './components/AmnioticFluidCalculator';
 import { VascularRatiosCalculator } from './components/VascularRatiosCalculator';
 import { PleuralEffusionCalculator } from './components/PleuralEffusionCalculator';
@@ -298,6 +299,17 @@ export const CALCULATORS: CalculatorDef[] = [
     reference: {
       text: 'Santos IS, et al. Carotid Intima-Media Thickness and Reference Values: Estudo Longitudinal de Saúde do Adulto (ELSA-Brasil). Arq Bras Cardiol 2016.',
       link: 'https://www.scielo.br/j/abc/a/v8x6QRL9P6q7XbJcQz7KxQf/?lang=pt'
+    }
+  },
+  {
+    id: 'liver-elastography',
+    name: 'Elastografia Hepática',
+    description: 'Rigidez hepática (kPa) → estágio de fibrose METAVIR por etiologia + esteatose por CAP.',
+    component: ElastographyCalculator,
+    areas: ['medicina-interna'],
+    reference: {
+      text: 'Cutoffs orientadores por etiologia (EFSUMB Guidelines; EASL/Baveno VII — cACLD); CAP para esteatose por Karlas et al. 2017. Dependem de método, aparelho, jejum e transaminases.',
+      link: 'https://pubmed.ncbi.nlm.nih.gov/28733013/'
     }
   },
 ];

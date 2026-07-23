@@ -10,7 +10,7 @@ import { formatOneInN, crlToGaWeeks } from '../../calculators/fmf/qc';
 import type { MarkerState } from '../../calculators/fmf/trisomy';
 import type { RacialOrigin, Conception } from '../../calculators/fmf/preeclampsia';
 import type { Analyzer, ParityKind, DiabetesKind } from '../../calculators/fmf/medians';
-import { tiradsScore, biradsSuggest, oradsSuggest, grafType, carotidStenosisNASCET, itbClassification, bosniakSuggest, liverFibrosisStage, liverSteatosisCAP, LiverEtiologia } from './scoring';
+import { tiradsScore, biradsSuggest, oradsSuggest, grafType, carotidStenosisNASCET, itbClassification, bosniakSuggest } from './scoring';
 import {
   ellipsoidVolume,
   prostateVolumeWeight,
@@ -22,6 +22,9 @@ import {
   resolveReferenceGa,
   ivcCollapsibilityIndex,
   imtClassification,
+  liverFibrosisStage,
+  liverSteatosisCAP,
+  LiverEtiologia,
   DatingMethod,
 } from '../../calculators/formulas';
 import {
