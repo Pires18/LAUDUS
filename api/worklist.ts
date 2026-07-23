@@ -1,6 +1,13 @@
+import dns from 'node:dns';
 import { verifyFirebaseIdToken } from './_edgeAuth.js';
 import { hasPacsEntitlement } from './_entitlements.js';
 import { getDb } from './_firebase.js';
+
+// O Tailscale Funnel publica o host do agente em DUAL-STACK (A/IPv4 + AAAA/IPv6).
+// O egress serverless da Vercel NÃO roteia IPv6 — sem isto, o fetch tenta o AAAA,
+// não cai pro IPv4 e falha com "fetch failed" (só na nuvem; navegador/tailnet ok).
+// Preferir IPv4 faz o undici conectar no ingress IPv4 do Funnel, que funciona.
+dns.setDefaultResultOrder('ipv4first');
 
 // Cache curto por instância — mesmo racional de `_entitlements.ts`: evita uma
 // leitura extra no Firestore em cada request de worklist só pra este log.
@@ -153,7 +160,11 @@ export default async function handler(req: any, res: any) {
       res.end(responseText);
       return;
     } catch (err: any) {
-      console.error('[Vercel Worklist Proxy Error]:', err);
+      // O motivo REAL fica em err.cause (undici): ENETUNREACH/EAI_AGAIN (IPv6),
+      // ETIMEDOUT (inalcançável), ENOTFOUND (DNS), etc. Sem expor, "fetch failed"
+      // esconde a causa — foi o que atrasou o diagnóstico do Funnel/IPv6.
+      const cause = err?.cause?.code || err?.cause?.message || '';
+      console.error('[Vercel Worklist Proxy Error]:', err?.message, '| cause:', cause, err?.cause);
       const isTimeout = err?.name === 'AbortError';
       res.statusCode = 200; // Retorna 200 com success: false para exibir o erro amigável na UI
       res.setHeader('Content-Type', 'application/json');
@@ -161,7 +172,7 @@ export default async function handler(req: any, res: any) {
         success: false,
         error: isTimeout
           ? 'O Agente Local não respondeu a tempo (timeout). Verifique se o agente está rodando e exposto via Tailscale Funnel.'
-          : `Não foi possível conectar ao Agente Local via Vercel. Certifique-se de que o Agente está ativo e acessível (Detalhes: ${err.message})`
+          : `Não foi possível conectar ao Agente Local via Vercel. Confirme que o Agente está ativo e exposto via Tailscale Funnel (na VM: sudo tailscale funnel --bg 3000). Detalhes: ${err?.message || 'erro'}${cause ? ` (${cause})` : ''}`
       }));
       return;
     }
