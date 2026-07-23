@@ -35,6 +35,22 @@ Trabalho acumulado desde a 2.2.0 (auditoria final 22–23/07).
   alterações'), select ≠ 1ª opção (a normal, por convenção do botão Normal) e
   qualquer chip de multiselect caracterizam achado e viram a seção para
   Alterado sozinhos. Medidas sem faixa seguem no card Normal (`alwaysShow`).
+- **FIX — medidas digitadas eram descartadas no card "Normal"** (varredura
+  completa em medicina fetal: 31 perdas num exame normal preenchido — PSV ACM,
+  oftálmicas P1/P2, IP DV, DIO/DBO, MoMs da bioquímica, comprimento de
+  funilização). Regra nova `fieldRegistersInNormal`: medida/tripla/cálculo com
+  valor digitado compila e calcula mesmo com a seção em normalidade (número
+  registrado é dado do laudo); o auto-preenchimento do botão Normal (que copia
+  o texto da faixa) não conta. Vale para todas as áreas.
+- **FIX — select com a opção normal escolhida também se registra** (varredura
+  nas outras 9 áreas: 88 perdas — "esteatose: ausente", "CEAP: C0", "GSUS: 0",
+  "Thompson: não realizado", "endoleak: ausente", fluxo portal/veias hepáticas,
+  jatos ureterais…). A opção escolhida documenta a pesquisa e agora compila
+  dentro do card Normal; select vazio segue colapsando na frase compacta.
+- **Medicina fetal — selects descritivos com `alwaysShow`**: dorso, bexiga
+  (gemelar), movimentos fetais, incisuras uterinas, onda A do ducto venoso,
+  posição do colo (cervicometria) e analisador da bioquímica agora se
+  registram no card Normal — antes eram engolidos pelo "sem alterações".
 - **Guarda de divisão** no percentil da RCP (`getCprRef` com desvio 0).
 - Testes: regressões cobertas (nódulo sem clique em Alterado compila e deriva
   TR; showIf não vaza; Normal manual segue suprimindo).

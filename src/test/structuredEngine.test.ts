@@ -150,6 +150,44 @@ describe('summarize — seções normal/alterado e repetíveis', () => {
     expect(hidden.filledCount).toBe(1); // só o flap conta como preenchido
   });
 
+  it('medida digitada se registra no card Normal; auto-preenchimento da faixa não', () => {
+    const schema: StructuredSchema = {
+      area: 'medicina-interna',
+      sections: [{
+        id: 'orgao', label: 'Órgão', normalable: true, normalText: 'aspecto habitual', fields: [
+          { id: 'medida_x', label: 'Medida X', kind: 'measure', unit: 'mm', normal: '10–20 mm' },
+        ],
+      }],
+    };
+    // número digitado (dentro da faixa, sem alwaysShow) compila junto da normalidade
+    const digitado = summarizeStructured(schema, { medida_x: '14' });
+    expect(digitado.lines.join('\n')).toMatch(/Órgão: sem alterações/);
+    expect(digitado.lines.join('\n')).toMatch(/Medida X: 14 mm/);
+    // botão Normal copia o TEXTO da faixa para o campo — isso não é registro
+    const auto = summarizeStructured(schema, { medida_x: '10–20 mm' });
+    expect(auto.lines.join('\n')).not.toMatch(/Medida X/);
+    expect(auto.lines.join('\n')).toMatch(/Órgão: sem alterações/);
+  });
+
+  it('select com a opção NORMAL escolhida se registra no card Normal; vazio colapsa', () => {
+    // Regressão: "esteatose: ausente", "CEAP: C0" etc. documentam a pesquisa —
+    // eram engolidos pelo colapso de normalidade (88 campos nas 10 áreas).
+    const schema: StructuredSchema = {
+      area: 'medicina-interna',
+      sections: [{
+        id: 'orgao', label: 'Órgão', normalable: true, normalText: 'aspecto habitual', fields: [
+          { id: 'pesquisa', label: 'Pesquisa Y', kind: 'select', options: ['ausente', 'presente'] },
+        ],
+      }],
+    };
+    const escolhido = summarizeStructured(schema, { pesquisa: 'ausente' }).lines.join('\n');
+    expect(escolhido).toMatch(/Órgão: sem alterações/); // 1ª opção não vira achado
+    expect(escolhido).toMatch(/Pesquisa Y: ausente/);   // mas o escolhido compila
+    const vazio = summarizeStructured(schema, {}).lines.join('\n');
+    expect(vazio).toMatch(/Órgão: sem alterações/);
+    expect(vazio).not.toMatch(/Pesquisa Y/);            // vazio segue compacto
+  });
+
   it('seção repetível itera instâncias por índice', () => {
     const { lines, filledCount } = summarizeStructured(tireoide, {
       [countKey(nodId)]: '2',

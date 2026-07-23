@@ -9,7 +9,7 @@ import { enrichSections } from './fieldLibrary';
 import { findStandardSchema } from './standardSchemas';
 import { mergeStructuredSchemas, MergedStructuredSchema } from './mergeSchemas';
 import { itemCount, itemFieldId } from './structuredKeys';
-import { effectiveSectionState } from './abnormalRange';
+import { effectiveSectionState, fieldRegistersInNormal } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
 import { visibleValues } from './visibility';
 
@@ -181,7 +181,7 @@ export function summarizeStructured(
       lines.push(`${section.label}: sem alterações${section.normalText ? ` (${section.normalText})` : ''}`);
       filledCount++;
       for (const field of section.fields) {
-        if (!field.alwaysShow) continue;
+        if (!fieldRegistersInNormal(field, vals[field.id])) continue;
         const text = fieldValueToText(vals[field.id]);
         if (!text) continue;
         filledCount++;

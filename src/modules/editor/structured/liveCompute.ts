@@ -1,7 +1,7 @@
 import { StructuredSchema, StructuredFieldValue, StructuredFieldDef } from '../../../types';
 import { fieldValueToText } from './deriveSchema';
 import { itemCount, itemFieldId } from './structuredKeys';
-import { effectiveSectionState } from './abnormalRange';
+import { effectiveSectionState, fieldRegistersInNormal } from './abnormalRange';
 import { sectionRepeatContainers } from './containers';
 import { visibleValues } from './visibility';
 import { meanArterialPressure, bodyMassIndex, seedForCalculator } from './calcSeed';
@@ -258,9 +258,9 @@ export function computeDerivations(
     // (a menos que o médico tenha escolhido manualmente) → passa a computar.
     const isNormal = section.normalable && effectiveSectionState(section, v) === 'normal';
     // Campos FIXOS da seção (não valem para seção-lista pura). Em 'Normal',
-    // só a biometria que se registra na normalidade (`alwaysShow`) segue calculando.
+    // só o que se registra na normalidade (`alwaysShow` + medidas digitadas) segue calculando.
     if (!section.repeatable) {
-      const fixed = isNormal ? section.fields.filter((f) => f.alwaysShow) : section.fields;
+      const fixed = isNormal ? section.fields.filter((f) => fieldRegistersInNormal(f, v[f.id])) : section.fields;
       if (fixed.length) {
         emitCalcs(fixed, (f) => f, '', isNormal ? undefined : section.score, section.id, (suffix) => `${section.id}__${suffix}`);
       }

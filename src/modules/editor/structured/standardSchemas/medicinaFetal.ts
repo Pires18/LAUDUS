@@ -103,7 +103,7 @@ const BIOQUIMICA = (): StructuredSection => ({
   normalable: true,
   normalText: 'não realizada / não fornecida',
   fields: [
-    { id: 'bio_analisador', label: 'Analisador', kind: 'select', options: ['Cobas', 'Delfia', 'Kryptor'], hint: 'define as medianas usadas na conversão em MoM' },
+    { id: 'bio_analisador', label: 'Analisador', kind: 'select', options: ['Cobas', 'Delfia', 'Kryptor'], alwaysShow: true, hint: 'define as medianas usadas na conversão em MoM' },
     { id: 'pappa_mom', label: 'PAPP-A', kind: 'measure', unit: 'MoM', normal: '≈ 1,0 MoM' },
     { id: 'bhcg_mom', label: 'β-hCG livre', kind: 'measure', unit: 'MoM', normal: '≈ 1,0 MoM' },
     { id: 'plgf_mom', label: 'PlGF', kind: 'measure', unit: 'pg/mL', hint: 'valor BRUTO (pg/mL) — o MoM é calculado pela mediana do analisador · rastreio de pré-eclâmpsia' },
@@ -119,7 +119,7 @@ const VITALIDADE = (): StructuredSection => ({
     { id: 'apresentacao', label: 'Apresentação', kind: 'select', options: ['cefálica', 'pélvica', 'córmica / transversa'], alwaysShow: true },
     { id: 'dorso', label: 'Dorso', kind: 'select', options: ['à esquerda', 'à direita', 'anterior', 'posterior'], alwaysShow: true },
     { id: 'bcf', label: 'BCF', kind: 'measure', unit: 'bpm', normal: '110–160 bpm', alwaysShow: true },
-    { id: 'movimentos', label: 'Movimentos fetais', kind: 'select', options: ['presentes e adequados', 'reduzidos', 'ausentes'], normalOption: 'presentes e adequados' },
+    { id: 'movimentos', label: 'Movimentos fetais', kind: 'select', options: ['presentes e adequados', 'reduzidos', 'ausentes'], normalOption: 'presentes e adequados', alwaysShow: true },
   ],
 });
 
@@ -150,10 +150,10 @@ const DOPPLER_FETAL = (opts: { oftalmicas?: boolean; ducto?: boolean; barcelona?
     { id: 'ip_acm', label: 'IP Artéria Cerebral Média', kind: 'measure', alwaysShow: true, hint: 'redistribuição se < p5 · RCP (ACM/AU) automática' },
     { id: 'psv_acm', label: 'PSV ACM', kind: 'measure', unit: 'cm/s', hint: 'MoM automático (18–40 sem) · anemia se > 1,5 MoM' },
     { id: 'ip_uta', label: 'IP Artérias Uterinas (média)', kind: 'measure', alwaysShow: true, hint: 'percentil automático · risco se > p95' },
-    { id: 'uta_incisura', label: 'Incisura protodiastólica', kind: 'select', options: ['ausente bilateral', 'presente unilateral', 'presente bilateral'], normalOption: 'ausente bilateral' },
+    { id: 'uta_incisura', label: 'Incisura protodiastólica', kind: 'select', options: ['ausente bilateral', 'presente unilateral', 'presente bilateral'], normalOption: 'ausente bilateral', alwaysShow: true },
     ...(opts.ducto
       ? [
-          { id: 'dv', label: 'Ducto venoso — onda A', kind: 'select' as const, options: ['positiva', 'ausente', 'reversa'], normalOption: 'positiva' },
+          { id: 'dv', label: 'Ducto venoso — onda A', kind: 'select' as const, options: ['positiva', 'ausente', 'reversa'], normalOption: 'positiva', alwaysShow: true },
           { id: 'ip_dv', label: 'IP Ducto Venoso', kind: 'measure' as const, hint: 'percentil automático · > p95 = pré-carga aumentada' },
         ]
       : []),
@@ -388,7 +388,7 @@ const MORFOLOGICA_1T = (): StructuredSection[] => [
     normalText: 'artérias uterinas com índices normais, sem incisuras; artérias oftálmicas abaixo do limiar de risco',
     fields: [
       { id: 'ip_uta', label: 'IP Artérias Uterinas (média)', kind: 'measure', calcId: 'doppler-fetal', alwaysShow: true, hint: 'percentil automático · risco se > p95' },
-      { id: 'uta_incisura', label: 'Incisuras protodiastólicas', kind: 'select', options: ['ausentes', 'presentes'], normalOption: 'ausentes' },
+      { id: 'uta_incisura', label: 'Incisuras protodiastólicas', kind: 'select', options: ['ausentes', 'presentes'], normalOption: 'ausentes', alwaysShow: true },
       { id: 'oft_p1', label: 'PSV 1º pico (P1)', kind: 'measure', unit: 'cm/s', hint: 'média dos dois olhos' },
       { id: 'oft_p2', label: 'PSV 2º pico (P2)', kind: 'measure', unit: 'cm/s', hint: 'razão P2/P1 automática · risco de PE se ≥ 0,65' },
       { id: 'risco_pe', label: 'Risco de pré-eclâmpsia (FMF)', kind: 'calc', calcId: 'fmf-preeclampsia-risk', fullWidth: true, hint: 'CALCULA AUTOMÁTICO ao preencher fatores maternos + PAM + IP uterinas + PlGF (chip de risco pré-termo e conduta AAS aparece sozinho) · abra para detalhar (4 PA / bilateral / oftálmicas) · apoio à decisão (não é a calculadora oficial da FMF)' },
@@ -464,7 +464,7 @@ const FETO_GEMELAR = (n: 1 | 2): StructuredSection[] => [
     normalText: 'situação longitudinal, movimentação ativa e batimentos rítmicos',
     fields: [
       { id: `f${n}_apresentacao`, label: 'Apresentação', kind: 'select', options: ['cefálica', 'pélvica', 'córmica / transversa'], alwaysShow: true },
-      { id: `f${n}_dorso`, label: 'Dorso', kind: 'select', options: ['à esquerda', 'à direita', 'anterior', 'posterior'] },
+      { id: `f${n}_dorso`, label: 'Dorso', kind: 'select', options: ['à esquerda', 'à direita', 'anterior', 'posterior'], alwaysShow: true },
       { id: `f${n}_bcf`, label: 'BCF', kind: 'measure', unit: 'bpm', normal: '110–160 bpm', alwaysShow: true },
     ],
   },
@@ -491,7 +491,7 @@ const FETO_GEMELAR = (n: 1 | 2): StructuredSection[] => [
       { id: `f${n}_ip_acm`, label: 'IP ACM', kind: 'measure' },
       { id: `f${n}_psv_acm`, label: 'PSV ACM', kind: 'measure', unit: 'cm/s', hint: 'anemia/TAPS: > 1,5 MoM' },
       { id: `f${n}_mbv`, label: 'MBV do saco', kind: 'measure', unit: 'mm', alwaysShow: true, hint: 'TTTS: < 20 mm (doador) / > 80 mm (receptor)' },
-      { id: `f${n}_bexiga`, label: 'Bexiga', kind: 'select', options: ['visualizada', 'não visualizada (doador)', 'distendida (receptor)'] },
+      { id: `f${n}_bexiga`, label: 'Bexiga', kind: 'select', options: ['visualizada', 'não visualizada (doador)', 'distendida (receptor)'], alwaysShow: true },
     ],
   },
 ];
@@ -530,7 +530,7 @@ const CERVICOMETRIA = (): StructuredSection[] => [
     normalText: 'em topografia habitual, morfologia e ecotextura normais',
     fields: [
       { id: 'colo', label: 'Comprimento do canal fechado', kind: 'measure', unit: 'mm', normal: '≥ 25 mm', alwaysShow: true, hint: 'colo curto se < 25 mm (auto) · via transvaginal' },
-      { id: 'colo_posicao', label: 'Posição', kind: 'select', options: ['posteriorizado', 'intermediário', 'centrado'] },
+      { id: 'colo_posicao', label: 'Posição', kind: 'select', options: ['posteriorizado', 'intermediário', 'centrado'], alwaysShow: true },
     ],
   },
   sistema('oci', 'Orifício Cervical Interno', 'fechado, sem sinais de insinuação das membranas'),

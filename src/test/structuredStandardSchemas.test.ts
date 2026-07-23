@@ -774,6 +774,29 @@ describe('standardSchemas — cálculo ao vivo em medicina fetal', () => {
     expect(pfe?.text).toMatch(/p\d+/); // percentil OMS (requer IG pela DUM)
   });
 
+  it('exame NORMAL preenchido: medidas digitadas e selects descritivos compilam (não são engolidos)', () => {
+    // Regressão: em seções normalable, medidas sem alwaysShow (PSV ACM,
+    // oftálmicas) e selects descritivos/normais (movimentos, incisura, dorso)
+    // eram descartados da compilação — o copiloto recebia o exame incompleto.
+    const s = obst();
+    const { lines } = summarizeStructured(s, {
+      bcf: '140',
+      movimentos: 'presentes e adequados',   // normalOption escolhida → ainda compila
+      psv_acm: '38,2',                       // medida digitada sem alwaysShow
+      oft_p1: '24,1',
+      oft_p2: '13,5',
+      uta_incisura: 'ausente bilateral',
+    });
+    const text = lines.join('\n');
+    for (const esperado of ['140', 'presentes e adequados', '38,2', '24,1', '13,5', 'ausente bilateral']) {
+      expect(text, `faltou "${esperado}" na compilação`).toContain(esperado);
+    }
+    // e a seção Doppler continua marcada como normalidade (nada disso é achado)
+    const soNormais = summarizeStructured(s, { psv_acm: '38,2', uta_incisura: 'ausente bilateral' }).lines.join('\n');
+    expect(soNormais).toMatch(/Dopplerfluxometria: sem alterações/);
+    expect(soNormais).toContain('38,2');
+  });
+
   it('RCP automática (ACM/AU) e percentis Doppler caem na seção doppler', () => {
     // a DUM só existe (showIf) com o método de datação 'DUM' — como na UI
     const d = computeDerivations(obst(), { ig_metodo: 'DUM', dum, ip_au: '1,4', ip_acm: '1,1' }, examDate);

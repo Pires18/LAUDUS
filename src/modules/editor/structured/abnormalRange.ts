@@ -120,6 +120,32 @@ function fieldContentIsFinding(field: StructuredFieldDef, value: StructuredField
 }
 
 /**
+ * Campo que SE REGISTRA no card Normal: marcado `alwaysShow` (biometria de
+ * rotina), medida/tripla/cálculo com valor digitado OU select com opção
+ * escolhida — o que o médico preencheu é dado do laudo mesmo com a seção em
+ * normalidade (PSV/MoM/diâmetros; "esteatose: ausente", "CEAP: C0", "Thompson:
+ * não realizado" documentam a pesquisa). Sem isso a compilação descartava o
+ * preenchido e o copiloto recebia o exame incompleto. NÃO contam: o
+ * auto-preenchimento de medida do botão Normal (que copia o TEXTO da faixa
+ * `field.normal` para o campo) e texto livre (texto real já vira Alterado via
+ * `fieldContentIsFinding`; o auto-preenchido é ruído). Select vazio segue
+ * colapsando na frase compacta de normalidade.
+ */
+export function fieldRegistersInNormal(
+  field: StructuredFieldDef,
+  value: StructuredFieldValue | undefined,
+): boolean {
+  if (field.alwaysShow) return true;
+  const t = asText(value);
+  if (!t) return false;
+  if (field.kind === 'select') return true;
+  if (field.kind === 'measure' || field.kind === 'triplet' || field.kind === 'calc') {
+    return t !== (field.normal || '').trim();
+  }
+  return false;
+}
+
+/**
  * Verdadeiro se a seção tem ACHADO: campo fixo com valor fora de faixa, campo
  * fixo com conteúdo digitado que caracteriza achado (texto/select/multiselect —
  * ver `fieldContentIsFinding`) OU qualquer campo preenchido numa instância
