@@ -1,13 +1,54 @@
 import dns from 'node:dns';
+import https from 'node:https';
 import { verifyFirebaseIdToken } from './_edgeAuth.js';
 import { hasPacsEntitlement } from './_entitlements.js';
 import { getDb } from './_firebase.js';
 
 // O Tailscale Funnel publica o host do agente em DUAL-STACK (A/IPv4 + AAAA/IPv6).
-// O egress serverless da Vercel NÃO roteia IPv6 — sem isto, o fetch tenta o AAAA,
-// não cai pro IPv4 e falha com "fetch failed" (só na nuvem; navegador/tailnet ok).
-// Preferir IPv4 faz o undici conectar no ingress IPv4 do Funnel, que funciona.
+// O egress serverless da Vercel NÃO roteia IPv6 — o `fetch` (undici) tentava o
+// AAAA e estourava UND_ERR_CONNECT_TIMEOUT (só na nuvem; navegador/tailnet ok).
+// setDefaultResultOrder não basta (o undici tem lógica própria de conexão), então
+// falamos com o agente via node:https FORÇANDO family:4 (ver requestAgentIPv4).
 dns.setDefaultResultOrder('ipv4first');
+
+/**
+ * POST/GET ao agente local FORÇANDO IPv4 (family:4) — contorna o AAAA do Funnel
+ * que a Vercel não consegue rotear. Usa node:https (built-in, sem risco de
+ * bundling). `timeoutMs` cobre conexão + resposta.
+ */
+function requestAgentIPv4(
+  targetUrl: string,
+  method: string,
+  headers: Record<string, string>,
+  bodyStr: string,
+  timeoutMs: number,
+): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(targetUrl);
+    const r = https.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: u.pathname + u.search,
+        method,
+        family: 4, // <- força IPv4; ignora o registro AAAA do Funnel
+        headers: { ...headers, 'Content-Length': Buffer.byteLength(bodyStr) },
+      },
+      (resp) => {
+        let data = '';
+        resp.setEncoding('utf8');
+        resp.on('data', (c) => (data += c));
+        resp.on('end', () => resolve({ status: resp.statusCode || 502, text: data }));
+      },
+    );
+    r.setTimeout(timeoutMs, () => {
+      r.destroy(Object.assign(new Error('conexão IPv4 ao agente esgotou (timeout)'), { code: 'AGENT_IPV4_TIMEOUT' }));
+    });
+    r.on('error', reject);
+    r.write(bodyStr);
+    r.end();
+  });
+}
 
 // Cache curto por instância — mesmo racional de `_entitlements.ts`: evita uma
 // leitura extra no Firestore em cada request de worklist só pra este log.
@@ -135,8 +176,6 @@ export default async function handler(req: any, res: any) {
       const targetUrl = `${localAgentUrl.replace(/\/$/, '')}/api/worklist${tenantQs}`;
       console.log(`[Vercel Worklist Proxy] Forwarding ${req.method} request to: ${targetUrl}`);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
       // Segredo do Agente Local (per-usuário): cada usuário tem o próprio agente
       // e o próprio segredo. O navegador envia x-agent-secret e o Vercel apenas
       // REPASSA (não usa segredo global). Fallback ao env global só por
@@ -146,33 +185,27 @@ export default async function handler(req: any, res: any) {
       if (perUserSecret) {
         fwdHeaders['x-agent-secret'] = String(perUserSecret);
       }
-      const response = await fetch(targetUrl, {
-        method: req.method,
-        headers: fwdHeaders,
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+      // Fala com o agente FORÇANDO IPv4 (family:4) — ver requestAgentIPv4.
+      const result = await requestAgentIPv4(targetUrl, req.method, fwdHeaders, JSON.stringify(body), 15000);
 
-      res.statusCode = response.status;
+      res.statusCode = result.status;
       res.setHeader('Content-Type', 'application/json');
-      const responseText = await response.text();
-      res.end(responseText);
+      res.end(result.text);
       return;
     } catch (err: any) {
-      // O motivo REAL fica em err.cause (undici): ENETUNREACH/EAI_AGAIN (IPv6),
-      // ETIMEDOUT (inalcançável), ENOTFOUND (DNS), etc. Sem expor, "fetch failed"
-      // esconde a causa — foi o que atrasou o diagnóstico do Funnel/IPv6.
-      const cause = err?.cause?.code || err?.cause?.message || '';
-      console.error('[Vercel Worklist Proxy Error]:', err?.message, '| cause:', cause, err?.cause);
-      const isTimeout = err?.name === 'AbortError';
-      res.statusCode = 200; // Retorna 200 com success: false para exibir o erro amigável na UI
+      // Diagnóstico: node:https expõe o código real em err.code (ETIMEDOUT,
+      // ENETUNREACH, ECONNREFUSED, ENOTFOUND, AGENT_IPV4_TIMEOUT). Incluímos
+      // também o IPv4 que foi tentado — se ainda estourar por IPv4, o problema é
+      // a Vercel não alcançar o Funnel (não é IP family).
+      const cause = err?.code || err?.cause?.code || err?.cause?.message || err?.message || 'erro';
+      let triedIpv4 = '';
+      try { triedIpv4 = (await dns.promises.resolve4(new URL(localAgentUrl).hostname))[0] || ''; } catch { /* ignore */ }
+      console.error('[Vercel Worklist Proxy Error]:', err?.message, '| code:', cause, '| ipv4:', triedIpv4);
+      res.statusCode = 200; // 200 com success:false para a UI exibir a mensagem
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
         success: false,
-        error: isTimeout
-          ? 'O Agente Local não respondeu a tempo (timeout). Verifique se o agente está rodando e exposto via Tailscale Funnel.'
-          : `Não foi possível conectar ao Agente Local via Vercel. Confirme que o Agente está ativo e exposto via Tailscale Funnel (na VM: sudo tailscale funnel --bg 3000). Detalhes: ${err?.message || 'erro'}${cause ? ` (${cause})` : ''}`
+        error: `Não foi possível conectar ao Agente Local via Vercel (IPv4${triedIpv4 ? ` ${triedIpv4}` : ''}: ${cause}). Confirme que o Agente está ativo e exposto via Tailscale Funnel (na VM: sudo tailscale funnel --bg 3000).`
       }));
       return;
     }
