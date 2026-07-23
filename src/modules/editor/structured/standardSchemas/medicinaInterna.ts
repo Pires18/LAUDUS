@@ -340,7 +340,41 @@ const RINS_VIAS_DOPPLER = (): StructuredSection[] => [
   VRPM(),
 ];
 
+// ───────────────────────── Elastografia Hepática ─────────────────────────
+// Ids canônicos lidos pelo liveCompute: `elasto_kpa` + `elasto_etiologia`
+// (estágio METAVIR) e `elasto_cap` (esteatose). Cutoffs orientadores.
+const ELASTOGRAFIA_HEPATICA = (): StructuredSection[] => [
+  {
+    id: 'elasto-metodo',
+    label: 'Método e Qualidade Técnica',
+    fields: [
+      { id: 'elasto_metodo', label: 'Método', kind: 'select', options: ['TE / FibroScan', '2D-SWE', 'pSWE / ARFI'], alwaysShow: true, hint: 'os cutoffs de fibrose são orientadores e dependentes do método/aparelho' },
+      { id: 'elasto_etiologia', label: 'Etiologia (define os cutoffs)', kind: 'select', options: ['viral (HBV/HCV)', 'DHGNA / NASH', 'alcoólica', 'colestática (CBP/CEP)', 'indeterminada'], alwaysShow: true, hint: 'os limiares METAVIR mudam por etiologia (auto)' },
+      { id: 'elasto_iqr', label: 'IQR/mediana', kind: 'measure', unit: '%', normal: '≤ 30%', alwaysShow: true, hint: 'exame confiável se IQR/mediana ≤ 30%' },
+      { id: 'elasto_sucesso', label: 'Taxa de sucesso', kind: 'measure', unit: '%', normal: '≥ 60%', hint: '≥ 10 medidas válidas · jejum ≥ 3 h' },
+    ],
+  },
+  {
+    id: 'elasto-fibrose',
+    label: 'Rigidez Hepática (Fibrose)',
+    fields: [
+      { id: 'elasto_kpa', label: 'Rigidez mediana', kind: 'measure', unit: 'kPa', alwaysShow: true, hint: 'estágio METAVIR (F0–F4) automático conforme a etiologia' },
+      { id: 'elasto_desc', label: 'Interpretação / limitações', kind: 'text', fullWidth: true, placeholder: 'confrontar com transaminases, congestão cardíaca, colestase, ascite, obesidade' },
+    ],
+  },
+  {
+    id: 'elasto-esteatose',
+    label: 'Esteatose (CAP)',
+    normalable: true,
+    normalText: 'CAP não realizado / sem esteatose significativa',
+    fields: [
+      { id: 'elasto_cap', label: 'CAP', kind: 'measure', unit: 'dB/m', alwaysShow: true, hint: 'S0 < 248 · S1 248–267 · S2 268–279 · S3 ≥ 280 (auto; FibroScan)' },
+    ],
+  },
+];
+
 export const MEDICINA_INTERNA_SCHEMAS: StandardSchemaDef[] = [
+  { name: 'ELASTOGRAFIA HEPÁTICA', match: /elastografia hep/, sections: ELASTOGRAFIA_HEPATICA },
   // mais específicos (COM DOPPLER) primeiro — o resolver usa a 1ª regex que casar
   {
     name: 'ABDOME SUPERIOR COM DOPPLER',

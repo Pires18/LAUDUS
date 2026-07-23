@@ -10,7 +10,7 @@ import { formatOneInN, crlToGaWeeks } from '../../calculators/fmf/qc';
 import type { MarkerState } from '../../calculators/fmf/trisomy';
 import type { RacialOrigin, Conception } from '../../calculators/fmf/preeclampsia';
 import type { Analyzer, ParityKind, DiabetesKind } from '../../calculators/fmf/medians';
-import { tiradsScore, biradsSuggest, oradsSuggest, grafType, carotidStenosisNASCET, itbClassification, bosniakSuggest } from './scoring';
+import { tiradsScore, biradsSuggest, oradsSuggest, grafType, carotidStenosisNASCET, itbClassification, bosniakSuggest, liverFibrosisStage, liverSteatosisCAP, LiverEtiologia } from './scoring';
 import {
   ellipsoidVolume,
   prostateVolumeWeight,
@@ -190,6 +190,16 @@ export function computeDerivations(
           alert: r.tr >= 4,
         });
       }
+      // Elastografia tireoidiana (adjunto — NÃO substitui o TI-RADS)
+      const eStrain = fieldValueToText(v[fid('elasto_tire_strain')]);
+      const eSwe = num(v[fid('elasto_tire_swe')]);
+      if (eStrain || eSwe != null) {
+        const susp = /^\s*[34]/.test(eStrain) || (eSwe != null && eSwe >= 65);
+        const parts: string[] = [];
+        if (eStrain) parts.push(`strain ${eStrain.split('—')[0].trim()}`);
+        if (eSwe != null) parts.push(`${fmt(eSwe, 0)} kPa`);
+        out.push({ id: scoreId('elasto'), sectionId, label: `${prefix}Elastografia`, text: `${parts.join(' · ')}${susp ? ' — rígido/suspeito (adjunto)' : ' — baixa suspeição'}`, alert: susp });
+      }
     }
 
     // Sugestão BI-RADS a partir da morfologia
@@ -202,6 +212,16 @@ export function computeDerivations(
         acusticas: fieldValueToText(v[fid('acusticas')]),
       });
       if (s) out.push({ id: scoreId('bi'), sectionId, label: `${prefix}Sugestão`, text: s.detail ? `${s.label} (${s.detail})` : s.label, alert: s.suspicious });
+      // Elastografia mamária (adjunto — NÃO substitui o BI-RADS)
+      const eStrain = fieldValueToText(v[fid('elasto_mama_strain')]);
+      const eSwe = num(v[fid('elasto_mama_swe')]);
+      if (eStrain || eSwe != null) {
+        const susp = /^\s*[45]/.test(eStrain) || (eSwe != null && eSwe >= 80);
+        const parts: string[] = [];
+        if (eStrain) parts.push(`strain ${eStrain.split('—')[0].trim()}`);
+        if (eSwe != null) parts.push(`${fmt(eSwe, 0)} kPa`);
+        out.push({ id: scoreId('elasto'), sectionId, label: `${prefix}Elastografia`, text: `${parts.join(' · ')}${susp ? ' — rígido/suspeito (adjunto)' : ' — baixa suspeição'}`, alert: susp });
+      }
     }
 
     // Sugestão O-RADS a partir do tipo/conteúdo/fluxo
@@ -638,6 +658,27 @@ export function computeDerivations(
   if (wirsung != null) {
     const dil = wirsung >= 3;
     out.push({ id: 'wirsung__cal', sectionId: secOf('wirsung', 'pancreas'), label: 'Ducto de Wirsung', text: `${fmt(wirsung, 1)} mm${dil ? ' — dilatado (≥ 3)' : ''}`, alert: dil });
+  }
+
+  // ── Elastografia hepática: fibrose (kPa → METAVIR por etiologia) + esteatose (CAP) ──
+  const elKpa = num(v['elasto_kpa']);
+  if (elKpa != null && elKpa > 0) {
+    const etTxt = fieldValueToText(v['elasto_etiologia']).toLowerCase();
+    const etiologia: LiverEtiologia | null = /viral|hbv|hcv/.test(etTxt) ? 'viral'
+      : /dhgna|nash|nafld|esteato/.test(etTxt) ? 'nafld'
+      : /alco/.test(etTxt) ? 'alcool'
+      : /colest|cbp|cep/.test(etTxt) ? 'colestatica' : null;
+    if (etiologia) {
+      const f = liverFibrosisStage(elKpa, etiologia);
+      if (f) out.push({ id: 'elasto__fibrose', sectionId: secOf('elasto_kpa', 'elasto-fibrose'), label: 'Elastografia hepática', text: `${fmt(elKpa, 1)} kPa — ${f.stage}`, alert: f.alert });
+    } else {
+      out.push({ id: 'elasto__fibrose', sectionId: secOf('elasto_kpa', 'elasto-fibrose'), label: 'Elastografia hepática', text: `${fmt(elKpa, 1)} kPa — informe a etiologia para o estágio METAVIR`, alert: false });
+    }
+  }
+  const elCap = num(v['elasto_cap']);
+  if (elCap != null && elCap > 0) {
+    const s = liverSteatosisCAP(elCap);
+    if (s) out.push({ id: 'elasto__cap', sectionId: secOf('elasto_cap', 'elasto-esteatose'), label: 'CAP (esteatose)', text: `${fmt(elCap, 0)} dB/m — ${s}`, alert: elCap >= 280 });
   }
 
   // ── Aorta abdominal: ectasia (2,5–2,9 cm) / aneurisma (≥ 3,0 cm) ──

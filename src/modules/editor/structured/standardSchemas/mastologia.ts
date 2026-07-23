@@ -54,6 +54,8 @@ const LESAO_BIRADS = (comLado: boolean): StructuredFieldDef[] => [
   { id: 'eco', label: 'Padrão ecogênico', kind: 'select', options: ['anecoico', 'hipoecoico', 'isoecoico', 'hiperecoico', 'heterogêneo', 'complexo cístico-sólido'] },
   { id: 'acusticas', label: 'Características acústicas posteriores', kind: 'select', options: ['nenhuma', 'reforço acústico posterior', 'sombra acústica', 'padrão combinado'] },
   { id: 'vasc', label: 'Vascularização (Doppler)', kind: 'select', options: ['não avaliada', 'ausente', 'interna', 'periférica / em anel', 'mista'] },
+  { id: 'elasto_mama_strain', label: 'Elastografia — strain (Tsukuba/Ueno)', kind: 'select', options: ['1 — mole', '2 — predominantemente mole', '3 — misto', '4 — predominantemente duro', '5 — duro'], hint: 'adjunto ao BI-RADS · 4–5 = suspeito (rígido) — auto' },
+  { id: 'elasto_mama_swe', label: 'Elastografia — SWE (Emáx)', kind: 'measure', unit: 'kPa', hint: 'adjunto quantitativo · benigno < 80 · suspeito ≥ 80–100 kPa (auto)' },
   { id: 'associados', label: 'Achados associados', kind: 'multiselect', options: ['dilatação ductal', 'calcificações em massa', 'calcificações fora de massa', 'distorção arquitetural', 'espessamento cutâneo', 'retração cutânea', 'edema'] },
   { id: 'birads', label: 'Categoria BI-RADS', kind: 'select', calcId: 'birads-us-2013', options: BIRADS_CAT, hint: 'a sugestão automática não substitui o julgamento' },
 ];

@@ -45,6 +45,8 @@ const NODULO_TIRADS: StructuredFieldDef[] = [
   { id: 'margem', label: 'Margem', kind: 'select', options: TIRADS_OPTIONS.margin, scoreKey: 'margin' },
   { id: 'focos', label: 'Focos ecogênicos', kind: 'multiselect', options: TIRADS_OPTIONS.foci, scoreKey: 'foci' },
   { id: 'vasc', label: 'Vascularização (Doppler)', kind: 'select', options: ['não avaliada', 'ausente', 'periférica', 'central', 'mista'] },
+  { id: 'elasto_tire_strain', label: 'Elastografia — strain (Asteria/Rago)', kind: 'select', options: ['1 — elástico', '2 — predominantemente elástico', '3 — predominantemente rígido', '4 — rígido'], hint: 'adjunto ao TI-RADS · 3–4 = suspeito (rígido) — auto' },
+  { id: 'elasto_tire_swe', label: 'Elastografia — SWE', kind: 'measure', unit: 'kPa', hint: 'adjunto quantitativo · benigno < 65 · suspeito ≥ 65–90 kPa (auto)' },
   // o escore inline já sai dos descritores acima; este campo abre a calculadora
   // completa (mesma conduta por tamanho) e recebe o resultado de volta
   { id: 'tirads_cat', label: 'Categoria ACR TI-RADS', kind: 'select', calcId: 'tirads-2017', options: ['TR1', 'TR2', 'TR3', 'TR4', 'TR5'], hint: 'a sugestão automática não substitui o julgamento' },

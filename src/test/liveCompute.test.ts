@@ -204,6 +204,31 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(computeDerivations(schema, { mbv: '15' }).find((x) => x.id === 'la__mbv')?.alert).toBe(true);
   });
 
+  it('elastografia hepática: kPa+etiologia → METAVIR; CAP → esteatose', () => {
+    const schema = deriveStructuredSchema(tpl('medicina-interna', 'ELASTOGRAFIA HEPÁTICA'), 'medicina-interna');
+    // viral, 13 kPa → F4 (cutoff viral 12); CAP 270 → S2
+    const d = computeDerivations(schema, { elasto_kpa: '13', elasto_etiologia: 'viral (HBV/HCV)', elasto_cap: '270' });
+    const fib = d.find((x) => x.id === 'elasto__fibrose');
+    expect(fib?.text).toMatch(/F4/);
+    expect(fib?.alert).toBe(true);
+    expect(d.find((x) => x.id === 'elasto__cap')?.text).toMatch(/S2/);
+    // mesma rigidez, etiologia alcoólica (cutoff F4=19) → não é F4
+    expect(computeDerivations(schema, { elasto_kpa: '13', elasto_etiologia: 'alcoólica' }).find((x) => x.id === 'elasto__fibrose')?.text).not.toMatch(/F4/);
+  });
+
+  it('elastografia tireoide (adjunto): strain 4 = rígido/suspeito', () => {
+    const schema = deriveStructuredSchema(tpl('pequenas-partes', 'TIREOIDE'), 'pequenas-partes');
+    const cid = groupContainerId('nodulos', 'item');
+    const d = computeDerivations(schema, {
+      [normalKey('nodulos')]: 'altered',
+      [countKey(cid)]: '1',
+      [itemFieldId(cid, 0, 'elasto_tire_strain')]: '4 — rígido',
+    });
+    const el = d.find((x) => /Elastografia/.test(x.label));
+    expect(el?.text).toMatch(/rígido\/suspeito/);
+    expect(el?.alert).toBe(true);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

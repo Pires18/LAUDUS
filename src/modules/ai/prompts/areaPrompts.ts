@@ -2047,6 +2047,11 @@ MAPA DE EXAMES DESTA ÁREA (3 templates de Camada 3):
    f) CALCIFICAÇÕES: macrocalcificações (BI-RADS 2) · microcalcificações em aglomerado
       dentro de nódulo (↑suspeita → CONSIDERAR BI-RADS 4B–5, correlação com MMG).
    g) TAMANHO: medir em 3 planos (mm × mm × mm). Documentar localização (quadrante + distância do mamilo em cm).
+   h) ELASTOGRAFIA (quando disponível — ADJUVANTE, não substitui o BI-RADS):
+      Strain (Tsukuba/Ueno 1–5): 1–3 padrão de baixa suspeição · 4–5 = rígido/suspeito.
+      Shear-wave (SWE, Emáx): benigno < 80 kPa · suspeito ≥ 80–100 kPa.
+      Um padrão rígido pode REFORÇAR a suspeição (BI-RADS 4), mas não rebaixa uma
+      lesão com morfologia suspeita. Relatar como achado complementar.
 
 3. CISTOS MAMÁRIOS — CLASSIFICAÇÃO COMPLETA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
