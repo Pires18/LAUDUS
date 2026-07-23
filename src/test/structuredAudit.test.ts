@@ -510,10 +510,15 @@ describe('AUDITORIA — calculadoras multi-campo integradas ao card completo', (
   it('LÍQUIDO AMNIÓTICO: os 4 quadrantes estão no card e o motor soma → classifica', () => {
     const sections = findStandardSchema('medicina-fetal', 'OBSTÉTRICA ABDOMINAL')!.sections;
     const la = sections.find((s) => s.id === 'liquido-amniotico')!;
-    for (const id of ['ila_q1', 'ila_q2', 'ila_q3', 'ila_q4', 'ila', 'mbv']) {
+    // 2º/3ºT: MBV é o método principal (sempre visível); avaliação subjetiva idem.
+    for (const id of ['la_subjetivo', 'mbv']) {
       const f = la.fields.find((x) => x.id === id);
-      expect(f, `LA: campo "${id}" ausente`).toBeTruthy();
+      expect(f, `LA: campo principal "${id}" ausente`).toBeTruthy();
       expect(f!.alwaysShow, `LA: "${id}" some no card`).toBe(true);
+    }
+    // ILA e os 4 quadrantes existem como OPCIONAIS (o motor soma quando preenchidos).
+    for (const id of ['ila_q1', 'ila_q2', 'ila_q3', 'ila_q4', 'ila']) {
+      expect(la.fields.find((x) => x.id === id), `LA: campo opcional "${id}" ausente`).toBeTruthy();
     }
     // 3+4+5+4 = 16 cm → volume normal, pela SOMA
     const s = deriveStructuredSchema(tvDop, 'medicina-fetal');
