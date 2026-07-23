@@ -1588,7 +1588,7 @@ MAPA DE EXAMES DESTA ÁREA (8 templates de Camada 3):
     EMI da ACC               │ <0,9 mm                       │ >1,2 mm = placa definida
     VPS ACI normal           │ 50–80 cm/s                    │ >125 = estenose ≥50%
     VPS ACI grave            │ ≥230 cm/s                     │ ≥70% NASCET → R6
-    Aorta abdominal (AP)     │ <3,0 cm (♂) / <2,6 cm (♀)    │ ≥5,5 cm → R6
+    Aorta abdominal (AP)     │ <2,5 cm (2,5–2,9 ectasia)     │ ≥3 cm aneurisma · ≥5,5 cm → R6
     Aorta torácica (raiz)    │ <4,0 cm (♂) / <3,6 cm (♀)    │ ≥5,5 cm ascend. → R6
     Artéria ilíaca comum     │ VPS 70–120 cm/s · trifásico   │ Aneurisma ≥1,5 cm
     VPS AR (renal)           │ <180 cm/s                     │ >180 + RAR >3,5 = estenose

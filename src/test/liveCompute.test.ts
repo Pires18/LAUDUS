@@ -84,6 +84,23 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(d2.find((x) => x.id === 'aorta__cal')?.alert).toBe(false);
   });
 
+  it('vascular: raiz aórtica ≥ 5,5 cm → R6; 4,2 dilatada; 3,5 normal', () => {
+    const schema = deriveStructuredSchema(tpl('vascular', 'AORTA TORÁCICA'), 'vascular');
+    expect(computeDerivations(schema, { raiz_calibre: '5,6' }).find((x) => x.id === 'raiz__cal')?.alert).toBe(true);
+    expect(computeDerivations(schema, { raiz_calibre: '4,2' }).find((x) => x.id === 'raiz__cal')?.text).toContain('dilatada');
+    expect(computeDerivations(schema, { raiz_calibre: '3,5' }).find((x) => x.id === 'raiz__cal')?.text).toBe('3,5 cm');
+  });
+
+  it('vascular: refluxo superficial > 0,5 s é patológico', () => {
+    const schema = deriveStructuredSchema(tpl('vascular', 'VENOSO MEMBRO INFERIOR'), 'vascular');
+    const pat = computeDerivations(schema, { 'refluxo_tempo_vs-d': '0,8' }).find((x) => x.id === 'refluxo_vs_d');
+    expect(pat?.text).toContain('patológico');
+    expect(pat?.alert).toBe(true);
+    const fis = computeDerivations(schema, { 'refluxo_tempo_vs-e': '0,3' }).find((x) => x.id === 'refluxo_vs_e');
+    expect(fis?.text).toContain('fisiológico');
+    expect(fis?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

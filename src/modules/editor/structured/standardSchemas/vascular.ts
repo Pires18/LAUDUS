@@ -208,7 +208,7 @@ const AORTA_ABDOMINAL = (): StructuredSection => ({
   normalable: true,
   normalText: 'aorta abdominal infrarrenal de calibre e trajeto normais, sem dilatação aneurismática, trombo mural ou dissecção',
   fields: [
-    { id: 'aorta', label: 'Maior calibre (AP × transverso, externo)', kind: 'measure', unit: 'cm', alwaysShow: true, normal: '< 3,0 cm (♂) · < 2,6 cm (♀)', hint: 'outer-to-outer · ectasia 2,5–2,9 · aneurisma ≥ 3,0 cm' },
+    { id: 'aorta', label: 'Maior calibre (AP × transverso, externo)', kind: 'measure', unit: 'cm', alwaysShow: true, normal: '< 2,5 cm', hint: 'outer-to-outer · ectasia 2,5–2,9 · aneurisma ≥ 3,0 cm · ≥ 5,5 = R6 (limite superior menor na ♀)' },
     { id: 'aorta_desc', label: 'Morfologia', kind: 'text', fullWidth: true, placeholder: 'fusiforme/sacular, trombo mural (espessura), dissecção, hematoma periaórtico' },
     { id: 'aorta_trombo', label: 'Trombo mural', kind: 'measure', unit: 'mm', hint: 'espessura máxima; relatar lúmen real vs. total' },
   ],
@@ -513,7 +513,7 @@ const ARTERIAS_RENAIS = (): StructuredSection[] => [
     normalText: 'aorta abdominal de calibre normal, sem placas obstrutivas no plano das artérias renais',
     fields: [
       { id: 'vps_aorta', label: 'VPS aorta (justarrenal)', kind: 'measure', unit: 'cm/s', alwaysShow: true, hint: 'denominador do RAR — sem ela não há razão aorto-renal' },
-      { id: 'aorta', label: 'Maior calibre', kind: 'measure', unit: 'cm', alwaysShow: true, normal: '< 3,0 cm' },
+      { id: 'aorta', label: 'Maior calibre', kind: 'measure', unit: 'cm', alwaysShow: true, normal: '< 2,5 cm', hint: 'ectasia 2,5–2,9 · aneurisma ≥ 3,0 cm' },
       { id: 'aorta_desc', label: 'Morfologia', kind: 'text', fullWidth: true, placeholder: 'placas, aneurisma, trombo' },
     ],
   },

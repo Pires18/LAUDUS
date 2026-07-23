@@ -492,7 +492,7 @@ describe('AUDITORIA — limiares clínicos: motor × prompt da IA', () => {
     expect(campo('pediatria', 'QUADRIL PEDIÁTRICO (DDQ)', 'cobertura_d').normal).toBe('> 50%');
     expect(campo('pediatria', 'RINS E VIAS URINÁRIAS PEDIÁTRICO', 'dap_d').normal).toMatch(/< 7 mm/);
     // vascular
-    expect(campo('vascular', 'AORTO-ILÍACO', 'aorta').normal).toMatch(/< 3,0 cm/);
+    expect(campo('vascular', 'AORTO-ILÍACO', 'aorta').normal).toMatch(/< 2,5 cm/);
     expect(campo('vascular', 'AORTA TORÁCICA', 'raiz_calibre').normal).toMatch(/< 4,0 cm/);
     expect(campo('vascular', 'CARÓTIDAS E VERTEBRAIS', 'emi_d').normal).toBe('< 0,9 mm');
   });

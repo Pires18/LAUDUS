@@ -582,6 +582,31 @@ export function computeDerivations(
     out.push({ id: 'aorta__cal', sectionId: secOf('aorta', 'aorta'), label: 'Aorta', text: `${fmt(aorta, 1)} cm${cls}`, alert: aorta >= 3.0 });
   }
 
+  // ── Aorta torácica: raiz aórtica dilatada / limiar cirúrgico (id próprio,
+  // distinto da aorta abdominal). Limite ♀ é menor (3,6 cm). ──
+  const raiz = num(v['raiz_calibre']);
+  if (raiz != null && raiz > 0) {
+    const cls = raiz >= 5.5 ? ' — aneurisma (≥ 5,5) — avaliação cirúrgica urgente (R6)'
+      : raiz >= 4.5 ? ' — dilatação significativa (≥ 4,5 · limiar cirúrgico em Marfan/valvopatia)'
+      : raiz > 4.0 ? ' — levemente dilatada (> 4,0 · limite ♀ 3,6)' : '';
+    out.push({ id: 'raiz__cal', sectionId: secOf('raiz_calibre', 'raiz'), label: 'Raiz aórtica', text: `${fmt(raiz, 1)} cm${cls}`, alert: raiz >= 5.5 });
+  }
+
+  // ── Venoso superficial: refluxo patológico (> 0,5 s) na safena magna/parva ──
+  for (const side of ['d', 'e'] as const) {
+    const rt = num(v[`refluxo_tempo_vs-${side}`]);
+    if (rt != null && rt > 0) {
+      const pat = rt > 0.5;
+      out.push({
+        id: `refluxo_vs_${side}`,
+        sectionId: secOf(`refluxo_tempo_vs-${side}`, `venoso-superficial-${side}`),
+        label: `Refluxo superficial ${side.toUpperCase()}`,
+        text: `${fmt(rt, 1)} s${pat ? ' — patológico (> 0,5 s)' : ' — fisiológico (≤ 0,5 s)'}`,
+        alert: pat,
+      });
+    }
+  }
+
   // ── Nervo mediano: área seccional no túnel do carpo (STC se ≥ 10 mm²;
   // 10–13 leve, > 13 moderado/grave) ──
   const csaMediano = num(v['csa_mediano']);
