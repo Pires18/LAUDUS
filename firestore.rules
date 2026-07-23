@@ -217,6 +217,15 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // ---- Collection group: nf (notas fiscais das transações) --------------
+    // Permite ao admin rodar collectionGroup('nf') na aba de status de NF
+    // (TransactionsTab). Uma regra de PATH aninhado (transactions/{tx}/nf/*)
+    // NÃO autoriza collection group query — exige esta wildcard recursiva.
+    // Só leitura, só admin.
+    match /{path=**}/nf/{nfId} {
+      allow read: if isAdmin();
+    }
+
     // ---- Assinaturas / planos do cliente ----------------------------------
     match /subscriptions/{subId} {
       // Dono lê a própria assinatura; admin lê/gerencia todas.

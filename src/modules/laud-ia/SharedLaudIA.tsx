@@ -16,7 +16,7 @@ import {
 import { classNames } from '../../utils/format';
 import { LAUDIA_VERSION } from '../../version';
 import { useConfirm } from '../../hooks/useConfirm';
-import { resolveGeminiModel } from '../ai/engine';
+import { resolveGeminiModel, GEMINI_LITE_MODEL, GEMINI_PRO_MODEL } from '../ai/engine';
 import { logger } from '../../utils/logger';
 import { generateReport, callMetricsHistory, type CallMetrics, auditReportQuality } from '../ai/engine';
 import { EXAM_AREAS, ExamArea, ReportTemplate, Patient } from '../../types';
@@ -60,8 +60,8 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     lite: { model: string; tokensPerReport: number; costPerThousandTokens: number };
     pro:  { model: string; tokensPerReport: number; costPerThousandTokens: number };
   }>({
-    lite: { model: 'gemini-3.5-flash',      tokensPerReport: 2000, costPerThousandTokens: 0.075 },
-    pro:  { model: 'gemini-3.1-pro-preview', tokensPerReport: 4000, costPerThousandTokens: 1.25  },
+    lite: { model: GEMINI_LITE_MODEL, tokensPerReport: 2000, costPerThousandTokens: 0.075 },
+    pro:  { model: GEMINI_PRO_MODEL,  tokensPerReport: 4000, costPerThousandTokens: 1.25  },
   });
   const [loadingMotorConfig, setLoadingMotorConfig] = useState(true);
 
@@ -74,12 +74,12 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
           const data = snap.data() as any;
           setMotorConfig({
             lite: {
-              model: data.lite?.model || 'gemini-3.5-flash',
+              model: data.lite?.model || GEMINI_LITE_MODEL,
               tokensPerReport: data.lite?.tokensPerReport ?? 2000,
               costPerThousandTokens: data.lite?.costPerThousandTokens ?? 0.075,
             },
             pro: {
-              model: data.pro?.model || 'gemini-3.1-pro-preview',
+              model: data.pro?.model || GEMINI_PRO_MODEL,
               tokensPerReport: data.pro?.tokensPerReport ?? 4000,
               costPerThousandTokens: data.pro?.costPerThousandTokens ?? 1.25,
             },
@@ -356,7 +356,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const model = genAI.getGenerativeModel({ model: GEMINI_LITE_MODEL });
       const result = await model.generateContent('Responda apenas: OK');
       if (result.response.text()) {
         setTestStatus('success');
@@ -1241,7 +1241,7 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
 
                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800">
                   <span className="font-black">Motor Único: Google Gemini</span><br/>
-                  <span className="text-[10px] text-blue-600">Lite = gemini-3.5-flash · Pro = gemini-3.1-pro-preview</span>
+                  <span className="text-[10px] text-blue-600">Lite = {GEMINI_LITE_MODEL} · Pro = {GEMINI_PRO_MODEL}</span>
                 </div>
               </div>
 
@@ -1323,8 +1323,8 @@ export function SharedLaudIA({ readOnly = false }: { readOnly?: boolean }) {
                               onChange={(e) => setMotorConfig({ ...motorConfig, [tier]: { ...cfg, model: e.target.value } })}
                               className="input h-10 text-xs"
                             >
-                              <option value="gemini-3.5-flash">gemini-3.5-flash (rápido, econômico)</option>
-                              <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (alta qualidade)</option>
+                              <option value={GEMINI_LITE_MODEL}>{GEMINI_LITE_MODEL} (rápido, econômico)</option>
+                              <option value={GEMINI_PRO_MODEL}>{GEMINI_PRO_MODEL} (alta qualidade)</option>
                             </select>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
