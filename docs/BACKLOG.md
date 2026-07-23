@@ -45,6 +45,32 @@
   confirmação de ativação do billing export pelo usuário.
   Origem: `docs/archive/PROPOSTA_CENTRO_FINANCEIRO_2026-07.md` (Fase D).
 
+## 🤖 IA / LAUD.IA (motores Gemini)
+
+- **[FEITO] IDs de modelo consolidados numa fonte única** (achados B+C da auditoria
+  2026-07) — criado `src/modules/ai/geminiModels.ts` (constantes `GEMINI_LITE_MODEL`
+  / `GEMINI_PRO_MODEL`, allowlist `VALID_GEMINI_MODELS`, resolvedor único
+  `resolveGeminiModel(raw, motor?)`). O provider deixou de ter normalizador gêmeo
+  (`resolveGeminiModelId` removido) e o `global_config/motor_config` do Firestore
+  agora É honrado quando o ID está no allowlist (antes qualquer valor era colapsado
+  por substring `'pro'`). IDs verificados na doc oficial do Google (jul/2026):
+  Lite=`gemini-3.5-flash` (GA), Pro=`gemini-3.1-pro-preview` (preview).
+- **[RESOLVIDO — achado A / 503] Pro não depende mais de modelo `-preview`** — o
+  default do Pro passou a ser `gemini-2.5-pro` (GA, estável) por decisão do usuário
+  (o `gemini-3.1-pro-preview` retornava 503 "overloaded" sob carga por ser preview).
+  O preview segue disponível como opção consciente no Admin→Custos de IA e como alvo
+  de fallback. Defesa em profundidade: **fallback automático de modelo** em
+  `GeminiProvider.postWithModelFallback` cobre TODOS os caminhos user-facing
+  (generate, stream, refino, copiloto-chat, `extractJson`/estruturado e copiloto
+  inline em `useCopilotSuggestions`): em 503/404 tenta uma vez o GA de contingência
+  (`GEMINI_FALLBACK` em geminiModels.ts). Alternativa de economia no Lite:
+  `gemini-3.6-flash` (GA, mais barato) via Admin→Custos de IA, sem redeploy.
+- **[ABERTO — resíduo de C] Literais de modelo ainda fora do módulo único** —
+  `laud-ia/SharedLaudIA.tsx:359` (`getGenerativeModel({ model: 'gemini-3.5-flash' })`)
+  e o resolvedor local próprio de `ai/generateTemplate.ts`. Não migrados por serem
+  território do processo paralelo (risco de conflito de merge). Apontar ambos para
+  `GEMINI_LITE_MODEL`/`resolveGeminiModel` quando a janela permitir.
+
 ## 🟠 Legal / LGPD
 
 - **Razão social e CNPJ ainda não divulgados** nos documentos legais (decisão de

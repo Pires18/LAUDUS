@@ -6,7 +6,7 @@ import {
   getDicomAuthParams,
 } from '../store/db';
 import { getStudyInstanceUID, getNumericUidFromFirestoreId } from '../utils/dicom';
-import { resolveGeminiModel, GEMINI_LITE_MODEL, GEMINI_PRO_MODEL } from '../modules/ai/engine';
+import { resolveGeminiModel, isValidGeminiModel, getFallbackModel, VALID_GEMINI_MODELS, GEMINI_LITE_MODEL, GEMINI_PRO_MODEL } from '../modules/ai/engine';
 
 // Ambiente de teste é 'node' → `window` é undefined, então getActivePacsUrl/
 // getWorklistEndpoint tomam o ramo não-Vercel (comportamento local/on-premise).
@@ -117,23 +117,61 @@ describe('getStudyInstanceUID / getNumericUidFromFirestoreId', () => {
 });
 
 describe('resolveGeminiModel', () => {
-  it('mapeia qualquer variante "pro" para o modelo Pro atual', () => {
-    expect(resolveGeminiModel('gemini-3.1-pro-preview')).toBe(GEMINI_PRO_MODEL);
-    expect(resolveGeminiModel('gemini-2.5-pro-preview-06-05')).toBe(GEMINI_PRO_MODEL);
-    expect(resolveGeminiModel('PRO')).toBe(GEMINI_PRO_MODEL);
+  it('honra um ID válido conhecido (permite trocar de modelo via config do Firestore)', () => {
+    expect(resolveGeminiModel('gemini-3.6-flash')).toBe('gemini-3.6-flash');
+    expect(resolveGeminiModel('gemini-3.1-pro-preview')).toBe('gemini-3.1-pro-preview'); // honrado (opt-in), não o default
+    expect(resolveGeminiModel('gemini-2.5-pro')).toBe(GEMINI_PRO_MODEL);                 // 2.5-pro É o default do Pro
+    expect(resolveGeminiModel('gemini-3.5-flash')).toBe(GEMINI_LITE_MODEL);
   });
 
-  it('mapeia flash/vazio/legado para o modelo Lite atual', () => {
-    expect(resolveGeminiModel('gemini-3.5-flash')).toBe(GEMINI_LITE_MODEL);
+  it('sem ID válido, usa o default do motor informado', () => {
+    expect(resolveGeminiModel('lixo', 'pro')).toBe(GEMINI_PRO_MODEL);
+    expect(resolveGeminiModel('lixo', 'lite')).toBe(GEMINI_LITE_MODEL);
+    expect(resolveGeminiModel(undefined, 'pro')).toBe(GEMINI_PRO_MODEL);
+  });
+
+  it('sem ID válido nem motor, cai na heurística: "pro" → Pro, resto → Lite', () => {
+    expect(resolveGeminiModel('PRO')).toBe(GEMINI_PRO_MODEL);
+    expect(resolveGeminiModel('gemini-2.5-pro-preview-06-05')).toBe(GEMINI_PRO_MODEL); // datado, fora do allowlist
     expect(resolveGeminiModel('gemini-2.5-flash-preview-05-20')).toBe(GEMINI_LITE_MODEL);
     expect(resolveGeminiModel(undefined)).toBe(GEMINI_LITE_MODEL);
     expect(resolveGeminiModel('')).toBe(GEMINI_LITE_MODEL);
   });
 
-  it('NUNCA emite IDs de modelo mortos (2.5/1.5 → 404)', () => {
-    for (const input of ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']) {
-      const out = resolveGeminiModel(input);
-      expect(out === GEMINI_LITE_MODEL || out === GEMINI_PRO_MODEL).toBe(true);
+  it('NUNCA emite um ID fora do allowlist (IDs aposentados como 1.5 são remapeados)', () => {
+    for (const input of ['gemini-1.5-pro', 'gemini-1.5-flash', 'modelo-inexistente', '']) {
+      expect(VALID_GEMINI_MODELS).toContain(resolveGeminiModel(input));
     }
+  });
+
+  it('isValidGeminiModel reconhece só IDs do allowlist', () => {
+    expect(isValidGeminiModel('gemini-3.5-flash')).toBe(true);
+    expect(isValidGeminiModel('gemini-3.1-pro-preview')).toBe(true);
+    expect(isValidGeminiModel('gemini-1.5-flash')).toBe(false);
+    expect(isValidGeminiModel('')).toBe(false);
+    expect(isValidGeminiModel(undefined)).toBe(false);
+  });
+});
+
+describe('getFallbackModel (contingência em 503/404)', () => {
+  it('quem opta pelo Pro preview cai para o Pro GA (mesmo nível, capacidade estável)', () => {
+    expect(getFallbackModel('gemini-3.1-pro-preview')).toBe(GEMINI_PRO_MODEL); // GA default
+  });
+
+  it('o Lite tem contingência definida', () => {
+    expect(getFallbackModel(GEMINI_LITE_MODEL)).toBe('gemini-2.5-flash');
+  });
+
+  it('todo alvo de fallback é ele mesmo um ID válido do allowlist', () => {
+    for (const primary of [GEMINI_LITE_MODEL, GEMINI_PRO_MODEL, 'gemini-3.6-flash']) {
+      const fb = getFallbackModel(primary);
+      if (fb) expect(VALID_GEMINI_MODELS).toContain(fb);
+    }
+  });
+
+  it('modelo sem contingência retorna undefined (não força troca)', () => {
+    expect(getFallbackModel('gemini-2.5-pro')).toBeUndefined();
+    expect(getFallbackModel('')).toBeUndefined();
+    expect(getFallbackModel(undefined)).toBeUndefined();
   });
 });

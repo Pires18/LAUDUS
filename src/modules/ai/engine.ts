@@ -14,6 +14,14 @@ import { logger } from '../../utils/logger';
 import { calculateAge } from '../../utils/format';
 import { getMotorProfile } from './motorProfiles';
 import { GEMINI_MODEL_PRICING } from './modelPricing';
+import {
+  GEMINI_LITE_MODEL,
+  GEMINI_PRO_MODEL,
+  VALID_GEMINI_MODELS,
+  isValidGeminiModel,
+  resolveGeminiModel,
+  getFallbackModel,
+} from './geminiModels';
 import { retrieveFewShotBlock } from './training/augment';
 import { scrubForGeneration } from './training/anonymize';
 
@@ -781,25 +789,20 @@ ${contextMessage}`;
 
 // ─── Funções auxiliares e motor de chamada de API ────────────────────────────
 
-/**
- * Fonte única de verdade dos modelos Gemini suportados.
- * Só existem dois níveis oficiais — Lite (rápido/econômico) e Pro (alta qualidade).
- * IDs antigos (gemini-2.5-*, 1.5-*) NÃO são mais válidos na API (404) e nunca
- * devem ser emitidos; qualquer entrada legada é normalizada para um destes.
- */
-export const GEMINI_LITE_MODEL = 'gemini-3.5-flash';
-export const GEMINI_PRO_MODEL = 'gemini-3.1-pro-preview';
-
-export function resolveGeminiModel(rawModel: string | undefined): string {
-  const raw = (rawModel || '').toLowerCase();
-  // Qualquer variante "pro" cai no Pro atual; todo o resto (flash/vazio/legado) no Lite.
-  // Nunca retornamos ids 2.5/1.5 (mortos na API).
-  return raw.includes('pro') ? GEMINI_PRO_MODEL : GEMINI_LITE_MODEL;
-}
+// Fonte única de verdade dos modelos Gemini: ver ./geminiModels.ts. Re-exportado
+// aqui por compatibilidade — vários módulos e testes importam estes símbolos de
+// '../engine'.
+export {
+  GEMINI_LITE_MODEL,
+  GEMINI_PRO_MODEL,
+  VALID_GEMINI_MODELS,
+  isValidGeminiModel,
+  resolveGeminiModel,
+  getFallbackModel,
+};
 
 function getModelForMode(settings: AppSettings, mode: string, area: string): string {
-  const modelToUse = settings.geminiModel || 'gemini-3.5-flash';
-  return resolveGeminiModel(modelToUse);
+  return resolveGeminiModel(settings.geminiModel, settings.selectedMotor);
 }
 
 import { GeminiProvider } from './providers/GeminiProvider';
@@ -928,8 +931,8 @@ async function resolveMotorConfigAndCheckQuota(
       const motorConfigRef = doc(firestore, 'global_config', 'motor_config');
       const motorConfigSnap = await getDoc(motorConfigRef);
       const motorConfig = {
-        lite: { model: 'gemini-3.5-flash' },
-        pro:  { model: 'gemini-3.1-pro-preview' }
+        lite: { model: GEMINI_LITE_MODEL },
+        pro:  { model: GEMINI_PRO_MODEL }
       };
 
       if (motorConfigSnap.exists()) {
@@ -938,9 +941,9 @@ async function resolveMotorConfigAndCheckQuota(
         if (configData.pro?.model)  motorConfig.pro.model  = configData.pro.model;
       }
 
-      // Normaliza p/ ID válido — corrige também configs antigas no Firestore
-      // (ex.: gemini-3.5-flash / gemini-3.1-pro-preview → IDs reais).
-      resolvedModelName = resolveGeminiModel(motorConfig[chosenMotor].model);
+      // Honra o modelo configurado no Firestore SE for um ID válido (allowlist);
+      // senão cai no default do motor escolhido. Ver resolveGeminiModel.
+      resolvedModelName = resolveGeminiModel(motorConfig[chosenMotor].model, chosenMotor);
     }
   } catch (err: any) {
     if (err.message && err.message.includes('cota mensal')) {

@@ -3,7 +3,7 @@ import { AppSettings } from '../../../types';
 import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
 import { robustJsonParse } from '../../ai/json';
-import { resolveGeminiModel } from '../../ai/engine';
+import { resolveGeminiModel, getFallbackModel } from '../../ai/engine';
 import { withRetry } from '../../ai/retry';
 import { logger } from '../../../utils/logger';
 
@@ -39,13 +39,14 @@ export function useCopilotSuggestions(settings: AppSettings) {
       const userMessage = `Área: ${area}\n\nLaudo:\n${plainText}`;
 
       // Sugestões são latency-sensitive: apenas 1 retry em 429/503.
-      const response = await withRetry(async () => fetch('/api/gemini', {
+      const primaryModel = resolveGeminiModel(settings.geminiModel || '', settings.selectedMotor);
+      const doFetch = (model: string) => withRetry(async () => fetch('/api/gemini', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${await getIdToken()}`,
           'x-uid': auth.currentUser?.uid || 'anonymous',
-          'x-gemini-model': resolveGeminiModel(settings.geminiModel || ''),
+          'x-gemini-model': model,
           'x-gemini-stream': 'false',
         },
         body: JSON.stringify({
@@ -55,6 +56,16 @@ export function useCopilotSuggestions(settings: AppSettings) {
         }),
         signal: controller.signal
       }), 1);
+
+      // Em 503/404 (modelo sobrecarregado/indisponível), tenta o GA de contingência.
+      let response = await doFetch(primaryModel);
+      if (!response.ok && (response.status === 503 || response.status === 404)) {
+        const fb = getFallbackModel(primaryModel);
+        if (fb) {
+          response.body?.cancel().catch(() => {});
+          response = await doFetch(fb);
+        }
+      }
 
       if (!response.ok) return;
       const result = await response.json();
@@ -72,7 +83,7 @@ export function useCopilotSuggestions(settings: AppSettings) {
     } finally {
       setLoadingSuggestions(false);
     }
-  }, [settings.geminiApiKey, settings.geminiModel]);
+  }, [settings.geminiApiKey, settings.geminiModel, settings.selectedMotor]);
 
   const clearSuggestions = useCallback(() => {
     abortRef.current?.abort();

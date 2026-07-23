@@ -5,23 +5,12 @@ import { geminiHttpError } from '../retry';
 import { logger } from '../../../utils/logger';
 import { auth } from '../../../lib/firebase';
 import { getIdToken } from '../../../lib/authToken';
+import { resolveGeminiModel, getFallbackModel } from '../geminiModels';
 
-/**
- * Resolves the canonical Gemini model ID. Modelos oficiais do usuário:
- * Lite = gemini-3.5-flash, Pro = gemini-3.1-pro-preview.
- */
-function resolveGeminiModelId(rawModel: string): string {
-  const raw = (rawModel || '').toLowerCase();
-
-  // IDs 2.5/1.5 antigos foram removidos: eram inválidos na API (404). Qualquer entrada
-  // legada cai no mapeamento por 'pro'/'flash' abaixo, resolvendo para os modelos atuais.
-  if (raw.includes('3.5') && raw.includes('flash')) return 'gemini-3.5-flash';
-  if (raw.includes('3.1') && raw.includes('pro'))   return 'gemini-3.1-pro-preview';
-  if (raw.includes('pro'))                           return 'gemini-3.1-pro-preview';
-  if (raw.includes('flash'))                         return 'gemini-3.5-flash';
-
-  return 'gemini-3.5-flash';
-}
+// Status em que trocar de MODELO pode ajudar: 503 (modelo sobrecarregado) e 404
+// (modelo indisponível/descontinuado). Não inclui 429 — costuma ser limite de
+// requisições do PROJETO, que outro modelo não contorna.
+const MODEL_UNAVAILABLE_STATUS = new Set([503, 404]);
 
 /** Build the standard Gemini request body. */
 function buildBody(
@@ -60,7 +49,48 @@ async function proxyHeaders(model: string, stream: boolean, settings: AppSetting
 
 export class GeminiProvider implements AiProvider {
   resolveModelName(settings: AppSettings, _mode: string, _area: string): string {
-    return resolveGeminiModelId(settings.geminiModel || '');
+    // settings.geminiModel já chega resolvido pelo engine; revalidamos pelo
+    // resolvedor único (idempotente) usando o motor como fallback seguro.
+    return resolveGeminiModel(settings.geminiModel, settings.selectedMotor);
+  }
+
+  /**
+   * POST ao proxy com retry (withRetry) e, se o modelo primário esgotar em 503
+   * (sobrecarga) ou 404 (indisponível), tenta UMA vez num modelo GA de
+   * contingência (getFallbackModel). Retorna a Response final — o chamador trata
+   * !ok. O corpo é idêntico entre as tentativas; só o header de modelo muda.
+   */
+  private async postWithModelFallback(
+    primaryModel: string,
+    bodyStr: string,
+    stream: boolean,
+    settings: AppSettings,
+    mode: string | undefined,
+    signal: AbortSignal | undefined,
+    helpers: any,
+  ): Promise<Response> {
+    const attempt = (model: string): Promise<Response> =>
+      helpers.withRetry(async () =>
+        fetch('/api/gemini', {
+          method: 'POST',
+          headers: await proxyHeaders(model, stream, settings, mode),
+          body: bodyStr,
+          signal,
+        }),
+      );
+
+    let response: Response = await attempt(primaryModel);
+    if (!response.ok && MODEL_UNAVAILABLE_STATUS.has(response.status)) {
+      const fallback = getFallbackModel(primaryModel);
+      if (fallback && fallback !== primaryModel) {
+        response.body?.cancel().catch(() => {});
+        logger.warn(
+          `[Gemini] "${primaryModel}" indisponível (HTTP ${response.status}); tentando modelo de contingência "${fallback}".`,
+        );
+        response = await attempt(fallback);
+      }
+    }
+    return response;
   }
 
   async generate(
@@ -75,18 +105,13 @@ export class GeminiProvider implements AiProvider {
     const model = this.resolveModelName(settings, mode, area);
     const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
 
-    const headers = await proxyHeaders(model, false, settings, mode);
-    const response = await helpers.withRetry(() => fetch('/api/gemini', {
-      method: 'POST',
-      headers,
-      body: buildBody(
-        systemInstruction,
-        built.userMessage,
-        helpers.getModeTemperature(mode, settings.aiTemperature),
-        helpers.getMaxTokens(area)
-      ),
-      signal,
-    }));
+    const bodyStr = buildBody(
+      systemInstruction,
+      built.userMessage,
+      helpers.getModeTemperature(mode, settings.aiTemperature),
+      helpers.getMaxTokens(area)
+    );
+    const response = await this.postWithModelFallback(model, bodyStr, false, settings, mode, signal, helpers);
 
     if (!response.ok) {
       const errText = await response.text();
@@ -112,18 +137,13 @@ export class GeminiProvider implements AiProvider {
     const model = this.resolveModelName(settings, mode, area);
     const systemInstruction = built.universalContext + (built.areaContext ? '\n\n' + built.areaContext : '');
 
-    const headers = await proxyHeaders(model, true, settings, mode);
-    const response = await helpers.withRetry(() => fetch('/api/gemini', {
-      method: 'POST',
-      headers,
-      body: buildBody(
-        systemInstruction,
-        built.userMessage,
-        helpers.getModeTemperature(mode, settings.aiTemperature),
-        helpers.getMaxTokens(area)
-      ),
-      signal,
-    }));
+    const bodyStr = buildBody(
+      systemInstruction,
+      built.userMessage,
+      helpers.getModeTemperature(mode, settings.aiTemperature),
+      helpers.getMaxTokens(area)
+    );
+    const response = await this.postWithModelFallback(model, bodyStr, true, settings, mode, signal, helpers);
 
     if (!response.ok) {
       const errText = await response.text();
@@ -197,19 +217,14 @@ export class GeminiProvider implements AiProvider {
         prompt += `\n\nATENÇÃO: A sua resposta anterior falhou ao ser processada como JSON. Erro: ${errorContext}. Por favor, retorne APENAS um JSON válido, sem texto adicional ou markdown.`;
       }
 
-      const headers = await proxyHeaders(model, false, settings);
-      const response = await helpers.withRetry(() => fetch('/api/gemini', {
-        method: 'POST',
-        headers,
-        body: buildBody(
-          built.universalContext,
-          prompt,
-          isRetry ? 0.0 : 0.1,
-          2048,
-          { responseMimeType: 'application/json' }
-        ),
-        signal,
-      }));
+      const bodyStr = buildBody(
+        built.universalContext,
+        prompt,
+        isRetry ? 0.0 : 0.1,
+        2048,
+        { responseMimeType: 'application/json' }
+      );
+      const response = await this.postWithModelFallback(model, bodyStr, false, settings, undefined, signal, helpers);
 
       if (!response.ok) {
         const errText = await response.text();

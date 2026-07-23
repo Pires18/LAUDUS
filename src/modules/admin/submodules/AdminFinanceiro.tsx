@@ -1397,12 +1397,16 @@ function AbacatePayTab() {
 
 // ─── Tab: Custos de IA ────────────────────────────────────────────────────────
 
-const LITE_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
-const PRO_MODELS  = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-1.5-pro'];
+// Opções do dropdown de modelo por motor. DEVEM estar em VALID_GEMINI_MODELS
+// (src/modules/ai/geminiModels.ts) — só IDs do allowlist são honrados pelo
+// resolvedor ao ler global_config/motor_config; qualquer outro vira no-op.
+const LITE_MODELS = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+// GA primeiro (default); o preview fica como opção consciente.
+const PRO_MODELS  = ['gemini-2.5-pro', 'gemini-3.1-pro-preview'];
 
 const DEFAULT_MOTOR = {
-  lite: { model: 'gemini-3.5-flash',       tokensPerReport: 2000, costPerThousandTokens: 0.075 },
-  pro:  { model: 'gemini-3.1-pro-preview',  tokensPerReport: 4000, costPerThousandTokens: 1.25  },
+  lite: { model: 'gemini-3.5-flash', tokensPerReport: 2000, costPerThousandTokens: 0.075 },
+  pro:  { model: 'gemini-2.5-pro',   tokensPerReport: 4000, costPerThousandTokens: 1.25  },
 };
 
 function IACostsTab() {
