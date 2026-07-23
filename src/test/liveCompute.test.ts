@@ -43,6 +43,47 @@ describe('computeDerivations — cálculo em tempo real', () => {
     expect(ativas?.alert).toBe(true);
   });
 
+  it('carótidas: EMI máx com chip inline ELSA (idade/sexo) e alerta se > p90', () => {
+    const schema = deriveStructuredSchema(tpl('vascular', 'CARÓTIDAS E VERTEBRAIS'), 'vascular');
+    // ♂ 60 anos, p90 (55-64) = 1,03 → 1,10 = acentuado (> p90)
+    const d = computeDerivations(schema, { emi_d: '0,9', emi_e: '1,1', emi_idade: '60', emi_sexo: 'masculino' });
+    const emi = d.find((x) => x.id === 'emi__class');
+    expect(emi?.text).toContain('1,10 mm (máx)');
+    expect(emi?.text).toMatch(/acentuado|p90/i);
+    expect(emi?.alert).toBe(true);
+  });
+
+  it('carótidas: EMI sem idade/sexo cai no limiar absoluto e pede dados p/ percentil', () => {
+    const schema = deriveStructuredSchema(tpl('vascular', 'CARÓTIDAS E VERTEBRAIS'), 'vascular');
+    const d = computeDerivations(schema, { emi_d: '0,7' });
+    const emi = d.find((x) => x.id === 'emi__class');
+    expect(emi?.text).toContain('normal (< 0,9 mm)');
+    expect(emi?.text).toMatch(/idade\/sexo/);
+    expect(emi?.alert).toBe(false);
+  });
+
+  it('abdome: colédoco pós-colecistectomia usa limiar ≤ 10 mm', () => {
+    const schema = deriveStructuredSchema(tpl('medicina-interna', 'ABDOME SUPERIOR'), 'medicina-interna');
+    // 8 mm com colecistectomia → limiar 10 → NÃO dilatado
+    const d = computeDerivations(schema, { coledoco: '8', vesicula_achados: 'colecistectomizado' });
+    expect(d.find((x) => x.id === 'coledoco__cal')?.text).not.toContain('dilatado');
+    // 8 mm sem colecistectomia → limiar 6 → dilatado
+    const d2 = computeDerivations(schema, { coledoco: '8' });
+    expect(d2.find((x) => x.id === 'coledoco__cal')?.text).toContain('dilatado');
+  });
+
+  it('abdome: aorta ≥ 5,5 cm sinaliza aneurisma volumoso (R6)', () => {
+    const schema = deriveStructuredSchema(tpl('medicina-interna', 'ABDOME SUPERIOR'), 'medicina-interna');
+    const d = computeDerivations(schema, { aorta: '5,6' });
+    const aorta = d.find((x) => x.id === 'aorta__cal');
+    expect(aorta?.text).toMatch(/R6|urgente|volumoso/i);
+    expect(aorta?.alert).toBe(true);
+    // 2,7 cm → ectasia, sem alerta
+    const d2 = computeDerivations(schema, { aorta: '2,7' });
+    expect(d2.find((x) => x.id === 'aorta__cal')?.text).toContain('ectasia');
+    expect(d2.find((x) => x.id === 'aorta__cal')?.alert).toBe(false);
+  });
+
   it('reumato: sem articulações preenchidas → não emite soma', () => {
     const schema = deriveStructuredSchema(tpl('reumatologico', 'ESCORE PDUS-28'), 'reumatologico');
     const d = computeDerivations(schema, {});

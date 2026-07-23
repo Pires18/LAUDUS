@@ -23,11 +23,22 @@ interface Props {
   initialCalcId?: string;
   /** Quando definido, o modal está em modo "aplicar a um campo estruturado". */
   structuredTargetLabel?: string;
-  /** Grava o resultado da calculadora de volta no campo da aba Estruturado. */
+  /** Grava o resultado da calculadora de volta num campo estruturado. */
   onApplyToField?: (result: { text: string; metrics: Record<string, any>; calcId?: string }) => void;
+  /**
+   * Ancorado no mesmo slot lateral do Copiloto (desktop), em vez de flutuar
+   * por cima de tudo — troca suave entre calculadora e Copiloto no mesmo
+   * lugar, sem sobrepor o editor/PACS. `false`/ausente mantém o comportamento
+   * antigo (janela flutuante), usado só quando não há como ancorar (ex.:
+   * imagem em tela cheia, onde esse slot não existe).
+   */
+  docked?: boolean;
+  /** Com `docked`, divide a largura meio a meio com o visor PACS (quando o
+   * editor de texto está oculto) em vez do tamanho fixo padrão. */
+  fillWidth?: boolean;
 }
 
-export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId, structuredTargetLabel, onApplyToField }: Props) {
+export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToReport, examDateMs, calculatorData = {}, onSaveCalculatorData, initialCalcId, structuredTargetLabel, onApplyToField, docked, fillWidth }: Props) {
   const { setView } = useApp();
   const { hasCalculators } = useSubscription();
   const [selectedCalcId, setSelectedCalcId] = useState<string | null>(initialCalcId || null);
@@ -153,11 +164,21 @@ export function CalculatorModal({ area, onClose, onSendToCopilot, onInsertToRepo
         className="fixed inset-0 bg-ink-900/65 backdrop-blur-md lg:hidden z-[410]"
       />
       <motion.div
-        initial={{ opacity: 0, scale: 0.94, y: 30 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94, y: 30 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-        className="fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[420] overflow-hidden"
+        layout={docked}
+        initial={docked ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 30 }}
+        animate={docked ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+        exit={docked ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 30 }}
+        transition={docked
+          ? { layout: { type: 'spring', damping: 32, stiffness: 320 }, opacity: { duration: 0.2, ease: 'easeOut' } }
+          : { type: 'spring', damping: 25, stiffness: 220 }
+        }
+        className={docked
+          ? classNames(
+              "fixed inset-x-0 top-0 w-full h-dvh z-[300] lg:z-auto lg:static lg:h-full bg-white border-l border-ink-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] lg:shadow-none flex flex-col overflow-hidden",
+              fillWidth ? "lg:w-1/2 lg:shrink" : "lg:w-[440px] lg:shrink-0"
+            )
+          : "fixed inset-x-0 top-0 w-full h-dvh rounded-none lg:inset-auto lg:bottom-24 lg:right-10 lg:w-[420px] lg:h-[72vh] lg:max-h-[660px] bg-white lg:rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] border border-ink-100 flex flex-col z-[420] overflow-hidden"
+        }
       >
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="relative h-16 shrink-0 overflow-hidden bg-ink-900 border-b border-ink-800">

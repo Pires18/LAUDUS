@@ -102,10 +102,12 @@ function checkMandatoryClassifications(html: string): VerificationIssue[] {
       severity: 'warning',
     },
     {
-      // Cisto renal COMPLEXO (descritor de complexidade na mesma sentença) exige Bosniak (2019).
+      // Cisto renal COMPLEXO (descritor de complexidade na mesma sentença) exige estratificação:
+      // categoria Bosniak OU recomendação de método seccional (TC/RM) — no US convencional a
+      // conduta correta pode ser encaminhar para caracterização em vez de cravar Bosniak.
       findingRe: /cisto[s]? rena(l|is)[^.]{0,90}(sept|calcific|parede espess|realce|conte[úu]do heterog|componente s[óo]lid|nodula[çr]|vegeta[çc]|complex)/,
-      classRe: /bosniak/i,
-      label: 'Cisto renal complexo sem categoria de Bosniak',
+      classRe: /bosniak|tomografi|resson[âa]nci|\btc\b|\brm\b|seccional|complementa[çr]/i,
+      label: 'Cisto renal complexo sem estratificação (Bosniak ou método seccional)',
       severity: 'warning',
     },
     {

@@ -1307,9 +1307,11 @@ export function auditReportQuality(html: string, area?: string | string[]): Qual
     { area: 'mastologia', organRe: /n[óo]dulo|massa|les[ãa]o focal/i, classRe: /BI-?RADS/i },
     { area: 'pequenas-partes', organRe: /tire[óo]id[^.]{0,60}(n[óo]dulo)|(n[óo]dulo)[^.]{0,60}tire[óo]id/i, classRe: /TI-?RADS/i },
     { area: 'ginecologia', organRe: /(ov[áa]ri|anexial|anexo)[^.]{0,60}(massa|cisto|forma[çc][ãa]o|tumor)/i, classRe: /O-?RADS/i },
-    // Cisto renal COMPLEXO (septo/calcificação/parede espessa/realce/componente sólido) exige Bosniak (2019).
+    // Cisto renal COMPLEXO (septo/calcificação/parede espessa/realce/componente sólido) exige
+    // estratificação: categoria Bosniak OU recomendação de método seccional (TC/RM) — no US
+    // convencional a conduta correta pode ser encaminhar em vez de cravar Bosniak.
     // Cisto renal simples NÃO dispara (organRe exige descritor de complexidade na mesma sentença).
-    { area: 'medicina-interna', organRe: /cisto[s]? rena(l|is)[^.]{0,90}(sept|calcifica|parede espess|realce|conte[úu]do heterog|componente s[óo]lid|nodula[çr]|vegeta[çc]|complex)/i, classRe: /Bosniak/i },
+    { area: 'medicina-interna', organRe: /cisto[s]? rena(l|is)[^.]{0,90}(sept|calcifica|parede espess|realce|conte[úu]do heterog|componente s[óo]lid|nodula[çr]|vegeta[çc]|complex)/i, classRe: /Bosniak|tomografi|resson[âa]nci|\bTC\b|\bRM\b|seccional|complementa[çr]/i },
     // Estenose carotídea exige graduação (NASCET/SRU) — aceita percentual/severidade como grau válido.
     { area: 'vascular', organRe: /(est[ée]nos)[^.]{0,45}(car[óo]tid|\bACI\b|bulbo)|(car[óo]tid|\bACI\b|bulbo car[óo]t)[^.]{0,70}(est[ée]nos)/i, classRe: /NASCET|SRU|\d{2}\s*[–\-a]\s*\d{2}\s*%|est[ée]nose\s+(leve|moderada|acentuada|importante|cr[íi]tica)|<\s*50\s*%|≥?\s*70\s*%/i },
   ];

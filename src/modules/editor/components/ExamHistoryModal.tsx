@@ -4,10 +4,11 @@ import { logger } from '../../../utils/logger';
 import { getAll, where, limit } from '../../../store/db';
 import {
   X, History, Clock, FileText, Search, SplitSquareHorizontal,
-  Eye, AlertCircle, Loader2, CalendarDays, Filter
+  Eye, AlertCircle, Loader2, CalendarDays, Filter, NotebookPen, ChevronDown, ClipboardList
 } from 'lucide-react';
 import { formatDateTime, classNames } from '../../../utils/format';
 import { AreaIcon } from '../../../components/AreaIcon';
+import { ClinicalRecordsSection } from '../../patients/components/ClinicalRecordsSection';
 
 interface ExamHistoryModalProps {
   patient: Patient;
@@ -60,6 +61,13 @@ export function ExamHistoryModal({
   const [compareMode, setCompareMode] = useState(false);
   const [search, setSearch] = useState('');
   const [areaFilter, setAreaFilter] = useState<ExamArea | 'todas'>('todas');
+  // Modo "Prontuário" — troca a área de conteúdo pra mostrar histórico/notas/
+  // convênio do paciente e os registros clínicos (notas, exame físico,
+  // laboratório), em vez da lista de laudos anteriores. Antes essa informação
+  // só existia num acordeon fácil de não notar dentro do editor — o botão
+  // "Histórico" agora dá acesso direto a ela.
+  const [showChart, setShowChart] = useState(false);
+  const hasChartSummary = !!(patient.history || patient.notes || patient.insurance);
 
   // Carrega TODOS os exames do paciente de uma vez.
   // Usa APENAS where() sem orderBy() para evitar exigência de índice composto
@@ -142,15 +150,31 @@ export function ExamHistoryModal({
           </div>
 
           <div className="relative z-10 flex items-center gap-3">
+            {/* Toggle Prontuário — histórico/notas/convênio + registros clínicos */}
+            <button
+              onClick={() => setShowChart(!showChart)}
+              title={showChart ? 'Ver laudos anteriores' : 'Ver prontuário (histórico, notas, registros clínicos)'}
+              className={classNames(
+                "flex items-center gap-2 h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                showChart
+                  ? "bg-emerald-500 text-white border-emerald-400 shadow-lg shadow-emerald-500/25"
+                  : "bg-white/10 text-white border-white/10 hover:bg-white/20"
+              )}
+            >
+              <ClipboardList size={14} />
+              <span className="hidden sm:inline">Prontuário</span>
+            </button>
+
             {/* Toggle comparação */}
             <button
-              onClick={() => setCompareMode(!compareMode)}
+              onClick={() => { setCompareMode(!compareMode); setShowChart(false); }}
               title={compareMode ? 'Visualizar laudo selecionado' : 'Comparar com laudo atual'}
+              disabled={showChart}
               className={classNames(
                 "flex items-center gap-2 h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
                 compareMode
                   ? "bg-brand-500 text-white border-brand-400 shadow-lg shadow-brand-500/25"
-                  : "bg-white/10 text-white border-white/10 hover:bg-white/20"
+                  : "bg-white/10 text-white border-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
               )}
             >
               <SplitSquareHorizontal size={14} />
@@ -365,7 +389,35 @@ export function ExamHistoryModal({
 
           {/* ── Área de conteúdo ── */}
           <main className="flex-1 flex flex-col min-w-0 bg-ink-50/30">
-            {!selected ? (
+            {showChart ? (
+              /* ── Modo Prontuário: histórico/notas/convênio + registros clínicos ── */
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8 space-y-5">
+                {hasChartSummary && (
+                  <div className="bg-white border border-emerald-100 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <NotebookPen size={14} className="text-emerald-600" />
+                      <h3 className="text-xs font-black text-emerald-700 uppercase tracking-widest">Dados do Paciente</h3>
+                    </div>
+                    {patient.history && (
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-emerald-500 tracking-wider mb-1">Histórico Clínico</p>
+                        <p className="text-xs text-ink-700 leading-relaxed bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 whitespace-pre-wrap">{patient.history}</p>
+                      </div>
+                    )}
+                    {patient.notes && (
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-emerald-500 tracking-wider mb-1">Observações</p>
+                        <p className="text-xs text-ink-600 leading-relaxed bg-emerald-50/40 border border-emerald-100 rounded-xl p-3 whitespace-pre-wrap">{patient.notes}</p>
+                      </div>
+                    )}
+                    {patient.insurance && (
+                      <p className="text-[10px] text-emerald-600 font-semibold">Convênio: {patient.insurance}</p>
+                    )}
+                  </div>
+                )}
+                <ClinicalRecordsSection patientId={patient.id} />
+              </div>
+            ) : !selected ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-5 text-center p-10">
                 <div className="w-20 h-20 rounded-[2rem] bg-ink-100 flex items-center justify-center">
                   <Eye size={32} className="text-ink-300" />

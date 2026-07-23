@@ -108,17 +108,30 @@ describe('auditReportQuality', () => {
     expect(placeholder).toBeDefined();
   });
 
-  it('sinaliza cisto renal complexo sem Bosniak (medicina-interna)', () => {
+  it('sinaliza cisto renal complexo sem estratificação (medicina-interna)', () => {
     const report = [
       '<h1>ABDOME</h1>',
       '<h2>TÉCNICA</h2><p>Convexo.</p>',
       '<h2>ANÁLISE</h2><p>Cisto renal à direita com septos espessos e calcificação parietal.</p>',
       '<h2>CONCLUSÃO</h2><p>Cisto renal a esclarecer.</p>',
-      '<h2>RECOMENDAÇÕES</h2><p>Complementar com TC.</p>',
+      '<h2>RECOMENDAÇÕES</h2><p>Seguimento clínico habitual.</p>',
       '<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Limitado por gases.</p>',
     ].join('');
     const result = auditReportQuality(report, 'medicina-interna');
     expect(result.issues.some(i => i.type === 'classification')).toBe(true);
+  });
+
+  it('aceita cisto renal complexo com recomendação de método seccional (TC/RM)', () => {
+    const report = [
+      '<h1>ABDOME</h1>',
+      '<h2>TÉCNICA</h2><p>Convexo.</p>',
+      '<h2>ANÁLISE</h2><p>Cisto renal à direita com septos espessos e calcificação parietal.</p>',
+      '<h2>CONCLUSÃO</h2><p>Cisto renal complexo a esclarecer.</p>',
+      '<h2>RECOMENDAÇÕES</h2><p>Complementar com tomografia computadorizada para caracterização.</p>',
+      '<h2>OBSERVAÇÕES METODOLÓGICAS</h2><p>Limitado por gases.</p>',
+    ].join('');
+    const result = auditReportQuality(report, 'medicina-interna');
+    expect(result.issues.some(i => i.type === 'classification')).toBe(false);
   });
 
   it('não sinaliza cisto renal simples (medicina-interna)', () => {

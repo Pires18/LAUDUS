@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
-import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess, deleteWorklistEntry } from '../../store/db';
+import { updateItem, getItem, getActivePacsUrl, getProxyEndpoint, logPatientAccess, deleteWorklistEntry, saveVersionSnapshot } from '../../store/db';
 import { useApp } from '../../store/app';
 import { ExamStatus, Patient, ReportTemplate, Clinic, ExamRequest, ClinicalRecord } from '../../types';
 import { where } from 'firebase/firestore';
@@ -191,6 +191,10 @@ export function ExamEditor({ examId }: Props) {
   const [showAnamnesisConsent, setShowAnamnesisConsent] = useState(false);
   const [showDicomImages, setShowDicomImages] = useState(false);
   const [copilotPrompt, setCopilotPrompt] = useState('');
+  // Levantado pro ExamEditor (em vez de estado local do LaudCopilot) porque o
+  // painel remonta ao alternar entre o editor normal e a imagem em tela
+  // cheia — sem isso, cada troca de contexto reabria sempre no chat.
+  const [copilotActiveTab, setCopilotActiveTab] = useState<'chat' | 'form' | 'structured'>('chat');
   // Canal dedicado para resultados de calculadora/formulário enviados ao
   // copiloto. Não passa pela caixa de texto (evita concatenação com rascunho
   // que impedia o disparo automático). Consumido e zerado após o envio.
@@ -593,6 +597,11 @@ export function ExamEditor({ examId }: Props) {
     return () => clearTimeout(timer);
   }, []);
 
+  // Com o visor PACS e o painel direito (Copiloto ou Calculadora) abertos ao
+  // mesmo tempo, os dois já ocupam o essencial da largura — o editor de texto
+  // some nesse meio-termo e só reaparece quando um dos dois fecha.
+  const hideMainEditor = showIntegratedViewer && (showCopilot || showCalculators);
+
   // Painel do Copiloto — extraído em variável (em vez de JSX inline) porque
   // ele é ancorado em dois lugares mutuamente exclusivos (editor normal vs.
   // visualização de imagem em tela cheia), nunca os dois ao mesmo tempo.
@@ -608,11 +617,13 @@ export function ExamEditor({ examId }: Props) {
         opacity: { duration: 0.2, ease: 'easeOut' },
       }}
       className={classNames(
-        "fixed inset-x-0 top-0 w-full h-dvh z-[300] lg:z-auto lg:static lg:h-full lg:shrink-0 bg-white border-l border-ink-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] lg:shadow-none flex flex-col overflow-hidden",
-        // Com o visor PACS também aberto ao lado, encolhe pra sobrar espaço
-        // real pro editor (dois painéis de ~450-540px cada deixariam o
-        // editor espremido demais em notebooks de 1280-1440px).
-        showIntegratedViewer && !showFullScreenImage ? "lg:w-[360px]" : "lg:w-[440px]"
+        "fixed inset-x-0 top-0 w-full h-dvh z-[300] lg:z-auto lg:static lg:h-full bg-white border-l border-ink-100 shadow-[0_20px_50px_rgba(0,0,0,0.12)] lg:shadow-none flex flex-col overflow-hidden",
+        // Com o editor oculto (PACS + Copiloto/Calculadora abertos juntos),
+        // divide a largura meio a meio com o visor PACS em vez de um tamanho
+        // fixo sobrando vão vazio; com o editor visível, mantém tamanho fixo
+        // (bem mais estreito quando o PACS também está aberto ao lado, pra
+        // não espremer o editor demais em notebooks de 1280-1440px).
+        hideMainEditor && !showFullScreenImage ? "lg:w-1/2 lg:shrink" : (showIntegratedViewer && !showFullScreenImage ? "lg:w-[360px] lg:shrink-0" : "lg:w-[440px] lg:shrink-0")
       )}
     >
       {/* Premium Header with Mesh-style Gradient */}
@@ -672,6 +683,8 @@ export function ExamEditor({ examId }: Props) {
           structuredCalcResult={structuredCalcResult}
           onStructuredResultConsumed={() => setStructuredCalcResult(null)}
           isDocked
+          activeTab={copilotActiveTab}
+          onActiveTabChange={setCopilotActiveTab}
         />
       </div>
     </motion.aside>
@@ -804,10 +817,13 @@ export function ExamEditor({ examId }: Props) {
                 preloadProgress={dicomPreloadProgress}
                 instancesReady={dicomInstancesReady}
                 retryInstance={retryDicomInstance}
+                fillWidth={hideMainEditor}
               />
             )}
 
-            {/* Main Workspace */}
+            {/* Main Workspace — oculto quando PACS + Copiloto/Calculadora
+                estão abertos juntos (ver hideMainEditor). */}
+            {!hideMainEditor && (
             <div className="flex-1 flex flex-col min-w-0 mr-0">
               {/* Section Progress Bar — real state vinculada ao isGenerating */}
               <div className="h-1 bg-ink-100/50 w-full shrink-0 relative overflow-hidden">
@@ -1091,11 +1107,51 @@ export function ExamEditor({ examId }: Props) {
             )}
           </div>
         </div>
+            )}
 
-        {/* Copilot: painel lateral ancorado (desktop) — só aqui fora da tela
-            cheia de imagem, onde o mesmo painel reaparece lado a lado. */}
+        {/* Painel direito ancorado: Calculadora OU Copiloto, nunca os dois ao
+            mesmo tempo — troca suave no mesmo slot (mesma posição/tamanho),
+            em vez da calculadora flutuar por cima de tudo. Só fora da tela
+            cheia de imagem, onde o mesmo Copiloto reaparece lado a lado. */}
         {!showFullScreenImage && (
-          <AnimatePresence>{copilotSidebar}</AnimatePresence>
+          <AnimatePresence mode="wait">
+            {showCalculators ? (
+              <CalculatorModal
+                key="calculator-docked"
+                docked
+                fillWidth={hideMainEditor}
+                initialCalcId={calcModalInitialId || undefined}
+                area={templates.length > 1 ? templates.map((t) => t.area) : exam.area}
+                examDateMs={exam.examDate ?? exam.createdAt}
+                onClose={() => { setShowCalculators(false); setCalcTargetField(null); }}
+                structuredTargetLabel={calcTargetField?.label}
+                onApplyToField={(result) => {
+                  if (calcTargetField) {
+                    setStructuredCalcResult({ fieldId: calcTargetField.fieldId, result });
+                  }
+                  setShowCalculators(false);
+                  setCalcTargetField(null);
+                  if (!showCopilot) setShowCopilot(true);
+                }}
+                onSendToCopilot={(text) => {
+                  setCopilotInjection(text);
+                  setShowCalculators(false);
+                  setCalcTargetField(null);
+                  if (!showCopilot) setShowCopilot(true);
+                }}
+                onInsertToReport={(html) => {
+                  editorRef.current?.insertContent(html);
+                  setShowCalculators(false);
+                }}
+                calculatorData={calculatorDataWithSeed}
+                onSaveCalculatorData={async (data) => {
+                  await updateItem('exams', exam.id, { calculatorData: data });
+                }}
+              />
+            ) : (
+              copilotSidebar
+            )}
+          </AnimatePresence>
         )}
 
         {/* Suggestion chips from B6 proactive AI — appear above FAB after generation */}
@@ -1228,7 +1284,11 @@ export function ExamEditor({ examId }: Props) {
         <ReportVersionsModal
           exam={exam}
           currentContent={reportContent}
-          onRestore={(content) => {
+          onRestore={async (content) => {
+            // Arquiva o conteúdo atual ANTES de sobrescrever — sem isso, o
+            // diálogo de confirmação prometia isso mas nada era salvo, e o
+            // que estava escrito na hora da restauração se perdia sem volta.
+            await saveVersionSnapshot(exam.id, reportContent, 'restore');
             setReportContent(content);
             updateItem('exams', exam.id, { reportContent: content });
           }}
@@ -1245,8 +1305,11 @@ export function ExamEditor({ examId }: Props) {
         <span><kbd className="px-1 py-0.5 rounded bg-ink-800 text-white/80 mr-1">⌘↵</kbd> Finalizar</span>
       </div>
 
+      {/* Fallback flutuante — só quando não há slot ancorado disponível (a
+          imagem em tela cheia usa a largura toda para a imagem + Copiloto).
+          Fora da tela cheia, a calculadora já está ancorada acima. */}
       <AnimatePresence>
-          {showCalculators && (
+          {showCalculators && showFullScreenImage && (
           <CalculatorModal
             initialCalcId={calcModalInitialId || undefined}
             area={templates.length > 1 ? templates.map((t) => t.area) : exam.area}

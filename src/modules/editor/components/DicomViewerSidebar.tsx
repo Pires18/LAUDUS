@@ -37,6 +37,13 @@ interface DicomViewerSidebarProps {
   preloadProgress: { done: number; total: number };
   instancesReady: boolean;
   retryInstance: (instanceId: string) => void;
+  /**
+   * Com o editor de texto oculto (PACS + Copiloto/Calculadora abertos ao
+   * mesmo tempo, sem o editor no meio), o visor deixa de ter uma largura fixa
+   * e passa a dividir o espaço meio a meio com o painel do lado — em vez de
+   * ficar num tamanho fixo sobrando um vão vazio no resto da tela.
+   */
+  fillWidth?: boolean;
 }
 
 export function DicomViewerSidebar({
@@ -69,9 +76,13 @@ export function DicomViewerSidebar({
   preloadProgress: progress,
   instancesReady,
   retryInstance: retryOne,
+  fillWidth,
 }: DicomViewerSidebarProps) {
   return (
-    <div className="absolute lg:relative z-30 lg:z-20 w-full lg:w-[460px] xl:w-[540px] border-r border-zinc-800/80 bg-[#0c0c0e] text-zinc-100 flex flex-col shrink-0 min-h-0 animate-fade-in inset-y-0 left-0 font-sans">
+    <div className={classNames(
+      "absolute lg:relative z-30 lg:z-20 w-full border-r border-zinc-800/80 bg-[#0c0c0e] text-zinc-100 flex flex-col min-h-0 animate-fade-in inset-y-0 left-0 font-sans",
+      fillWidth ? "lg:w-1/2 lg:shrink" : "lg:w-[460px] xl:w-[540px] shrink-0"
+    )}>
       {/* Header */}
       <div className="px-5 py-4 border-b border-zinc-800/80 bg-[#09090b] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -215,6 +226,7 @@ export function DicomViewerSidebar({
               const formattedTime = time ? `${time.substring(0, 2)}:${time.substring(2, 4)}` : '';
               const isCurrent = study.ID === selectedStudyId;
               const isThisExam = !!currentExamId && study.MainDicomTags?.AccessionNumber === currentExamId;
+              const seriesCount = Array.isArray(study.Series) ? study.Series.length : null;
 
               return (
                 <button
@@ -238,7 +250,10 @@ export function DicomViewerSidebar({
                           <span className="shrink-0 px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30 text-[8px] font-black uppercase tracking-wider">Este exame</span>
                         )}
                       </p>
-                      <p className="text-[9px] opacity-75 mt-0.5">{formattedDate} {formattedTime} • ID: {study.MainDicomTags?.PatientID || '—'}</p>
+                      <p className="text-[9px] opacity-75 mt-0.5">
+                        {formattedDate} {formattedTime}
+                        {seriesCount !== null && <> • {seriesCount} {seriesCount === 1 ? 'série' : 'séries'}</>}
+                      </p>
                     </div>
                     <span className={classNames(
                       "text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 select-none",

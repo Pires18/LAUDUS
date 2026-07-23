@@ -192,7 +192,7 @@ export interface ExamRequest {
   reportVersions?: Array<{
     timestamp: number;
     content: string;
-    trigger: 'generation' | 'refine' | 'copilot' | 'manual';
+    trigger: 'generation' | 'refine' | 'copilot' | 'manual' | 'restore';
   }>;
   /** Aparelho de ultrassom (dicomDevices[].id) escolhido na criação — reutilizado
    * ao reenviar a worklist depois, para não redirecionar o exame ao aparelho

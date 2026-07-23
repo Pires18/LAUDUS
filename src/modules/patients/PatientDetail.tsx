@@ -2,9 +2,9 @@ import { useApp } from '../../store/app';
 import { useDocument, useCollection } from '../../hooks/useFirestore';
 import { updateItem, logPatientAccess } from '../../store/db';
 import { PageHeader } from '../../components/PageHeader';
-import { Patient, ExamRequest, EXAM_AREAS, Clinic } from '../../types';
-import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings, ClipboardPen, Check, X as XIcon, Star } from 'lucide-react';
-import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone } from '../../utils/format';
+import { Patient, ExamRequest, ExamStatus, EXAM_AREAS, Clinic } from '../../types';
+import { ArrowLeft, Phone, Mail, MapPin, FileText, Edit, ShieldPlus, Loader2, Building2, Plus, UserCircle, ClipboardList, ShieldCheck, Settings, ClipboardPen, Check, X as XIcon, Star, Search } from 'lucide-react';
+import { calculateAge, formatDate, formatDateTime, formatCPF, formatPhone, classNames } from '../../utils/format';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Modal } from '../../components/Modal';
 import { PatientForm } from './PatientForm';
@@ -34,6 +34,11 @@ export function PatientDetail({ patientId }: Props) {
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [followUpReasonDraft, setFollowUpReasonDraft] = useState('');
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+  // Busca/filtro do histórico de exames — sem isso, um paciente com anos de
+  // acompanhamento vira uma lista longa sem forma de achar um exame específico.
+  const [examSearch, setExamSearch] = useState('');
+  const [examAreaFilter, setExamAreaFilter] = useState<'todas' | ExamRequest['area']>('todas');
+  const [examStatusFilter, setExamStatusFilter] = useState<'todos' | ExamStatus>('todos');
 
   const { data: patient, loading: patientLoading } = useDocument<Patient>('patients', patientId);
   const { data: exams, loading: examsLoading } = useCollection<ExamRequest>('exams', {
@@ -55,13 +60,33 @@ export function PatientDetail({ patientId }: Props) {
     return [...exams].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [exams]);
 
-  // Apply clinic filter if selected
+  // Apply clinic filter if selected, plus busca/área/status do histórico.
   const filteredExams = useMemo(() => {
     let result = sortedExams;
     if (selectedClinicId) result = result.filter(e => e.clinicId === selectedClinicId);
     if (isReception) result = result.filter(e => e.status === 'finalizado');
+    if (examAreaFilter !== 'todas') result = result.filter(e => e.area === examAreaFilter);
+    if (examStatusFilter !== 'todos') result = result.filter(e => e.status === examStatusFilter);
+    const q = examSearch.trim().toLowerCase();
+    if (q) {
+      result = result.filter(e => {
+        const clinic = e.clinicId ? clinicMap.get(e.clinicId) : null;
+        return (
+          e.examType?.toLowerCase().includes(q) ||
+          e.requestingPhysician?.toLowerCase().includes(q) ||
+          clinic?.name?.toLowerCase().includes(q)
+        );
+      });
+    }
     return result;
-  }, [sortedExams, selectedClinicId, isReception]);
+  }, [sortedExams, selectedClinicId, isReception, examAreaFilter, examStatusFilter, examSearch, clinicMap]);
+
+  // Áreas presentes no histórico deste paciente — evita listar no filtro
+  // áreas que ele nunca fez exame.
+  const examAreasInHistory = useMemo(() => {
+    const ids = new Set(sortedExams.map(e => e.area));
+    return EXAM_AREAS.filter(a => ids.has(a.id));
+  }, [sortedExams]);
 
   if (patientLoading) {
     return (
@@ -405,12 +430,63 @@ export function PatientDetail({ patientId }: Props) {
             </div>
           </div>
 
+          {sortedExams.length > 3 && (
+            <div className="px-5 py-3 border-b border-ink-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white">
+              <div className="relative flex-1">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+                <input
+                  value={examSearch}
+                  onChange={(e) => setExamSearch(e.target.value)}
+                  placeholder="Buscar por tipo de exame, médico solicitante ou clínica..."
+                  className="w-full h-9 pl-8 pr-3 bg-ink-50 border border-ink-200 focus:border-brand-400 rounded-xl focus:ring-2 focus:ring-brand-400/10 outline-none transition-all text-xs text-ink-800 placeholder-ink-400"
+                />
+                {examSearch && (
+                  <button onClick={() => setExamSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600">
+                    <XIcon size={12} />
+                  </button>
+                )}
+              </div>
+              <select
+                value={examAreaFilter}
+                onChange={(e) => setExamAreaFilter(e.target.value as typeof examAreaFilter)}
+                className="h-9 px-2.5 bg-ink-50 border border-ink-200 rounded-xl text-xs font-semibold text-ink-700 outline-none focus:border-brand-400 shrink-0"
+              >
+                <option value="todas">Todas as áreas</option>
+                {examAreasInHistory.map((a) => (
+                  <option key={a.id} value={a.id}>{a.label}</option>
+                ))}
+              </select>
+              <select
+                value={examStatusFilter}
+                onChange={(e) => setExamStatusFilter(e.target.value as typeof examStatusFilter)}
+                className="h-9 px-2.5 bg-ink-50 border border-ink-200 rounded-xl text-xs font-semibold text-ink-700 outline-none focus:border-brand-400 shrink-0"
+              >
+                <option value="todos">Todos os status</option>
+                <option value="finalizado">Finalizado</option>
+                <option value="em-andamento">Em Andamento</option>
+                <option value="pendente">Pendente</option>
+              </select>
+            </div>
+          )}
+
         {examsLoading ? (
           <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-ink-300" /></div>
         ) : filteredExams.length === 0 ? (
           <div className="text-center py-12">
             <FileText size={24} className="mx-auto text-ink-300 mb-2" />
-            <p className="text-sm text-ink-500">Nenhum exame encontrado para este paciente.</p>
+            <p className="text-sm text-ink-500">
+              {sortedExams.length === 0
+                ? 'Nenhum exame encontrado para este paciente.'
+                : 'Nenhum exame corresponde à busca/filtro.'}
+            </p>
+            {sortedExams.length > 0 && (examSearch || examAreaFilter !== 'todas' || examStatusFilter !== 'todos') && (
+              <button
+                onClick={() => { setExamSearch(''); setExamAreaFilter('todas'); setExamStatusFilter('todos'); }}
+                className="mt-2 text-xs font-bold text-brand-600 hover:text-brand-700 underline underline-offset-2"
+              >
+                Limpar filtros
+              </button>
+            )}
           </div>
         ) : (
           <div className="divide-y divide-ink-50">

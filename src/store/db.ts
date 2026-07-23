@@ -860,7 +860,7 @@ export async function getPatientPreviousExams(patientId: string, area: string, c
 export async function saveVersionSnapshot(
   examId: string,
   content: string,
-  trigger: 'generation' | 'refine' | 'copilot' | 'manual'
+  trigger: 'generation' | 'refine' | 'copilot' | 'manual' | 'restore'
 ): Promise<void> {
   if (!content || !content.trim()) return;
   try {

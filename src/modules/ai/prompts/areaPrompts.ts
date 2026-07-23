@@ -263,7 +263,7 @@ ESCOPO E MAPA DE EXAMES DESTA ÁREA (7 templates de Camada 3):
    IPP (lobo mediano)      │ Ausente                            │ >10 mm = Grau III (obstrução)
    Bexiga (espessura)      │ ≤3 mm (repleta ≥300 mL)            │ >5 mm = espessamento significativo
    RPM (pós-miccional)     │ <50 mL                             │ >100 mL obstrutivo · >300 mL = R6
-   Aorta (AP infrarrenal)  │ <3,0 cm                            │ ≥3 cm aneurisma · ≥5,5 cm = R6
+   Aorta (AP infrarrenal)  │ <2,5 cm (2,5–2,9 = ectasia)        │ ≥3 cm aneurisma · ≥5,5 cm = R6
    VCI (expiração)         │ <2,1 cm + colapso ≥50%             │ >2,1 sem colapso = IC/SBC
    VBP (calibre)           │ ≤6 mm (<70a) / ≤8 mm (colec.)     │ >7 mm → investigar coledoco
    Wirsung (ducto panc.)   │ ≤2 mm                              │ ≥3 mm = investigar causa

@@ -17,7 +17,15 @@ const TRIGGER_LABELS: Record<string, { label: string; className: string }> = {
   'refine':     { label: 'Refinamento',    className: 'bg-purple-50 text-purple-700 border-purple-200' },
   'copilot':    { label: 'Laud.IA Copilot', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   'manual':     { label: 'Edição Manual',   className: 'bg-ink-50 text-ink-700 border-ink-200' },
+  'restore':    { label: 'Antes de Restaurar', className: 'bg-amber-50 text-amber-700 border-amber-200' },
 };
+
+/** Contagem de palavras a partir do HTML — proxy simples e rápida pra saber o
+ * tamanho de uma versão sem precisar de um diff completo. */
+function countWords(html: string): number {
+  const text = html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim();
+  return text ? text.split(/\s+/).length : 0;
+}
 
 export function ReportVersionsModal({
   exam,
@@ -132,6 +140,11 @@ export function ReportVersionsModal({
               versions.map((ver, idx) => {
                 const triggerStyle = TRIGGER_LABELS[ver.trigger] || TRIGGER_LABELS['manual'];
                 const isSelected = selectedIdx === idx;
+                // `versions` está do mais novo pro mais antigo — o vizinho em
+                // idx+1 é a versão anterior no tempo, base pro delta.
+                const wordCount = countWords(ver.content);
+                const prevWordCount = idx + 1 < versions.length ? countWords(versions[idx + 1].content) : null;
+                const delta = prevWordCount !== null ? wordCount - prevWordCount : null;
 
                 return (
                   <button
@@ -169,8 +182,13 @@ export function ReportVersionsModal({
                       </span>
                     </div>
 
-                    <span className="text-[9px] text-ink-400 font-bold uppercase truncate max-w-[240px]">
-                      Tamanho: {Math.round(ver.content.length / 1024 * 10) / 10} KB
+                    <span className="text-[9px] text-ink-400 font-bold uppercase truncate max-w-[240px] flex items-center gap-1.5">
+                      {wordCount} palavra{wordCount !== 1 ? 's' : ''}
+                      {delta !== null && delta !== 0 && (
+                        <span className={delta > 0 ? "text-emerald-600" : "text-rose-600"}>
+                          {delta > 0 ? `+${delta}` : delta}
+                        </span>
+                      )}
                     </span>
                   </button>
                 );

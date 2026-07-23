@@ -214,6 +214,15 @@ interface LaudCopilotProps {
   structuredCalcResult?: { fieldId: string; result: { text: string; metrics?: Record<string, any>; calcId?: string } } | null;
   onStructuredResultConsumed?: () => void;
   isDocked?: boolean;
+  /**
+   * Aba ativa (chat/form/structured) — controlada de fora (ExamEditor) em vez
+   * de estado local, porque este componente remonta ao alternar entre o
+   * editor normal e a imagem em tela cheia (é ancorado em dois lugares
+   * diferentes da árvore). Sem isso, cada troca de contexto reabria sempre
+   * no chat, perdendo a aba em que o médico estava.
+   */
+  activeTab?: 'chat' | 'form' | 'structured';
+  onActiveTabChange?: (tab: 'chat' | 'form' | 'structured') => void;
 }
 
 export function LaudCopilot({
@@ -236,11 +245,18 @@ export function LaudCopilot({
   onOpenCalcForField,
   structuredCalcResult,
   onStructuredResultConsumed,
-  isDocked
+  isDocked,
+  activeTab: activeTabProp,
+  onActiveTabChange: onActiveTabChangeProp,
 }: LaudCopilotProps) {
   const { settings, updateSettings, showToast } = useApp();
   const confirm = useConfirm();
-  const [activeTab, setActiveTab] = useState<'chat' | 'form' | 'structured'>('chat');
+  // Aba controlada de fora (ExamEditor) quando os props forem fornecidos;
+  // caso contrário, cai num estado interno (fallback). Preserva a capacidade
+  // de "levantar" a aba sem obrigar todos os pontos de montagem a controlá-la.
+  const [internalTab, setInternalTab] = useState<'chat' | 'form' | 'structured'>('chat');
+  const activeTab = activeTabProp ?? internalTab;
+  const onActiveTabChange = onActiveTabChangeProp ?? setInternalTab;
   const [formText, setFormText] = useState(exam.customFormValue ?? template?.customForm ?? '');
   const [anamnesisText, setAnamnesisText] = useState(exam.anamnesis ?? '');
   const [structuredValues, setStructuredValues] = useState<Record<string, StructuredFieldValue>>(exam.structuredValue ?? {});
@@ -1017,7 +1033,7 @@ export function LaudCopilot({
       findingsSummary += `\n\nDADOS DO FORMULÁRIO:\n${textToSend.trim()}`;
     }
 
-    setActiveTab('chat');
+    onActiveTabChange('chat');
     handleSend(findingsSummary);
   };
 
@@ -1200,7 +1216,7 @@ export function LaudCopilot({
       msg += `\n\nCÁLCULOS AUTOMÁTICOS (já calculados a partir dos dados — use EXATAMENTE estes valores; NÃO recalcule e NÃO contradiga a categoria/escore nem a conduta aqui indicada: a classificação sistematizada [BI-RADS, TI-RADS, O-RADS, Bosniak, NASCET, FIGO etc.] e a recomendação de seguimento devem refletir fielmente estes resultados na CONCLUSÃO e nas RECOMENDAÇÕES):\n${derivLines.join('\n')}`;
     }
 
-    setActiveTab('chat');
+    onActiveTabChange('chat');
     handleSend(msg);
   };
 
@@ -1219,7 +1235,7 @@ export function LaudCopilot({
       {/* ── Tab Bar ── */}
       <div className="flex border-b border-ink-100 bg-white shrink-0 select-none z-10">
         <button
-          onClick={() => setActiveTab('chat')}
+          onClick={() => onActiveTabChange('chat')}
           className={classNames(
             "flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-[11px] font-black uppercase tracking-widest transition-all relative",
             activeTab === 'chat' ? "text-brand-700" : "text-ink-400 hover:text-ink-700"
@@ -1240,7 +1256,7 @@ export function LaudCopilot({
           )}
         </button>
         <button
-          onClick={() => setActiveTab('form')}
+          onClick={() => onActiveTabChange('form')}
           className={classNames(
             "flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-[11px] font-black uppercase tracking-widest transition-all relative",
             activeTab === 'form' ? "text-brand-700" : "text-ink-400 hover:text-ink-700"
@@ -1256,7 +1272,7 @@ export function LaudCopilot({
           )}
         </button>
         <button
-          onClick={() => setActiveTab('structured')}
+          onClick={() => onActiveTabChange('structured')}
           className={classNames(
             "flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-[11px] font-black uppercase tracking-widest transition-all relative",
             activeTab === 'structured' ? "text-brand-700" : "text-ink-400 hover:text-ink-700"

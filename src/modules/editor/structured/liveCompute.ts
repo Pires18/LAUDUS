@@ -21,6 +21,7 @@ import {
   parseIgLabel,
   resolveReferenceGa,
   ivcCollapsibilityIndex,
+  imtClassification,
   DatingMethod,
 } from '../../calculators/formulas';
 import {
@@ -274,6 +275,33 @@ export function computeDerivations(
     }
   }
 
+  // ── Carótidas: EMI (espessura médio-intimal) máxima classificada por ELSA-Brasil ──
+  // Chip inline consistente com os demais cálculos: usa o maior valor entre D/E.
+  // Com idade+sexo → percentil ELSA (imtClassification); sem eles → referência absoluta.
+  {
+    const emiD = num(v['emi_d']);
+    const emiE = num(v['emi_e']);
+    if (emiD != null || emiE != null) {
+      const emiMax = Math.max(emiD ?? 0, emiE ?? 0);
+      const age = num(v['emi_idade']);
+      const sexoTxt = fieldValueToText(v['emi_sexo']).toLowerCase();
+      const sex: 'male' | 'female' | null = /femin/.test(sexoTxt) ? 'female' : /mascul/.test(sexoTxt) ? 'male' : null;
+      const cls = age != null && sex ? imtClassification(age, sex, emiMax) : null;
+      let text: string;
+      let alert: boolean;
+      if (cls) {
+        text = `${fmt(emiMax)} mm (máx) — ${cls}`;
+        alert = /acentuado|elevado|> p90/i.test(cls);
+      } else {
+        // sem idade/sexo: limiar absoluto (< 0,9 normal · 0,9–1,2 espessado · > 1,2 placa)
+        const abs = emiMax > 1.2 ? 'placa (> 1,2 mm)' : emiMax >= 0.9 ? 'espessado (0,9–1,2 mm)' : 'normal (< 0,9 mm)';
+        text = `${fmt(emiMax)} mm (máx) — ${abs} · informe idade/sexo p/ percentil ELSA`;
+        alert = emiMax > 1.2;
+      }
+      out.push({ id: 'emi__class', sectionId: secOf('emi_d', 'emi'), label: 'EMI (ELSA-Brasil)', text, alert });
+    }
+  }
+
   // ── ITB: interpretação por lado ──
   for (const side of ['d', 'e'] as const) {
     const itb = num(v[`itb_${side}`]);
@@ -524,13 +552,16 @@ export function computeDerivations(
   const coledoco = num(v['coledoco']);
   if (coledoco != null) {
     const idoso = ctx?.ageYears != null && ctx.ageYears > 70;
-    const limiar = idoso ? 8 : 6;
+    // Pós-colecistectomia dilata o colédoco fisiologicamente (limiar sobe p/ ≤ 10 mm).
+    const colec = /colecistectomiz/i.test(fieldValueToText(v['vesicula_achados']));
+    const limiar = colec ? 10 : idoso ? 8 : 6;
+    const contexto = colec ? ' · pós-colecistectomia' : idoso ? ' · > 70 anos' : '';
     const dil = coledoco > limiar;
     out.push({
       id: 'coledoco__cal',
       sectionId: secOf('coledoco', 'vias-biliares'),
       label: 'Colédoco',
-      text: `${fmt(coledoco, 1)} mm${dil ? ` — dilatado (> ${limiar}${idoso ? ' · > 70 anos' : ''})` : ''}`,
+      text: `${fmt(coledoco, 1)} mm${dil ? ` — dilatado (> ${limiar}${contexto})` : ''}`,
       alert: dil,
     });
   }
@@ -545,7 +576,9 @@ export function computeDerivations(
   // ── Aorta abdominal: ectasia (2,5–2,9 cm) / aneurisma (≥ 3,0 cm) ──
   const aorta = num(v['aorta']);
   if (aorta != null && aorta > 0) {
-    const cls = aorta >= 3.0 ? ' — aneurisma (≥ 3,0)' : aorta >= 2.5 ? ' — ectasia (2,5–2,9)' : '';
+    const cls = aorta >= 5.5 ? ' — aneurisma volumoso (≥ 5,5) — avaliação vascular urgente (R6)'
+      : aorta >= 3.0 ? ' — aneurisma (≥ 3,0)'
+      : aorta >= 2.5 ? ' — ectasia (2,5–2,9)' : '';
     out.push({ id: 'aorta__cal', sectionId: secOf('aorta', 'aorta'), label: 'Aorta', text: `${fmt(aorta, 1)} cm${cls}`, alert: aorta >= 3.0 });
   }
 
