@@ -9,8 +9,9 @@ import { StandardSchemaDef } from './types';
  * MUSA (adenomiose), IETA (endométrio), FIGO (miomas) e IDEA (endometriose).
  *
  * - ids CANÔNICOS do liveCompute: `endometrio_esp` + `menopausa` (limiar
- *   pós-menopausa > 4 mm), `ovd_dims`/`ovd_afc` e `ove_dims`/`ove_afc` (SOP:
- *   CFA ≥ 20 ou volume > 10 cm³), `utero_dims` (volume por elipsoide).
+ *   pós-menopausa sem TH > 5 mm · TH cíclica > 8 · TH contínua > 6),
+ *   `ovd_dims`/`ovd_afc` e `ove_dims`/`ove_afc` (SOP: CFA ≥ 20 ou volume
+ *   > 10 cm³), `utero_dims` (volume por elipsoide).
  * - Biometria de rotina fica no card 'Normal' (`alwaysShow`) — volume uterino,
  *   espessura endometrial, volume ovariano/CFA seguem sendo medidos e calculados.
  * - Lesões (miomas FIGO, formações O-RADS, pólipos, endometriomas, focos de DIE)
@@ -138,7 +139,7 @@ const OVARIO = (side: 'direito' | 'esquerdo'): StructuredSection => {
     fields: [
       // ids canônicos: volume + CFA alimentam a morfologia de SOP no liveCompute
       { id: `ov${s}_dims`, label: 'Dimensões', kind: 'triplet', unit: 'cm', calcId: 'volume-elipsoide', normal: '< 10 cm³', alwaysShow: true, hint: 'volume ovariano por elipsoide' },
-      { id: `ov${s}_afc`, label: 'Folículos antrais (CFA)', kind: 'measure', normal: '< 12 por ovário', alwaysShow: true, hint: 'SOP se ≥ 20 ou volume > 10 cm³ (auto)' },
+      { id: `ov${s}_afc`, label: 'Folículos antrais (CFA)', kind: 'measure', normal: '< 20 por ovário (Diretriz 2023)', alwaysShow: true, hint: 'SOP se ≥ 20 ou volume > 10 cm³ (auto)' },
       { id: `ov${s}_desc`, label: 'Achados', kind: 'text', fullWidth: true, placeholder: 'folículo dominante, corpo lúteo, mobilidade' },
     ],
   };
