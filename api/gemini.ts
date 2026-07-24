@@ -2,9 +2,12 @@ import { verifyAuthEdge } from './_edgeAuth.js';
 import { evaluateReportQuota } from './_quota.js';
 import { checkRateLimit } from './_rateLimit.js';
 
-export const config = {
-  runtime: 'edge',
-};
+// Runtime Node (Fluid Compute) — NÃO declarar `runtime: 'edge'`. O Edge runtime
+// foi descontinuado pela Vercel e ignorava o maxDuration do vercel.json, o que
+// causava FUNCTION_INVOCATION_TIMEOUT (504) em gerações longas do Motor Pro.
+// No Node, o maxDuration de 300s (vercel.json) vale para a invocação inteira.
+// O handler permanece no formato web-standard (Request → Response), suportado
+// pelo runtime Node com streaming.
 
 const RATE_LIMIT = 20;
 const RATE_WINDOW_MS = 60_000;
@@ -58,7 +61,7 @@ async function checkReportQuota(uid: string, idToken: string): Promise<{ allowed
 // Marcador de versão do proxy — permite confirmar qual build está no ar.
 // Acesse /api/gemini?ping=1 no navegador: se aparecer "embed" e
 // "embed-batch" em features, o suporte a embeddings está publicado.
-const PROXY_VERSION = 'v2-embeddings-2026-06';
+const PROXY_VERSION = 'v3-node-300s-2026-07';
 
 export default async function handler(req: Request) {
   if (req.method === 'OPTIONS') {

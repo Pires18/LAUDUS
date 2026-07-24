@@ -57,6 +57,17 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it('re-tenta 504 (timeout) no máximo 1 vez — cada tentativa custa ~60s e uma geração cobrada', async () => {
+    const fn = vi.fn(async () => new Response('FUNCTION_INVOCATION_TIMEOUT', { status: 504 }));
+
+    const promise = withRetry(fn, 3);
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    expect(fn).toHaveBeenCalledTimes(2); // 1 tentativa + 1 retry (não 4)
+    expect((result as Response).status).toBe(504);
+  });
+
   it('não re-tenta AbortError', async () => {
     const abortErr = new Error('The user aborted a request.');
     abortErr.name = 'AbortError';
@@ -78,6 +89,12 @@ describe('geminiHttpError', () => {
     const err = geminiHttpError(429, 'rate limit');
     expect(err.message).toContain('429');
     expect(err.message).toContain('Limite de requisições');
+  });
+
+  it('traduz timeout 504 da Vercel (FUNCTION_INVOCATION_TIMEOUT) em mensagem acionável', () => {
+    const err = geminiHttpError(504, 'An error occurred with your deployment\n\nFUNCTION_INVOCATION_TIMEOUT\n\ngru1::abc-123');
+    expect(err.message).toContain('timeout 504');
+    expect(err.message).not.toContain('FUNCTION_INVOCATION_TIMEOUT');
   });
 
   it('mantém o formato original para outros status', () => {
